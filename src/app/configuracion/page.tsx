@@ -1,17 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { fetchConfiguracion } from "@/lib/queries";
-import { guardarConfiguracion } from "@/lib/mutations";
-import { useData } from "@/lib/useData";
+import { useConfig } from "@/lib/configStore";
 import { probarConexion } from "@/lib/plan";
 
 export default function ConfiguracionPage() {
-  const { data, loading, reload, setData } = useData(fetchConfiguracion, {
-    base_url: "https://api.minimax.io/v1",
-    minimax_api_key: null as string | null,
-    model: "Minimax-M3",
-  });
+  const { data, loading, save } = useConfig();
 
   const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState("https://api.minimax.io/v1");
@@ -34,11 +28,7 @@ export default function ConfiguracionPage() {
       model: model.trim() || "Minimax-M3",
     };
     try {
-      await guardarConfiguracion(saved);
-      // Actualiza el estado local inmediatamente para que "Probar conexión"
-      // funcione sin esperar al refetch (y sin riesgo de que el refetch
-      // sobreescriba el valor por una inconsistencia de lectura).
-      setData(saved);
+      await save(saved);
       setMensaje("Configuración guardada. El campo de la key se vacía por seguridad.");
       setApiKey("");
     } catch (e) {

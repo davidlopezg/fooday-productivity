@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { fetchConfiguracion, fetchTareas } from "@/lib/queries";
+import { fetchTareas } from "@/lib/queries";
 import { guardarPlanDiario } from "@/lib/mutations";
 import { useData } from "@/lib/useData";
+import { useConfig } from "@/lib/configStore";
 import { generarPlan, type EstadoEmocional, type PlanGenerado } from "@/lib/plan";
 import type { Tarea } from "@/lib/types";
 
@@ -14,11 +15,7 @@ const RUEDA = ["No, estoy presente", "Un poco", "Sí, todo me arrastra", "Totalm
 const NECESIDAD = ["Calma", "Claridad", "Contención", "Esperanza", "Nada"];
 
 export default function PlanDiarioPage() {
-  const config = useData(fetchConfiguracion, {
-    base_url: "https://api.minimax.io/v1",
-    minimax_api_key: null as string | null,
-    model: "Minimax-M3",
-  });
+  const config = useConfig();
   const tareasQ = useData<Tarea[]>(() => fetchTareas("pendiente"), []);
 
   const [estado, setEstado] = useState<EstadoEmocional>({

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Sidebar } from "@/components/Sidebar";
+import { ConfigProvider } from "@/lib/configStore";
 
 /**
  * Shell de la SPA: comprueba sesión (cliente) y muestra el sidebar.
@@ -45,13 +46,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen">
-      <Sidebar />
-      <main className="min-w-0 flex-1">
-        <div className="mx-auto w-full max-w-6xl px-4 py-6 md:px-8 md:py-10">
-          {children}
-        </div>
-      </main>
-    </div>
+    <ConfigProvider>
+      <div className="flex min-h-screen">
+        <Sidebar />
+        <main className="min-w-0 flex-1">
+          <div className="mx-auto w-full max-w-6xl px-4 py-6 md:px-8 md:py-10">
+            {children}
+          </div>
+        </main>
+      </div>
+    </ConfigProvider>
   );
 }
