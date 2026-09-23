@@ -15,8 +15,9 @@ const NECESIDAD = ["Calma", "Claridad", "Contención", "Esperanza", "Nada"];
 
 export default function PlanDiarioPage() {
   const config = useData(fetchConfiguracion, {
+    base_url: "https://api.minimax.io/v1",
     minimax_api_key: null as string | null,
-    model: "MiniMax-Text-01",
+    model: "Minimax-M3",
   });
   const tareasQ = useData<Tarea[]>(() => fetchTareas("pendiente"), []);
 
@@ -40,6 +41,7 @@ export default function PlanDiarioPage() {
     setError(null);
     try {
       const p = await generarPlan(
+        config.data.base_url,
         config.data.minimax_api_key,
         config.data.model,
         estado,

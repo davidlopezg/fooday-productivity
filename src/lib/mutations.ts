@@ -77,6 +77,7 @@ export async function crearCaptura(texto: string) {
 }
 
 export async function guardarConfiguracion(datos: {
+  base_url?: string;
   minimax_api_key: string | null;
   model: string;
 }) {
@@ -88,8 +89,9 @@ export async function guardarConfiguracion(datos: {
   await supabase.from("configuracion").upsert(
     {
       user_id: user.id,
+      base_url: datos.base_url || "https://api.minimax.io/v1",
       minimax_api_key: datos.minimax_api_key,
-      model: datos.model || "MiniMax-Text-01",
+      model: datos.model || "Minimax-M3",
     },
     { onConflict: "user_id" },
   );

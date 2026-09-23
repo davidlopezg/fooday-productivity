@@ -8,12 +8,14 @@ import { probarConexion } from "@/lib/plan";
 
 export default function ConfiguracionPage() {
   const { data, loading, reload } = useData(fetchConfiguracion, {
+    base_url: "https://api.minimax.io/v1",
     minimax_api_key: null as string | null,
-    model: "MiniMax-Text-01",
+    model: "Minimax-M3",
   });
 
   const [apiKey, setApiKey] = useState("");
-  const [model, setModel] = useState("MiniMax-Text-01");
+  const [baseUrl, setBaseUrl] = useState("https://api.minimax.io/v1");
+  const [model, setModel] = useState("Minimax-M3");
   const [mostrar, setMostrar] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [probando, setProbando] = useState(false);
@@ -28,8 +30,9 @@ export default function ConfiguracionPage() {
     setMensaje(null);
     try {
       await guardarConfiguracion({
+        base_url: baseUrl.trim() || data.base_url,
         minimax_api_key: apiKey.trim() || data.minimax_api_key,
-        model: model.trim() || "MiniMax-Text-01",
+        model: model.trim() || "Minimax-M3",
       });
       setMensaje("Configuración guardada.");
       setApiKey("");
@@ -43,6 +46,7 @@ export default function ConfiguracionPage() {
 
   async function probar() {
     const key = apiKey.trim() || data.minimax_api_key;
+    const url = baseUrl.trim() || data.base_url;
     if (!key) {
       setError("Introduce o guarda primero una API key.");
       return;
@@ -51,8 +55,8 @@ export default function ConfiguracionPage() {
     setError(null);
     setMensaje(null);
     try {
-      await probarConexion(key, model || "MiniMax-Text-01");
-      setMensaje("Conexión con MiniMax OK ✅");
+      await probarConexion(url, key, model || "Minimax-M3");
+      setMensaje("Conexión OK ✅");
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -106,15 +110,28 @@ export default function ConfiguracionPage() {
         </div>
 
         <div>
+          <span className="text-sm font-medium">Base URL</span>
+          <input
+            value={baseUrl}
+            onChange={(e) => setBaseUrl(e.target.value)}
+            className={`${field} mt-2`}
+            placeholder="https://api.minimax.io/v1"
+          />
+          <p className="mt-2 text-xs text-muted-foreground">
+            Por defecto <code>https://api.minimax.io/v1</code>. Cámbialo si usas otro proveedor o endpoint.
+          </p>
+        </div>
+
+        <div>
           <span className="text-sm font-medium">Modelo</span>
           <input
             value={model}
             onChange={(e) => setModel(e.target.value)}
             className={`${field} mt-2`}
-            placeholder="MiniMax-Text-01"
+            placeholder="Minimax-M3"
           />
           <p className="mt-2 text-xs text-muted-foreground">
-            Por defecto <code>MiniMax-Text-01</code>. Cámbialo si usas otro.
+            Por defecto <code>Minimax-M3</code>. Cámbialo si usas otro.
           </p>
         </div>
 

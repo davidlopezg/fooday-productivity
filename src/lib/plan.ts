@@ -1,5 +1,5 @@
-// Generación del plan diario con MiniMax (llamada directa desde el navegador).
-// La API key se lee de la configuración del usuario en Supabase.
+// Generación del plan diario con el proveedor configurado por el usuario
+// (por defecto MiniMax). Llamada directa desde el navegador.
 
 import type { Tarea } from "@/lib/types";
 
@@ -23,7 +23,9 @@ export type PlanGenerado = {
   tareas: TareaPlan[];
 };
 
-const ENDPOINT = "https://api.minimax.chat/v1/chat/completions";
+function endpoint(baseUrl: string): string {
+  return `${baseUrl.replace(/\/+$/, "")}/chat/completions`;
+}
 
 function buildPrompt(estado: EstadoEmocional, tareas: Tarea[]): string {
   const lista = tareas
@@ -72,6 +74,7 @@ NO añadas "Sure", "Here is", ni markdown. SOLO el JSON.`;
 }
 
 export async function generarPlan(
+  baseUrl: string,
   apiKey: string,
   model: string,
   estado: EstadoEmocional,
@@ -79,14 +82,14 @@ export async function generarPlan(
 ): Promise<PlanGenerado> {
   const prompt = buildPrompt(estado, tareas);
 
-  const res = await fetch(ENDPOINT, {
+  const res = await fetch(endpoint(baseUrl), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: model || "MiniMax-Text-01",
+      model: model || "Minimax-M3",
       messages: [
         { role: "system", content: "Eres un asistente que responde SOLO con JSON válido." },
         { role: "user", content: prompt },
@@ -98,7 +101,7 @@ export async function generarPlan(
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`MiniMax ${res.status}: ${text.slice(0, 200)}`);
+    throw new Error(`API ${res.status}: ${text.slice(0, 200)}`);
   }
 
   const data = await res.json();
@@ -108,17 +111,15 @@ export async function generarPlan(
   try {
     parsed = JSON.parse(content);
   } catch {
-    // Fallback: extraer el primer {...}
     const match = content.match(/\{[\s\S]*\}/);
     if (!match) throw new Error("La IA no devolvió JSON válido.");
     parsed = JSON.parse(match[0]);
   }
 
-  // Saneamiento mínimo
   const semaforo = (["verde", "amarillo", "rojo"] as const).includes(parsed.semaforo)
     ? parsed.semaforo
     : "amarillo";
-  const tareas_limpias: TareaPlan[] = Array.isArray(parsed.tareas)
+  const tareasLimpias: TareaPlan[] = Array.isArray(parsed.tareas)
     ? parsed.tareas.slice(0, 4).map((t) => ({
         tipo: (["imprescindible", "autocuidado", "micro", "extra"] as const).includes(t.tipo)
           ? t.tipo
@@ -131,19 +132,23 @@ export async function generarPlan(
     semaforo,
     resumen: String(parsed.resumen ?? "").slice(0, 800),
     recomendacion: String(parsed.recomendacion ?? "").slice(0, 800),
-    tareas: tareas_limpias,
+    tareas: tareasLimpias,
   };
 }
 
-export async function probarConexion(apiKey: string, model: string): Promise<void> {
-  const res = await fetch(ENDPOINT, {
+export async function probarConexion(
+  baseUrl: string,
+  apiKey: string,
+  model: string,
+): Promise<void> {
+  const res = await fetch(endpoint(baseUrl), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: model || "MiniMax-Text-01",
+      model: model || "Minimax-M3",
       messages: [{ role: "user", content: "Responde SOLO con el JSON: {\"ok\":true}" }],
       temperature: 0,
       response_format: { type: "json_object" },
@@ -151,6 +156,6 @@ export async function probarConexion(apiKey: string, model: string): Promise<voi
   });
   if (!res.ok) {
     const t = await res.text().catch(() => "");
-    throw new Error(`MiniMax ${res.status}: ${t.slice(0, 160)}`);
+    throw new Error(`API ${res.status}: ${t.slice(0, 160)}`);
   }
 }

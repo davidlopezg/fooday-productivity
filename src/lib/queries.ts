@@ -66,16 +66,18 @@ export async function fetchCapturasPendientes(): Promise<Captura[]> {
 }
 
 export async function fetchConfiguracion(): Promise<{
+  base_url: string;
   minimax_api_key: string | null;
   model: string;
 }> {
   const { data } = await createClient()
     .from("configuracion")
-    .select("minimax_api_key,model")
+    .select("base_url,minimax_api_key,model")
     .maybeSingle();
   return {
+    base_url: (data?.base_url as string) ?? "https://api.minimax.io/v1",
     minimax_api_key: (data?.minimax_api_key as string | null) ?? null,
-    model: (data?.model as string) ?? "MiniMax-Text-01",
+    model: (data?.model as string) ?? "Minimax-M3",
   };
 }
 
