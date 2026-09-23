@@ -10,6 +10,8 @@ import {
   IconInbox,
   IconList,
   IconMenu,
+  IconSettings,
+  IconSparkles,
   IconTarget,
   IconX,
 } from "@/components/icons";
@@ -19,9 +21,11 @@ const LINKS = [
   { href: "/", label: "Hoy", Icon: IconHome },
   { href: "/captura", label: "Captura", Icon: IconInbox },
   { href: "/tareas", label: "Tareas", Icon: IconList },
+  { href: "/plan-diario", label: "Plan diario", Icon: IconSparkles },
   { href: "/semana", label: "Semana", Icon: IconCalendar },
   { href: "/metas", label: "Metas", Icon: IconTarget },
   { href: "/norte", label: "Norte", Icon: IconCompass },
+  { href: "/configuracion", label: "Configuración", Icon: IconSettings },
 ];
 
 function NavItems({ onNavigate }: { onNavigate?: () => void }) {

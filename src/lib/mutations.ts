@@ -75,3 +75,71 @@ export async function crearCaptura(texto: string) {
   if (!t) return;
   await createClient().from("capturas").insert({ texto: t, estado: "pendiente" });
 }
+
+export async function guardarConfiguracion(datos: {
+  minimax_api_key: string | null;
+  model: string;
+}) {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("No autenticado");
+  await supabase.from("configuracion").upsert(
+    {
+      user_id: user.id,
+      minimax_api_key: datos.minimax_api_key,
+      model: datos.model || "MiniMax-Text-01",
+    },
+    { onConflict: "user_id" },
+  );
+}
+
+export async function guardarPlanDiario(payload: {
+  fecha: string;
+  semaforo: string;
+  despertar: string;
+  mente: string;
+  cuerpo: string;
+  rueda: string;
+  necesidad: string;
+  resumen: string;
+  recomendacion: string;
+  tareas: { tipo: "imprescindible" | "autocuidado" | "micro" | "extra"; titulo_libre: string }[];
+}) {
+  const supabase = createClient();
+  const { data: plan, error } = await supabase
+    .from("planes_diarios")
+    .upsert(
+      {
+        owner_id: (await supabase.auth.getUser()).data.user?.id ?? null,
+        fecha: payload.fecha,
+        semaforo: payload.semaforo,
+        despertar: payload.despertar,
+        mente: payload.mente,
+        cuerpo: payload.cuerpo,
+        rueda: payload.rueda,
+        necesidad: payload.necesidad,
+        resumen: payload.resumen,
+        recomendacion: payload.recomendacion,
+      },
+      { onConflict: "owner_id,fecha" },
+    )
+    .select("id")
+    .single();
+  if (error || !plan) throw error ?? new Error("No se pudo guardar el plan");
+  // Borra tareas previas de ese plan y reinserta
+  await supabase.from("plan_diario_tareas").delete().eq("plan_diario_id", plan.id);
+  if (payload.tareas.length > 0) {
+    await supabase.from("plan_diario_tareas").insert(
+      payload.tareas.map((t, i) => ({
+        plan_diario_id: plan.id,
+        tipo: t.tipo,
+        titulo_libre: t.titulo_libre,
+        orden: i,
+        hecho: false,
+      })),
+    );
+  }
+  return plan.id;
+}

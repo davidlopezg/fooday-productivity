@@ -65,6 +65,20 @@ export async function fetchCapturasPendientes(): Promise<Captura[]> {
   return (data ?? []) as Captura[];
 }
 
+export async function fetchConfiguracion(): Promise<{
+  minimax_api_key: string | null;
+  model: string;
+}> {
+  const { data } = await createClient()
+    .from("configuracion")
+    .select("minimax_api_key,model")
+    .maybeSingle();
+  return {
+    minimax_api_key: (data?.minimax_api_key as string | null) ?? null,
+    model: (data?.model as string) ?? "MiniMax-Text-01",
+  };
+}
+
 export async function fetchNorte() {
   const supabase = createClient();
   const [p, v, vi] = await Promise.all([
