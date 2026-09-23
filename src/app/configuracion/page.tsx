@@ -7,7 +7,7 @@ import { useData } from "@/lib/useData";
 import { probarConexion } from "@/lib/plan";
 
 export default function ConfiguracionPage() {
-  const { data, loading, reload } = useData(fetchConfiguracion, {
+  const { data, loading, reload, setData } = useData(fetchConfiguracion, {
     base_url: "https://api.minimax.io/v1",
     minimax_api_key: null as string | null,
     model: "Minimax-M3",
@@ -28,12 +28,16 @@ export default function ConfiguracionPage() {
     setGuardando(true);
     setError(null);
     setMensaje(null);
+    const saved = {
+      base_url: baseUrl.trim() || data.base_url,
+      minimax_api_key: apiKey.trim() || data.minimax_api_key,
+      model: model.trim() || "Minimax-M3",
+    };
     try {
-      await guardarConfiguracion({
-        base_url: baseUrl.trim() || data.base_url,
-        minimax_api_key: apiKey.trim() || data.minimax_api_key,
-        model: model.trim() || "Minimax-M3",
-      });
+      await guardarConfiguracion(saved);
+      // Actualiza el estado local inmediatamente para que "Probar conexión"
+      // funcione sin esperar al refetch.
+      setData(saved);
       setMensaje("Configuración guardada.");
       setApiKey("");
       reload();
