@@ -36,11 +36,11 @@ export default function ConfiguracionPage() {
     try {
       await guardarConfiguracion(saved);
       // Actualiza el estado local inmediatamente para que "Probar conexión"
-      // funcione sin esperar al refetch.
+      // funcione sin esperar al refetch (y sin riesgo de que el refetch
+      // sobreescriba el valor por una inconsistencia de lectura).
       setData(saved);
-      setMensaje("Configuración guardada.");
+      setMensaje("Configuración guardada. El campo de la key se vacía por seguridad.");
       setApiKey("");
-      reload();
     } catch (e) {
       setError((e as Error).message);
     } finally {
