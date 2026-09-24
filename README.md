@@ -78,6 +78,7 @@ npm run dev
 - [`docs/MIGRACION.md`](docs/MIGRACION.md) — ETL desde `fooday-intelligence-core`
 - [`docs/CONFIGURACION.md`](docs/CONFIGURACION.md) — Supabase paso a paso
 - [`docs/DESPLIEGUE.md`](docs/DESPLIEGUE.md) — publicar en GitHub Pages + app móvil (PWA)
+- [`docs/CAPACITOR.md`](docs/CAPACITOR.md) — APK / IPA nativos con Capacitor
 
 ---
 
@@ -98,5 +99,11 @@ npm run dev
 
 ## 📱 Móvil
 
-La app es **PWA instalable** (manifest + icono). Se despliega como SPA estática
-en **GitHub Pages**. Ver [`docs/DESPLIEGUE.md`](docs/DESPLIEGUE.md).
+La app es **PWA instalable** (manifest + icono) y además se puede compilar
+como **app nativa Android / iOS con Capacitor**:
+
+- **PWA rápida** → desplegar en GitHub Pages, abrir en el móvil y
+  "Añadir a pantalla de inicio". Cero fricción.
+- **APK / iOS nativo** → `npm run cap:build:android` (o `:ios`) genera
+  el proyecto nativo listo para Android Studio / Xcode.
+  Ver [`docs/CAPACITOR.md`](docs/CAPACITOR.md).
