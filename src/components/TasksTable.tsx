@@ -1,12 +1,13 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import type { Tarea } from "@/lib/types";
+import type { Tarea, Subtarea } from "@/lib/types";
 import {
   actualizarTarea,
   archivarTarea,
   crearTarea,
   desarchivarTarea,
+  desgranarTarea,
   eliminarTarea,
   marcarHecha,
   reabrirTarea,
@@ -16,9 +17,12 @@ import {
   IconCheck,
   IconPencil,
   IconSearch,
+  IconSparkles,
   IconTrash,
   IconX,
 } from "@/components/icons";
+import { useConfig } from "@/lib/configStore";
+import { createClient } from "@/lib/supabase/client";
 
 const PRIORIDADES = ["critica", "urgente", "alta", "media", "baja"];
 const ESTADOS = ["pendiente", "en_progreso", "bloqueada", "hecha", "archivada"];
@@ -289,6 +293,7 @@ function EditarModal({
   onClose: () => void;
   onChanged: () => void;
 }) {
+  const { data: cfg } = useConfig();
   const [form, setForm] = useState<{
     titulo: string;
     descripcion: string;
@@ -308,10 +313,46 @@ function EditarModal({
     pts: tarea.pts != null ? String(tarea.pts) : "",
     esfuerzo: tarea.esfuerzo ?? "",
   });
+  const [subtareas, setSubtareas] = useState<Subtarea[]>(
+    Array.isArray(tarea.subtareas) ? tarea.subtareas : [],
+  );
+  const [desgranando, setDesgranando] = useState(false);
+  const [iaError, setIaError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  async function desgranar() {
+    setIaError(null);
+    setDesgranando(true);
+    try {
+      const nuevas = await desgranarTarea(tarea.id, cfg);
+      setSubtareas(nuevas);
+      // No cerramos el modal: el usuario revisará y guardará (o no)
+    } catch (e) {
+      setIaError((e as Error).message);
+    } finally {
+      setDesgranando(false);
+    }
+  }
+
+  function limpiarSubtareas() {
+    if (subtareas.length === 0) return;
+    if (!confirm("¿Vaciar la lista de subtareas?")) return;
+    setSubtareas([]);
+  }
+
+  function moverSubtarea(idx: number, dir: -1 | 1) {
+    setSubtareas((arr) => {
+      const next = arr.slice();
+      const j = idx + dir;
+      if (j < 0 || j >= next.length) return next;
+      [next[idx], next[j]] = [next[j], next[idx]];
+      return next;
+    });
+  }
 
   function guardar() {
     startTransition(async () => {
+      // 1) Guarda los campos del formulario
       await actualizarTarea({
         id: tarea.id,
         titulo: form.titulo,
@@ -323,6 +364,18 @@ function EditarModal({
         pts: form.pts ? Number(form.pts) : null,
         esfuerzo: form.esfuerzo || null,
       });
+      // 2) Guarda las subtareas (pueden venir de la IA o editadas a mano)
+      const limpias = subtareas
+        .map((s) => ({
+          descripcion: s.descripcion.trim(),
+          tiempo_estimado_min:
+            s.tiempo_estimado_min && s.tiempo_estimado_min > 0
+              ? Math.min(5, Math.round(s.tiempo_estimado_min))
+              : null,
+          hecho: !!s.hecho,
+        }))
+        .filter((s) => s.descripcion.length > 0);
+      await createClient().from("tareas").update({ subtareas: limpias.length > 0 ? limpias : null }).eq("id", tarea.id);
       onChanged();
       onClose();
     });
@@ -333,15 +386,15 @@ function EditarModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative w-full max-w-lg rounded-xl border border-border bg-card p-5 shadow-lg">
-        <div className="mb-4 flex items-center justify-between">
+      <div className="relative flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col rounded-xl border border-border bg-card shadow-lg">
+        <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-4">
           <h2 className="font-semibold">Editar tarea</h2>
           <button onClick={onClose} className="rounded-md p-1.5 hover:bg-accent" aria-label="Cerrar">
             <IconX className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="space-y-3">
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
           <label className="block">
             <span className="mb-1 block text-xs text-muted-foreground">Título</span>
             <input className={field} value={form.titulo} onChange={(e) => setForm({ ...form, titulo: e.target.value })} />
@@ -384,9 +437,21 @@ function EditarModal({
               <input className={field} value={form.esfuerzo} onChange={(e) => setForm({ ...form, esfuerzo: e.target.value })} />
             </label>
           </div>
+
+          {/* Subtareas (desglose al máximo) */}
+          <SubtareasEditor
+            subtareas={subtareas}
+            onChange={setSubtareas}
+            desgranando={desgranando}
+            iaError={iaError}
+            onDesgranar={desgranar}
+            onLimpiar={limpiarSubtareas}
+            onMover={moverSubtarea}
+            tieneKey={!!cfg.minimax_api_key}
+          />
         </div>
 
-        <div className="mt-5 flex justify-end gap-2">
+        <div className="flex shrink-0 justify-end gap-2 border-t border-border px-5 py-4">
           <button onClick={onClose} className="rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-accent">
             Cancelar
           </button>
@@ -446,15 +511,15 @@ function CrearModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative w-full max-w-lg rounded-xl border border-border bg-card p-5 shadow-lg">
-        <div className="mb-4 flex items-center justify-between">
+      <div className="relative flex max-h-[calc(100vh-2rem)] w-full max-w-lg flex-col rounded-xl border border-border bg-card shadow-lg">
+        <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-4">
           <h2 className="font-semibold">Nueva tarea</h2>
           <button onClick={onClose} className="rounded-md p-1.5 hover:bg-accent" aria-label="Cerrar">
             <IconX className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="space-y-3">
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
           <label className="block">
             <span className="mb-1 block text-xs text-muted-foreground">Título *</span>
             <input
@@ -509,7 +574,7 @@ function CrearModal({
           </div>
         </div>
 
-        <div className="mt-5 flex justify-end gap-2">
+        <div className="flex shrink-0 justify-end gap-2 border-t border-border px-5 py-4">
           <button onClick={onClose} className="rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-accent">
             Cancelar
           </button>
@@ -523,5 +588,198 @@ function CrearModal({
         </div>
       </div>
     </div>
+  );
+}
+
+// ============================================================================
+// Editor de subtareas (desglose al máximo)
+// ============================================================================
+
+function SubtareasEditor({
+  subtareas,
+  onChange,
+  desgranando,
+  iaError,
+  onDesgranar,
+  onLimpiar,
+  onMover,
+  tieneKey,
+}: {
+  subtareas: Subtarea[];
+  onChange: (next: Subtarea[]) => void;
+  desgranando: boolean;
+  iaError: string | null;
+  onDesgranar: () => void;
+  onLimpiar: () => void;
+  onMover: (idx: number, dir: -1 | 1) => void;
+  tieneKey: boolean;
+}) {
+  function actualizar(idx: number, patch: Partial<Subtarea>) {
+    onChange(subtareas.map((s, i) => (i === idx ? { ...s, ...patch } : s)));
+  }
+  function eliminar(idx: number) {
+    onChange(subtareas.filter((_, i) => i !== idx));
+  }
+  function anadir() {
+    onChange([
+      ...subtareas,
+      { descripcion: "", tiempo_estimado_min: 5, hecho: false },
+    ]);
+  }
+
+  const hechas = subtareas.filter((s) => s.hecho).length;
+  const total = subtareas.length;
+  const pct = total > 0 ? Math.round((hechas / total) * 100) : 0;
+
+  return (
+    <section className="rounded-lg border border-border bg-muted/30 p-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Subtareas (desglose)
+            </span>
+            {total > 0 && (
+              <span className="rounded-full border border-border bg-background px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                {hechas}/{total} · {pct}%
+              </span>
+            )}
+          </div>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            Micro-pasos accionables (≤5 min, primera persona, imperativo).
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          {total > 0 && (
+            <button
+              type="button"
+              onClick={onLimpiar}
+              className="rounded-md border border-border px-2 py-1 text-[11px] font-medium hover:bg-accent"
+              title="Vaciar la lista"
+            >
+              Limpiar
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onDesgranar}
+            disabled={desgranando}
+            className="inline-flex items-center gap-1.5 rounded-md bg-gradient-to-r from-violet-600 to-indigo-600 px-2.5 py-1 text-[11px] font-medium text-white shadow-sm hover:opacity-90 disabled:opacity-50"
+            title={tieneKey ? "Descomponer la tarea en micro-pazos con IA" : "Configura primero la API key"}
+          >
+            <IconSparkles className="h-3.5 w-3.5" />
+            {desgranando ? "Desgranando…" : total > 0 ? "Regenerar" : "Desgranar al máximo posible"}
+          </button>
+        </div>
+      </div>
+
+      {!tieneKey && (
+        <p className="mb-2 rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-700 dark:text-amber-400">
+          No hay API key de MiniMax configurada. Ve a{" "}
+          <a href="/configuracion" className="underline">
+            Configuración
+          </a>{" "}
+          para añadir una. Puedes seguir editando las subtareas a mano.
+        </p>
+      )}
+      {iaError && (
+        <p className="mb-2 rounded-md border border-red-500/20 bg-red-500/10 px-2 py-1.5 text-[11px] text-red-600 dark:text-red-400">
+          {iaError}
+        </p>
+      )}
+
+      {total > 0 && (
+        <div className="mb-2 h-1.5 w-full overflow-hidden rounded-full bg-border">
+          <div
+            className="h-full bg-emerald-500 transition-all"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      )}
+
+      <ul className="space-y-1.5">
+        {subtareas.map((s, idx) => (
+          <li
+            key={idx}
+            className="flex items-start gap-2 rounded-md border border-border bg-background px-2 py-1.5"
+          >
+            <input
+              type="checkbox"
+              checked={!!s.hecho}
+              onChange={(e) => actualizar(idx, { hecho: e.target.checked })}
+              className="mt-1.5 h-4 w-4 shrink-0 cursor-pointer accent-emerald-500"
+              aria-label="Marcar como hecha"
+            />
+            <input
+              type="text"
+              value={s.descripcion}
+              onChange={(e) => actualizar(idx, { descripcion: e.target.value })}
+              placeholder="Micro-paso (verbo + objeto concreto)…"
+              className={`min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-0.5 text-sm outline-none focus:border-input focus:bg-background ${
+                s.hecho ? "text-muted-foreground line-through" : ""
+              }`}
+            />
+            <div className="flex shrink-0 items-center gap-1">
+              <input
+                type="number"
+                min={1}
+                max={5}
+                step={1}
+                value={s.tiempo_estimado_min ?? ""}
+                onChange={(e) =>
+                  actualizar(idx, {
+                    tiempo_estimado_min:
+                      e.target.value === "" ? null : Math.max(1, Math.min(5, Number(e.target.value))),
+                  })
+                }
+                className="w-12 rounded border border-input bg-background px-1 py-0.5 text-center text-xs outline-none focus:ring-1 focus:ring-ring"
+                title="Minutos estimados (1–5)"
+                aria-label="Minutos estimados"
+              />
+              <span className="text-[10px] text-muted-foreground">min</span>
+              <div className="flex flex-col">
+                <button
+                  type="button"
+                  onClick={() => onMover(idx, -1)}
+                  disabled={idx === 0}
+                  className="rounded px-1 text-xs text-muted-foreground hover:bg-accent disabled:opacity-30"
+                  title="Subir"
+                  aria-label="Subir"
+                >
+                  ▲
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onMover(idx, 1)}
+                  disabled={idx === subtareas.length - 1}
+                  className="rounded px-1 text-xs text-muted-foreground hover:bg-accent disabled:opacity-30"
+                  title="Bajar"
+                  aria-label="Bajar"
+                >
+                  ▼
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => eliminar(idx)}
+                className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                title="Eliminar"
+                aria-label="Eliminar"
+              >
+                <IconTrash className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      <button
+        type="button"
+        onClick={anadir}
+        className="mt-2 w-full rounded-md border border-dashed border-border px-2 py-1.5 text-xs text-muted-foreground hover:bg-accent"
+      >
+        + Añadir subtarea a mano
+      </button>
+    </section>
   );
 }

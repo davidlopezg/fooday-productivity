@@ -6,6 +6,8 @@ import { useState } from "react";
 import {
   IconCalendar,
   IconCompass,
+  IconHeart,
+  IconHistory,
   IconHome,
   IconInbox,
   IconList,
@@ -22,6 +24,8 @@ const LINKS = [
   { href: "/captura", label: "Captura", Icon: IconInbox },
   { href: "/tareas", label: "Tareas", Icon: IconList },
   { href: "/plan-diario", label: "Plan diario", Icon: IconSparkles },
+  { href: "/plan-diario/historico", label: "Histórico planes", Icon: IconHistory },
+  { href: "/dashboard-emocional", label: "Dashboard emocional", Icon: IconHeart },
   { href: "/semana", label: "Semana", Icon: IconCalendar },
   { href: "/metas", label: "Metas", Icon: IconTarget },
   { href: "/norte", label: "Norte", Icon: IconCompass },

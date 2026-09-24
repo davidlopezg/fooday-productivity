@@ -29,7 +29,7 @@ export default function NortePage() {
         <h2 className="mb-4 font-semibold tracking-tight">🎯 Propósito</h2>
         <ul className="space-y-2">
           {data.propositos.map((p) => (
-            <li key={p.id} className="text-sm leading-relaxed">
+            <li key={p.id} className="whitespace-pre-wrap text-sm leading-relaxed">
               {p.texto}
             </li>
           ))}
@@ -46,7 +46,7 @@ export default function NortePage() {
             <div key={v.id} className="rounded-lg border border-border bg-background p-4">
               <div className="text-sm font-medium">{v.nombre}</div>
               {v.descripcion ? (
-                <div className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                <div className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
                   {v.descripcion}
                 </div>
               ) : null}
@@ -62,7 +62,7 @@ export default function NortePage() {
         <h2 className="mb-4 font-semibold tracking-tight">🔭 Visión</h2>
         <ul className="space-y-3">
           {data.visiones.map((v) => (
-            <li key={v.id} className="text-sm leading-relaxed">
+            <li key={v.id} className="whitespace-pre-wrap text-sm leading-relaxed">
               <span className="mr-2 rounded bg-muted px-2 py-0.5 text-[11px] uppercase text-muted-foreground">
                 {v.horizonte}
               </span>

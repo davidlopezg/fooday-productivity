@@ -46,3 +46,17 @@ supabase/.temp
 
 # Datos personales generados por el ETL (no publicar)
 supabase/seed/
+
+# Artefactos accidentales Windows (redirigir a "nul")
+/nul
+
+# Builds de Capacitor (se regeneran con `npx cap sync`)
+/android/app/build/
+/android/build/
+/android/.gradle/
+/android/local.properties
+/android/app/release/
+/ios/App/build/
+/ios/Pods/
+/ios/App/Podfile.lock
+

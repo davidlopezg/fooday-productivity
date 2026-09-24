@@ -5,7 +5,7 @@ import { useConfig } from "@/lib/configStore";
 import { probarConexion } from "@/lib/plan";
 
 export default function ConfiguracionPage() {
-  const { data, loading, save } = useConfig();
+  const { data, loading, save, diagnostic } = useConfig();
 
   const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState("https://api.minimax.io/v1");
@@ -158,6 +158,35 @@ export default function ConfiguracionPage() {
             {guardando ? "Guardando…" : "Guardar"}
           </button>
         </div>
+      </section>
+
+      <section className="rounded-xl border border-dashed border-border bg-muted/30 p-4 text-xs text-muted-foreground space-y-1">
+        <p className="font-medium text-foreground">Diagnóstico</p>
+        <p>
+          Supabase URL:{" "}
+          <code className="rounded bg-background px-1 py-0.5">
+            {diagnostic.supabaseUrl.replace(/^https?:\/\//, "").replace(/\.co$/, ".co")}
+          </code>
+        </p>
+        <p>
+          User ID:{" "}
+          <code className="rounded bg-background px-1 py-0.5">
+            {diagnostic.userId ?? "(sin sesión)"}
+          </code>
+        </p>
+        {diagnostic.lastError ? (
+          <p className="text-red-600 dark:text-red-400">
+            Último error de sincronización con Supabase: {diagnostic.lastError}
+          </p>
+        ) : (
+          <p className="text-emerald-600 dark:text-emerald-400">
+            Sincronización con Supabase OK ✓ (la key también está en este navegador).
+          </p>
+        )}
+        <p className="pt-1">
+          Si ves error de &quot;relation does not exist&quot; o similar, aplica{" "}
+          <code>supabase/migrations/0002_configuracion.sql</code> en el SQL Editor de Supabase.
+        </p>
       </section>
     </div>
   );

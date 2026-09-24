@@ -118,3 +118,17 @@ export const IconSparkles = (p: IconProps) => (
     <path d="M6 15l.7 2.1L9 18l-2.3.9L6 21l-.7-2.1L3 18l2.3-.9Z" />
   </svg>
 );
+
+export const IconHeart = (p: IconProps) => (
+  <svg {...base} {...p}>
+    <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1a5.5 5.5 0 1 0-7.8 7.8l1 1L12 21l7.8-7.5 1-1a5.5 5.5 0 0 0 0-7.9Z" />
+  </svg>
+);
+
+export const IconHistory = (p: IconProps) => (
+  <svg {...base} {...p}>
+    <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+    <path d="M3 3v5h5" />
+    <path d="M12 7v5l3 2" />
+  </svg>
+);

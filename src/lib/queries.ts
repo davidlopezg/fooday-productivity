@@ -4,6 +4,9 @@ import type {
   Captura,
   Meta,
   PlanDiario,
+  PlanDiarioBloque,
+  PlanDiarioBorrador,
+  PlanDiarioSubtarea,
   PlanDiarioTarea,
   Ritual,
   Tarea,
@@ -42,11 +45,14 @@ export async function fetchPlanHoy(): Promise<
   (PlanDiario & { tareas: PlanDiarioTarea[] }) | null
 > {
   const supabase = createClient();
-  const { data: plan } = await supabase
+  // Si hay varias generaciones del mismo día, coge la de num_generación más alto.
+  const { data: planes } = await supabase
     .from("planes_diarios")
     .select("*")
     .eq("fecha", HOY())
-    .maybeSingle();
+    .order("num_generacion", { ascending: false })
+    .limit(1);
+  const plan = planes?.[0];
   if (!plan) return null;
   const { data: tareas } = await supabase
     .from("plan_diario_tareas")
@@ -117,4 +123,122 @@ export async function fetchContadores() {
     metasActivas: m.count ?? 0,
     capturasPendientes: c.count ?? 0,
   };
+}
+
+// ============================================================================
+// Plan diario v2 — queries extendidas
+// ============================================================================
+
+/** Plan completo: cabecera + tareas + subtareas + bloques + borradores */
+export async function fetchPlanCompleto(
+  id: string,
+): Promise<
+  | (PlanDiario & {
+      tareas: (PlanDiarioTarea & { subtareas: PlanDiarioSubtarea[]; borradores: PlanDiarioBorrador[] })[];
+      bloques: PlanDiarioBloque[];
+    })
+  | null
+> {
+  const supabase = createClient();
+  const { data: plan } = await supabase.from("planes_diarios").select("*").eq("id", id).maybeSingle();
+  if (!plan) return null;
+  const { data: tareas } = await supabase
+    .from("plan_diario_tareas")
+    .select("*, subtareas:plan_diario_subtareas(*), borradores:plan_diario_borradores(*)")
+    .eq("plan_diario_id", id)
+    .order("orden");
+  const { data: bloques } = await supabase
+    .from("plan_diario_bloques")
+    .select("*")
+    .eq("plan_diario_id", id)
+    .order("orden");
+  return {
+    ...(plan as PlanDiario),
+    bloques: (bloques ?? []) as PlanDiarioBloque[],
+    tareas: ((tareas ?? []) as Array<PlanDiarioTarea & { subtareas: PlanDiarioSubtarea[]; borradores: PlanDiarioBorrador[] }>).map(
+      (t) => ({
+        ...t,
+        subtareas: ((t.subtareas ?? []) as PlanDiarioSubtarea[]).sort((a, b) => a.orden - b.orden),
+        borradores: ((t.borradores ?? []) as PlanDiarioBorrador[]).sort(
+          (a, b) => +new Date(b.created_at) - +new Date(a.created_at),
+        ),
+      }),
+    ),
+  };
+}
+
+/** Histórico paginado de planes (incluye todas las generaciones del mismo día) */
+export async function fetchPlanes(opts?: { desde?: string; hasta?: string; limit?: number }) {
+  const supabase = createClient();
+  let q = supabase
+    .from("planes_diarios")
+    .select("id,fecha,semaforo,resumen,recomendacion,num_generacion,created_at")
+    .order("fecha", { ascending: false })
+    .order("num_generacion", { ascending: false })
+    .limit(opts?.limit ?? 200);
+  if (opts?.desde) q = q.gte("fecha", opts.desde);
+  if (opts?.hasta) q = q.lte("fecha", opts.hasta);
+  const { data: planes } = await q;
+  if (!planes || planes.length === 0) return [];
+  // cuenta tareas y hechas por plan
+  const ids = planes.map((p) => p.id);
+  const { data: conteos } = await supabase
+    .from("plan_diario_tareas")
+    .select("plan_diario_id,hecho")
+    .in("plan_diario_id", ids);
+  const agg = new Map<string, { total: number; hechas: number }>();
+  for (const t of conteos ?? []) {
+    const a = agg.get(t.plan_diario_id) ?? { total: 0, hechas: 0 };
+    a.total++;
+    if (t.hecho) a.hechas++;
+    agg.set(t.plan_diario_id, a);
+  }
+  return planes.map((p) => ({
+    ...(p as unknown as PlanDiario),
+    tareas_total: agg.get(p.id)?.total ?? 0,
+    tareas_hechas: agg.get(p.id)?.hechas ?? 0,
+  }));
+}
+
+/** Últimos N planes (para histórico emocional) — incluye los estados emocionales */
+export async function fetchHistorialEmocional(n: number): Promise<PlanDiario[]> {
+  const { data } = await createClient()
+    .from("planes_diarios")
+    .select("*")
+    .order("fecha", { ascending: false })
+    .order("num_generacion", { ascending: false })
+    .limit(n);
+  return ((data ?? []) as PlanDiario[]).reverse();
+}
+
+/** Estadísticas emocionales agregadas para el dashboard */
+export async function fetchEmocionalStats(dias: number) {
+  const supabase = createClient();
+  const desde = new Date();
+  desde.setDate(desde.getDate() - dias);
+  const desdeStr = desde.toISOString().slice(0, 10);
+  const { data } = await supabase
+    .from("planes_diarios")
+    .select("fecha,semaforo,despertar,mente,cuerpo,rueda,reflexion")
+    .gte("fecha", desdeStr)
+    .order("fecha", { ascending: true });
+  const planes = (data ?? []) as Array<
+    Pick<PlanDiario, "fecha" | "semaforo" | "despertar" | "mente" | "cuerpo" | "rueda" | "reflexion">
+  >;
+  // agrupa por fecha y quédate con la última generación del día
+  const porDia = new Map<string, (typeof planes)[number]>();
+  for (const p of planes) {
+    const cur = porDia.get(p.fecha);
+    if (!cur) porDia.set(p.fecha, p);
+  }
+  const serie = Array.from(porDia.values()).sort((a, b) => a.fecha.localeCompare(b.fecha));
+  // distribución semáforo
+  const distSem = { verde: 0, amarillo: 0, rojo: 0, sin_definir: 0 };
+  for (const p of serie) {
+    if (p.semaforo === "verde") distSem.verde++;
+    else if (p.semaforo === "amarillo") distSem.amarillo++;
+    else if (p.semaforo === "rojo") distSem.rojo++;
+    else distSem.sin_definir++;
+  }
+  return { serie, totalDias: serie.length, distSem };
 }
