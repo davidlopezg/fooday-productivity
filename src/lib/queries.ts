@@ -10,6 +10,7 @@ import type {
   PlanDiarioTarea,
   Ritual,
   Tarea,
+  TareaAdjunto,
 } from "@/lib/types";
 
 const HOY = () => new Date().toISOString().slice(0, 10);
@@ -241,4 +242,40 @@ export async function fetchEmocionalStats(dias: number) {
     else distSem.sin_definir++;
   }
   return { serie, totalDias: serie.length, distSem };
+}
+
+// ============================================================================
+// Adjuntos de tarea
+// ============================================================================
+
+/** Lista los adjuntos de una tarea (más recientes primero). */
+export async function fetchAdjuntosTarea(tareaId: string): Promise<TareaAdjunto[]> {
+  const { data, error } = await createClient()
+    .from("tarea_adjuntos")
+    .select("*")
+    .eq("tarea_id", tareaId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as TareaAdjunto[];
+}
+
+/**
+ * Devuelve un Map<tarea_id, count> con el nº de adjuntos por tarea.
+ * Útil para pintar el icono "📎 N" en la tabla principal sin N+1 queries.
+ */
+export async function fetchAdjuntosCount(
+  tareaIds: string[],
+): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+  if (tareaIds.length === 0) return map;
+  const { data, error } = await createClient()
+    .from("tarea_adjuntos")
+    .select("tarea_id")
+    .in("tarea_id", tareaIds);
+  if (error) throw error;
+  for (const row of data ?? []) {
+    const id = (row as { tarea_id: string }).tarea_id;
+    map.set(id, (map.get(id) ?? 0) + 1);
+  }
+  return map;
 }

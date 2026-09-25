@@ -132,3 +132,32 @@ export const IconHistory = (p: IconProps) => (
     <path d="M12 7v5l3 2" />
   </svg>
 );
+
+export const IconPaperclip = (p: IconProps) => (
+  <svg {...base} {...p}>
+    <path d="M21 11.5 12.5 20a5 5 0 0 1-7-7L13 5.5a3.5 3.5 0 0 1 5 5L9.5 19a2 2 0 0 1-3-3l7-7" />
+  </svg>
+);
+
+export const IconDownload = (p: IconProps) => (
+  <svg {...base} {...p}>
+    <path d="M12 4v12" />
+    <path d="m7 11 5 5 5-5" />
+    <path d="M5 20h14" />
+  </svg>
+);
+
+export const IconUpload = (p: IconProps) => (
+  <svg {...base} {...p}>
+    <path d="M12 20V8" />
+    <path d="m7 13 5-5 5 5" />
+    <path d="M5 4h14" />
+  </svg>
+);
+
+export const IconFile = (p: IconProps) => (
+  <svg {...base} {...p}>
+    <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z" />
+    <path d="M14 3v5h5" />
+  </svg>
+);

@@ -4,13 +4,21 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
  * Carga datos de forma asíncrona con estado de loading y `reload()`.
- * Pensado para la SPA estática (todo en cliente).
+ *
+ * - `loading` se inicializa a `true` y se apaga tras el primer load.
+ * - Para señales de "estoy recargando" durante mutaciones, el consumidor
+ *   debería usar `useTransition` local en su handler.
+ * - `deps` opcional: si cambia, se vuelve a cargar.
  */
-export function useData<T>(loader: () => Promise<T>, initial: T) {
+export function useData<T>(
+  loader: () => Promise<T>,
+  initial: T,
+  deps: ReadonlyArray<unknown> = [],
+) {
   const [data, setData] = useState<T>(initial);
-  const [loading, setLoading] = useState(true);
-  const [nonce, setNonce] = useState(0);
+  const [loaded, setLoaded] = useState(false);
   const loaderRef = useRef(loader);
+  const depsKey = deps.map((d) => JSON.stringify(d)).join("|");
 
   // Mantiene el loader actualizado sin tocar refs durante el render.
   useEffect(() => {
@@ -19,26 +27,22 @@ export function useData<T>(loader: () => Promise<T>, initial: T) {
 
   useEffect(() => {
     let alive = true;
-    loaderRef
-      .current()
-      .then((d) => {
-        if (alive) {
-          setData(d);
-          setLoading(false);
-        }
-      })
-      .catch(() => {
-        if (alive) setLoading(false);
-      });
+    loaderRef.current().then((d) => {
+      if (!alive) return;
+      setData(d);
+      setLoaded(true);
+    });
     return () => {
       alive = false;
     };
-  }, [nonce]);
+  }, [depsKey]);
 
   const reload = useCallback(() => {
-    setLoading(true);
-    setNonce((n) => n + 1);
+    loaderRef.current().then((d) => {
+      setData(d);
+      setLoaded(true);
+    });
   }, []);
 
-  return { data, loading, reload, setData };
+  return { data, loading: !loaded, reload, setData };
 }

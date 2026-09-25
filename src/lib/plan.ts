@@ -1169,3 +1169,86 @@ export async function desgranarTareaIA(
   }
   return { subtareas: capped, prompt_usado: prompt };
 }
+
+
+// ============================================================================
+// Criterio de terminación — "Esta tarea está HECHA cuando..."
+// ============================================================================
+// Es una sola línea. Ataca el problema de "se me quedan a medias":
+// si no puedes escribirla, no es una tarea — es un proyecto.
+
+export type CriterioTerminacionOpts = {
+  titulo: string;
+  descripcion?: string | null;
+  notas?: string | null;
+  /** Lo que ya haya escrito el usuario, si lo hay. Se pasa para mantenerlo o mejorarlo, nunca para "machacarlo". */
+  criterioPrevio?: string | null;
+};
+
+export type CriterioTerminacionResultado = {
+  criterio_terminacion: string | null;
+  prompt_usado: string;
+};
+
+function buildPromptCriterio(opts: CriterioTerminacionOpts): string {
+  const desc = opts.descripcion?.trim();
+  const notas = opts.notas?.trim();
+  const previo = opts.criterioPrevio?.trim();
+
+  return `Eres el asistente operativo de David. Tu ÚNICO trabajo aquí es escribir UNA SOLA LÍNEA describiendo cuándo la tarea está TERMINADA.
+
+TAREA:
+Titulo: ${opts.titulo}
+${desc ? `Descripcion: ${desc}` : ""}
+${notas ? `Notas: ${notas}` : ""}
+
+==========
+LA REGLA (léela 2 veces)
+==========
+Esta regla ataca el "se me quedan a medias". Para CADA tarea que sobrevive, escribe una sola línea:
+
+  "Esta tarea está HECHA cuando ______________."
+
+Ejemplos:
+  - "Hacer la declaración de la renta" → "Tarea hecha cuando haya enviado el borrador al gestor por WhatsApp"
+  - "Resolver tema facturas" → "Hecha cuando haya subido las 3 facturas pendientes al banco online y hecho la captura de pantalla"
+  - "Llamar al gestor" → "Hecha cuando haya colgado y anotado lo que me ha dicho en 2 líneas"
+
+REGLAS DE ORO:
+1. UNA SOLA línea. Sin puntos suspensivos. Sin "etc."
+2. COMIENZA exactamente con "Esta tarea está HECHA cuando " (o "Hecha cuando " si es muy corta).
+3. EXPRÉSALO en hechos observables (qué queda hecho, dónde, qué prueba de que se hizo).
+4. Si el título es un PROYECTO grande ("montar la web", "reformar la cocina"), NO lo conviertas en un proyecto a medias. Devuelve EXACTAMENTE el string: "__ES_PROYECTO__" (esto permitirá que David lo parta en trozos).
+5. Sé concreto: incluye el "dónde", "a quién", "con qué herramienta" si aplica.
+${previo ? `6. Ya hay un borrador previo. MEJÓRALO si es vago, o devuélvelo tal cual si ya cumple la regla. Previo: "${previo}"` : ""}
+
+FORMATO — JSON ESTRICTO sin texto fuera:
+{
+  "criterio_terminacion": "<la frase, o '__ES_PROYECTO__' si es un proyecto>"
+}`;
+}
+
+export async function generarCriterioTerminacionIA(
+  baseUrl: string,
+  apiKey: string,
+  model: string,
+  opts: CriterioTerminacionOpts,
+): Promise<CriterioTerminacionResultado> {
+  const prompt = buildPromptCriterio(opts);
+  const parsed = await llamarLLM<{ criterio_terminacion?: unknown }>(
+    baseUrl,
+    apiKey,
+    model,
+    "Respondes SOLO con JSON valido.",
+    prompt,
+    true,
+  );
+
+  let criterio: string | null = null;
+  const raw = typeof parsed?.criterio_terminacion === "string" ? parsed.criterio_terminacion.trim() : "";
+  if (raw && raw !== "__ES_PROYECTO__") {
+    criterio = raw.slice(0, 400);
+  }
+
+  return { criterio_terminacion: criterio, prompt_usado: prompt };
+}

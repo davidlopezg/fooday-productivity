@@ -1,97 +1,71 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   fetchTareas,
   fetchHistorialEmocional,
 } from "@/lib/queries";
 import {
-  guardarPlanDiario,
+  upsertTareaPorTitulo,
+  guardarPlanDiarioSimple,
   guardarNotasPlan,
-  guardarBorrador,
-  BLOQUES_FIJOS,
 } from "@/lib/mutations";
 import { useData } from "@/lib/useData";
 import { useConfig } from "@/lib/configStore";
-import {
-  generarPlan,
-  redactarBorrador,
-  informeToMarkdown,
-  type EstadoEmocional,
-  type PlanGeneradoLigero,
-} from "@/lib/plan";
-import type {
-  InformePlan,
-  PlanDiario,
-  PlanDiarioBorrador,
-  Tarea,
-} from "@/lib/types";
+import { generarPlanSimple } from "@/lib/planSimple";
+import type { PlanDiario, PlanGeneradoSimple, Tarea } from "@/lib/types";
 
 // ----------------------------------------------------------------------------
 // Constantes UI
 // ----------------------------------------------------------------------------
 
-const DESPIERTAR = ["Con energía", "Cansado pero estable", "Agotado", "Ansioso"];
-const MENTE = ["Relativamente clara", "Acelerada", "Nublada", "Oscura"];
-const CUERPO = ["Liviano", "Tenso", "Dolorido", "Me cuesta habitarlo"];
-const RUEDA = ["No, estoy presente", "Un poco", "Sí, todo me arrastra", "Totalmente sobrepasado"];
-const NECESIDAD = ["Calma", "Claridad", "Contención", "Esperanza", "Nada"];
+const HOY = () => new Date().toISOString().slice(0, 10);
 
-const SEM: Record<string, string> = {
-  verde: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
-  amarillo: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
-  rojo: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20",
+const SEM_COLOR: Record<"verde" | "amarillo" | "rojo", string> = {
+  verde: "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+  amarillo: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+  rojo: "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300",
 };
 
-const SEM_FUERTE: Record<string, string> = {
-  verde: "border-emerald-500/40 bg-emerald-500/5",
-  amarillo: "border-amber-500/40 bg-amber-500/5",
-  rojo: "border-red-500/40 bg-red-500/5",
+const BLOQUE_LABELS: Record<1 | 2 | 3 | 4, string> = {
+  1: "Bloque 1",
+  2: "Bloque 2",
+  3: "Bloque 3",
+  4: "Bloque 4",
+};
+
+const BLOQUE_HORARIO: Record<1 | 2 | 3 | 4, string> = {
+  1: "11:00 – 12:00",
+  2: "12:00 – 13:00",
+  3: "15:00 – 16:00",
+  4: "16:00 – 17:00",
 };
 
 // ----------------------------------------------------------------------------
 // Tipos locales
 // ----------------------------------------------------------------------------
 
-type RedactarEstado = {
-  idLocal: string;
+type TareaLibre = {
+  /** clave local para la lista en UI */
+  uid: string;
+  /** id de la tarea en BD (null mientras se está persistiendo) */
+  id_bd: string | null;
   titulo: string;
-  tipoTarea: string;
-  tipo: "email" | "whatsapp" | "documento" | "otro";
-  destinatario: string;
-  contexto: string;
-  asunto: string;
-  cuerpo: string;
-  prompt_usado: string;
-  guardando: boolean;
-  generando: boolean;
-  error: string | null;
+  /** true si la RPC tuvo que crearla; false si ya existía */
+  creada: boolean;
+  /** estado de persistencia */
+  estado: "idle" | "guardando" | "guardado" | "error";
+  error?: string;
 };
 
-type TareaLocal = {
-  idLocal: string;
-  titulo: string;
-  borradores: PlanDiarioBorrador[];
-};
-
-type PlanLocal = {
-  id: string;
+type PlanLocal = PlanGeneradoSimple & {
+  /** id de la fila en planes_diarios (post-guardado) */
+  planId: string | null;
   fecha: string;
   fecha_larga: string;
-  num_generacion: number;
-  semaforo: "verde" | "amarillo" | "rojo";
-  despertar: string;
-  mente: string;
-  cuerpo: string;
-  rueda: string;
-  necesidad: string;
-  resumen: string;
-  recomendacion: string;
-  reflexion: string;
-  contextoExtra: string;
-  informe: InformePlan;
-  tareas: TareaLocal[];
+  estadoEmocionalTexto: string;
   notas: string;
+  guardadoAt: number;
 };
 
 // ----------------------------------------------------------------------------
@@ -101,22 +75,20 @@ type PlanLocal = {
 export default function PlanDiarioPage() {
   const config = useConfig();
   const tareasQ = useData<Tarea[]>(() => fetchTareas("pendiente"), []);
-  const historialQ = useData<PlanDiario[]>(() => fetchHistorialEmocional(5), []);
+  const historialQ = useData<PlanDiario[]>(() => fetchHistorialEmocional(7), []);
 
-  const [estado, setEstado] = useState<EstadoEmocional>({
-    despertar: "Cansado pero estable",
-    mente: "Acelerada",
-    cuerpo: "Tenso",
-    rueda: "Sí, todo me arrastra",
-    necesidad: "Claridad",
-  });
-  const [reflexion, setReflexion] = useState("");
-  const [contextoExtra, setContextoExtra] = useState("");
-  const [tareasLibres, setTareasLibres] = useState("");
+  // ── Parte 1: input ──
+  const [estadoTexto, setEstadoTexto] = useState("");
+  const [tareaNueva, setTareaNueva] = useState("");
+  const [tareasLibres, setTareasLibres] = useState<TareaLibre[]>([]);
+  const [errorTarea, setErrorTarea] = useState<string | null>(null);
+
+  // ── Estado de generación ──
   const [generando, setGenerando] = useState(false);
-  const [planLocal, setPlanLocal] = useState<PlanLocal | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [planLocal, setPlanLocal] = useState<PlanLocal | null>(null);
 
+  // ── Notas del día ──
   const [notasEstado, setNotasEstado] = useState<
     | { status: "idle" }
     | { status: "guardando" }
@@ -124,83 +96,114 @@ export default function PlanDiarioPage() {
     | { status: "error"; mensaje: string }
   >({ status: "idle" });
 
-  const [redactar, setRedactar] = useState<RedactarEstado | null>(null);
+  // Cuando hay plan generado, recargar historial automáticamente
+  useEffect(() => {
+    if (planLocal) historialQ.reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [planLocal?.planId]);
+
+  // ----------------------------------------------------------------------------
+  // Handlers
+  // ----------------------------------------------------------------------------
+
+  async function anadirTareaLibre() {
+    const titulo = tareaNueva.trim();
+    if (!titulo) return;
+    setErrorTarea(null);
+
+    // Evitar duplicados locales (en la lista en memoria)
+    if (tareasLibres.some((t) => t.titulo.toLowerCase() === titulo.toLowerCase())) {
+      setErrorTarea(`"${titulo}" ya está en la lista.`);
+      return;
+    }
+
+    const uid = `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    setTareasLibres((arr) => [
+      ...arr,
+      { uid, id_bd: null, titulo, creada: false, estado: "guardando" },
+    ]);
+    setTareaNueva("");
+
+    try {
+      const r = await upsertTareaPorTitulo(titulo);
+      setTareasLibres((arr) =>
+        arr.map((t) =>
+          t.uid === uid
+            ? { ...t, id_bd: r.id, creada: r.creada, estado: "guardado" }
+            : t,
+        ),
+      );
+      tareasQ.reload();
+    } catch (e) {
+      setTareasLibres((arr) =>
+        arr.map((t) =>
+          t.uid === uid
+            ? { ...t, estado: "error", error: (e as Error).message }
+            : t,
+        ),
+      );
+    }
+  }
+
+  function eliminarTareaLibre(uid: string) {
+    setTareasLibres((arr) => arr.filter((t) => t.uid !== uid));
+  }
 
   async function generar() {
     if (!config.data.minimax_api_key) {
       setError("Configura primero tu API key en /configuracion.");
       return;
     }
+    if (!estadoTexto.trim()) {
+      setError('Escribe primero cómo te sientes hoy en "¿Cómo te sientes?"');
+      return;
+    }
     setGenerando(true);
     setError(null);
     try {
-      const libres = tareasLibres
-        .split("\n")
-        .map((l) => l.trim())
-        .filter(Boolean);
-      const fecha = new Date().toISOString().slice(0, 10);
+      const fecha = HOY();
+      const tareasLibresConId = tareasLibres
+        .filter((t) => t.id_bd)
+        .map<Tarea>((t) => ({
+          id: t.id_bd as string,
+          titulo: t.titulo,
+          estado: "pendiente",
+          prioridad: "media",
+          // el resto de campos no los necesitamos para el prompt
+        } as Tarea));
 
-      const r: PlanGeneradoLigero = await generarPlan(
-        config.data.base_url,
-        config.data.minimax_api_key,
-        config.data.model,
+      const plan = await generarPlanSimple(
         {
+          baseUrl: config.data.base_url,
+          apiKey: config.data.minimax_api_key,
+          model: config.data.model,
+        },
+        {
+          estadoTexto,
           fecha,
-          estado,
           tareas: tareasQ.data,
-          tareasLibres: libres,
-          reflexion,
-          contextoExtra,
+          tareasLibres: tareasLibresConId,
           historial: historialQ.data,
         },
       );
 
-      const planId = await guardarPlanDiario({
+      const fecha_larga = fechaToLargaLocal(fecha);
+      const planId = await guardarPlanDiarioSimple({
         fecha,
-        fecha_larga: fechaToLargaLocal(fecha),
-        semaforo: r.semaforo,
-        ...estado,
-        resumen: r.resumen,
-        recomendacion: r.recomendacion,
-        reflexion: reflexion || undefined,
-        contexto_extra: contextoExtra || undefined,
-        tareas: r.tareas.map((t) => ({
-          tipo: t.tipo,
-          titulo_libre: t.titulo_libre,
-          es_ia: t.es_ia,
-          bloque_energia: t.bloque_energia,
-          bloque_cognitivo: t.bloque_cognitivo,
-          es_tarea_libre: false,
-          subtareas: t.subtareas.map((s) => ({
-            descripcion: s.descripcion,
-            tiempo_estimado_min: s.tiempo_estimado_min,
-          })),
-        })),
-        informe: r.informe,
+        fecha_larga,
+        estadoEmocionalTexto: estadoTexto,
+        plan,
       });
 
       setPlanLocal({
-        id: planId,
+        ...plan,
+        planId,
         fecha,
-        fecha_larga: fechaToLargaLocal(fecha),
-        num_generacion:
-          (historialQ.data[historialQ.data.length - 1]?.num_generacion ?? 0) + 1,
-        semaforo: r.semaforo,
-        ...estado,
-        resumen: r.resumen,
-        recomendacion: r.recomendacion,
-        reflexion,
-        contextoExtra,
-        informe: r.informe,
-        tareas: r.tareas.map((t, i) => ({
-          idLocal: `local-${planId}-${i}`,
-          titulo: t.titulo_libre,
-          borradores: [],
-        })),
+        fecha_larga,
+        estadoEmocionalTexto: estadoTexto,
         notas: "",
+        guardadoAt: Date.now(),
       });
-      tareasQ.reload();
-      historialQ.reload();
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -209,139 +212,31 @@ export default function PlanDiarioPage() {
   }
 
   async function guardarNotas() {
-    if (!planLocal) return;
+    if (!planLocal?.planId) return;
     setNotasEstado({ status: "guardando" });
     try {
-      await guardarNotasPlan(planLocal.id, planLocal.notas);
+      await guardarNotasPlan(planLocal.planId, planLocal.notas);
       setNotasEstado({ status: "guardado", timestamp: Date.now() });
     } catch (e) {
       setNotasEstado({ status: "error", mensaje: (e as Error).message });
     }
   }
 
-  function abrirRedactar(t: TareaLocal) {
-    setRedactar({
-      idLocal: t.idLocal,
-      titulo: t.titulo,
-      tipoTarea: "imprescindible",
-      tipo: "email",
-      destinatario: "",
-      contexto: "",
-      asunto: "",
-      cuerpo: "",
-      prompt_usado: "",
-      guardando: false,
-      generando: false,
-      error: null,
-    });
+  function empezarDeNuevo() {
+    setPlanLocal(null);
+    setEstadoTexto("");
+    setTareasLibres([]);
+    setTareaNueva("");
+    setError(null);
+    setNotasEstado({ status: "idle" });
   }
 
-  async function generarBorrador() {
-    if (!redactar || !config.data.minimax_api_key) return;
-    setRedactar({ ...redactar, generando: true, error: null });
-    try {
-      const r = await redactarBorrador(
-        config.data.base_url,
-        config.data.minimax_api_key,
-        config.data.model,
-        {
-          tarea: { titulo_libre: redactar.titulo, tipo: redactar.tipoTarea },
-          tipo: redactar.tipo,
-          contextoUsuario: redactar.contexto,
-          destinatario: redactar.destinatario || undefined,
-        },
-      );
-      setRedactar({
-        ...redactar,
-        asunto: r.asunto,
-        cuerpo: r.cuerpo,
-        prompt_usado: r.prompt_usado,
-        generando: false,
-      });
-    } catch (e) {
-      setRedactar({ ...redactar, generando: false, error: (e as Error).message });
-    }
-  }
+  // ----------------------------------------------------------------------------
+  // Render
+  // ----------------------------------------------------------------------------
 
-  async function persistirBorrador() {
-    if (!redactar || !planLocal) return;
-    const tarea = planLocal.tareas.find((t) => t.idLocal === redactar.idLocal);
-    if (!tarea) return;
-    const idReal = await resolverIdRealTarea(planLocal.id, tarea.titulo);
-    if (!idReal) {
-      setRedactar({ ...redactar, error: "No se encontró la tarea en BD" });
-      return;
-    }
-    setRedactar({ ...redactar, guardando: true, error: null });
-    try {
-      const borradorId = await guardarBorrador({
-        plan_diario_tarea_id: idReal,
-        tipo: redactar.tipo,
-        contenido: redactar.asunto
-          ? `Asunto: ${redactar.asunto}\n\n${redactar.cuerpo}`
-          : redactar.cuerpo,
-        prompt_usado: redactar.prompt_usado || undefined,
-      });
-      const nuevo: PlanDiarioBorrador = {
-        id: borradorId,
-        plan_diario_tarea_id: idReal,
-        tipo: redactar.tipo,
-        contenido: redactar.cuerpo,
-        prompt_usado: redactar.prompt_usado || null,
-        created_at: new Date().toISOString(),
-      };
-      setPlanLocal({
-        ...planLocal,
-        tareas: planLocal.tareas.map((t) =>
-          t.idLocal === redactar.idLocal ? { ...t, borradores: [nuevo, ...t.borradores] } : t,
-        ),
-      });
-      setRedactar(null);
-    } catch (e) {
-      setRedactar({ ...redactar, guardando: false, error: (e as Error).message });
-    }
-  }
-
-  function copiarCuerpo() {
-    if (!redactar) return;
-    const txt = redactar.asunto
-      ? `Asunto: ${redactar.asunto}\n\n${redactar.cuerpo}`
-      : redactar.cuerpo;
-    navigator.clipboard?.writeText(txt).catch(() => {});
-  }
-
-  function descargarMarkdown() {
-    if (!planLocal) return;
-    const md = informeToMarkdown(
-      planLocal.fecha,
-      planLocal.fecha_larga,
-      planLocal.informe,
-      planLocal.semaforo,
-      planLocal.despertar,
-      planLocal.mente,
-      planLocal.cuerpo,
-      planLocal.rueda,
-      planLocal.necesidad,
-      planLocal.resumen,
-      planLocal.recomendacion,
-      planLocal.notas,
-      planLocal.reflexion,
-    );
-    const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${planLocal.fecha}-planificacion-diaria.md`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }
-
-  const select =
-    "h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring";
-  const textareaCls =
-    "min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring";
+  const input =
+    "w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring";
 
   return (
     <div className="space-y-6">
@@ -350,7 +245,7 @@ export default function PlanDiarioPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Plan diario</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Estado emocional + IA = informe completo (psicología + operativa + nutrición).
+            ¿Cómo te sientes? + tareas + IA = plan ejecutable para hoy.
           </p>
         </div>
         <div className="flex gap-2 text-xs">
@@ -360,18 +255,12 @@ export default function PlanDiarioPage() {
           >
             📋 Histórico
           </a>
-          <a
-            href="/dashboard-emocional"
-            className="rounded-md border border-border px-3 py-1.5 hover:bg-muted"
-          >
-            💚 Dashboard
-          </a>
         </div>
       </header>
 
       {!config.data.minimax_api_key && !config.loading && (
         <div className="rounded-md border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-600 dark:text-amber-400">
-          Aún no has configurado tu API key de MiniMax.{" "}
+          Aún no has configurado tu API key.{" "}
           <a href="/configuracion" className="underline underline-offset-4">
             Ir a Configuración
           </a>
@@ -379,109 +268,145 @@ export default function PlanDiarioPage() {
         </div>
       )}
 
-      {/* Histórico mini-cards */}
-      {historialQ.data.length > 0 && (
-        <section className="rounded-xl border border-border bg-card p-5">
-          <h2 className="mb-3 text-sm font-semibold tracking-tight">
-            📈 Últimos {historialQ.data.length} días
-          </h2>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-            {historialQ.data.map((h) => (
-              <div key={h.id} className="rounded-lg border border-border bg-background p-3 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">{h.fecha.slice(5)}</span>
-                  {h.semaforo && (
-                    <span className={`rounded-full border px-1.5 py-0.5 text-[10px] ${SEM[h.semaforo]}`}>
-                      {h.semaforo}
-                    </span>
-                  )}
-                </div>
-                <p className="mt-1 truncate text-muted-foreground">
-                  {h.despertar?.split(" ")[0] ?? "—"} · {h.mente?.split(" ")[0] ?? "—"}
-                </p>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Formulario */}
+      {/* =========================================================================
+          PARTE 1 — INPUT
+      ========================================================================= */}
       <section className="rounded-xl border border-border bg-card p-6">
-        <h2 className="mb-4 font-semibold tracking-tight">Estado de hoy</h2>
-        <div className="grid gap-4 sm:grid-cols-2">
-          {([
-            ["despertar", "¿Cómo te has despertado?", DESPIERTAR],
-            ["mente", "¿Cómo está tu mente?", MENTE],
-            ["cuerpo", "¿Cómo habita tu cuerpo?", CUERPO],
-            ["rueda", "¿Rueda del ratón?", RUEDA],
-            ["necesidad", "¿Qué necesitas hoy?", NECESIDAD],
-          ] as const).map(([k, label, opts]) => (
-            <label key={k} className="block">
-              <span className="mb-1 block text-xs text-muted-foreground">{label}</span>
-              <select
-                className={select}
-                value={estado[k]}
-                onChange={(e) => setEstado({ ...estado, [k]: e.target.value })}
-              >
-                {opts.map((o) => (
-                  <option key={o} value={o}>{o}</option>
-                ))}
-              </select>
-            </label>
-          ))}
+        <h2 className="mb-1 text-base font-semibold tracking-tight">
+          Parte 1 — Captura
+        </h2>
+        <p className="mb-5 text-xs text-muted-foreground">
+          Cuéntame cómo estás y, si quieres, añade tareas sueltas. La IA se
+          encarga del resto.
+        </p>
+
+        {/* 1A — ¿Cómo te sientes? */}
+        <label className="block">
+          <span className="mb-1 flex items-center gap-2 text-sm font-medium">
+            <span>¿Cómo te sientes?</span>
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary">
+              Principal
+            </span>
+          </span>
+          <textarea
+            className={`${input} min-h-[100px]`}
+            value={estadoTexto}
+            onChange={(e) => setEstadoTexto(e.target.value)}
+            placeholder='Ej: "Estoy cansado, con la cabeza nublada, pero con ganas de cerrar el bug del cliente antes de comer."'
+          />
+        </label>
+
+        {/* 1B — Otras tareas */}
+        <div className="mt-5">
+          <label className="block">
+            <span className="mb-1 flex items-center gap-2 text-sm font-medium">
+              <span>Otras tareas</span>
+              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                Opcional
+              </span>
+            </span>
+            <p className="mb-2 text-xs text-muted-foreground">
+              Una por línea. Si la tarea ya existe en tu base de datos, no se
+              duplica: la IA la reutiliza tal cual.
+            </p>
+          </label>
+
+          <div className="flex gap-2">
+            <input
+              type="text"
+              className={input}
+              value={tareaNueva}
+              onChange={(e) => setTareaNueva(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  anadirTareaLibre();
+                }
+              }}
+              placeholder='Escribe una tarea y pulsa Enter (ej: "Llamar a María")'
+            />
+            <button
+              type="button"
+              onClick={anadirTareaLibre}
+              disabled={!tareaNueva.trim()}
+              className="shrink-0 rounded-md border border-border bg-background px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"
+            >
+              Añadir
+            </button>
+          </div>
+
+          {errorTarea && (
+            <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+              {errorTarea}
+            </p>
+          )}
+
+          {tareasLibres.length > 0 && (
+            <ul className="mt-3 space-y-1.5">
+              {tareasLibres.map((t) => (
+                <li
+                  key={t.uid}
+                  className="flex items-center justify-between gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm"
+                >
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="truncate">{t.titulo}</span>
+                    {t.estado === "guardando" && (
+                      <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+                        guardando…
+                      </span>
+                    )}
+                    {t.estado === "guardado" && !t.creada && (
+                      <span
+                        className="shrink-0 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300"
+                        title="Ya existía en la base de datos — no se duplicó"
+                      >
+                        ya en BD
+                      </span>
+                    )}
+                    {t.estado === "guardado" && t.creada && (
+                      <span
+                        className="shrink-0 rounded-full border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 text-[10px] font-medium text-sky-700 dark:text-sky-300"
+                        title="Tarea nueva creada en la base de datos"
+                      >
+                        nueva
+                      </span>
+                    )}
+                    {t.estado === "error" && (
+                      <span
+                        className="shrink-0 rounded-full border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-[10px] font-medium text-red-700 dark:text-red-300"
+                        title={t.error ?? "Error"}
+                      >
+                        error
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => eliminarTareaLibre(t.uid)}
+                    aria-label="Quitar tarea"
+                    className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  >
+                    ×
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
-        <details className="mt-5 rounded-md border border-border">
-          <summary className="cursor-pointer select-none px-3 py-2 text-sm font-medium hover:bg-muted/50">
-            ➕ Inputs opcionales (reflexión, contexto, tareas adicionales)
-          </summary>
-          <div className="space-y-3 p-3">
-            <label className="block">
-              <span className="mb-1 block text-xs text-muted-foreground">
-                Reflexión / desahogo (opcional)
-              </span>
-              <textarea
-                className={textareaCls}
-                value={reflexion}
-                onChange={(e) => setReflexion(e.target.value)}
-                placeholder="¿Qué tienes en la cabeza hoy? Sin filtro."
-              />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs text-muted-foreground">
-                Contexto extra (opcional)
-              </span>
-              <textarea
-                className={textareaCls}
-                value={contextoExtra}
-                onChange={(e) => setContextoExtra(e.target.value)}
-                placeholder="Cita médica, evento familiar, deadline que se acerca…"
-              />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs text-muted-foreground">
-                Tareas adicionales (1 por línea, no están en BD)
-              </span>
-              <textarea
-                className={textareaCls}
-                value={tareasLibres}
-                onChange={(e) => setTareasLibres(e.target.value)}
-                placeholder={"Llamar a María\nLlevar coche al taller"}
-              />
-            </label>
-          </div>
-        </details>
-
-        <div className="mt-5 flex flex-wrap items-center gap-2">
+        {/* 1C — Botón Generar Plan */}
+        <div className="mt-6 flex flex-wrap items-center gap-3">
           <button
             onClick={generar}
-            disabled={generando || !config.data.minimax_api_key}
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+            disabled={generando || !config.data.minimax_api_key || !estadoTexto.trim()}
+            className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {generando ? "Generando informe con IA…" : "Generar plan"}
+            <BoltIcon className="h-4 w-4" />
+            {generando ? "Generando plan…" : "Generar plan"}
           </button>
           <span className="text-xs text-muted-foreground">
-            {tareasQ.data.length} tareas pendientes de BD
+            {tareasQ.data.length} tareas pendientes en BD
+            {tareasLibres.length > 0 && ` · ${tareasLibres.length} añadidas en esta sesión`}
           </span>
         </div>
 
@@ -492,492 +417,306 @@ export default function PlanDiarioPage() {
         )}
       </section>
 
-      {/* Plan generado: informe rico */}
+      {/* =========================================================================
+          PARTE 2 — RESULTADO (se muestra tras pulsar "Generar plan")
+      ========================================================================= */}
       {planLocal && (
-        <InformeRender planLocal={planLocal} onAbrirRedactar={abrirRedactar} onDescargar={descargarMarkdown} />
+        <PlanGeneradoView
+          plan={planLocal}
+          notasEstado={notasEstado}
+          onNotasChange={(texto) => setPlanLocal({ ...planLocal, notas: texto })}
+          onGuardarNotas={guardarNotas}
+          onEmpezarDeNuevo={empezarDeNuevo}
+        />
       )}
 
-      {/* Notas del día */}
-      {planLocal && (
+      {/* Histórico mini-cards (solo si no hay plan activo aún) */}
+      {!planLocal && historialQ.data.length > 0 && (
         <section className="rounded-xl border border-border bg-card p-5">
-          <h3 className="mb-2 text-sm font-semibold tracking-tight">📓 Notas del día</h3>
-          <div className="flex flex-col gap-2">
-            <div className="flex gap-2">
-              <textarea
-                className="min-h-[80px] flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
-                value={planLocal.notas}
-                onChange={(e) => {
-                  setPlanLocal({ ...planLocal, notas: e.target.value });
-                  if (notasEstado.status === "guardado") setNotasEstado({ status: "idle" });
-                }}
-                placeholder="Reflexiones al final del día, qué salió bien, qué ajustar mañana…"
-              />
-              <button
-                onClick={guardarNotas}
-                disabled={notasEstado.status === "guardando"}
-                className="h-fit rounded-md border border-border bg-background px-3 py-1.5 text-xs hover:bg-muted disabled:opacity-50"
+          <h2 className="mb-3 text-sm font-semibold tracking-tight">
+            📈 Últimos {historialQ.data.length} planes
+          </h2>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+            {historialQ.data.slice(-7).map((h) => (
+              <div
+                key={h.id}
+                className="rounded-lg border border-border bg-background p-3 text-xs"
               >
-                {notasEstado.status === "guardando" ? "Guardando…" : "Guardar"}
-              </button>
-            </div>
-            {notasEstado.status === "guardado" && (
-              <p className="text-xs text-emerald-600 dark:text-emerald-400">
-                ✅ Guardado a las{" "}
-                {new Date(notasEstado.timestamp).toLocaleTimeString("es-ES", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </p>
-            )}
-            {notasEstado.status === "error" && (
-              <p className="text-xs text-red-600 dark:text-red-400">
-                ❌ Error: {notasEstado.mensaje}
-              </p>
-            )}
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">{h.fecha.slice(5)}</span>
+                  {h.semaforo && (
+                    <span
+                      className={`rounded-full border px-1.5 py-0.5 text-[10px] ${SEM_COLOR[h.semaforo]}`}
+                    >
+                      {h.semaforo[0]?.toUpperCase()}
+                    </span>
+                  )}
+                </div>
+                {h.resumen && (
+                  <p className="mt-1 line-clamp-2 text-muted-foreground">
+                    {h.resumen}
+                  </p>
+                )}
+              </div>
+            ))}
           </div>
         </section>
-      )}
-
-      {/* Modal de redacción */}
-      {redactar && (
-        <RedactarModal
-          estado={redactar}
-          onChange={setRedactar}
-          onGenerar={generarBorrador}
-          onCopiar={copiarCuerpo}
-          onGuardar={persistirBorrador}
-          onCerrar={() => setRedactar(null)}
-        />
       )}
     </div>
   );
 }
 
 // ============================================================================
-// Render del informe rico
+// Vista del plan generado (Parte 2)
 // ============================================================================
 
-function InformeRender({
-  planLocal,
-  onAbrirRedactar,
-  onDescargar,
+function PlanGeneradoView({
+  plan,
+  notasEstado,
+  onNotasChange,
+  onGuardarNotas,
+  onEmpezarDeNuevo,
 }: {
-  planLocal: PlanLocal;
-  onAbrirRedactar: (t: TareaLocal) => void;
-  onDescargar: () => void;
+  plan: PlanLocal;
+  notasEstado:
+    | { status: "idle" }
+    | { status: "guardando" }
+    | { status: "guardado"; timestamp: number }
+    | { status: "error"; mensaje: string };
+  onNotasChange: (texto: string) => void;
+  onGuardarNotas: () => void;
+  onEmpezarDeNuevo: () => void;
 }) {
-  const inf = planLocal.informe;
+  const semaforo = plan.semaforo;
+
   return (
-    <section className={`space-y-6 rounded-2xl border-2 bg-card p-6 ${SEM_FUERTE[planLocal.semaforo]}`}>
-      {/* Cabecera + semáforo */}
-      <header>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">
-              📅 {planLocal.fecha_larga}
-            </h1>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Generación #{planLocal.num_generacion} · guardado en Supabase
+    <div className="space-y-6">
+      {/* Cabecera del plan */}
+      <header className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-5">
+        <div>
+          <h2 className="text-xl font-bold tracking-tight">
+            📅 {plan.fecha_larga}
+          </h2>
+          {plan.estadoEmocionalTexto && (
+            <p className="mt-1 text-xs italic text-muted-foreground">
+              "{plan.estadoEmocionalTexto}"
             </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span
-              className={`inline-block rounded-full border px-3 py-1 text-xs font-medium ${SEM[planLocal.semaforo]}`}
-            >
-              {planLocal.semaforo.toUpperCase()}
-            </span>
-            <button
-              onClick={onDescargar}
-              className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted"
-            >
-              📄 Descargar .md
-            </button>
-          </div>
+          )}
         </div>
-        <blockquote className="mt-3 rounded-md border-l-4 border-primary/60 bg-muted/30 px-4 py-2 text-sm italic">
-          {inf.cabecera}
-        </blockquote>
+        <div className="flex flex-wrap items-center gap-2">
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wide ${SEM_COLOR[semaforo]}`}
+          >
+            <SemaforoDot semaforo={semaforo} />
+            {semaforo}
+          </span>
+          <button
+            onClick={onEmpezarDeNuevo}
+            className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted"
+          >
+            ↻ Empezar de nuevo
+          </button>
+        </div>
       </header>
 
-      {/* Estado hoy */}
-      <Section titulo="🌡️ Tu Estado Hoy">
-        <div className="overflow-hidden rounded-lg border border-border">
-          <table className="w-full text-sm">
-            <tbody className="divide-y divide-border/60">
-              {inf.estado_hoy.tabla.map((f, i) => (
-                <tr key={i}>
-                  <td className="w-40 bg-muted/30 px-4 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    {f.campo}
-                  </td>
-                  <td className="px-4 py-2">
-                    <span className="mr-2 text-base">{f.emoji}</span>
-                    {f.valor}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* ============================================================
+          SECCIÓN A — Resultado Psicológico
+      ============================================================ */}
+      <section className="rounded-xl border border-border bg-card p-6">
+        <SectionHeader
+          emoji="🧠"
+          titulo="Resultado Psicológico"
+          subtitulo="Lectura de tu estado + tendencia + recomendación + contexto del día."
+        />
+
+        <div className="space-y-4">
+          <SubBloque titulo="Análisis del estado actual">
+            <p className="text-sm leading-relaxed">{plan.analisis_emocional}</p>
+          </SubBloque>
+
+          <SubBloque titulo="Tendencia vs histórico">
+            <p className="text-sm leading-relaxed">{plan.tendencia}</p>
+          </SubBloque>
+
+          <SubBloque titulo="Recomendación accionable">
+            <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed">
+              {plan.recomendacion_psicologica
+                .split(/(?:;|\n|(?:^|\s)-\s)/)
+                .map((s) => s.trim())
+                .filter(Boolean)
+                .map((s, i) => (
+                  <li key={i}>{s}</li>
+                ))}
+            </ul>
+          </SubBloque>
+
+          <SubBloque titulo="Contexto del día">
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              {plan.contexto_dia}
+            </p>
+          </SubBloque>
         </div>
-        {inf.estado_hoy.conexion_emocional && (
-          <div className="mt-3 rounded-md border-l-4 border-violet-500/50 bg-violet-500/5 px-4 py-2 text-sm leading-relaxed">
-            <strong>Conexión emocional:</strong> {inf.estado_hoy.conexion_emocional}
-          </div>
-        )}
-      </Section>
+      </section>
 
-      {/* Tendencia */}
-      {inf.tendencia.registros.length > 0 && (
-        <Section titulo="📈 Tendencia vs últimos registros">
-          <div className="overflow-x-auto rounded-lg border border-border">
-            <table className="w-full text-xs">
-              <thead className="bg-muted/40 text-left text-[10px] uppercase tracking-wide text-muted-foreground">
-                <tr>
-                  <th className="px-3 py-2">Indicador</th>
-                  {inf.tendencia.registros.map((r, i) => (
-                    <th key={i} className="px-3 py-2 text-center">
-                      {r.fecha}
-                    </th>
-                  ))}
-                  <th className="px-3 py-2 text-center">Tendencia</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/60">
-                {(["despertar", "mente", "cuerpo", "rueda", "necesita"] as const).map((campo) => (
-                  <tr key={campo}>
-                    <td className="bg-muted/30 px-3 py-2 font-medium capitalize">{campo}</td>
-                    {inf.tendencia.registros.map((r, i) => {
-                      const rec = r as unknown as Record<string, unknown>;
-                      return (
-                        <td key={i} className="px-3 py-2 text-center text-[11px]">
-                          {String(rec[campo] ?? "—")}
-                        </td>
-                      );
-                    })}
-                    <td className="px-3 py-2 text-center">
-                      {inf.tendencia.registros[inf.tendencia.registros.length - 1]
-                        ?.tendencia_despertar ?? "—"}
-                    </td>
-                  </tr>
-                ))}
-                <tr className="bg-muted/20">
-                  <td className="px-3 py-2 font-medium">Semáforo</td>
-                  {inf.tendencia.registros.map((r, i) => (
-                    <td key={i} className="px-3 py-2 text-center">
-                      {r.semaforo}
-                    </td>
-                  ))}
-                  <td></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          {inf.tendencia.lectura && (
-            <p className="mt-3 text-sm leading-relaxed">{inf.tendencia.lectura}</p>
-          )}
-        </Section>
-      )}
+      {/* ============================================================
+          SECCIÓN B — Timeblocking
+      ============================================================ */}
+      <section className="rounded-xl border border-border bg-card p-6">
+        <SectionHeader
+          emoji="⏱️"
+          titulo="Timeblocking"
+          subtitulo={`${plan.num_bloques_activos} de 4 bloques activos · cada bloque son 60 min estrictos.`}
+        />
 
-      {/* Lectura Psicológica */}
-      <Section titulo="🧠 Lectura Psicológica">
-        {inf.lectura_psicologica.estado_actual && (
-          <SubSection titulo="Estado actual">
-            <p className="text-sm leading-relaxed">{inf.lectura_psicologica.estado_actual}</p>
-          </SubSection>
-        )}
-        {inf.lectura_psicologica.analisis_emocional && (
-          <SubSection titulo="Análisis emocional">
-            <p className="text-sm leading-relaxed">{inf.lectura_psicologica.analisis_emocional}</p>
-          </SubSection>
-        )}
-        {inf.lectura_psicologica.recomendaciones_hoy.length > 0 && (
-          <SubSection titulo="Recomendación psicológica — Para hoy">
-            <ol className="list-decimal space-y-1 pl-5 text-sm leading-relaxed">
-              {inf.lectura_psicologica.recomendaciones_hoy.map((r, i) => (
-                <li key={i}>{r}</li>
-              ))}
-            </ol>
-          </SubSection>
-        )}
-        {inf.lectura_psicologica.si_sobrepasado.length > 0 && (
-          <SubSection titulo="Si te sentís sobrepasado">
-            <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed">
-              {inf.lectura_psicologica.si_sobrepasado.map((r, i) => (
-                <li key={i}>{r}</li>
-              ))}
-            </ul>
-          </SubSection>
-        )}
-        {inf.lectura_psicologica.si_cuerpo_empeora.length > 0 && (
-          <SubSection titulo="Si el cuerpo empeora antes de las 17:00">
-            <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed text-red-700 dark:text-red-400">
-              {inf.lectura_psicologica.si_cuerpo_empeora.map((r, i) => (
-                <li key={i}>{r}</li>
-              ))}
-            </ul>
-          </SubSection>
-        )}
-        {inf.lectura_psicologica.para_esta_semana.length > 0 && (
-          <SubSection titulo="Para tener en cuenta (esta semana)">
-            <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed">
-              {inf.lectura_psicologica.para_esta_semana.map((r, i) => (
-                <li key={i}>{r}</li>
-              ))}
-            </ul>
-          </SubSection>
-        )}
-      </Section>
-
-      {/* Conexión con tareas */}
-      {inf.conexion_tareas.analisis_realismo.length > 0 && (
-        <Section titulo="🎯 Cómo afecta a tus tareas">
-          <SubSection titulo="Análisis de realismo">
-            <div className="overflow-x-auto rounded-lg border border-border">
-              <table className="w-full text-xs">
-                <thead className="bg-muted/40 text-left text-[10px] uppercase tracking-wide text-muted-foreground">
-                  <tr>
-                    <th className="px-3 py-2">Tarea reportada</th>
-                    <th className="px-3 py-2">¿Realista hoy?</th>
-                    <th className="px-3 py-2">Por qué</th>
-                    <th className="px-3 py-2">Acción</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/60">
-                  {inf.conexion_tareas.analisis_realismo.map((x, i) => (
-                    <tr key={i}>
-                      <td className="px-3 py-2 font-medium">
-                        {x.tarea}
-                        {x.origen && <span className="ml-1 text-[10px] text-muted-foreground">({x.origen})</span>}
-                      </td>
-                      <td className="px-3 py-2 text-center">
-                        {x.realista_hoy === "si" ? "✅ Sí" : x.realista_hoy === "si_condiciones" ? "⚠️ Con cond." : "❌ No"}
-                      </td>
-                      <td className="px-3 py-2 text-[11px]">{x.por_que}</td>
-                      <td className="px-3 py-2 text-[11px] font-medium">{x.accion}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        {/* Grid 2x2 con línea horizontal divisoria (mediodía) */}
+        <div className="relative">
+          {/* Línea horizontal que representa el mediodía */}
+          <div className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2">
+            <div className="flex items-center gap-2">
+              <div className="h-px flex-1 bg-border" />
+              <span className="rounded-full bg-background px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                ☀️ mediodía
+              </span>
+              <div className="h-px flex-1 bg-border" />
             </div>
-          </SubSection>
-          {inf.conexion_tareas.justificacion_3_tareas && (
-            <div className="mt-3 rounded-md border-l-4 border-amber-500/50 bg-amber-500/5 px-4 py-2 text-sm leading-relaxed">
-              {inf.conexion_tareas.justificacion_3_tareas}
-            </div>
-          )}
-        </Section>
-      )}
-
-      {/* Día optimizado */}
-      <Section titulo="📋 Tu Día Optimizado">
-        {inf.dia_optimizado.energia_disponible && (
-          <p className="mb-2 text-sm">
-            <strong>ENERGÍA DISPONIBLE:</strong> {inf.dia_optimizado.energia_disponible}
-          </p>
-        )}
-        {inf.dia_optimizado.principio_hoy && (
-          <p className="mb-3 text-sm italic text-muted-foreground">
-            <strong>Principio hoy:</strong> {inf.dia_optimizado.principio_hoy}
-          </p>
-        )}
-        {inf.dia_optimizado.horario.length > 0 && (
-          <div className="overflow-x-auto rounded-lg border border-border">
-            <table className="w-full text-xs">
-              <thead className="bg-muted/40 text-left text-[10px] uppercase tracking-wide text-muted-foreground">
-                <tr>
-                  <th className="px-3 py-2">Horario</th>
-                  <th className="px-3 py-2">Bloque</th>
-                  <th className="px-3 py-2">Tarea</th>
-                  <th className="px-3 py-2">Por qué</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/60">
-                {inf.dia_optimizado.horario.map((h, i) => (
-                  <tr key={i}>
-                    <td className="whitespace-nowrap px-3 py-2 font-medium">{h.horario}</td>
-                    <td className="px-3 py-2 text-[11px]">{h.bloque}</td>
-                    <td className="px-3 py-2">{h.tarea}</td>
-                    <td className="px-3 py-2 text-[11px] text-muted-foreground">{h.por_que}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
-        )}
-        {inf.dia_optimizado.delegacion_ia.length > 0 && (
-          <div className="mt-3 rounded-md border-l-4 border-fuchsia-500/50 bg-fuchsia-500/5 px-4 py-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-fuchsia-700 dark:text-fuchsia-300">
-              🤖 Delegación IA
-            </p>
-            <ul className="mt-1 space-y-1 text-sm">
-              {inf.dia_optimizado.delegacion_ia.map((d, i) => (
-                <li key={i}>
-                  <strong>🔧 {d.que}</strong> — <span className="text-muted-foreground">{d.cuando_listo}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-        {inf.dia_optimizado.patron_detectado && (
-          <p className="mt-3 text-xs italic text-muted-foreground">
-            {inf.dia_optimizado.patron_detectado}
-          </p>
-        )}
-      </Section>
 
-      {/* Clasificación de tareas */}
-      <Section titulo="📊 Clasificación de Todas las tareas">
-        {inf.clasificacion_tareas.del_dia.length > 0 && (
-          <SubSection titulo={`🔴 Tareas del día (${inf.clasificacion_tareas.del_dia.length})`}>
-            <TareasTablaDelDia
-              tareas={inf.clasificacion_tareas.del_dia}
-              tareasLocal={planLocal.tareas}
-              onAbrirRedactar={onAbrirRedactar}
-            />
-          </SubSection>
-        )}
-        {inf.clasificacion_tareas.pendientes_criticas.length > 0 && (
-          <SubSection titulo="🟠 Pendientes críticas (próximos 7 días)">
-            <TablaSencilla
-              headers={["Tarea", "Deadline", "Notas"]}
-              filas={inf.clasificacion_tareas.pendientes_criticas.map((t) => [
-                t.titulo,
-                t.deadline ?? "—",
-                t.notas ?? "—",
-              ])}
-            />
-          </SubSection>
-        )}
-        {inf.clasificacion_tareas.programables.length > 0 && (
-          <SubSection titulo="🟡 Programables (próxima semana)">
-            <TablaSencilla
-              headers={["Tarea", "Esfuerzo"]}
-              filas={inf.clasificacion_tareas.programables.map((t) => [t.titulo, t.esfuerzo ?? "—"])}
-            />
-          </SubSection>
-        )}
-        {inf.clasificacion_tareas.backlog.length > 0 && (
-          <SubSection titulo="⚪ Backlog">
-            <ul className="list-disc space-y-1 pl-5 text-sm">
-              {inf.clasificacion_tareas.backlog.map((t, i) => (
-                <li key={i}>{t.titulo}</li>
-              ))}
-            </ul>
-          </SubSection>
-        )}
-      </Section>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {([1, 2, 3, 4] as const).map((n) => {
+              const bloque = plan.bloques.find((b) => b.bloque_num === n);
+              const activo = bloque !== undefined;
 
-      {/* Recomendación estratégica */}
-      {inf.recomendacion_estrategica.vs_plan_largo.length > 0 && (
-        <Section titulo="🎯 Recomendación Estratégica del Día">
-          <SubSection titulo="vs Plan a largo plazo">
-            <TablaSencilla
-              headers={["Tarea de hoy", "Meta estratégica", "Conexión"]}
-              filas={inf.recomendacion_estrategica.vs_plan_largo.map((r) => [r.tarea, r.meta, r.conexion])}
-            />
-          </SubSection>
-          {inf.recomendacion_estrategica.si_estancas && (
-            <SubSection titulo="Si te estancás">
-              <p className="text-sm leading-relaxed">{inf.recomendacion_estrategica.si_estancas}</p>
-            </SubSection>
-          )}
-          {inf.recomendacion_estrategica.cierre_dia.length > 0 && (
-            <SubSection titulo="Cierre del día">
-              <ul className="space-y-1 text-sm">
-                {inf.recomendacion_estrategica.cierre_dia.map((c, i) => (
-                  <li key={i} className="flex gap-2">
-                    <span>☐</span>
-                    <span>{c}</span>
-                  </li>
-                ))}
-              </ul>
-            </SubSection>
-          )}
-        </Section>
-      )}
+              return (
+                <div
+                  key={n}
+                  className={`relative rounded-lg border p-4 ${
+                    activo
+                      ? "border-primary/30 bg-primary/5"
+                      : "border-dashed border-border bg-muted/30 opacity-60"
+                  }`}
+                >
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-xs font-semibold uppercase tracking-wide">
+                      {BLOQUE_LABELS[n]}
+                    </span>
+                    <span className="rounded-full bg-background px-2 py-0.5 text-[10px] text-muted-foreground">
+                      {BLOQUE_HORARIO[n]}
+                    </span>
+                  </div>
 
-      {/* Notas */}
-      {inf.notas.length > 0 && (
-        <Section titulo="📝 Notas">
-          <div className="space-y-4">
-            {inf.notas.map((n, i) => (
-              <div key={i} className="rounded-md border border-border bg-background p-3">
-                <h4 className="text-sm font-semibold">
-                  {i + 1}. {n.titulo}
-                </h4>
-                <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
-                  {n.texto}
-                </p>
-              </div>
-            ))}
-          </div>
-        </Section>
-      )}
-
-      {/* Comida */}
-      <Section titulo="🍽️ Propuesta de Comida">
-        <SubSection titulo="🥗 Plato Base 1 — Desayuno">
-          <PlatoBaseView pb={inf.comida.plato_base_desayuno} />
-        </SubSection>
-        <SubSection titulo="🥗 Plato Base 2 — Comida">
-          <PlatoBaseView pb={inf.comida.plato_base_comida} />
-        </SubSection>
-        {(inf.comida.cambio_20_80.propuesto || inf.comida.cambio_20_80.impacto) && (
-          <SubSection titulo="🎯 Cambio 20/80">
-            <ul className="space-y-1 text-sm">
-              {inf.comida.cambio_20_80.propuesto && (
-                <li><strong>Propuesto:</strong> {inf.comida.cambio_20_80.propuesto}</li>
-              )}
-              {inf.comida.cambio_20_80.impacto && (
-                <li><strong>Impacto:</strong> {inf.comida.cambio_20_80.impacto}</li>
-              )}
-              {inf.comida.cambio_20_80.implementacion && (
-                <li><strong>Implementación:</strong> {inf.comida.cambio_20_80.implementacion}</li>
-              )}
-            </ul>
-          </SubSection>
-        )}
-        {inf.comida.merienda && (
-          <SubSection titulo="🥜 Merienda">
-            <p className="text-sm">{inf.comida.merienda}</p>
-          </SubSection>
-        )}
-        {inf.comida.cena && (
-          <SubSection titulo="🍲 Cena">
-            <p className="text-sm">{inf.comida.cena}</p>
-          </SubSection>
-        )}
-
-        {inf.comida.menu_familiar.length > 0 && (
-          <SubSection titulo="🍴 Menú Familiar (MAÑANA y resto de semana)">
-            <TablaSencilla
-              headers={["Día", "Comida", "Cena"]}
-              filas={inf.comida.menu_familiar.map((m) => [m.dia, m.comida, m.cena])}
-            />
-          </SubSection>
-        )}
-
-        {inf.comida.lista_compra.length > 0 && (
-          <SubSection titulo="🛒 Lista de la Compra">
-            <div className="space-y-2">
-              {inf.comida.lista_compra.map((l, i) => (
-                <div key={i} className="rounded-md border border-border bg-background p-3">
-                  <h5 className="text-sm font-semibold">{l.categoria}</h5>
-                  <p className="mt-1 text-sm text-muted-foreground">{l.items}</p>
+                  {activo ? (
+                    <div>
+                      <div className="mb-1 flex flex-wrap items-center gap-2">
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                            bloque.tipo === "profunda"
+                              ? "border border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-300"
+                              : "border border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300"
+                          }`}
+                        >
+                          {bloque.tipo}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          60 min
+                        </span>
+                      </div>
+                      <p className="text-sm font-medium leading-snug">
+                        {bloque.titulo_libre}
+                      </p>
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        {bloque.tarea_id
+                          ? "📌 vinculada a tarea en BD"
+                          : "✨ tarea propuesta por la IA"}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="flex h-[60px] items-center justify-center text-xs italic text-muted-foreground">
+                      bloque desactivado
+                    </div>
+                  )}
                 </div>
-              ))}
-            </div>
-          </SubSection>
-        )}
+              );
+            })}
+          </div>
+        </div>
 
-        {inf.comida.plan_domingo && (
-          <SubSection titulo="📋 Plan Domingo (batch cooking)">
-            <p className="whitespace-pre-wrap text-sm leading-relaxed">
-              {inf.comida.plan_domingo}
+        <p className="mt-3 text-[11px] text-muted-foreground">
+          La IA decide el número de bloques activos según tu estado. Los
+          bloques 1-2 son de mañana (antes de comer); los bloques 3-4 de
+          tarde.
+        </p>
+      </section>
+
+      {/* ============================================================
+          SECCIÓN C — Sugerencia de Comida
+      ============================================================ */}
+      <section className="rounded-xl border border-border bg-card p-6">
+        <SectionHeader
+          emoji="🍽️"
+          titulo="Sugerencia de comida"
+          subtitulo="Una sola recomendación adaptada a tu estado y al día de hoy."
+        />
+
+        <div className="rounded-lg border border-border bg-gradient-to-br from-amber-500/5 via-orange-500/5 to-rose-500/5 p-5">
+          <h3 className="text-lg font-bold tracking-tight">
+            {plan.comida.titulo || "—"}
+          </h3>
+          <p className="mt-2 text-sm leading-relaxed">
+            {plan.comida.descripcion}
+          </p>
+          {plan.comida.motivo && (
+            <p className="mt-3 border-t border-border/60 pt-3 text-xs italic text-muted-foreground">
+              💡 {plan.comida.motivo}
             </p>
-          </SubSection>
-        )}
-      </Section>
-    </section>
+          )}
+        </div>
+      </section>
+
+      {/* ============================================================
+          Notas del día
+      ============================================================ */}
+      <section className="rounded-xl border border-border bg-card p-5">
+        <h3 className="mb-2 text-sm font-semibold tracking-tight">
+          📓 Notas del día
+        </h3>
+        <div className="flex flex-col gap-2">
+          <div className="flex gap-2">
+            <textarea
+              className="min-h-[80px] flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+              value={plan.notas}
+              onChange={(e) => {
+                onNotasChange(e.target.value);
+                if (notasEstado.status === "guardado") {
+                  // reset visual; la próxima vez que guarde se actualizará el timestamp
+                }
+              }}
+              placeholder="Reflexiones al final del día, qué salió bien, qué ajustar mañana…"
+            />
+            <button
+              onClick={onGuardarNotas}
+              disabled={notasEstado.status === "guardando"}
+              className="h-fit rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
+            >
+              {notasEstado.status === "guardando" ? "Guardando…" : "Guardar"}
+            </button>
+          </div>
+          {notasEstado.status === "guardado" && (
+            <p className="text-xs text-emerald-600 dark:text-emerald-400">
+              ✅ Guardado a las{" "}
+              {new Date(notasEstado.timestamp).toLocaleTimeString("es-ES", {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </p>
+          )}
+          {notasEstado.status === "error" && (
+            <p className="text-xs text-red-600 dark:text-red-400">
+              ❌ Error: {notasEstado.mensaje}
+            </p>
+          )}
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -985,19 +724,38 @@ function InformeRender({
 // Sub-componentes de presentación
 // ============================================================================
 
-function Section({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+function SectionHeader({
+  emoji,
+  titulo,
+  subtitulo,
+}: {
+  emoji: string;
+  titulo: string;
+  subtitulo?: string;
+}) {
   return (
-    <div>
-      <h2 className="mb-3 text-base font-semibold tracking-tight">{titulo}</h2>
-      <div className="space-y-3">{children}</div>
+    <div className="mb-4">
+      <h2 className="flex items-center gap-2 text-base font-semibold tracking-tight">
+        <span className="text-lg">{emoji}</span>
+        {titulo}
+      </h2>
+      {subtitulo && (
+        <p className="mt-1 text-xs text-muted-foreground">{subtitulo}</p>
+      )}
     </div>
   );
 }
 
-function SubSection({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+function SubBloque({
+  titulo,
+  children,
+}: {
+  titulo: string;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="rounded-md border border-border bg-background p-3">
-      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+    <div className="rounded-lg border border-border bg-background p-3">
+      <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         {titulo}
       </h3>
       {children}
@@ -1005,240 +763,30 @@ function SubSection({ titulo, children }: { titulo: string; children: React.Reac
   );
 }
 
-function TablaSencilla({ headers, filas }: { headers: string[]; filas: string[][] }) {
-  return (
-    <div className="overflow-x-auto rounded-lg border border-border">
-      <table className="w-full text-xs">
-        <thead className="bg-muted/40 text-left text-[10px] uppercase tracking-wide text-muted-foreground">
-          <tr>
-            {headers.map((h, i) => (
-              <th key={i} className="px-3 py-2">{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border/60">
-          {filas.map((f, i) => (
-            <tr key={i}>
-              {f.map((c, j) => (
-                <td key={j} className="px-3 py-2 align-top">{c}</td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+function SemaforoDot({ semaforo }: { semaforo: "verde" | "amarillo" | "rojo" }) {
+  const color =
+    semaforo === "verde"
+      ? "bg-emerald-500"
+      : semaforo === "amarillo"
+        ? "bg-amber-500"
+        : "bg-red-500";
+  return <span className={`h-2 w-2 rounded-full ${color}`} aria-hidden />;
 }
 
-function PlatoBaseView({ pb }: { pb: { estructura: string; tiempo: string; variaciones: string[]; base_metabolica: string } }) {
+function BoltIcon({ className }: { className?: string }) {
   return (
-    <div>
-      <p className="text-sm"><strong>Estructura:</strong> {pb.estructura}</p>
-      <p className="text-sm"><strong>Tiempo:</strong> {pb.tiempo}</p>
-      {pb.variaciones.length > 0 && (
-        <ul className="mt-1 list-disc pl-5 text-sm">
-          {pb.variaciones.map((v, i) => (
-            <li key={i}>{v}</li>
-          ))}
-        </ul>
-      )}
-      {pb.base_metabolica && (
-        <p className="mt-2 text-xs italic text-muted-foreground">{pb.base_metabolica}</p>
-      )}
-    </div>
-  );
-}
-
-function TareasTablaDelDia({
-  tareas,
-  tareasLocal,
-  onAbrirRedactar,
-}: {
-  tareas: InformePlan["clasificacion_tareas"]["del_dia"];
-  tareasLocal: TareaLocal[];
-  onAbrirRedactar: (t: TareaLocal) => void;
-}) {
-  return (
-    <div className="overflow-x-auto rounded-lg border border-border">
-      <table className="w-full text-xs">
-        <thead className="bg-muted/40 text-left text-[10px] uppercase tracking-wide text-muted-foreground">
-          <tr>
-            <th className="px-3 py-2">#</th>
-            <th className="px-3 py-2">Tarea</th>
-            <th className="px-3 py-2">Origen</th>
-            <th className="px-3 py-2">Tipo</th>
-            <th className="px-3 py-2">Bloque</th>
-            <th className="px-3 py-2 text-right">Tiempo</th>
-            <th className="px-3 py-2">IA</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border/60">
-          {tareas.map((t, i) => {
-            const tl = tareasLocal[i];
-            return (
-              <tr key={i}>
-                <td className="px-3 py-2 font-bold">{t.id ?? `T${i + 1}`}</td>
-                <td className="px-3 py-2 font-medium">{t.titulo}</td>
-                <td className="px-3 py-2 text-muted-foreground">{t.origen ?? "—"}</td>
-                <td className="px-3 py-2">{t.tipo ?? "—"}</td>
-                <td className="px-3 py-2">{t.bloque_energia ?? "—"}</td>
-                <td className="px-3 py-2 text-right tabular-nums">
-                  {t.tiempo_min ? `${t.tiempo_min} min` : "—"}
-                </td>
-                <td className="px-3 py-2">
-                  {tl && (
-                    <button
-                      onClick={() => onAbrirRedactar(tl)}
-                      className="rounded border border-fuchsia-500/30 bg-fuchsia-500/10 px-2 py-0.5 text-[10px] font-medium text-fuchsia-700 hover:opacity-90 dark:text-fuchsia-300"
-                    >
-                      ✍️ Redactar
-                    </button>
-                  )}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-// ============================================================================
-// Modal de redacción (Parte 2)
-// ============================================================================
-
-function RedactarModal({
-  estado,
-  onChange,
-  onGenerar,
-  onCopiar,
-  onGuardar,
-  onCerrar,
-}: {
-  estado: RedactarEstado;
-  onChange: (n: RedactarEstado) => void;
-  onGenerar: () => void;
-  onCopiar: () => void;
-  onGuardar: () => void;
-  onCerrar: () => void;
-}) {
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-      onClick={onCerrar}
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      viewBox="0 0 24 24"
+      aria-hidden
     >
-      <div
-        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-4 flex items-start justify-between gap-2">
-          <div>
-            <h2 className="text-lg font-semibold">✍️ Redactar borrador</h2>
-            <p className="text-xs text-muted-foreground">Tarea: {estado.titulo}</p>
-          </div>
-          <button onClick={onCerrar} className="text-xl text-muted-foreground hover:text-foreground">
-            ×
-          </button>
-        </div>
-
-        <div className="space-y-3">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block">
-              <span className="mb-1 block text-xs text-muted-foreground">Tipo</span>
-              <select
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
-                value={estado.tipo}
-                onChange={(e) =>
-                  onChange({ ...estado, tipo: e.target.value as RedactarEstado["tipo"] })
-                }
-              >
-                <option value="email">Email</option>
-                <option value="whatsapp">WhatsApp</option>
-                <option value="documento">Documento</option>
-                <option value="otro">Otro</option>
-              </select>
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs text-muted-foreground">
-                Destinatario (opcional)
-              </span>
-              <input
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
-                value={estado.destinatario}
-                onChange={(e) => onChange({ ...estado, destinatario: e.target.value })}
-                placeholder="Tania, gestoría, etc."
-              />
-            </label>
-          </div>
-
-          <label className="block">
-            <span className="mb-1 block text-xs text-muted-foreground">¿Qué quieres redactar?</span>
-            <textarea
-              className="min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
-              value={estado.contexto}
-              onChange={(e) => onChange({ ...estado, contexto: e.target.value })}
-              placeholder="Contexto, puntos a incluir, tono…"
-            />
-          </label>
-
-          <button
-            onClick={onGenerar}
-            disabled={estado.generando || !estado.contexto.trim()}
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
-          >
-            {estado.generando ? "Redactando con IA…" : "✨ Generar borrador"}
-          </button>
-
-          {estado.error && (
-            <div className="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-600 dark:text-red-400">
-              {estado.error}
-            </div>
-          )}
-
-          {(estado.asunto || estado.cuerpo) && (
-            <div className="space-y-2 border-t border-border pt-3">
-              {estado.tipo === "email" && (
-                <label className="block">
-                  <span className="mb-1 block text-xs text-muted-foreground">Asunto</span>
-                  <input
-                    className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
-                    value={estado.asunto}
-                    onChange={(e) => onChange({ ...estado, asunto: e.target.value })}
-                  />
-                </label>
-              )}
-              <label className="block">
-                <span className="mb-1 block text-xs text-muted-foreground">
-                  Cuerpo (editable antes de guardar/enviar)
-                </span>
-                <textarea
-                  className="min-h-[200px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
-                  value={estado.cuerpo}
-                  onChange={(e) => onChange({ ...estado, cuerpo: e.target.value })}
-                />
-              </label>
-
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={onCopiar}
-                  className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted"
-                >
-                  📋 Copiar
-                </button>
-                <button
-                  onClick={onGuardar}
-                  disabled={estado.guardando}
-                  className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
-                >
-                  {estado.guardando ? "Guardando…" : "💾 Guardar borrador"}
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+      <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z" />
+    </svg>
   );
 }
 
@@ -1246,22 +794,9 @@ function RedactarModal({
 // Helpers
 // ----------------------------------------------------------------------------
 
-async function resolverIdRealTarea(planId: string, titulo: string): Promise<string | null> {
-  const supabase = (await import("@/lib/supabase/client")).createClient();
-  const { data } = await supabase
-    .from("plan_diario_tareas")
-    .select("id,titulo_libre")
-    .eq("plan_diario_id", planId)
-    .order("orden");
-  if (!data) return null;
-  const match = data.find((t) => t.titulo_libre === titulo);
-  return (match?.id as string) ?? null;
-}
-
 function fechaToLargaLocal(fecha: string): string {
   const [y, m, d] = fecha.split("-").map(Number);
-  const date = new Date(Date.UTC(y, m - 1, d));
-  return date.toLocaleDateString("es-ES", {
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("es-ES", {
     weekday: "long",
     day: "numeric",
     month: "long",

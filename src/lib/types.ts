@@ -66,6 +66,17 @@ export interface Subtarea {
   hecho?: boolean;
 }
 
+/** Fila de metadatos en `tarea_adjuntos`. Los bytes viven en Supabase Storage. */
+export interface TareaAdjunto {
+  id: string;
+  tarea_id: string;
+  filename: string;
+  mime: string | null;
+  size_bytes: number | null;
+  storage_path: string;
+  created_at: string;
+}
+
 export interface Tarea {
   id: string;
   area_id: string | null;
@@ -84,6 +95,8 @@ export interface Tarea {
   notas: string | null;
   completada_at: string | null;
   subtareas: Subtarea[] | null;
+  /** Frase "Esta tarea está HECHA cuando __________". */
+  criterio_terminacion: string | null;
 }
 
 export interface Ritual {
@@ -304,6 +317,59 @@ export interface InformeComida {
   menu_familiar: { dia: string; comida: string; cena: string }[];
   lista_compra: { categoria: string; items: string }[];
   plan_domingo: string;
+}
+
+// ============================================================================
+// Plan diario v3 — entrada/salida simple (Parte 1 + Parte 2)
+// ============================================================================
+
+/** Input emocional libre del usuario (Parte 1) */
+export interface EstadoEmocionalInput {
+  texto: string;
+}
+
+/** Tarea suelta del input (Parte 1) — se persiste vía upsertTareaPorTitulo */
+export interface TareaLibreInput {
+  titulo: string;
+  /** id que devuelve la RPC si ya existía en BD; null si se acaba de crear */
+  tarea_id_existente: string | null;
+}
+
+/** Sugerencia gastronómica única (Parte 2 — Sección C) */
+export interface ComidaSugerida {
+  titulo: string;
+  descripcion: string;
+  motivo: string;
+}
+
+/** Tarea asignada a un bloque de timeblocking (Parte 2 — Sección B) */
+export interface BloqueTareaPlan {
+  bloque_num: 1 | 2 | 3 | 4;
+  /** Una sola tarea profunda por bloque; en rápidas se rellena `titulo_libre` agrupado */
+  tipo: "profunda" | "rapida";
+  tarea_id: string | null;
+  titulo_libre: string;
+  /** Tiempo estimado en minutos (60 = bloque entero) */
+  tiempo_min: number;
+}
+
+/** Plan generado por la IA en la nueva estructura A+B+C */
+export interface PlanGeneradoSimple {
+  semaforo: "verde" | "amarillo" | "rojo";
+  /** Sección A — análisis del estado actual introducido */
+  analisis_emocional: string;
+  /** Sección A — comparación con el histórico (tendencia) */
+  tendencia: string;
+  /** Sección A — recomendación accionable */
+  recomendacion_psicologica: string;
+  /** Sección A — contexto del día de la semana (ej: "Hoy es lunes, tocan pagos…") */
+  contexto_dia: string;
+  /** Sección B — nº de bloques activos (1-4) decidido por la IA según el estado */
+  num_bloques_activos: 1 | 2 | 3 | 4;
+  /** Sección B — tareas asignadas a cada bloque activo */
+  bloques: BloqueTareaPlan[];
+  /** Sección C — sugerencia gastronómica */
+  comida: ComidaSugerida;
 }
 
 export interface InformePlan {
