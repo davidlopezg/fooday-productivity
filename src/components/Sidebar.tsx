@@ -65,7 +65,7 @@ export function Sidebar() {
   return (
     <>
       {/* Barra superior (móvil) */}
-      <div className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-border bg-background/90 px-4 backdrop-blur md:hidden">
+      <div className="sticky top-0 z-40 flex h-14 w-full items-center gap-3 border-b border-border bg-background/90 px-4 backdrop-blur md:hidden">
         <button
           onClick={() => setOpen(true)}
           aria-label="Abrir menú"
