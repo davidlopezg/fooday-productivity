@@ -23,7 +23,15 @@ export default function LoginPage() {
       return;
     }
     router.push("/");
-    router.refresh();
+    // router.refresh() falla en static export (GitHub Pages).
+    // Si falla, recargamos la página entera para sincronizar la sesión.
+    try {
+      router.refresh();
+    } catch {
+      if (typeof window !== "undefined") {
+        window.location.href = "/";
+      }
+    }
   }
 
   const field =

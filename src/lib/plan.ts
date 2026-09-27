@@ -368,65 +368,73 @@ async function llamarLLM<T>(
   userPrompt: string,
   parseJSON: boolean,
 ): Promise<T> {
-  const res = await fetch(endpoint(baseUrl), {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: model || "Minimax-M3",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      temperature: 0.4,
-      response_format: parseJSON ? { type: "json_object" } : undefined,
-    }),
-  });
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`API ${res.status}: ${text.slice(0, 200)}`);
-  }
-
-  const data = await res.json();
-  const content: string = data?.choices?.[0]?.message?.content ?? "";
-  if (!parseJSON) return content as T;
-
+  // Timeout de 45s para no colgarse si la API no responde
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 45_000);
   try {
-    return JSON.parse(content);
-  } catch (e1) {
-    if (typeof window !== "undefined") {
-      console.warn("[plan] JSON.parse directo falló:", (e1 as Error).message);
-      console.warn("[plan] Content (primeros 600 chars):", content.slice(0, 600));
-      console.warn("[plan] Alrededor de pos 322:", content.slice(280, 380));
-    }
-  }
+    const res = await fetch(endpoint(baseUrl), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: model || "Minimax-M3",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        temperature: 0.4,
+        response_format: parseJSON ? { type: "json_object" } : undefined,
+      }),
+      signal: controller.signal,
+    });
 
-  try {
-    const json = extractFirstJSON(content);
-    return JSON.parse(json);
-  } catch (e2) {
-    if (typeof window !== "undefined") {
-      console.warn("[plan] extractFirstJSON falló:", (e2 as Error).message);
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`API ${res.status}: ${text.slice(0, 200)}`);
     }
-  }
 
-  // Último intento: sanea problemas comunes de LLMs
-  try {
-    const json = extractFirstJSON(content);
-    const saneado = sanearJSONComun(json);
-    return JSON.parse(saneado);
-  } catch (e3) {
-    if (typeof window !== "undefined") {
-      console.warn("[plan] sanearJSONComun falló:", (e3 as Error).message);
+    const data = await res.json();
+    const content: string = data?.choices?.[0]?.message?.content ?? "";
+    if (!parseJSON) return content as T;
+
+    try {
+      return JSON.parse(content);
+    } catch (e1) {
+      if (typeof window !== "undefined") {
+        console.warn("[plan] JSON.parse directo falló:", (e1 as Error).message);
+        console.warn("[plan] Content (primeros 600 chars):", content.slice(0, 600));
+        console.warn("[plan] Alrededor de pos 322:", content.slice(280, 380));
+      }
     }
-  }
 
-  throw new Error(
-    `La IA no devolvió JSON válido. Primeros 200 chars: ${content.slice(0, 200).replace(/\n/g, " ")}`,
-  );
+    try {
+      const json = extractFirstJSON(content);
+      return JSON.parse(json);
+    } catch (e2) {
+      if (typeof window !== "undefined") {
+        console.warn("[plan] extractFirstJSON falló:", (e2 as Error).message);
+      }
+    }
+
+    // Último intento: sanea problemas comunes de LLMs
+    try {
+      const json = extractFirstJSON(content);
+      const saneado = sanearJSONComun(json);
+      return JSON.parse(saneado);
+    } catch (e3) {
+      if (typeof window !== "undefined") {
+        console.warn("[plan] sanearJSONComun falló:", (e3 as Error).message);
+      }
+    }
+
+    throw new Error(
+      `La IA no devolvió JSON válido. Primeros 200 chars: ${content.slice(0, 200).replace(/\n/g, " ")}`,
+    );
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 /** Repara problemas típicos de LLMs: trailing commas, comillas simples, undefined, NaN. */

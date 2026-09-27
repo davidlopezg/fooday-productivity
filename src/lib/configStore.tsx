@@ -54,6 +54,11 @@ function writeLS(cfg: Config) {
 
 async function fetchRemote(): Promise<Config> {
   const supabase = createClient();
+  // Refresca la sesión por si el token expiró entre la carga de página y ahora
+  const { error: refreshError } = await supabase.auth.refreshSession();
+  if (refreshError && !String(refreshError).includes("No session")) {
+    console.warn("[configStore] refreshSession:", refreshError.message);
+  }
   const { data, error } = await supabase
     .from("configuracion")
     .select("base_url,minimax_api_key,model")
@@ -158,13 +163,12 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
       // 2) Intenta sincronizar con Supabase (best effort).
       try {
         const supabase = createClient();
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        if (!user) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) {
           setLastError("No autenticado (no se pudo sincronizar con Supabase)");
           return;
         }
+        const user = session.user;
         const { error } = await supabase.from("configuracion").upsert(
           {
             user_id: user.id,

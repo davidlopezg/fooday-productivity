@@ -200,43 +200,60 @@ async function llamarLLM<T>(
   apiKey: string,
   model: string,
   userPrompt: string,
+  /** Señal para abortar la petición (timeout, etc.) */
+  signal?: AbortSignal,
+  /** Algunas APIs (Ollama, LM Studio, etc.) rechazan este campo. Solo se envía
+   *  si la baseUrl parece de un proveedor OpenAI-compatible conocido. */
 ): Promise<T> {
-  const res = await fetch(endpoint(baseUrl), {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: model || "Minimax-M3",
-      messages: [
-        {
-          role: "system",
-          content:
-            "Eres un asistente que responde SOLO con JSON válido, sin texto fuera.",
-        },
-        { role: "user", content: userPrompt },
-      ],
-      temperature: 0.4,
-      response_format: { type: "json_object" },
-    }),
-  });
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`API ${res.status}: ${text.slice(0, 200)}`);
+  const knownJsonFormat = /openai|minimax|groq|deepseek|together|anthropic/i.test(baseUrl);
+  const body: Record<string, unknown> = {
+    model: model || "Minimax-M3",
+    messages: [
+      {
+        role: "system",
+        content:
+          "Eres un asistente que responde SOLO con JSON válido, sin texto fuera.",
+      },
+      { role: "user", content: userPrompt },
+    ],
+    temperature: 0.4,
+  };
+  if (knownJsonFormat) {
+    body.response_format = { type: "json_object" };
   }
 
-  const data = await res.json();
-  const content: string = data?.choices?.[0]?.message?.content ?? "";
-  if (!content) throw new Error("La IA devolvió una respuesta vacía.");
-
+  // Timeout de 45s para no colgarse si la API no responde
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 45_000);
   try {
-    return JSON.parse(content);
-  } catch {
-    // fallback: extraer primer bloque {...} válido
-    const json = extractFirstJSON(content);
-    return JSON.parse(saneadorComun(json));
+    const res = await fetch(endpoint(baseUrl), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(body),
+      signal: signal ?? controller.signal,
+    });
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`API ${res.status}: ${text.slice(0, 200)}`);
+    }
+
+    const data = await res.json();
+    const content: string = data?.choices?.[0]?.message?.content ?? "";
+    if (!content) throw new Error("La IA devolvió una respuesta vacía.");
+
+    try {
+      return JSON.parse(content);
+    } catch {
+      // fallback: extraer primer bloque {...} válido
+      const json = extractFirstJSON(content);
+      return JSON.parse(saneadorComun(json));
+    }
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
