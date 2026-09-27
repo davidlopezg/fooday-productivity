@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
   IconCalendar,
+  IconColumns,
   IconCompass,
   IconHeart,
   IconHistory,
@@ -23,6 +24,7 @@ const LINKS = [
   { href: "/", label: "Hoy", Icon: IconHome },
   { href: "/captura", label: "Captura", Icon: IconInbox },
   { href: "/tareas", label: "Tareas", Icon: IconList },
+  { href: "/pipeline", label: "Pipeline", Icon: IconColumns },
   { href: "/plan-diario", label: "Plan diario", Icon: IconSparkles },
   { href: "/plan-diario/historico", label: "Histórico planes", Icon: IconHistory },
   { href: "/dashboard-emocional", label: "Dashboard emocional", Icon: IconHeart },

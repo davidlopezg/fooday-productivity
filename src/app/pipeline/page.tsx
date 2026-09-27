@@ -1,0 +1,277 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  MouseSensor,
+  TouchSensor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
+import { fetchTareas } from "@/lib/queries";
+import { actualizarTarea } from "@/lib/mutations";
+import { useData } from "@/lib/useData";
+import type { EstadoTarea, Prioridad, Tarea } from "@/lib/types";
+
+type ColId = Prioridad | "sin_prioridad";
+
+const COLUMNAS: { id: ColId; label: string; acento: string }[] = [
+  { id: "critica", label: "Crítica", acento: "border-t-red-500" },
+  { id: "urgente", label: "Urgente", acento: "border-t-orange-500" },
+  { id: "alta", label: "Alta", acento: "border-t-amber-500" },
+  { id: "media", label: "Media", acento: "border-t-sky-500" },
+  { id: "baja", label: "Baja", acento: "border-t-border" },
+  { id: "sin_prioridad", label: "Sin prioridad", acento: "border-t-border" },
+];
+
+const ACTIVAS: EstadoTarea[] = ["pendiente", "en_progreso", "bloqueada"];
+
+const TONO_ESTADO: Record<string, string> = {
+  pendiente: "bg-muted text-muted-foreground border-border",
+  en_progreso:
+    "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+  bloqueada: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20",
+  hecha:
+    "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
+  archivada: "bg-muted text-muted-foreground border-border",
+};
+
+const prioridadDe = (t: Tarea): ColId => t.prioridad ?? "sin_prioridad";
+
+/** Solo el contenido de la tarjeta: se reutiliza en el DragOverlay. */
+function TarjetaContenido({ t }: { t: Tarea }) {
+  return (
+    <>
+      <p
+        className={`text-sm font-medium leading-snug ${
+          t.estado === "hecha" ? "line-through opacity-60" : ""
+        }`}
+      >
+        {t.titulo}
+      </p>
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        <span
+          className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${
+            TONO_ESTADO[t.estado] ?? TONO_ESTADO.pendiente
+          }`}
+        >
+          {t.estado.replace("_", " ")}
+        </span>
+        {t.deadline && (
+          <span className="text-[11px] text-muted-foreground">
+            📅 {t.deadline}
+          </span>
+        )}
+        {t.pts != null && (
+          <span className="text-[11px] text-muted-foreground">{t.pts} pts</span>
+        )}
+        {t.capa && (
+          <span className="text-[11px] text-muted-foreground">{t.capa}</span>
+        )}
+      </div>
+    </>
+  );
+}
+
+function Tarjeta({ t }: { t: Tarea }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: t.id,
+  });
+  return (
+    <article
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      // touch-manipulation: evita el zoom por doble toque sin bloquear el
+      // scroll vertical. El TouchSensor usa delay 200ms, así que desplazar
+      // con el dedo sigue haciendo scroll en vez de arrastrar la tarjeta.
+      className={`cursor-grab touch-manipulation select-none rounded-lg border border-border bg-card p-3 shadow-sm active:cursor-grabbing ${
+        isDragging ? "opacity-30" : "hover:shadow-md"
+      }`}
+    >
+      <TarjetaContenido t={t} />
+    </article>
+  );
+}
+
+function Columna({
+  id,
+  label,
+  acento,
+  n,
+  children,
+}: {
+  id: ColId;
+  label: string;
+  acento: string;
+  n: number;
+  children: React.ReactNode;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id });
+  return (
+    <section
+      ref={setNodeRef}
+      className={`flex max-h-[70dvh] w-[80vw] shrink-0 snap-start flex-col rounded-xl border border-t-4 bg-muted/20 ${acento} ${
+        isOver ? "ring-2 ring-ring ring-offset-2 ring-offset-background" : ""
+      } sm:w-72 md:w-auto md:min-w-0 md:flex-1`}
+    >
+      <header className="flex shrink-0 items-center justify-between gap-2 px-3 py-2.5">
+        <h2 className="text-sm font-semibold tracking-tight">{label}</h2>
+        <span className="rounded-full bg-background px-2 py-0.5 text-[11px] text-muted-foreground">
+          {n}
+        </span>
+      </header>
+      <div className="min-h-[80px] flex-1 space-y-2 overflow-y-auto px-2 pb-2">
+        {children}
+      </div>
+    </section>
+  );
+}
+
+export default function PipelinePage() {
+  const {
+    data: tareas,
+    loading,
+    error,
+    reload,
+    setData,
+  } = useData<Tarea[]>(fetchTareas, []);
+  const [verTodas, setVerTodas] = useState(false);
+  const [arrastrada, setArrastrada] = useState<Tarea | null>(null);
+  const [guardando, setGuardando] = useState(false);
+  const [errorMover, setErrorMover] = useState<string | null>(null);
+
+  // MouseSensor = ratón en escritorio. TouchSensor con delay = en móvil hay
+  // que MANTENER pulsado para arrastrar; si deslizas antes, hace scroll.
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 200, tolerance: 8 },
+    }),
+    useSensor(KeyboardSensor),
+  );
+
+  const visibles = useMemo(
+    () =>
+      verTodas ? tareas : tareas.filter((t) => ACTIVAS.includes(t.estado)),
+    [tareas, verTodas],
+  );
+
+  const porColumna = useMemo(() => {
+    const m = new Map<ColId, Tarea[]>();
+    for (const c of COLUMNAS) m.set(c.id, []);
+    for (const t of visibles) m.get(prioridadDe(t))?.push(t);
+    return m;
+  }, [visibles]);
+
+  function onDragStart(e: DragStartEvent) {
+    setErrorMover(null);
+    setArrastrada(tareas.find((t) => t.id === e.active.id) ?? null);
+  }
+
+  async function onDragEnd(e: DragEndEvent) {
+    setArrastrada(null);
+    const destino = e.over?.id as ColId | undefined;
+    const t = tareas.find((x) => x.id === e.active.id);
+    if (!t || !destino || prioridadDe(t) === destino) return;
+
+    const nueva = destino === "sin_prioridad" ? null : destino;
+    const antes = tareas;
+    // Optimista: la tarjeta cambia de columna al instante, sin esperar a la red.
+    setData((prev) =>
+      prev.map((x) => (x.id === t.id ? { ...x, prioridad: nueva } : x)),
+    );
+    setGuardando(true);
+    try {
+      await actualizarTarea({ id: t.id, prioridad: nueva });
+    } catch (err) {
+      setData(antes); // rollback si Supabase dice que no
+      setErrorMover(
+        err instanceof Error ? err.message : "No se pudo mover la tarea",
+      );
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Pipeline</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {loading
+              ? "Cargando…"
+              : "Arrastra una tarjeta a otra columna para cambiar su prioridad." +
+                (guardando ? " Guardando…" : "")}
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 text-sm text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={verTodas}
+              onChange={(e) => setVerTodas(e.target.checked)}
+              className="h-4 w-4"
+            />
+            Ver hechas y archivadas
+          </label>
+          <button
+            onClick={reload}
+            className="rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-accent"
+          >
+            Recargar
+          </button>
+        </div>
+      </header>
+
+      {error && (
+        <p className="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">
+          Error al cargar tareas: {error}
+        </p>
+      )}
+      {errorMover && (
+        <p className="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">
+          {errorMover}
+        </p>
+      )}
+
+      <DndContext
+        sensors={sensors}
+        onDragStart={onDragStart}
+        onDragEnd={onDragEnd}
+        onDragCancel={() => setArrastrada(null)}
+      >
+        <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-4">
+          {COLUMNAS.map((c) => (
+            <Columna
+              key={c.id}
+              id={c.id}
+              label={c.label}
+              acento={c.acento}
+              n={porColumna.get(c.id)?.length ?? 0}
+            >
+              {porColumna.get(c.id)?.map((t) => (
+                <Tarjeta key={t.id} t={t} />
+              ))}
+            </Columna>
+          ))}
+        </div>
+
+        <DragOverlay dropAnimation={null}>
+          {arrastrada ? (
+            <article className="w-64 rotate-2 cursor-grabbing rounded-lg border border-border bg-card p-3 shadow-xl">
+              <TarjetaContenido t={arrastrada} />
+            </article>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
+    </div>
+  );
+}

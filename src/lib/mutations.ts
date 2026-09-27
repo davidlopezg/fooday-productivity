@@ -37,7 +37,7 @@ export interface TareaCampos {
   id: string;
   titulo?: string;
   descripcion?: string | null;
-  prioridad?: string;
+  prioridad?: string | null;
   estado?: string;
   deadline?: string | null;
   capa?: string | null;
@@ -52,7 +52,10 @@ export async function actualizarTarea(datos: TareaCampos) {
   if (campos.estado !== undefined) {
     update.completada_at = campos.estado === "hecha" ? new Date().toISOString() : null;
   }
-  await createClient().from("tareas").update(update).eq("id", id);
+  const { error } = await createClient().from("tareas").update(update).eq("id", id);
+  // Sin esto, un UPDATE fallido (RLS, red, columna inexistente) pasaba por
+  // bueno y la UI mentia: el dato no se guardaba y nadie se enteraba.
+  if (error) throw new Error(`No se pudo actualizar la tarea: ${error.message}`);
 }
 
 export type TareaCreada = {

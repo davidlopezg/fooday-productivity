@@ -26,6 +26,14 @@ export const IconInbox = (p: IconProps) => (
   </svg>
 );
 
+export const IconColumns = (p: IconProps) => (
+  <svg {...base} {...p}>
+    <rect x="3" y="4" width="5" height="16" rx="1" />
+    <rect x="9.5" y="4" width="5" height="10" rx="1" />
+    <rect x="16" y="4" width="5" height="13" rx="1" />
+  </svg>
+);
+
 export const IconList = (p: IconProps) => (
   <svg {...base} {...p}>
     <path d="M8 6h13M8 12h13M8 18h13" />
