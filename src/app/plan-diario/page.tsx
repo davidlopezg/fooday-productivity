@@ -164,13 +164,27 @@ export default function PlanDiarioPage() {
       const fecha = HOY();
       const tareasLibresConId = tareasLibres
         .filter((t) => t.id_bd)
-        .map<Tarea>((t) => ({
+        .map((t): Tarea => ({
           id: t.id_bd as string,
           titulo: t.titulo,
           estado: "pendiente",
           prioridad: "media",
-          // el resto de campos no los necesitamos para el prompt
-        } as Tarea));
+          // El resto de campos no se usan en `buildPrompt`/`sanearPlanSimple`
+          area_id: null,
+          meta_id: null,
+          codigo: null,
+          descripcion: null,
+          capa: null,
+          deadline: null,
+          pts: null,
+          esfuerzo: null,
+          importe: null,
+          origen: null,
+          notas: null,
+          completada_at: null,
+          subtareas: null,
+          criterio_terminacion: null,
+        }));
 
       const plan = await generarPlanSimple(
         {
@@ -401,7 +415,7 @@ export default function PlanDiarioPage() {
             disabled={generando || !config.data.minimax_api_key || !estadoTexto.trim()}
             className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <BoltIcon className="h-4 w-4" />
+            <IconBolt className="h-4 w-4" />
             {generando ? "Generando plan…" : "Generar plan"}
           </button>
           <span className="text-xs text-muted-foreground">
@@ -773,26 +787,7 @@ function SemaforoDot({ semaforo }: { semaforo: "verde" | "amarillo" | "rojo" }) 
   return <span className={`h-2 w-2 rounded-full ${color}`} aria-hidden />;
 }
 
-function BoltIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      viewBox="0 0 24 24"
-      aria-hidden
-    >
-      <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z" />
-    </svg>
-  );
-}
-
-// ----------------------------------------------------------------------------
-// Helpers
-// ----------------------------------------------------------------------------
+import { IconBolt } from "@/components/icons";
 
 function fechaToLargaLocal(fecha: string): string {
   const [y, m, d] = fecha.split("-").map(Number);

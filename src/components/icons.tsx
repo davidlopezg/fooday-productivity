@@ -161,3 +161,18 @@ export const IconFile = (p: IconProps) => (
     <path d="M14 3v5h5" />
   </svg>
 );
+
+export const IconBolt = (p: IconProps) => (
+  <svg
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    viewBox="0 0 24 24"
+    aria-hidden
+    {...p}
+  >
+    <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z" />
+  </svg>
+);

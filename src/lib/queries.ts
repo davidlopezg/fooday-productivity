@@ -23,7 +23,8 @@ export async function fetchAreas(): Promise<Area[]> {
 export async function fetchTareas(estado?: string): Promise<Tarea[]> {
   let q = createClient().from("tareas").select("*").order("created_at", { ascending: false });
   if (estado) q = q.eq("estado", estado);
-  const { data } = await q;
+  const { data, error } = await q;
+  if (error) throw error;
   return (data ?? []) as Tarea[];
 }
 

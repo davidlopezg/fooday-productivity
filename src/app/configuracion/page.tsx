@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useConfig } from "@/lib/configStore";
 import { probarConexion } from "@/lib/plan";
 
@@ -8,8 +8,8 @@ export default function ConfiguracionPage() {
   const { data, loading, save, diagnostic } = useConfig();
 
   const [apiKey, setApiKey] = useState("");
-  const [baseUrl, setBaseUrl] = useState("https://api.minimax.io/v1");
-  const [model, setModel] = useState("Minimax-M3");
+  const [baseUrl, setBaseUrl] = useState(data.base_url);
+  const [model, setModel] = useState(data.model);
   const [mostrar, setMostrar] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [probando, setProbando] = useState(false);
@@ -17,6 +17,15 @@ export default function ConfiguracionPage() {
   const [error, setError] = useState<string | null>(null);
 
   const tieneKey = !!data.minimax_api_key;
+
+  // Sincroniza los campos cuando se recargan los datos remotos
+  useEffect(() => {
+    setBaseUrl(data.base_url);
+    setModel(data.model);
+    if (!apiKey && data.minimax_api_key) {
+      // No machacamos la key que el usuario está escribiendo
+    }
+  }, [data.base_url, data.model]);
 
   async function guardar() {
     setGuardando(true);
@@ -171,7 +180,13 @@ export default function ConfiguracionPage() {
         <p>
           User ID:{" "}
           <code className="rounded bg-background px-1 py-0.5">
-            {diagnostic.userId ?? "(sin sesión)"}
+            {loading ? (
+              <span className="text-muted-foreground">cargando…</span>
+            ) : diagnostic.userId ? (
+              diagnostic.userId.slice(0, 12) + "…"
+            ) : (
+              <span className="text-red-500">(sin sesión)</span>
+            )}
           </code>
         </p>
         {diagnostic.lastError ? (

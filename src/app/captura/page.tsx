@@ -13,15 +13,25 @@ export default function CapturaPage() {
   );
   const [texto, setTexto] = useState("");
   const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!texto.trim()) return;
     setGuardando(true);
-    await crearCaptura(texto);
-    setTexto("");
-    setGuardando(false);
-    reload();
+    setError(null);
+    let alive = true;
+    try {
+      await crearCaptura(texto);
+      if (!alive) return;
+      setTexto("");
+      reload();
+    } catch (e: unknown) {
+      if (!alive) return;
+      setError(e instanceof Error ? e.message : "Error al guardar captura");
+    } finally {
+      if (alive) setGuardando(false);
+    }
   }
 
   return (
@@ -42,6 +52,9 @@ export default function CapturaPage() {
           placeholder="Escribe aquí… (tarea, problema, reflexión, idea…)"
           className="w-full rounded-md border border-input bg-background p-3 text-sm outline-none focus:ring-2 focus:ring-ring"
         />
+        {error && (
+          <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
+        )}
         <button
           type="submit"
           disabled={guardando}

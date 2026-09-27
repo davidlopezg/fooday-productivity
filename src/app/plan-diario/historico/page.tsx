@@ -89,6 +89,7 @@ export default function PlanDiarioHistoricoPage() {
                   <th className="px-4 py-3">Tareas</th>
                   <th className="px-4 py-3">Resumen</th>
                   <th className="px-4 py-3">Recomendación</th>
+                  <th className="px-4 py-3 w-8"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60">
@@ -123,10 +124,13 @@ export default function PlanDiarioHistoricoPage() {
                         <td className="max-w-xs truncate px-4 py-3 text-xs text-muted-foreground">
                           {p.recomendacion ?? "—"}
                         </td>
+                        <td className="px-4 py-3 text-center text-xs text-muted-foreground">
+                          {isExpanded ? "▼" : "▶"}
+                        </td>
                       </tr>
                       {isExpanded && (
                         <tr className="bg-muted/20">
-                          <td colSpan={6} className="px-4 py-4">
+                          <td colSpan={7} className="px-4 py-4">
                             <div className="grid gap-3 sm:grid-cols-2">
                               <div>
                                 <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">

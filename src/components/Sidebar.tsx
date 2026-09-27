@@ -44,7 +44,7 @@ function NavItems({ onNavigate }: { onNavigate?: () => void }) {
             key={href}
             href={href}
             onClick={onNavigate}
-            className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+            className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors active:bg-accent ${
               active
                 ? "bg-accent text-accent-foreground"
                 : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
@@ -65,15 +65,17 @@ export function Sidebar() {
   return (
     <>
       {/* Barra superior (móvil) */}
-      <div className="sticky top-0 z-40 flex h-14 w-full items-center gap-3 border-b border-border bg-background/90 px-4 backdrop-blur md:hidden">
-        <button
-          onClick={() => setOpen(true)}
-          aria-label="Abrir menú"
-          className="rounded-md p-1.5 hover:bg-accent"
-        >
-          <IconMenu className="h-5 w-5" />
-        </button>
-        <span className="font-semibold tracking-tight">fooday·productivity</span>
+      <div className="safe-t sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur md:hidden">
+        <div className="flex h-14 items-center gap-3 px-4">
+          <button
+            onClick={() => setOpen(true)}
+            aria-label="Abrir menú"
+            className="-ml-2 rounded-md p-2 hover:bg-accent active:bg-accent"
+          >
+            <IconMenu className="h-5 w-5" />
+          </button>
+          <span className="font-semibold tracking-tight">fooday·productivity</span>
+        </div>
       </div>
 
       {/* Drawer (móvil) */}
@@ -83,21 +85,21 @@ export function Sidebar() {
             className="absolute inset-0 bg-black/50"
             onClick={() => setOpen(false)}
           />
-          <aside className="absolute left-0 top-0 h-full w-64 border-r border-border bg-card p-4">
-            <div className="mb-6 flex items-center justify-between">
+          <aside className="safe-t safe-b absolute left-0 top-0 flex h-full w-72 max-w-[85vw] flex-col overflow-y-auto border-r border-border bg-card px-4 pb-4">
+            <div className="flex h-14 shrink-0 items-center justify-between">
               <span className="font-semibold tracking-tight">
                 fooday·productivity
               </span>
               <button
                 onClick={() => setOpen(false)}
                 aria-label="Cerrar menú"
-                className="rounded-md p-1.5 hover:bg-accent"
+                className="-mr-2 rounded-md p-2 hover:bg-accent active:bg-accent"
               >
                 <IconX className="h-4 w-4" />
               </button>
             </div>
             <NavItems onNavigate={() => setOpen(false)} />
-            <div className="mt-6 border-t border-border pt-4">
+            <div className="mt-auto border-t border-border pt-4">
               <SignOut />
             </div>
           </aside>

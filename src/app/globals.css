@@ -77,6 +77,11 @@
   border-color: hsl(var(--border));
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
@@ -84,7 +89,37 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Scrollbar sutil */
+/* ---------------------------------------------------------------------------
+   Móvil: zonas seguras (notch / barra de gestos).
+   `viewport-fit=cover` está activo en layout.tsx, así que sin esto el
+   contenido queda debajo del notch y de la barra de gestos.
+--------------------------------------------------------------------------- */
+.safe-t {
+  padding-top: env(safe-area-inset-top);
+}
+.safe-b {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+@media (hover: none) {
+  /* Sin flash azul al tocar; el feedback lo dan los estados :active/hover */
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* iOS hace zoom automático al enfocar un campo con font-size < 16px,
+   lo que "rompe" el layout. En móvil forzamos 16px. */
+@media (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* Scrollbar sutil (solo puntero fino: en táctil sobra) */
+@media (pointer: fine) {
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -95,6 +130,7 @@ body {
 }
 ::-webkit-scrollbar-track {
   background: transparent;
+}
 }
 
 /* Foco accesible (skill: accessibility checklist) */

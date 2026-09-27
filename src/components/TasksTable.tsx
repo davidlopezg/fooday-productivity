@@ -72,6 +72,71 @@ function Badge({ tone, children }: { tone: string; children: React.ReactNode }) 
 const inputCls =
   "h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring";
 
+/** Acciones de una tarea. Compartidas por la tabla (escritorio) y las tarjetas (movil). */
+function TareaAcciones({
+  t,
+  run,
+  onEditar,
+}: {
+  t: Tarea;
+  run: (fn: () => Promise<void>) => void;
+  onEditar: () => void;
+}) {
+  const btn =
+    "rounded-md p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground active:bg-accent";
+  return (
+    <div className="flex shrink-0 items-center gap-0.5">
+      {t.estado === "hecha" ? (
+        <button title="Reabrir" aria-label="Reabrir" onClick={() => run(() => reabrirTarea(t.id))} className={btn}>
+          <IconX className="h-4 w-4" />
+        </button>
+      ) : (
+        <button
+          title="Marcar como hecha"
+          aria-label="Marcar como hecha"
+          onClick={() => run(() => marcarHecha(t.id))}
+          className={`${btn} hover:text-emerald-500`}
+        >
+          <IconCheck className="h-4 w-4" />
+        </button>
+      )}
+      <button title="Editar" aria-label="Editar" onClick={onEditar} className={btn}>
+        <IconPencil className="h-4 w-4" />
+      </button>
+      {t.estado === "archivada" ? (
+        <button
+          title="Desarchivar"
+          aria-label="Desarchivar"
+          onClick={() => run(() => desarchivarTarea(t.id))}
+          className={btn}
+        >
+          <IconArchive className="h-4 w-4" />
+        </button>
+      ) : (
+        <button
+          title="Archivar"
+          aria-label="Archivar"
+          onClick={() => run(() => archivarTarea(t.id))}
+          className={btn}
+        >
+          <IconArchive className="h-4 w-4" />
+        </button>
+      )}
+      <button
+        title="Eliminar"
+        aria-label="Eliminar"
+        onClick={() => {
+          if (confirm(`¿Eliminar "${t.titulo}"? No se puede deshacer.`))
+            run(() => eliminarTarea(t.id));
+        }}
+        className={`${btn} hover:bg-destructive/10 hover:text-destructive`}
+      >
+        <IconTrash className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
+
 export function TasksTable({
   tareas,
   adjuntosCount,
@@ -107,8 +172,12 @@ export function TasksTable({
 
   function run(fn: () => Promise<void>) {
     startTransition(async () => {
-      await fn();
-      onChanged();
+      try {
+        await fn();
+        onChanged();
+      } catch (e: unknown) {
+        console.error("[TasksTable] run falló:", e instanceof Error ? e.message : String(e));
+      }
     });
   }
 
@@ -161,8 +230,64 @@ export function TasksTable({
         </button>
       </div>
 
-      {/* Tabla */}
-      <div className="overflow-x-auto rounded-xl border border-border bg-card">
+      {/* Lista de tarjetas (movil): la tabla de 760px obliga a scroll lateral */}
+      <ul className="space-y-2 md:hidden">
+        {filtradas.map((t) => {
+          const nAdj = adjuntosCount?.get(t.id) ?? 0;
+          return (
+            <li key={t.id} className="rounded-xl border border-border bg-card p-3">
+              <div className="flex items-start gap-1">
+                <div className="min-w-0 flex-1">
+                  <div
+                    className={`text-sm font-medium ${
+                      t.estado === "hecha" ? "line-through opacity-60" : ""
+                    }`}
+                  >
+                    {t.titulo}
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                    <Badge tone={TONO_ESTADO[t.estado] ?? TONO_ESTADO.pendiente}>
+                      {t.estado.replace("_", " ")}
+                    </Badge>
+                    {t.prioridad && (
+                      <Badge tone={TONO_PRIORIDAD[t.prioridad] ?? TONO_PRIORIDAD.media}>
+                        {t.prioridad.toUpperCase()}
+                      </Badge>
+                    )}
+                    {t.capa && (
+                      <span className="text-[11px] text-muted-foreground">{t.capa}</span>
+                    )}
+                    {t.deadline && (
+                      <span className="text-[11px] text-muted-foreground">📅 {t.deadline}</span>
+                    )}
+                    {t.pts != null && (
+                      <span className="text-[11px] text-muted-foreground">{t.pts} pts</span>
+                    )}
+                    {t.codigo && (
+                      <span className="text-[11px] text-muted-foreground">{t.codigo}</span>
+                    )}
+                    {nAdj > 0 && (
+                      <span className="inline-flex items-center gap-0.5 text-[11px] text-muted-foreground">
+                        <IconPaperclip className="h-3 w-3" />
+                        {nAdj}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <TareaAcciones t={t} run={run} onEditar={() => setEditando(t)} />
+              </div>
+            </li>
+          );
+        })}
+        {filtradas.length === 0 && (
+          <li className="rounded-xl border border-dashed border-border px-3 py-10 text-center text-sm text-muted-foreground">
+            No hay tareas que coincidan con los filtros.
+          </li>
+        )}
+      </ul>
+
+      {/* Tabla (escritorio) */}
+      <div className="hidden overflow-x-auto rounded-xl border border-border bg-card md:block">
         <table className="w-full min-w-[760px] text-sm">
           <thead>
             <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
@@ -230,59 +355,11 @@ export function TasksTable({
                   </Badge>
                 </td>
                 <td className="px-3 py-3">
-                  <div className="flex items-center justify-end gap-1">
-                    {t.estado === "hecha" ? (
-                      <button
-                        title="Reabrir"
-                        onClick={() => run(() => reabrirTarea(t.id))}
-                        className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
-                      >
-                        <IconX className="h-4 w-4" />
-                      </button>
-                    ) : (
-                      <button
-                        title="Marcar como hecha"
-                        onClick={() => run(() => marcarHecha(t.id))}
-                        className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-emerald-500"
-                      >
-                        <IconCheck className="h-4 w-4" />
-                      </button>
-                    )}
-                    <button
-                      title="Editar"
-                      onClick={() => setEditando(t)}
-                      className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
-                    >
-                      <IconPencil className="h-4 w-4" />
-                    </button>
-                    {t.estado === "archivada" ? (
-                      <button
-                        title="Desarchivar"
-                        onClick={() => run(() => desarchivarTarea(t.id))}
-                        className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
-                      >
-                        <IconArchive className="h-4 w-4" />
-                      </button>
-                    ) : (
-                      <button
-                        title="Archivar"
-                        onClick={() => run(() => archivarTarea(t.id))}
-                        className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
-                      >
-                        <IconArchive className="h-4 w-4" />
-                      </button>
-                    )}
-                    <button
-                      title="Eliminar"
-                      onClick={() => {
-                        if (confirm(`¿Eliminar "${t.titulo}"? No se puede deshacer.`))
-                          run(() => eliminarTarea(t.id));
-                      }}
-                      className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                    >
-                      <IconTrash className="h-4 w-4" />
-                    </button>
-                  </div>
+                  <TareaAcciones
+                    t={t}
+                    run={run}
+                    onEditar={() => setEditando(t)}
+                  />
                 </td>
               </tr>
             ))}
@@ -380,44 +457,53 @@ function EditarModal({
     });
   }
 
+  const [guardarError, setGuardarError] = useState<string | null>(null);
+
   function guardar() {
+    setGuardarError(null);
     startTransition(async () => {
-      // 1) Guarda los campos del formulario
-      await actualizarTarea({
-        id: tarea.id,
-        titulo: form.titulo,
-        descripcion: form.descripcion || null,
-        prioridad: form.prioridad,
-        estado: form.estado,
-        deadline: form.deadline || null,
-        capa: form.capa || null,
-        pts: form.pts ? Number(form.pts) : null,
-        esfuerzo: form.esfuerzo || null,
-        criterio_terminacion: form.criterio_terminacion.trim() || null,
-      });
-      // 2) Guarda las subtareas (pueden venir de la IA o editadas a mano)
-      const limpias = subtareas
-        .map((s) => ({
-          descripcion: s.descripcion.trim(),
-          tiempo_estimado_min:
-            s.tiempo_estimado_min && s.tiempo_estimado_min > 0
-              ? Math.min(5, Math.round(s.tiempo_estimado_min))
-              : null,
-          hecho: !!s.hecho,
-        }))
-        .filter((s) => s.descripcion.length > 0);
-      await createClient().from("tareas").update({ subtareas: limpias.length > 0 ? limpias : null }).eq("id", tarea.id);
-      onChanged();
-      onClose();
+      try {
+        // 1) Guarda los campos del formulario
+        await actualizarTarea({
+          id: tarea.id,
+          titulo: form.titulo,
+          descripcion: form.descripcion || null,
+          prioridad: form.prioridad,
+          estado: form.estado,
+          deadline: form.deadline || null,
+          capa: form.capa || null,
+          pts: form.pts ? Number(form.pts) : null,
+          esfuerzo: form.esfuerzo || null,
+          criterio_terminacion: form.criterio_terminacion.trim() || null,
+        });
+        // 2) Guarda las subtareas (pueden venir de la IA o editadas a mano)
+        const limpias = subtareas
+          .map((s) => ({
+            descripcion: s.descripcion.trim(),
+            tiempo_estimado_min:
+              s.tiempo_estimado_min && s.tiempo_estimado_min > 0
+                ? Math.min(5, Math.round(s.tiempo_estimado_min))
+                : null,
+            hecho: !!s.hecho,
+          }))
+          .filter((s) => s.descripcion.length > 0);
+        await createClient().from("tareas").update({ subtareas: limpias.length > 0 ? limpias : null }).eq("id", tarea.id);
+        onChanged();
+        onClose();
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e ?? "Error desconocido");
+        console.error("[editarTarea] falló:", msg);
+        setGuardarError(msg);
+      }
     });
   }
 
   const field = "w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col rounded-xl border border-border bg-card shadow-lg">
+      <div className="safe-b relative flex max-h-[90dvh] w-full max-w-2xl flex-col rounded-t-2xl border border-border bg-card shadow-lg sm:max-h-[calc(100dvh-2rem)] sm:rounded-xl">
         <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-4">
           <h2 className="font-semibold">Editar tarea</h2>
           <button onClick={onClose} className="rounded-md p-1.5 hover:bg-accent" aria-label="Cerrar">
@@ -444,7 +530,7 @@ function EditarModal({
             cfg={cfg}
             tieneKey={!!cfg.minimax_api_key}
           />
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="block">
               <span className="mb-1 block text-xs text-muted-foreground">Prioridad</span>
               <select className={field} value={form.prioridad} onChange={(e) => setForm({ ...form, prioridad: e.target.value })}>
@@ -495,7 +581,9 @@ function EditarModal({
           />
         </div>
 
-        <div className="flex shrink-0 justify-end gap-2 border-t border-border px-5 py-4">
+        <div className="flex shrink-0 items-center justify-between gap-2 border-t border-border px-5 py-4">
+          <span className="text-[11px] text-red-600 dark:text-red-400">{guardarError}</span>
+          <div className="flex gap-2">
           <button onClick={onClose} className="rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-accent">
             Cancelar
           </button>
@@ -504,8 +592,9 @@ function EditarModal({
             disabled={pending}
             className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
           >
-            {pending ? "Guardando…" : "Guardar"}
+            {pending ? (guardarError ? "Error — reintentar" : "Guardando…") : "Guardar"}
           </button>
+          </div>
         </div>
       </div>
     </div>
@@ -537,6 +626,7 @@ function CrearModal({
   const [iaMsg, setIaMsg] = useState<string | null>(null);
   const [adjMsg, setAdjMsg] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [guardarError, setGuardarError] = useState<string | null>(null);
 
   /**
    * Auto-IA al guardar:
@@ -556,61 +646,68 @@ function CrearModal({
     if (!form.titulo.trim()) return;
     setIaMsg(null);
     setAdjMsg(null);
+    setGuardarError(null);
     startTransition(async () => {
-      const subtareasLimpias = subtareas
-        .map((s) => ({
-          descripcion: s.descripcion.trim(),
-          tiempo_estimado_min:
-            s.tiempo_estimado_min && s.tiempo_estimado_min > 0
-              ? Math.min(5, Math.round(s.tiempo_estimado_min))
-              : null,
-          hecho: !!s.hecho,
-        }))
-        .filter((s) => s.descripcion.length > 0);
+      try {
+        const subtareasLimpias = subtareas
+          .map((s) => ({
+            descripcion: s.descripcion.trim(),
+            tiempo_estimado_min:
+              s.tiempo_estimado_min && s.tiempo_estimado_min > 0
+                ? Math.min(5, Math.round(s.tiempo_estimado_min))
+                : null,
+            hecho: !!s.hecho,
+          }))
+          .filter((s) => s.descripcion.length > 0);
 
-      // Paso 1: crear tarea (manual + IA en background si aplica).
-      // crearTareaConIA se queda esperando a la IA cuando aplica.
-      const creada = await crearTareaConIA(
-        {
-          titulo: form.titulo.trim(),
-          descripcion: form.descripcion || null,
-          prioridad: form.prioridad,
-          estado: form.estado,
-          deadline: form.deadline || null,
-          capa: form.capa || null,
-          pts: form.pts ? Number(form.pts) : null,
-          esfuerzo: form.esfuerzo || null,
-          criterio_terminacion_manual: form.criterio_terminacion.trim() || null,
-          subtareas_manuales:
-            subtareasLimpias.length > 0 ? subtareasLimpias : null,
-        },
-        {
-          base_url: cfg.base_url,
-          minimax_api_key: cfg.minimax_api_key,
-          model: cfg.model,
-          onProgress: (m) => setIaMsg(m),
-        },
-      );
-
-      // Paso 2: subir los adjuntos pendientes con el id recién creado.
-      if (tieneAdjuntos) {
-        setAdjMsg(`⏳ Subiendo ${adjuntosCola.length} adjunto(s)…`);
-        const files = adjuntosCola.map((p) => p.file);
-        const subidos = await subirAdjuntos(creada.id, files, (_i, _f, estado, errMsg) => {
-          if (estado === "error" && errMsg) {
-            console.warn("[crearTarea] adjunto falló:", errMsg);
-          }
-        });
-        const fallaron = files.length - subidos.length;
-        setAdjMsg(
-          fallaron === 0
-            ? `✓ ${subidos.length} adjunto(s) subido(s)`
-            : `⚠️ ${subidos.length} subido(s), ${fallaron} fallaron`,
+        // Paso 1: crear tarea (manual + IA en background si aplica).
+        // crearTareaConIA se queda esperando a la IA cuando aplica.
+        const creada = await crearTareaConIA(
+          {
+            titulo: form.titulo.trim(),
+            descripcion: form.descripcion || null,
+            prioridad: form.prioridad,
+            estado: form.estado,
+            deadline: form.deadline || null,
+            capa: form.capa || null,
+            pts: form.pts ? Number(form.pts) : null,
+            esfuerzo: form.esfuerzo || null,
+            criterio_terminacion_manual: form.criterio_terminacion.trim() || null,
+            subtareas_manuales:
+              subtareasLimpias.length > 0 ? subtareasLimpias : null,
+          },
+          {
+            base_url: cfg.base_url,
+            minimax_api_key: cfg.minimax_api_key,
+            model: cfg.model,
+            onProgress: (m) => setIaMsg(m),
+          },
         );
-      }
 
-      onChanged();
-      onClose();
+        // Paso 2: subir los adjuntos pendientes con el id recién creado.
+        if (tieneAdjuntos) {
+          setAdjMsg(`⏳ Subiendo ${adjuntosCola.length} adjunto(s)…`);
+          const files = adjuntosCola.map((p) => p.file);
+          const subidos = await subirAdjuntos(creada.id, files, (_i, _f, estado, errMsg) => {
+            if (estado === "error" && errMsg) {
+              console.warn("[crearTarea] adjunto falló:", errMsg);
+            }
+          });
+          const fallaron = files.length - subidos.length;
+          setAdjMsg(
+            fallaron === 0
+              ? `✓ ${subidos.length} adjunto(s) subido(s)`
+              : `⚠️ ${subidos.length} subido(s), ${fallaron} fallaron`,
+          );
+        }
+
+        onChanged();
+        onClose();
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e ?? "Error desconocido");
+        console.error("[crearTarea] falló:", msg);
+        setGuardarError(msg);
+      }
     });
   }
 
@@ -618,9 +715,9 @@ function CrearModal({
     "w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col rounded-xl border border-border bg-card shadow-lg">
+      <div className="safe-b relative flex max-h-[90dvh] w-full max-w-2xl flex-col rounded-t-2xl border border-border bg-card shadow-lg sm:max-h-[calc(100dvh-2rem)] sm:rounded-xl">
         <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-4">
           <h2 className="font-semibold">Nueva tarea</h2>
           <button onClick={onClose} className="rounded-md p-1.5 hover:bg-accent" aria-label="Cerrar">
@@ -658,7 +755,7 @@ function CrearModal({
             tieneKey={!!cfg.minimax_api_key}
           />
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="block">
               <span className="mb-1 block text-xs text-muted-foreground">Prioridad</span>
               <select className={field} value={form.prioridad} onChange={(e) => setForm({ ...form, prioridad: e.target.value })}>
@@ -733,9 +830,9 @@ function CrearModal({
         </div>
 
         <div className="flex shrink-0 items-center justify-between gap-2 border-t border-border px-5 py-4">
-          <span className="text-[11px] text-muted-foreground">
-            {adjMsg ?? iaMsg ?? (usaraIA ? "🪄 Se enriquecerá con IA al guardar." : "")}
-          </span>
+          <span className="text-[11px] text-red-600 dark:text-red-400">
+              {guardarError ?? adjMsg ?? iaMsg ?? (usaraIA ? "🪄 Se enriquecerá con IA al guardar." : "")}
+            </span>
           <div className="flex gap-2">
             <button onClick={onClose} className="rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-accent">
               Cancelar
@@ -745,7 +842,7 @@ function CrearModal({
               disabled={pending || !form.titulo.trim()}
               className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
             >
-              {pending ? "Creando…" : usaraIA || tieneAdjuntos ? "✨ Crear tarea" : "Crear tarea"}
+              {pending ? (guardarError ? "Error — reintentar" : "Creando…") : usaraIA || tieneAdjuntos ? "✨ Crear tarea" : "Crear tarea"}
             </button>
           </div>
         </div>
@@ -1161,7 +1258,7 @@ function AdjuntosEditor({
   tareaId: string | null;
   /** Cola de archivos pendientes de subir (modo crear) */
   cola: PendingFile[];
-  setCola?: (next: PendingFile[]) => void;
+  setCola?: (next: PendingFile[] | ((prev: PendingFile[]) => PendingFile[])) => void;
   /** Callback tras crear/borrar (modo editar) — para recargar */
   onUpload?: () => void;
 }) {
@@ -1198,7 +1295,7 @@ function AdjuntosEditor({
       aceptados.push({ file: f, status: "pendiente" });
     }
     if (aceptados.length === 0) return;
-    setCola?.([...cola, ...aceptados]);
+    setCola?.((prev) => [...prev, ...aceptados]);
   }
 
   async function handleFiles(files: FileList | null) {
@@ -1209,20 +1306,23 @@ function AdjuntosEditor({
       // Modo editar: subo directamente, sin cola local
       setError(null);
       setSubiendo(true);
-      const progreso = new Map<number, "subiendo" | "ok" | "error">();
-      await subirAdjuntos(
-        tareaId,
-        fileArr,
-        (_idx, _file, estado) => {
-          // Sólo para feedback visual simplificado (no exponemos índice).
-          progreso.set(fileArr.indexOf(_file), estado);
-        },
-      );
-      setSubiendo(false);
-      // Recarga lista
-      const rows = await fetchAdjuntosTarea(tareaId);
-      setExistentes(rows);
-      onUpload?.();
+      try {
+        await subirAdjuntos(
+          tareaId,
+          fileArr,
+          (_idx, _file, estado) => {
+            // Sólo para feedback visual simplificado (no exponemos índice).
+          },
+        );
+        // Recarga lista
+        const rows = await fetchAdjuntosTarea(tareaId);
+        setExistentes(rows);
+        onUpload?.();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Error al subir adjuntos");
+      } finally {
+        setSubiendo(false);
+      }
     } else {
       // Modo crear: a la cola local
       addFiles(fileArr);
@@ -1230,9 +1330,7 @@ function AdjuntosEditor({
   }
 
   async function quitarCola(idx: number) {
-    const next = cola.slice();
-    next.splice(idx, 1);
-    setCola?.(next);
+    setCola?.((prev) => prev.filter((_, i) => i !== idx));
   }
 
   async function borrarExistente(adj: TareaAdjunto) {

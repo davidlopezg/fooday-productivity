@@ -74,9 +74,13 @@ export async function crearTarea(datos: {
   subtareas?: Subtarea[] | null;
 }): Promise<TareaCreada> {
   const supabase = createClient();
+
   const { data, error } = await supabase
     .from("tareas")
     .insert({
+      // owner_id no se pasa explícitamente porque la columna tiene
+      // default auth.uid() + RLS with check. El usuario de la sesión
+      // actual se asigna automáticamente en la BD.
       titulo: datos.titulo,
       prioridad: datos.prioridad ?? "media",
       estado: datos.estado ?? "pendiente",
@@ -92,8 +96,11 @@ export async function crearTarea(datos: {
     })
     .select("id,titulo")
     .single();
-  if (error) throw error;
-  if (!data) throw new Error("No se pudo crear la tarea");
+  if (error) {
+    console.error("[crearTarea] Supabase error:", error);
+    throw new Error(`No se pudo crear la tarea: ${error.message}`);
+  }
+  if (!data) throw new Error("No se pudo crear la tarea — la base de datos no devolvió confirmación.");
   return { id: data.id as string, titulo: data.titulo as string };
 }
 
@@ -299,10 +306,9 @@ export async function guardarConfiguracion(datos: {
   model: string;
 }) {
   const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("No autenticado");
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) throw new Error("No autenticado");
+  const user = session.user;
   await supabase.from("configuracion").upsert(
     {
       user_id: user.id,
@@ -407,10 +413,9 @@ export async function guardarPlanDiario(payload: {
   informe?: InformePlan;
 }): Promise<string> {
   const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("No autenticado");
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) throw new Error("No autenticado");
+  const user = session.user;
 
   // Calcula num_generacion: cuenta cuántas hay para ese (owner, fecha)
   const { count } = await supabase
@@ -580,10 +585,9 @@ export async function guardarPlanDiarioSimple(payload: {
   plan: PlanGeneradoSimple;
 }): Promise<string> {
   const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("No autenticado");
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) throw new Error("No autenticado");
+  const user = session.user;
 
   // num_generacion: cuenta cuántas hay hoy (puede haber varias generaciones/día)
   const { count } = await supabase
@@ -657,6 +661,18 @@ export async function guardarPlanDiarioSimple(payload: {
 // (necesitamos el id de la tarea). Si una subida falla, los demás siguen.
 // ============================================================================
 
+/** Genera un UUID v4 compatible con navegadores modernos y antiguos Android WebView. */
+function generarUUID(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  // Fallback para navegadores antiguos / WebViews Android < 85
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
+
 export const ADJUNTOS_BUCKET = "tareas-adjuntos";
 export const MAX_ADJUNTO_BYTES = 10 * 1024 * 1024; // 10 MB
 
@@ -684,12 +700,11 @@ export async function subirAdjuntos(
   if (files.length === 0) return [];
 
   // 1) Averigua el owner para construir el path válido bajo el RLS del Storage.
+  // Usamos getSession() (cached en memoria) en vez de getUser() (HTTP call).
   const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("No autenticado");
-  const ownerId = user.id;
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) throw new Error("No autenticado");
+  const ownerId = session.user.id;
 
   const creados: TareaAdjunto[] = [];
 
@@ -703,7 +718,7 @@ export async function subirAdjuntos(
     }
     onProgreso?.(i, file, "subiendo");
     const safeName = sanitizeFilename(file.name) || "archivo";
-    const uniqueName = `${crypto.randomUUID()}-${safeName}`;
+    const uniqueName = `${generarUUID()}-${safeName}`;
     const storagePath = `${ownerId}/${tareaId}/${uniqueName}`;
 
     try {
