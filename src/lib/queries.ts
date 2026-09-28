@@ -29,6 +29,41 @@ export async function fetchTareas(estado?: string): Promise<Tarea[]> {
   return (data ?? []) as Tarea[];
 }
 
+/**
+ * Tareas completadas (estado='hecha'), ordenadas por fecha de completación
+ * descendente. Devuelve también las áreas relacionadas para poder pintar
+ * chips sin un join extra. Limita a `limit` filas para no traer la historia
+ * entera si el usuario tiene miles.
+ */
+export async function fetchTareasCompletadas(opts?: { limit?: number }) {
+  const supabase = createClient();
+  const limit = opts?.limit ?? 1000;
+  const { data: tareas, error } = await supabase
+    .from("tareas")
+    .select("*")
+    .eq("estado", "hecha")
+    .not("completada_at", "is", null)
+    .order("completada_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  const tareasArr = (tareas ?? []) as Tarea[];
+  if (tareasArr.length === 0) return [] as Array<Tarea & { area: Area | null }>;
+
+  const areaIds = Array.from(
+    new Set(tareasArr.map((t) => t.area_id).filter((id): id is string => !!id)),
+  );
+  const { data: areas } = areaIds.length
+    ? await supabase.from("areas").select("id,nombre,color,orden").in("id", areaIds)
+    : { data: [] };
+  const areaById = new Map<string, Area>(
+    ((areas ?? []) as Area[]).map((a) => [a.id, a]),
+  );
+  return tareasArr.map((t) => ({
+    ...t,
+    area: t.area_id ? areaById.get(t.area_id) ?? null : null,
+  }));
+}
+
 export async function fetchMetas(): Promise<Meta[]> {
   const { data } = await createClient().from("metas").select("*").order("codigo");
   return (data ?? []) as Meta[];

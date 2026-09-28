@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, type SVGProps } from "react";
 import {
   IconCalendar,
-  IconColumns,
+  IconCheck,
   IconCompass,
+  IconFlag,
   IconHeart,
   IconHistory,
   IconHome,
@@ -20,43 +21,101 @@ import {
 } from "@/components/icons";
 import { SignOut } from "@/components/SignOut";
 
-const LINKS = [
+type IconComponent = (p: SVGProps<SVGSVGElement>) => React.ReactElement;
+type NavItem = { href: string; label: string; Icon: IconComponent };
+type NavSection = { label?: string; items: NavItem[] };
+
+// Items sueltos fuera de la sección Tareas
+const TOP_ITEMS: NavItem[] = [
   { href: "/", label: "Hoy", Icon: IconHome },
-  { href: "/captura", label: "Captura", Icon: IconInbox },
-  { href: "/tareas", label: "Tareas", Icon: IconList },
-  { href: "/pipeline", label: "Pipeline", Icon: IconColumns },
-  { href: "/plan-diario", label: "Plan diario", Icon: IconSparkles },
-  { href: "/plan-diario/historico", label: "Histórico planes", Icon: IconHistory },
-  { href: "/dashboard-emocional", label: "Dashboard emocional", Icon: IconHeart },
-  { href: "/semana", label: "Semana", Icon: IconCalendar },
-  { href: "/metas", label: "Metas", Icon: IconTarget },
+  { href: "/captura", label: "Capturar", Icon: IconInbox },
   { href: "/norte", label: "Norte", Icon: IconCompass },
+  { href: "/metas", label: "Metas", Icon: IconTarget },
+  { href: "/semana", label: "Semana", Icon: IconCalendar },
+];
+
+// Sección Tareas
+const TASKS_SECTION: NavSection = {
+  label: "Tareas",
+  items: [
+    { href: "/tareas", label: "Tareas", Icon: IconList },
+    { href: "/tareas/completadas", label: "Completadas", Icon: IconCheck },
+    { href: "/pipeline", label: "Prioridad", Icon: IconFlag },
+    { href: "/plan-diario", label: "Plan diario", Icon: IconSparkles },
+    { href: "/plan-diario/historico", label: "Histórico de planes", Icon: IconHistory },
+  ],
+};
+
+// Utilidades al final
+const UTIL_ITEMS: NavItem[] = [
+  { href: "/dashboard-emocional", label: "Dashboard emocional", Icon: IconHeart },
   { href: "/configuracion", label: "Configuración", Icon: IconSettings },
 ];
+
+function NavLink({
+  href,
+  label,
+  Icon,
+  active,
+  onNavigate,
+}: NavItem & { active: boolean; onNavigate?: () => void }) {
+  return (
+    <Link
+      href={href}
+      onClick={onNavigate}
+      className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors active:bg-accent ${
+        active
+          ? "bg-accent text-accent-foreground"
+          : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+      }`}
+    >
+      <Icon className="h-4 w-4" aria-hidden />
+      {label}
+    </Link>
+  );
+}
+
+function NavSection({
+  section,
+  pathname,
+  onNavigate,
+}: {
+  section: NavSection;
+  pathname: string;
+  onNavigate?: () => void;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      {section.label && (
+        <h3 className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+          {section.label}
+        </h3>
+      )}
+      {section.items.map((item) => {
+        const active =
+          item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+        return (
+          <NavLink
+            key={item.href}
+            {...item}
+            active={active}
+            onNavigate={onNavigate}
+          />
+        );
+      })}
+    </div>
+  );
+}
 
 function NavItems({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   return (
-    <nav className="flex flex-col gap-1">
-      {LINKS.map(({ href, label, Icon }) => {
-        const active =
-          href === "/" ? pathname === "/" : pathname.startsWith(href);
-        return (
-          <Link
-            key={href}
-            href={href}
-            onClick={onNavigate}
-            className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors active:bg-accent ${
-              active
-                ? "bg-accent text-accent-foreground"
-                : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
-            }`}
-          >
-            <Icon className="h-4 w-4" aria-hidden />
-            {label}
-          </Link>
-        );
-      })}
+    <nav className="flex flex-col gap-5">
+      <NavSection section={{ items: TOP_ITEMS }} pathname={pathname} onNavigate={onNavigate} />
+      <NavSection section={TASKS_SECTION} pathname={pathname} onNavigate={onNavigate} />
+      <div className="border-t border-border pt-4">
+        <NavSection section={{ items: UTIL_ITEMS }} pathname={pathname} onNavigate={onNavigate} />
+      </div>
     </nav>
   );
 }

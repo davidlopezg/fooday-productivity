@@ -170,6 +170,13 @@ export const IconFile = (p: IconProps) => (
   </svg>
 );
 
+export const IconFlag = (p: IconProps) => (
+  <svg {...base} {...p}>
+    <path d="M5 21V4" />
+    <path d="M5 4h13l-2.5 4.5L18 13H5" />
+  </svg>
+);
+
 export const IconBolt = (p: IconProps) => (
   <svg
     fill="none"
