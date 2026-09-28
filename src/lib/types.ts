@@ -108,6 +108,22 @@ export interface Ritual {
   activo: boolean;
 }
 
+/**
+ * Asignación de una tarea a un día de una semana concreta.
+ * Una tarea solo puede aparecer una vez por semana (constraint UNIQUE).
+ * Para moverla de día, se hace UPDATE sobre la misma fila.
+ */
+export interface PlanSemanalTarea {
+  id: string;
+  anio: number;
+  semana_iso: number;
+  tarea_id: string;
+  dia_semana: number; // ISO 1=lunes .. 7=domingo
+  orden: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface PlanDiario {
   id: string;
   fecha: string;

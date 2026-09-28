@@ -8,6 +8,7 @@ import type {
   PlanDiarioBorrador,
   PlanDiarioSubtarea,
   PlanDiarioTarea,
+  PlanSemanalTarea,
   Ritual,
   Tarea,
   TareaAdjunto,
@@ -258,6 +259,45 @@ export async function fetchAdjuntosTarea(tareaId: string): Promise<TareaAdjunto[
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as TareaAdjunto[];
+}
+
+// ============================================================================
+// Plan semanal — queries (plan_semanal_tareas)
+// ============================================================================
+
+/** Devuelve las asignaciones tarea↔día de una semana concreta. */
+export async function fetchPlanSemanal(opts: {
+  anio: number;
+  semana_iso: number;
+}): Promise<PlanSemanalTarea[]> {
+  const { data, error } = await createClient()
+    .from("plan_semanal_tareas")
+    .select("*")
+    .eq("anio", opts.anio)
+    .eq("semana_iso", opts.semana_iso)
+    .order("dia_semana", { ascending: true })
+    .order("orden", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as PlanSemanalTarea[];
+}
+
+/**
+ * Tareas marcadas como CRÍTICAS y activas (no hechas/archivadas/descartadas),
+ * ordenadas por deadline ascendente (las sin deadline al final).
+ * Es la "pool" que usa la página /semana para proponer con IA y para el
+ * backlog de planificación.
+ */
+export async function fetchTareasCriticasActivas(): Promise<Tarea[]> {
+  const { data, error } = await createClient()
+    .from("tareas")
+    .select("*")
+    .eq("prioridad", "critica")
+    .in("estado", ["pendiente", "en_progreso", "bloqueada"])
+    // deadline NULL al final: las más urgentes primero, las sin fecha al final.
+    .order("deadline", { ascending: true, nullsFirst: false })
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as Tarea[];
 }
 
 /**

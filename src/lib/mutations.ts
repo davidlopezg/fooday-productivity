@@ -786,3 +786,100 @@ export async function signedUrlAdjunto(adj: TareaAdjunto, expiresIn = 3600): Pro
   if (!data?.signedUrl) throw new Error("No se pudo generar la URL firmada");
   return data.signedUrl;
 }
+
+// ============================================================================
+// Plan semanal — mutaciones (plan_semanal_tareas)
+//
+// Reglas:
+//   • Cada tarea aparece como máximo UNA VEZ por (anio, semana_iso).
+//   • Para moverla de día, se hace UPDATE sobre la misma fila (no DELETE+INSERT).
+//   • Para sacarla de la semana, se hace DELETE.
+//   • Para meterla, INSERT (o UPSERT si se quiere idempotencia).
+// ============================================================================
+
+/**
+ * Coloca una tarea en un día de la semana. Si ya estaba planificada esa
+ * semana (en otro día o en el mismo), actualiza `dia_semana` y `orden`.
+ */
+export async function asignarTareaADia(payload: {
+  anio: number;
+  semana_iso: number;
+  tarea_id: string;
+  dia_semana: number;
+  orden?: number;
+}): Promise<void> {
+  const supabase = createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) throw new Error("No autenticado");
+  const user = session.user;
+  const { error } = await supabase
+    .from("plan_semanal_tareas")
+    .upsert(
+      {
+        owner_id: user.id,
+        anio: payload.anio,
+        semana_iso: payload.semana_iso,
+        tarea_id: payload.tarea_id,
+        dia_semana: payload.dia_semana,
+        orden: payload.orden ?? 0,
+      },
+      { onConflict: "owner_id,anio,semana_iso,tarea_id" },
+    );
+  if (error) throw new Error(`No se pudo asignar la tarea: ${error.message}`);
+}
+
+/** Saca una tarea de la planificación de esa semana. */
+export async function quitarTareaDeSemana(payload: {
+  anio: number;
+  semana_iso: number;
+  tarea_id: string;
+}): Promise<void> {
+  const { error } = await createClient()
+    .from("plan_semanal_tareas")
+    .delete()
+    .eq("anio", payload.anio)
+    .eq("semana_iso", payload.semana_iso)
+    .eq("tarea_id", payload.tarea_id);
+  if (error) throw new Error(`No se pudo quitar la tarea: ${error.message}`);
+}
+
+/**
+ * Aplica en batch la propuesta de la IA: mapea dia_semana → [tarea_id, ...]
+ * y hace UPSERT de todas las filas en una sola llamada.
+ * No borra lo que ya había: AÑADE (lo que ya estuviera en otro día se sobreescribe
+ * porque la PK compuesta es (owner, anio, semana, tarea)).
+ */
+export async function aplicarPropuestaIA(payload: {
+  anio: number;
+  semana_iso: number;
+  /** Ej: { 1: ["uuid1","uuid2"], 3: ["uuid3"], ... }. Días fuera de [1..7] se ignoran. */
+  propuesta: Record<number, string[]>;
+}): Promise<number> {
+  const supabase = createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) throw new Error("No autenticado");
+  const user = session.user;
+
+  const filas: Array<Record<string, unknown>> = [];
+  for (const [diaStr, tareaIds] of Object.entries(payload.propuesta)) {
+    const dia = Number(diaStr);
+    if (!Number.isFinite(dia) || dia < 1 || dia > 7) continue;
+    tareaIds.forEach((tareaId, i) => {
+      if (!tareaId) return;
+      filas.push({
+        owner_id: user.id,
+        anio: payload.anio,
+        semana_iso: payload.semana_iso,
+        tarea_id: tareaId,
+        dia_semana: dia,
+        orden: i,
+      });
+    });
+  }
+  if (filas.length === 0) return 0;
+  const { error } = await supabase
+    .from("plan_semanal_tareas")
+    .upsert(filas, { onConflict: "owner_id,anio,semana_iso,tarea_id" });
+  if (error) throw new Error(`No se pudo aplicar la propuesta: ${error.message}`);
+  return filas.length;
+}
