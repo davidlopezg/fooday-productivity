@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { fetchTareasCompletadas } from "@/lib/queries";
+import { reabrirTarea } from "@/lib/mutations";
 import { useData } from "@/lib/useData";
 import type { Area, Prioridad, TareaSubtarea, Tarea } from "@/lib/types";
-import { IconCheck } from "@/components/icons";
+import { IconCheck, IconX } from "@/components/icons";
 
 type TareaConArea = Tarea & { area: Area | null };
 
@@ -283,7 +284,7 @@ export default function TareasCompletadasPage() {
               </h2>
               <div className="space-y-2">
                 {g.tareas.map((t) => (
-                  <TareaCompletadaRow key={t.id} t={t} />
+                  <TareaCompletadaRow key={t.id} t={t} onRestored={reload} />
                 ))}
               </div>
             </div>
@@ -315,11 +316,32 @@ function Stat({
   );
 }
 
-function TareaCompletadaRow({ t }: { t: TareaConArea }) {
+function TareaCompletadaRow({
+  t,
+  onRestored,
+}: {
+  t: TareaConArea;
+  onRestored: () => void;
+}) {
   const completada = parseCompletadaAt(t.completada_at);
   const subs = (t.subtareas ?? []) as TareaSubtarea[];
   const subsHechas = subs.filter((s) => s.hecho);
   const subsPendientes = subs.filter((s) => !s.hecho);
+  const [pending, startTransition] = useTransition();
+
+  function restaurar() {
+    startTransition(async () => {
+      try {
+        await reabrirTarea(t.id);
+        onRestored();
+      } catch (e: unknown) {
+        console.error(
+          "[TareasCompletadas] restaurar falló:",
+          e instanceof Error ? e.message : String(e),
+        );
+      }
+    });
+  }
 
   return (
     <article className="rounded-xl border border-border bg-card p-4 transition-colors hover:bg-card/80">
@@ -385,14 +407,25 @@ function TareaCompletadaRow({ t }: { t: TareaConArea }) {
           )}
         </div>
 
-        {/* Fecha/hora de completado */}
-        <div className="shrink-0 text-right text-[11px] text-muted-foreground">
+        {/* Fecha/hora de completado + acción restaurar */}
+        <div className="flex shrink-0 flex-col items-end gap-2 text-[11px] text-muted-foreground">
           {completada && (
-            <>
+            <div className="text-right">
               <p className="font-medium tabular-nums text-foreground/80">{formatoHora(completada)}</p>
               <p className="text-[10px]">{completada.toLocaleDateString(LOCALE)}</p>
-            </>
+            </div>
           )}
+          <button
+            type="button"
+            onClick={restaurar}
+            disabled={pending}
+            aria-label="Restaurar tarea"
+            title="Restaurar tarea"
+            className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:border-amber-500/40 hover:bg-amber-500/10 hover:text-amber-700 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:text-amber-300"
+          >
+            <IconX className="h-3 w-3" />
+            {pending ? "Restaurando…" : "Restaurar"}
+          </button>
         </div>
       </div>
     </article>
