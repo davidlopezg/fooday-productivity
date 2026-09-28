@@ -210,20 +210,32 @@ export default function TareasCompletadasPage() {
       {/* Filtros */}
       <section className="rounded-xl border border-border bg-card p-4">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-muted-foreground">Rango:</span>
-          {(["7", "30", "90", "365", "todo"] as Rango[]).map((r) => (
-            <button
-              key={r}
-              onClick={() => setRango(r)}
-              className={`rounded-md border px-3 py-1 text-xs ${
-                rango === r
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-background hover:bg-muted"
-              }`}
-            >
-              {r === "todo" ? "Todo" : `Últimos ${r} días`}
-            </button>
-          ))}
+          <span className="text-xs font-medium text-muted-foreground">Rango:</span>
+          {(["7", "30", "90", "365", "todo"] as Rango[]).map((r) => {
+            const active = rango === r;
+            return (
+              <button
+                key={r}
+                type="button"
+                onClick={() => setRango(r)}
+                aria-pressed={active}
+                className={`cursor-pointer rounded-md border px-3 py-1 text-xs font-medium transition-all ${
+                  active
+                    ? "border-emerald-500 bg-emerald-500 text-white shadow-sm"
+                    : "border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground"
+                }`}
+              >
+                {r === "todo" ? "Todo" : `Últimos ${r} días`}
+              </button>
+            );
+          })}
+          <span className="ml-auto text-xs tabular-nums text-muted-foreground">
+            {loading
+              ? "Cargando…"
+              : rango === "todo"
+                ? `${filtradas.length} tareas en total`
+                : `${filtradas.length} de ${tareas.length} tareas`}
+          </span>
         </div>
       </section>
 
