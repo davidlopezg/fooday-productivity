@@ -25,13 +25,13 @@ import {
   desgranarTarea,
   eliminarAdjunto,
   MAX_ADJUNTO_BYTES,
+  reemplazarSubtareasTarea,
   signedUrlAdjunto,
   subirAdjuntos,
 } from "@/lib/mutations";
 import { fetchAdjuntosTarea } from "@/lib/queries";
 import { useConfig } from "@/lib/configStore";
 import { generarCriterioTerminacionIA } from "@/lib/plan";
-import { createClient } from "@/lib/supabase/client";
 import type { Subtarea, Tarea, TareaAdjunto } from "@/lib/types";
 
 export type PendingFile = { file: File; status: "pendiente" };
@@ -703,7 +703,7 @@ export function EditarModal({
     criterio_terminacion: tarea.criterio_terminacion ?? "",
   });
   const [subtareas, setSubtareas] = useState<Subtarea[]>(
-    Array.isArray(tarea.subtareas) ? tarea.subtareas : [],
+    Array.isArray(tarea.subtareas) ? (tarea.subtareas as unknown as Subtarea[]) : [],
   );
   const [desgranando, setDesgranando] = useState(false);
   const [iaError, setIaError] = useState<string | null>(null);
@@ -714,7 +714,7 @@ export function EditarModal({
     setDesgranando(true);
     try {
       const nuevas = await desgranarTarea(tarea.id, cfg);
-      setSubtareas(nuevas);
+      setSubtareas(nuevas as unknown as Subtarea[]);
     } catch (e) {
       setIaError((e as Error).message);
     } finally {
@@ -766,10 +766,7 @@ export function EditarModal({
             hecho: !!s.hecho,
           }))
           .filter((s) => s.descripcion.length > 0);
-        await createClient()
-          .from("tareas")
-          .update({ subtareas: limpias.length > 0 ? limpias : null })
-          .eq("id", tarea.id);
+        await reemplazarSubtareasTarea(tarea.id, limpias);
         onChanged();
         onClose();
       } catch (e: unknown) {

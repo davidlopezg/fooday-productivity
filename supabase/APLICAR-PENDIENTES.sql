@@ -3,8 +3,9 @@
 --
 -- Pegar TODO esto en Supabase → SQL Editor → Run.
 --
--- Son las migraciones 0005 → 0008 (columnas subtareas y criterio_terminacion,
--- plan diario v3 + RPC upsert_tarea_by_titulo, y adjuntos por tarea).
+-- Son las migraciones 0005 → 0008 + 0010 (columnas subtareas y criterio_terminacion,
+-- plan diario v3 + RPC upsert_tarea_by_titulo, adjuntos por tarea y migración de
+-- `subtareas` JSONB a tabla relacional `tareas_subtareas`).
 -- Todas son idempotentes: se pueden ejecutar varias veces sin romper nada.
 --
 -- Este archivo NO está en supabase/migrations/ a propósito, para no
@@ -277,6 +278,81 @@ create policy "tareas_adjuntos_delete" on storage.objects
     bucket_id = 'tareas-adjuntos'
     and (storage.foldername(name))[1] = auth.uid()::text
   );
+
+-- ############################################################################
+-- ## 0010_tareas_subtareas_tabla.sql
+-- ############################################################################
+
+create table if not exists public.tareas_subtareas (
+  id                   uuid primary key default gen_random_uuid(),
+  owner_id             uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  tarea_id             uuid not null references public.tareas(id) on delete cascade,
+  descripcion          text not null,
+  tiempo_estimado_min  int  check (tiempo_estimado_min is null or tiempo_estimado_min between 1 and 5),
+  hecho                boolean not null default false,
+  orden                int  not null default 0,
+  created_at           timestamptz not null default now(),
+  updated_at           timestamptz not null default now()
+);
+
+create index if not exists idx_tareas_subtareas_tarea on public.tareas_subtareas(tarea_id);
+create index if not exists idx_tareas_subtareas_owner_tarea on public.tareas_subtareas(owner_id, tarea_id);
+create index if not exists idx_tareas_subtareas_pendientes on public.tareas_subtareas(tarea_id) where hecho = false;
+
+drop trigger if exists trg_tareas_subtareas_updated on public.tareas_subtareas;
+create trigger trg_tareas_subtareas_updated before update on public.tareas_subtareas
+  for each row execute function public.set_updated_at();
+
+alter table public.tareas_subtareas enable row level security;
+
+drop policy if exists "own_select" on public.tareas_subtareas;
+drop policy if exists "own_insert" on public.tareas_subtareas;
+drop policy if exists "own_update" on public.tareas_subtareas;
+drop policy if exists "own_delete" on public.tareas_subtareas;
+
+create policy "own_select" on public.tareas_subtareas for select using (owner_id = auth.uid());
+create policy "own_insert" on public.tareas_subtareas for insert with check (owner_id = auth.uid());
+create policy "own_update" on public.tareas_subtareas for update using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+create policy "own_delete" on public.tareas_subtareas for delete using (owner_id = auth.uid());
+
+-- Migración JSONB -> filas (idempotente)
+do $$
+declare v_count int;
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='tareas'
+      and column_name='subtareas' and data_type='jsonb'
+  ) then
+    delete from public.tareas_subtareas ts
+    where exists (
+      select 1 from public.tareas t
+      where t.id = ts.tarea_id and t.subtareas is not null and jsonb_typeof(t.subtareas)='array'
+    );
+    with parsed as (
+      select t.id as tarea_id, t.owner_id, b.ord as orden,
+        nullif(btrim(coalesce(b.elem->>'descripcion','')),'') as descripcion,
+        case
+          when (b.elem ? 'tiempo_estimado_min')
+               and (b.elem->>'tiempo_estimado_min') ~ '^[0-9]+$'
+               and (b.elem->>'tiempo_estimado_min')::int between 1 and 5
+            then (b.elem->>'tiempo_estimado_min')::int
+          else null
+        end as tiempo_estimado_min,
+        coalesce((b.elem->>'hecho')::boolean, false) as hecho
+      from public.tareas t
+      cross join lateral jsonb_array_elements(t.subtareas) with ordinality as b(elem, ord)
+      where t.subtareas is not null and jsonb_typeof(t.subtareas)='array'
+    )
+    insert into public.tareas_subtareas (tarea_id, owner_id, orden, descripcion, tiempo_estimado_min, hecho)
+    select tarea_id, owner_id, orden, descripcion, tiempo_estimado_min, hecho from parsed
+    where descripcion is not null;
+    get diagnostics v_count = row_count;
+    raise notice '[0010] Migradas % subtareas', v_count;
+  end if;
+end $$;
+
+alter table public.tareas drop column if exists subtareas;
 
 -- ============================================================================
 -- Refresca la caché de esquema de PostgREST (por si acaso).

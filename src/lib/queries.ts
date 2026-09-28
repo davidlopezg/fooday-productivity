@@ -12,6 +12,7 @@ import type {
   Ritual,
   Tarea,
   TareaAdjunto,
+  TareaSubtarea,
 } from "@/lib/types";
 
 const HOY = () => new Date().toISOString().slice(0, 10);
@@ -22,11 +23,22 @@ export async function fetchAreas(): Promise<Area[]> {
 }
 
 export async function fetchTareas(estado?: string): Promise<Tarea[]> {
-  let q = createClient().from("tareas").select("*").order("created_at", { ascending: false });
+  let q = createClient()
+    .from("tareas")
+    .select("*, subtareas:tareas_subtareas(*)")
+    .order("created_at", { ascending: false });
   if (estado) q = q.eq("estado", estado);
   const { data, error } = await q;
   if (error) throw error;
-  return (data ?? []) as Tarea[];
+  return ordenarSubtareas((data ?? []) as Tarea[]);
+}
+
+/** Ordena las subtareas anidadas por `orden` ascendente. */
+function ordenarSubtareas<T extends { subtareas: TareaSubtarea[] | null }>(tareas: T[]): T[] {
+  return tareas.map((t) => ({
+    ...t,
+    subtareas: ((t.subtareas ?? []) as TareaSubtarea[]).slice().sort((a, b) => a.orden - b.orden),
+  }));
 }
 
 /**
@@ -40,14 +52,14 @@ export async function fetchTareasCompletadas(opts?: { limit?: number }) {
   const limit = opts?.limit ?? 1000;
   const { data: tareas, error } = await supabase
     .from("tareas")
-    .select("*")
+    .select("*, subtareas:tareas_subtareas(*)")
     .eq("estado", "hecha")
     .not("completada_at", "is", null)
     .order("completada_at", { ascending: false })
     .limit(limit);
   if (error) throw error;
-  const tareasArr = (tareas ?? []) as Tarea[];
-  if (tareasArr.length === 0) return [] as Array<Tarea & { area: Area | null }>;
+  const tareasArr = ordenarSubtareas((tareas ?? []) as Tarea[]);
+  if (tareasArr.length === 0) return [] as Array<Tarea & { area: Area | null; subtareas: TareaSubtarea[] | null }>;
 
   const areaIds = Array.from(
     new Set(tareasArr.map((t) => t.area_id).filter((id): id is string => !!id)),
@@ -325,14 +337,14 @@ export async function fetchPlanSemanal(opts: {
 export async function fetchTareasCriticasActivas(): Promise<Tarea[]> {
   const { data, error } = await createClient()
     .from("tareas")
-    .select("*")
+    .select("*, subtareas:tareas_subtareas(*)")
     .eq("prioridad", "critica")
     .in("estado", ["pendiente", "en_progreso", "bloqueada"])
     // deadline NULL al final: las más urgentes primero, las sin fecha al final.
     .order("deadline", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: true });
   if (error) throw error;
-  return (data ?? []) as Tarea[];
+  return ordenarSubtareas((data ?? []) as Tarea[]);
 }
 
 /**

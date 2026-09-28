@@ -4,6 +4,7 @@ import type {
   PlanGeneradoSimple,
   Subtarea,
   TareaAdjunto,
+  TareaSubtarea,
 } from "@/lib/types";
 import { desgranarTareaIA, generarCriterioTerminacionIA } from "@/lib/plan";
 
@@ -63,7 +64,10 @@ export type TareaCreada = {
   titulo: string;
 };
 
-/** Crea la tarea y DEVUELVE el id (la fila creada). */
+/** Crea la tarea y DEVUELVE el id (la fila creada).
+ *  Las subtareas se insertan DESPUÉS (necesitamos el id de la tarea).
+ *  Si falla la inserción de subtareas, la tarea sigue creada — se perderán
+ *  solo las subtareas, que es un mal menor. */
 export async function crearTarea(datos: {
   titulo: string;
   prioridad?: string;
@@ -93,8 +97,6 @@ export async function crearTarea(datos: {
       pts: datos.pts ?? null,
       esfuerzo: datos.esfuerzo ?? null,
       criterio_terminacion: datos.criterio_terminacion ?? null,
-      subtareas:
-        datos.subtareas && datos.subtareas.length > 0 ? datos.subtareas : null,
       origen: "manual",
     })
     .select("id,titulo")
@@ -104,7 +106,17 @@ export async function crearTarea(datos: {
     throw new Error(`No se pudo crear la tarea: ${error.message}`);
   }
   if (!data) throw new Error("No se pudo crear la tarea — la base de datos no devolvió confirmación.");
-  return { id: data.id as string, titulo: data.titulo as string };
+  const id = data.id as string;
+
+  if (datos.subtareas && datos.subtareas.length > 0) {
+    try {
+      await reemplazarSubtareasTarea(id, datos.subtareas);
+    } catch (e) {
+      console.warn("[crearTarea] fallo insertando subtareas:", e);
+    }
+  }
+
+  return { id, titulo: data.titulo as string };
 }
 
 /**
@@ -189,10 +201,7 @@ export async function crearTareaConIA(
         },
       );
       if (subtareas.length > 0) {
-        await createClient()
-          .from("tareas")
-          .update({ subtareas })
-          .eq("id", creada.id);
+        await reemplazarSubtareasTarea(creada.id, subtareas);
       }
     }
 
@@ -235,19 +244,19 @@ export async function crearCaptura(texto: string) {
 
 /**
  * Desgrana una tarea al máximo posible usando la IA y persiste el resultado
- * en `tareas.subtareas` (JSONB). Mantiene el estado `hecho` de las subtareas
- * que ya existieran con la misma descripción.
+ * en `tareas_subtareas`. Mantiene el estado `hecho` de las subtareas que ya
+ * existieran con la misma descripción.
  */
 export async function desgranarTarea(
   id: string,
   cfg: { base_url: string; minimax_api_key: string | null; model: string },
-): Promise<Subtarea[]> {
+): Promise<TareaSubtarea[]> {
   const supabase = createClient();
 
   // 1) Lee la tarea actual para tener título + descripción + subtareas previas
   const { data: tarea, error: errRead } = await supabase
     .from("tareas")
-    .select("titulo,descripcion,notas,subtareas")
+    .select("titulo,descripcion,notas")
     .eq("id", id)
     .maybeSingle();
   if (errRead) throw errRead;
@@ -259,7 +268,18 @@ export async function desgranarTarea(
     );
   }
 
-  // 2) Llama a la IA
+  // 2) Lee las subtareas previas para pasarlas al prompt y preservar `hecho`
+  const { data: subsPrevias } = await supabase
+    .from("tareas_subtareas")
+    .select("descripcion, hecho")
+    .eq("tarea_id", id);
+  const subtareasPreviasWire: Subtarea[] = (subsPrevias ?? []).map((s) => ({
+    descripcion: (s as { descripcion: string }).descripcion,
+    tiempo_estimado_min: null,
+    hecho: (s as { hecho: boolean }).hecho,
+  }));
+
+  // 3) Llama a la IA
   const { subtareas } = await desgranarTareaIA(
     cfg.base_url,
     cfg.minimax_api_key,
@@ -268,39 +288,75 @@ export async function desgranarTarea(
       titulo: (tarea.titulo as string) ?? "",
       descripcion: (tarea.descripcion as string | null) ?? null,
       notas: (tarea.notas as string | null) ?? null,
-      subtareasPrevias: (tarea.subtareas as Subtarea[] | null) ?? null,
+      subtareasPrevias: subtareasPreviasWire,
     },
   );
 
-  // 3) Mezcla con `hecho` previo: si una subtarea nueva coincide (normalizada)
-  //    con una ya marcada como hecha, la marcamos como hecha también.
-  const previas = ((tarea.subtareas as Subtarea[] | null) ?? []).filter(
-    (s) => s.descripcion && s.hecho,
-  );
-  const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
-  const hechas = new Set(previas.map((p) => norm(p.descripcion)));
-  const mezcladas: Subtarea[] = subtareas.map((s) => ({
-    descripcion: s.descripcion,
-    tiempo_estimado_min: s.tiempo_estimado_min ?? null,
-    hecho: hechas.has(norm(s.descripcion)),
-  }));
-
-  // 4) Persiste en Supabase
-  const { error: errUpd } = await supabase
-    .from("tareas")
-    .update({ subtareas: mezcladas })
-    .eq("id", id);
-  if (errUpd) throw errUpd;
-
-  return mezcladas;
+  // 4) Persiste (reemplazo total, preservando `hecho` por descripción)
+  const guardadas = await reemplazarSubtareasTarea(id, subtareas);
+  return guardadas;
 }
 
-/** Guarda manualmente las subtareas de una tarea (sin pasar por la IA). */
-export async function guardarSubtareas(id: string, subtareas: Subtarea[]) {
-  await createClient()
-    .from("tareas")
-    .update({ subtareas: subtareas.length > 0 ? subtareas : null })
-    .eq("id", id);
+/**
+ * Reemplaza TODAS las subtareas de una tarea. Preserva el flag `hecho` de
+ * las que ya estuvieran marcadas, matching por descripción normalizada
+ * (trim + lower + colapsar espacios). Devuelve las filas insertadas.
+ *
+ * Es el único punto de escritura sobre `tareas_subtareas` — úsalo siempre
+ * que quieras modificar las subtareas desde la app.
+ */
+export async function reemplazarSubtareasTarea(
+  tareaId: string,
+  nuevas: Subtarea[],
+): Promise<TareaSubtarea[]> {
+  const supabase = createClient();
+
+  // 1) Lee `hecho` de las anteriores
+  const { data: anteriores, error: errPrev } = await supabase
+    .from("tareas_subtareas")
+    .select("descripcion, hecho")
+    .eq("tarea_id", tareaId);
+  if (errPrev) throw errPrev;
+
+  const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
+  const hechas = new Set(
+    (anteriores ?? [])
+      .filter((a) => a.hecho && (a as { descripcion: string }).descripcion)
+      .map((a) => norm((a as { descripcion: string }).descripcion)),
+  );
+
+  // 2) Borra todas
+  const { error: errDel } = await supabase
+    .from("tareas_subtareas")
+    .delete()
+    .eq("tarea_id", tareaId);
+  if (errDel) throw errDel;
+
+  // 3) Sanea e inserta
+  const limpias = nuevas
+    .map((s) => ({
+      descripcion: s.descripcion.trim(),
+      tiempo_estimado_min:
+        s.tiempo_estimado_min && s.tiempo_estimado_min > 0
+          ? Math.min(5, Math.round(s.tiempo_estimado_min))
+          : null,
+    }))
+    .filter((s) => s.descripcion.length > 0);
+  if (limpias.length === 0) return [];
+
+  const filas = limpias.map((s, i) => ({
+    tarea_id: tareaId,
+    descripcion: s.descripcion,
+    tiempo_estimado_min: s.tiempo_estimado_min,
+    orden: i,
+    hecho: hechas.has(norm(s.descripcion)),
+  }));
+  const { data: insertadas, error: errIns } = await supabase
+    .from("tareas_subtareas")
+    .insert(filas)
+    .select("*");
+  if (errIns) throw errIns;
+  return (insertadas ?? []) as TareaSubtarea[];
 }
 
 export async function guardarConfiguracion(datos: {

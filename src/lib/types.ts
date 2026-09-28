@@ -60,10 +60,28 @@ export interface Meta {
   plazo: string | null;
 }
 
+/**
+ * Forma "wire" de una subtarea — la que produce/acepta la IA y la UI
+ * (sin id, sin tarea_id). Cuando la subtarea ya está persistida, se usa
+ * `TareaSubtarea` (con id, tarea_id, owner_id, orden).
+ */
 export interface Subtarea {
   descripcion: string;
   tiempo_estimado_min?: number | null;
   hecho?: boolean;
+}
+
+/** Fila persistida en `tareas_subtareas` (FK a `tareas`). */
+export interface TareaSubtarea {
+  id: string;
+  owner_id: string;
+  tarea_id: string;
+  descripcion: string;
+  tiempo_estimado_min: number | null;
+  hecho: boolean;
+  orden: number;
+  created_at: string;
+  updated_at: string;
 }
 
 /** Fila de metadatos en `tarea_adjuntos`. Los bytes viven en Supabase Storage. */
@@ -94,7 +112,8 @@ export interface Tarea {
   origen: string | null;
   notas: string | null;
   completada_at: string | null;
-  subtareas: Subtarea[] | null;
+  /** Subtareas (desglose) — vienen con la tarea al hacer nested select. */
+  subtareas: TareaSubtarea[] | null;
   /** Frase "Esta tarea está HECHA cuando __________". */
   criterio_terminacion: string | null;
 }

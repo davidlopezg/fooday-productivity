@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { fetchTareasCompletadas } from "@/lib/queries";
 import { useData } from "@/lib/useData";
-import type { Area, Prioridad, Subtarea, Tarea } from "@/lib/types";
+import type { Area, Prioridad, TareaSubtarea, Tarea } from "@/lib/types";
 import { IconCheck } from "@/components/icons";
 
 type TareaConArea = Tarea & { area: Area | null };
@@ -156,7 +156,7 @@ export default function TareasCompletadasPage() {
     let subtareasTotales = 0;
     let conCriterio = 0;
     for (const t of filtradas) {
-      const subs = (t.subtareas ?? []) as Subtarea[];
+      const subs = (t.subtareas ?? []) as TareaSubtarea[];
       if (subs.length > 0) {
         subtareasTotales += subs.length;
         subtareasHechas += subs.filter((s) => s.hecho).length;
@@ -317,7 +317,7 @@ function Stat({
 
 function TareaCompletadaRow({ t }: { t: TareaConArea }) {
   const completada = parseCompletadaAt(t.completada_at);
-  const subs = (t.subtareas ?? []) as Subtarea[];
+  const subs = (t.subtareas ?? []) as TareaSubtarea[];
   const subsHechas = subs.filter((s) => s.hecho);
   const subsPendientes = subs.filter((s) => !s.hecho);
 
