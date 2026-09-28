@@ -171,6 +171,15 @@ export function bloquesFijosDe(dia: DiaSemana): BloqueFijo[] {
   return BLOQUES_FIJOS.filter((b) => b.dia === dia);
 }
 
+/**
+ * Un día está BLOQUEADO si tiene algún bloque fijo con `bloquea: true`.
+ * En días bloqueados no se pueden arrastrar tareas ni usar el botón "+ Añadir".
+ * (L: no — M: no — X: no — J: sí — V: no — S: sí — D: sí).
+ */
+export function esDiaBloqueado(dia: DiaSemana): boolean {
+  return BLOQUES_FIJOS.some((f) => f.dia === dia && f.bloquea);
+}
+
 /** Días elegibles para la propuesta IA (los NO bloqueados, sin contar S-D). */
 export const DIAS_IA: readonly DiaSemana[] = [1, 2, 3, 5] as const; // L, M, X, V
 

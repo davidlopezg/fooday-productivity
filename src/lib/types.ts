@@ -115,6 +115,7 @@ export interface Ritual {
  */
 export interface PlanSemanalTarea {
   id: string;
+  owner_id: string;
   anio: number;
   semana_iso: number;
   tarea_id: string;
