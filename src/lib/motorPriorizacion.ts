@@ -361,7 +361,15 @@ async function llamarLLM<T>(
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 45_000);
+  const timeoutId = setTimeout(
+    () =>
+      controller.abort(
+        new Error(
+          "La IA no respondió a tiempo (más de 45s). Vuelve a intentarlo.",
+        ),
+      ),
+    45_000,
+  );
   try {
     const res = await fetch(endpoint(baseUrl), {
       method: "POST",
@@ -388,6 +396,26 @@ async function llamarLLM<T>(
       const first = extractFirstJSON(content);
       return JSON.parse(saneadorComun(first));
     }
+  } catch (e) {
+    // El `reason` del AbortController llega al catch como `cause` del error.
+    //
+    // Caso 1 — timeout nuestro: el `abort()` de arriba le pasa un Error con
+    //   mensaje útil. Si lo machacamos aquí, el usuario nunca ve el mensaje
+    //   específico. Dejamos pasar el `cause` tal cual.
+    //
+    // Caso 2 — abort externo (componente desmontado, regenerar rápido,
+    //   navegación): el `cause` es undefined o un DOMException genérico
+    //   ("signal is aborted without reason"). Mostramos un mensaje amable.
+    if (e instanceof Error && e.name === "AbortError") {
+      const cause = (e as Error & { cause?: unknown }).cause;
+      if (cause instanceof Error && cause.message) {
+        throw cause;
+      }
+      throw new Error(
+        "La petición a la IA fue cancelada (navegación o regeneración). Reintenta.",
+      );
+    }
+    throw e;
   } finally {
     clearTimeout(timeoutId);
   }
