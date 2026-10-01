@@ -340,6 +340,11 @@ export async function reemplazarSubtareasTarea(
         s.tiempo_estimado_min && s.tiempo_estimado_min > 0
           ? Math.min(5, Math.round(s.tiempo_estimado_min))
           : null,
+      // Preserva el `hecho` que trae el input (lo que el usuario acaba de
+      // marcar en el editor). Solo recurrimos al match por descripción con
+      // las filas antiguas cuando el input NO trae `hecho` definido — eso
+      // ocurre cuando las subtareas vienen de la IA, que a veces omite el flag.
+      hecho: typeof s.hecho === "boolean" ? s.hecho : undefined,
     }))
     .filter((s) => s.descripcion.length > 0);
   if (limpias.length === 0) return [];
@@ -349,7 +354,7 @@ export async function reemplazarSubtareasTarea(
     descripcion: s.descripcion,
     tiempo_estimado_min: s.tiempo_estimado_min,
     orden: i,
-    hecho: hechas.has(norm(s.descripcion)),
+    hecho: typeof s.hecho === "boolean" ? s.hecho : hechas.has(norm(s.descripcion)),
   }));
   const { data: insertadas, error: errIns } = await supabase
     .from("tareas_subtareas")

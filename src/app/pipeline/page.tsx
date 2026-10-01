@@ -14,10 +14,16 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { fetchTareas } from "@/lib/queries";
+import { fetchMetas, fetchTareas } from "@/lib/queries";
 import { actualizarTarea } from "@/lib/mutations";
 import { useData } from "@/lib/useData";
-import type { EstadoTarea, Prioridad, Tarea } from "@/lib/types";
+import type { EstadoTarea, Meta, Prioridad, Tarea } from "@/lib/types";
+import { useConfig } from "@/lib/configStore";
+import { IconBolt, IconSparkles } from "@/components/icons";
+import {
+  generarPriorizacion,
+  type PriorizacionInmediata,
+} from "@/lib/motorPriorizacion";
 
 type ColId = Prioridad | "sin_prioridad";
 
@@ -142,10 +148,17 @@ export default function PipelinePage() {
     reload,
     setData,
   } = useData<Tarea[]>(fetchTareas, []);
+  const metasQ = useData<Meta[]>(fetchMetas, []);
+  const cfg = useConfig();
   const [verTodas, setVerTodas] = useState(false);
   const [arrastrada, setArrastrada] = useState<Tarea | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [errorMover, setErrorMover] = useState<string | null>(null);
+  const [analizando, setAnalizando] = useState(false);
+  const [errorIA, setErrorIA] = useState<string | null>(null);
+  const [prioridadIA, setPrioridadIA] = useState<PriorizacionInmediata | null>(
+    null,
+  );
 
   // MouseSensor = ratón en escritorio. TouchSensor con delay = en móvil hay
   // que MANTENER pulsado para arrastrar; si deslizas antes, hace scroll.
@@ -197,6 +210,79 @@ export default function PipelinePage() {
       );
     } finally {
       setGuardando(false);
+    }
+  }
+
+  async function analizarConIA() {
+    if (analizando) return null;
+    if (!cfg.data.minimax_api_key) {
+      setErrorIA(
+        "Configura primero tu API key. Ve a /configuracion para añadirla.",
+      );
+      return null;
+    }
+    setAnalizando(true);
+    setErrorIA(null);
+    try {
+      const tareasActivas = tareas.filter((t) =>
+        ACTIVAS.includes(t.estado),
+      );
+      if (tareasActivas.length === 0) {
+        setErrorIA(
+          "No hay tareas activas para analizar. Añade o reabre alguna tarea primero.",
+        );
+        return null;
+      }
+      const ahora = new Date();
+      const fecha = ahora.toISOString().slice(0, 10);
+      const horaLocal = ahora.toTimeString().slice(0, 5);
+      const diaSemana = ahora.toLocaleDateString("es-ES", {
+        weekday: "long",
+      });
+      const resultado = await generarPriorizacion(
+        {
+          baseUrl: cfg.data.base_url,
+          apiKey: cfg.data.minimax_api_key,
+          model: cfg.data.model,
+        },
+        {
+          tareas: tareasActivas,
+          metas: metasQ.data,
+          fecha,
+          horaLocal,
+          diaSemana,
+        },
+      );
+      setPrioridadIA(resultado);
+      return resultado;
+    } catch (e) {
+      setErrorIA(e instanceof Error ? e.message : "Error desconocido.");
+      return null;
+    } finally {
+      setAnalizando(false);
+    }
+  }
+
+  async function empezarTareaSugerida() {
+    if (!prioridadIA?.tarea_id_sugerida) return;
+    const t = tareas.find((x) => x.id === prioridadIA.tarea_id_sugerida);
+    if (!t) return;
+    const antes = tareas;
+    // Optimista
+    setData((prev) =>
+      prev.map((x) =>
+        x.id === t.id ? { ...x, estado: "en_progreso" } : x,
+      ),
+    );
+    try {
+      await actualizarTarea({ id: t.id, estado: "en_progreso" });
+    } catch (err) {
+      setData(antes);
+      setErrorMover(
+        err instanceof Error
+          ? err.message
+          : "No se pudo marcar la tarea como 'en progreso'",
+      );
     }
   }
 
@@ -272,6 +358,114 @@ export default function PipelinePage() {
           ) : null}
         </DragOverlay>
       </DndContext>
+
+      {/* =========================================================================
+              IA — Motor de Priorización Ejecutable
+          Aparece debajo del tablero. Un solo botón → un único resultado
+          accionable (tarea + motivo + tiempo + primer paso).
+          ========================================================================= */}
+      <section
+        aria-label="Motor de priorización con IA"
+        className="rounded-xl border border-border bg-card p-5"
+      >
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="flex items-center gap-2 text-base font-semibold tracking-tight">
+              <IconSparkles className="h-4 w-4 text-primary" aria-hidden />
+              Motor de priorización — IA
+            </h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Analiza todas tus tareas activas y tus metas y devuelve UNA sola
+              acción concreta para hacer en menos de 45 minutos.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={analizarConIA}
+            disabled={analizando || loading}
+            className="inline-flex shrink-0 items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 active:bg-primary/80 disabled:opacity-50"
+          >
+            <IconBolt className="h-4 w-4" aria-hidden />
+            {analizando
+              ? "Analizando…"
+              : prioridadIA
+                  ? "Regenerar análisis"
+                  : "¿Qué hago ahora?"}
+          </button>
+        </div>
+
+        {!cfg.data.minimax_api_key && !cfg.loading && (
+          <div className="mt-4 rounded-md border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-600 dark:text-amber-400">
+            Aún no has configurado tu API key.{" "}
+            <a href="/configuracion" className="underline underline-offset-4">
+              Ir a Configuración
+            </a>
+            .
+          </div>
+        )}
+
+        {errorIA && (
+          <p className="mt-4 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">
+            {errorIA}
+          </p>
+        )}
+
+        {prioridadIA && (
+          <div className="mt-5 space-y-4 rounded-lg border border-border bg-background/50 p-4">
+            {/* Tarea inmediata — la pieza más visible */}
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Tarea inmediata
+              </p>
+              <p className="mt-1 text-xl font-semibold leading-snug tracking-tight">
+                {prioridadIA.tarea_inmediata}
+              </p>
+              {prioridadIA.tarea_id_sugerida && (
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  <button
+                    type="button"
+                    onClick={empezarTareaSugerida}
+                    className="rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium hover:bg-accent"
+                  >
+                    Marcar “{prioridadIA.tarea_titulo_match}” como en progreso
+                  </button>
+                </p>
+              )}
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              {/* Motivo */}
+              <div className="rounded-md border border-border bg-card p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Motivo de selección
+                </p>
+                <p className="mt-1 text-sm leading-relaxed">
+                  {prioridadIA.motivo}
+                </p>
+              </div>
+              {/* Tiempo + micro-paso */}
+              <div className="space-y-3">
+                <div className="rounded-md border border-border bg-card p-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Tiempo asignado
+                  </p>
+                  <p className="mt-1 text-sm font-medium">
+                    ⏱ {prioridadIA.tiempo_min} min (máx 45)
+                  </p>
+                </div>
+                <div className="rounded-md border border-primary/30 bg-primary/5 p-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-primary">
+                    Primer micro-paso (primer minuto)
+                  </p>
+                  <p className="mt-1 text-sm font-medium leading-relaxed">
+                    {prioridadIA.primer_paso}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </section>
     </div>
   );
 }
