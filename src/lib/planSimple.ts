@@ -31,9 +31,11 @@ export type GenerarPlanSimpleOpts = {
   reflexion?: string;
   /** Fecha YYYY-MM-DD */
   fecha: string;
-  /** Tareas pendientes de BD (se ofrecen como candidatas a los bloques) */
+  /** Tareas pendientes de BD (backlog; se usan como 3ª prioridad). */
   tareas: Tarea[];
-  /** Tareas sueltas recién creadas/asignadas a este plan (referencias a `tareas`) */
+  /** Tareas programadas en /semana para el día de HOY (PRIORIDAD 1). */
+  tareasProgramadasHoy: Tarea[];
+  /** Tareas sueltas recién añadidas en esta sesión (PRIORIDAD 2). */
   tareasLibres: Tarea[];
   /** Últimos N planes del usuario (para que la IA calcule tendencia) */
   historial: PlanDiario[];
@@ -65,22 +67,30 @@ function fechaToLarga(fecha: string): string {
 // ----------------------------------------------------------------------------
 
 function buildPrompt(opts: GenerarPlanSimpleOpts): string {
-  const { estado, reflexion, fecha, tareas, tareasLibres, historial } = opts;
+  const { estado, reflexion, fecha, tareas, tareasProgramadasHoy, tareasLibres, historial } = opts;
   const fechaLarga = fechaToLarga(fecha);
 
-  // Candidatas: BD + libres recién creadas. Cap a 25 para no abrumar al prompt.
-  const candidatas = [...tareas, ...tareasLibres]
-    .filter((t, i, arr) => arr.findIndex((x) => x.id === t.id) === i)
-    .slice(0, 25);
+  // Tres fuentes de tareas, se muestran al LLM como tres listas separadas
+  // con prioridad explícita. Las listas de prioridades altas se eliminan de
+  // la lista de backlog para no presentarlas dos veces.
+  const programadasIds = new Set(tareasProgramadasHoy.map((t) => t.id));
+  const libresIds = new Set(tareasLibres.map((t) => t.id));
+  const backlog = tareas.filter(
+    (t) => !programadasIds.has(t.id) && !libresIds.has(t.id),
+  );
 
-  const listaCandidatas = candidatas.length
-    ? candidatas
-        .map(
-          (t, i) =>
-            `${i + 1}. [${t.prioridad ?? "media"}${t.codigo ? ` · ${t.codigo}` : ""}] ${t.titulo}${t.deadline ? ` (deadline: ${t.deadline})` : ""}`,
-        )
-        .join("\n")
-    : "(sin tareas disponibles)";
+  const fmt = (arr: Tarea[]) =>
+    arr
+      .slice(0, 25)
+      .map(
+        (t, i) =>
+          `${i + 1}. [${t.prioridad ?? "media"}${t.codigo ? ` · ${t.codigo}` : ""}] ${t.titulo}${t.deadline ? ` (deadline: ${t.deadline})` : ""}`,
+      )
+      .join("\n") || "(ninguna)";
+
+  const listaProgramadas = fmt(tareasProgramadasHoy);
+  const listaLibres = fmt(tareasLibres);
+  const listaBacklog = fmt(backlog);
 
   const hist = historial.length
     ? historial
@@ -128,9 +138,22 @@ HISTÓRICO RECIENTE (últimos ${historial.length} planes)
 ${hist}
 
 ============================================================
-TAREAS CANDIDATAS (mezcla de BD + recién creadas)
+TAREAS PROGRAMADAS PARA HOY (vienen de /semana, drag&drop)
+PRIORIDAD 1 — David se ha comprometido a hacerlas hoy. Asígnalas primero.
 ============================================================
-${listaCandidatas}
+${listaProgramadas}
+
+============================================================
+OTRAS TAREAS AÑADIDAS EN ESTA SESIÓN (quick-add del formulario)
+PRIORIDAD 2 — Úsalas si las programadas no cubren los bloques activos.
+============================================================
+${listaLibres}
+
+============================================================
+RESTO DEL BACKLOG (todas las pendientes NO listadas arriba)
+PRIORIDAD 3 — Solo si las 2 anteriores no cubren los bloques activos.
+============================================================
+${listaBacklog}
 
 ============================================================
 REGLAS DEL PLAN
@@ -168,10 +191,15 @@ E) SEMÁFORO: deduce del estado emocional estructurado del usuario.
 F) TIMEBLOCKING (Sección B):
    - Tienes exactamente 4 bloques de 60 min cada uno: bloque 1 y 2 son MAÑANA (antes de comer); bloque 3 y 4 son TARDE (después de comer).
    - Num_bloques_activos: 1 a 4 según el semáforo (regla E).
+   - ASIGNACIÓN DE TAREAS A BLOQUES (orden de prioridad):
+     1º Tareas PROGRAMADAS PARA HOY (compromiso explícito de David).
+     2º Tareas AÑADIDAS EN ESTA SESIÓN.
+     3º Resto del BACKLOG (último recurso).
+   - Si un bloque se queda sin tarea de ninguna fuente, propón una abstracta ("Paseo consciente de 60 min").
    - Asigna UNA tarea por bloque (las primeras num_bloques_activos ranuras).
    - Una tarea PROFUNDA ocupa el bloque entero (60 min). Tareas RÁPIDAS pueden agruparse: pon UNA sola línea con " + " entre varias (ej: "Revisar correo + llamar gestoría + agendar médico") que ocupe el bloque entero.
-   - Ordena por: (1) estado emocional (tareas ligeras si rojo, profundas si verde), (2) prioridad de la tarea, (3) tipo (profunda antes que rápida salvo que el cuerpo pida pausa).
-   - Las tareas deben salir de la lista de candidatas. Puedes referenciarlas por el nº de la lista. Si ninguna sirve, propón una tarea abstracta ("Paseo consciente de 60 min") como tarea libre.
+   - Ordena por: (1) prioridad de fuente (regla arriba), (2) estado emocional (tareas ligeras si rojo, profundas si verde), (3) prioridad de la tarea, (4) tipo (profunda antes que rápida salvo que el cuerpo pida pausa).
+   - Las tareas deben salir de alguna de las 3 listas. Puedes referenciarlas por su nº en cada lista. Si ninguna sirve, propón una tarea abstracta ("Paseo consciente de 60 min") como tarea libre.
 
 G) COMIDA (Sección C):
    - UNA sola sugerencia gastronómica para la comida principal de hoy.
@@ -401,6 +429,12 @@ export async function generarPlanSimple(
   const prompt = buildPrompt(opts);
   const parsed = await llamarLLM<unknown>(ia.baseUrl, ia.apiKey, ia.model, prompt);
 
-  const candidatas = [...opts.tareas, ...opts.tareasLibres];
+  // Para sanear, la IA puede haber referido cualquier tarea de las 3 listas.
+  // Le damos las 3 al matcher para que matchee por título contra cualquiera.
+  const candidatas = [
+    ...opts.tareasProgramadasHoy,
+    ...opts.tareasLibres,
+    ...opts.tareas,
+  ];
   return sanearPlanSimple(parsed, candidatas);
 }

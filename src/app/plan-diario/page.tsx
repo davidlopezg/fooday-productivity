@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   fetchTareas,
   fetchHistorialEmocional,
+  fetchPlanSemanal,
 } from "@/lib/queries";
 import {
   upsertTareaPorTitulo,
@@ -14,7 +15,13 @@ import { useData } from "@/lib/useData";
 import { useConfig } from "@/lib/configStore";
 import { generarPlanSimple } from "@/lib/planSimple";
 import type { EstadoEmocional } from "@/lib/plan";
-import type { PlanDiario, PlanGeneradoSimple, Tarea } from "@/lib/types";
+import { getCurrentISOWeek } from "@/lib/semana";
+import type {
+  PlanDiario,
+  PlanGeneradoSimple,
+  PlanSemanalTarea,
+  Tarea,
+} from "@/lib/types";
 
 // ----------------------------------------------------------------------------
 // Constantes UI
@@ -91,6 +98,31 @@ export default function PlanDiarioPage() {
   const config = useConfig();
   const tareasQ = useData<Tarea[]>(() => fetchTareas("pendiente"), []);
   const historialQ = useData<PlanDiario[]>(() => fetchHistorialEmocional(7), []);
+
+  // ── Semana actual + día de hoy (ISO 1=lun..7=dom) ──
+  const currentWeek = useMemo(() => getCurrentISOWeek(), []);
+  const today = useMemo(
+    () => ((new Date().getDay() || 7) as 1 | 2 | 3 | 4 | 5 | 6 | 7),
+    [],
+  );
+  const planSemanalQ = useData<PlanSemanalTarea[]>(
+    () =>
+      fetchPlanSemanal({
+        anio: currentWeek.anio,
+        semana_iso: currentWeek.semana_iso,
+      }),
+    [],
+  );
+
+  // Tareas que /semana marcó para HOY (intersección plan_semanal_tareas × tareas pendientes).
+  const tareasProgramadasHoy = useMemo<Tarea[]>(() => {
+    const ids = new Set(
+      planSemanalQ.data
+        .filter((p) => p.dia_semana === today)
+        .map((p) => p.tarea_id),
+    );
+    return tareasQ.data.filter((t) => ids.has(t.id));
+  }, [planSemanalQ.data, tareasQ.data, today]);
 
   // ── Parte 1: input ──
   const [estado, setEstado] = useState<EstadoEmocional>({
@@ -215,6 +247,7 @@ export default function PlanDiarioPage() {
           reflexion,
           fecha,
           tareas: tareasQ.data,
+          tareasProgramadasHoy,
           tareasLibres: tareasLibresConId,
           historial: historialQ.data,
         },
@@ -368,7 +401,74 @@ export default function PlanDiarioPage() {
           </div>
         </details>
 
-        {/* 1C — Otras tareas */}
+        {/* 1C — Tareas programadas para HOY (read-only, vienen de /semana) */}
+        <div className="mt-5">
+          <div className="mb-1 flex items-center gap-2 text-sm font-medium">
+            <span>📅 Programadas para hoy</span>
+            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              Desde /semana
+            </span>
+            <span className="ml-auto text-xs text-muted-foreground">
+              {tareasProgramadasHoy.length > 0
+                ? `${tareasProgramadasHoy.length} tareas · solo lectura`
+                : "solo lectura"}
+            </span>
+          </div>
+          <p className="mb-2 text-xs text-muted-foreground">
+            {tareasProgramadasHoy.length > 0
+              ? "Estas tareas vienen de tu planificación semanal. La IA las prioriza al armar los bloques."
+              : "Aún no has marcado tareas para hoy en /semana. Ve allí a planificar."}
+          </p>
+
+          {planSemanalQ.loading ? (
+            <div className="rounded-md border border-dashed border-border bg-muted/30 px-3 py-3 text-xs text-muted-foreground">
+              Cargando…
+            </div>
+          ) : tareasProgramadasHoy.length === 0 ? (
+            <div className="rounded-md border border-dashed border-border bg-muted/30 px-3 py-3 text-xs text-muted-foreground">
+              No has marcado tareas para hoy en{" "}
+              <a
+                href="/semana"
+                className="font-medium text-foreground underline underline-offset-4"
+              >
+                /semana
+              </a>
+              .
+            </div>
+          ) : (
+            <ul className="space-y-1.5">
+              {tareasProgramadasHoy.map((t) => (
+                <li
+                  key={t.id}
+                  className="flex items-center justify-between gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm"
+                >
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="truncate">{t.titulo}</span>
+                    {t.prioridad && (
+                      <span className="shrink-0 rounded-full border border-border bg-background px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                        {t.prioridad}
+                      </span>
+                    )}
+                    {t.deadline && (
+                      <span className="shrink-0 text-[10px] text-muted-foreground">
+                        ⏰ {t.deadline}
+                      </span>
+                    )}
+                  </div>
+                  <a
+                    href="/semana"
+                    className="shrink-0 rounded p-1 text-xs text-muted-foreground hover:bg-background hover:text-foreground"
+                    title="Editar en /semana"
+                  >
+                    ↗
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {/* 1D — Otras tareas */}
         <div className="mt-5">
           <label className="block">
             <span className="mb-1 flex items-center gap-2 text-sm font-medium">
@@ -466,7 +566,7 @@ export default function PlanDiarioPage() {
           )}
         </div>
 
-        {/* 1D — Botón Generar Plan */}
+        {/* 1E — Botón Generar Plan */}
         <div className="mt-6 flex flex-wrap items-center gap-3">
           <button
             onClick={generar}
