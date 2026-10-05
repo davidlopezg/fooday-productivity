@@ -339,7 +339,7 @@ export default function MetasPage() {
                 m.es_wig ? "border-violet-500/40" : "border-border"
               }`}
             >
-              {/* Botones esquina superior derecha: WIG (diana) + Editar (lápiz) */}
+              {/* Botones esquina superior derecha: Editar (lápiz) + WIG (diana) */}
               <div className="absolute right-3 top-3 z-10 flex items-center gap-1">
                 <button
                   type="button"
@@ -348,7 +348,7 @@ export default function MetasPage() {
                     e.stopPropagation();
                     setEditando(mp);
                   }}
-                  className="rounded-full p-1.5 text-muted-foreground/40 transition-colors hover:bg-accent hover:text-foreground"
+                  className="rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                   title="Editar meta"
                   aria-label="Editar meta"
                 >

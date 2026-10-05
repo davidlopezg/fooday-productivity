@@ -26,7 +26,15 @@ import type {
   Tarea,
   TareaSinMeta,
 } from "@/lib/types";
-import { IconArchive, IconArrowLeft, IconPlus, IconTarget, IconTrash } from "@/components/icons";
+import {
+  IconArchive,
+  IconArrowLeft,
+  IconPencil,
+  IconPlus,
+  IconTarget,
+  IconTrash,
+} from "@/components/icons";
+import { EditarMetaModal } from "@/components/EditarMetaModal";
 
 const ESTADO_META: Record<string, string> = {
   sin_empezar: "bg-muted text-muted-foreground border-border",
@@ -72,6 +80,7 @@ export default function MetaDetallePage() {
 
   const plan = planQ.data;
   const periodos = periodosQ.data;
+  const [editando, setEditando] = useState(false);
 
   // Trimestres del año actual que NO tienen aún un resultado en esta meta.
   // Se usan para el selector "+ Añadir resultado".
@@ -161,16 +170,24 @@ export default function MetaDetallePage() {
                 <div className="text-xs text-muted-foreground">
                   {plan.tareas_hechas}/{plan.total_tareas} tareas hechas
                 </div>
-                <button
-                  onClick={async () => {
-                    if (!confirm(`¿Archivar "${plan.meta.titulo}"?`)) return;
-                    await archivarMeta(plan.meta.id);
-                    await planQ.reload();
-                  }}
-                  className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium hover:bg-accent"
-                >
-                  <IconArchive className="h-3.5 w-3.5" /> Archivar
-                </button>
+                <div className="mt-3 flex items-center justify-end gap-2">
+                  <button
+                    onClick={() => setEditando(true)}
+                    className="inline-flex items-center gap-1.5 rounded-md bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
+                  >
+                    <IconPencil className="h-3.5 w-3.5" /> Editar
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!confirm(`¿Archivar "${plan.meta.titulo}"?`)) return;
+                      await archivarMeta(plan.meta.id);
+                      await planQ.reload();
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium hover:bg-accent"
+                  >
+                    <IconArchive className="h-3.5 w-3.5" /> Archivar
+                  </button>
+                </div>
               </div>
             </div>
             <div className="mt-4">
@@ -232,6 +249,14 @@ export default function MetaDetallePage() {
             )}
           </section>
         </>
+      )}
+
+      {plan && editando && (
+        <EditarMetaModal
+          meta={plan.meta}
+          onClose={() => setEditando(false)}
+          onChanged={() => planQ.reload()}
+        />
       )}
     </div>
   );
