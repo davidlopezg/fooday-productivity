@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState, type SVGProps } from "react";
 import {
   IconBolt,
@@ -18,55 +18,67 @@ import {
   IconHome,
   IconInbox,
   IconList,
+  IconLogout,
   IconMenu,
   IconSettings,
   IconSparkles,
   IconTarget,
   IconX,
 } from "@/components/icons";
-import { SignOut } from "@/components/SignOut";
-import { ThemeToggle } from "@/components/ThemeToggle";
+import { createClient } from "@/lib/supabase/client";
 
 type IconComponent = (p: SVGProps<SVGSVGElement>) => React.ReactElement;
 type NavItem = { href: string; label: string; Icon: IconComponent };
 type NavSection = { label?: string; items: NavItem[] };
 
-// Items sueltos fuera de la sección Tareas
-const TOP_ITEMS: NavItem[] = [
+// Bloque 1 — Acción y Captura Rápida (el día a día)
+const QUICK_ITEMS: NavItem[] = [
   { href: "/", label: "Hoy", Icon: IconHome },
   { href: "/captura", label: "Capturar", Icon: IconInbox },
+];
+
+// Bloque 2 — Dirección y Planificación Estratégica
+const STRATEGY_ITEMS: NavItem[] = [
   { href: "/norte", label: "Norte", Icon: IconCompass },
   { href: "/metas", label: "Metas", Icon: IconTarget },
   { href: "/proyectos", label: "Proyectos", Icon: IconFolder },
-  { href: "/semana", label: "Semana", Icon: IconCalendar },
 ];
 
-// Sub-ítems del bloque Metas (solo Plan trimestral).
-// El "Inbox" NO vive aquí: es de tareas, no de metas. Está en TASKS_SECTION.
+// Plan trimestral — vive como sub-ítem de Metas, dentro del Bloque 2.
+// El "Inbox" NO vive aquí: es de tareas, no de metas.
 const METAS_NEST: NavItem[] = [
   { href: "/metas/plan", label: "Plan trimestral", Icon: IconCalendar },
 ];
 
-// Sección Tareas
-const TASKS_SECTION: NavSection = {
-  label: "Tareas",
-  items: [
-    { href: "/tareas", label: "Tareas", Icon: IconList },
-    { href: "/tareas/inbox", label: "Inbox", Icon: IconInbox },
-    { href: "/tareas/completadas", label: "Completadas", Icon: IconCheck },
-    { href: "/pipeline", label: "Prioridad", Icon: IconFlag },
-    { href: "/plan-diario", label: "Plan diario", Icon: IconSparkles },
-    { href: "/plan-diario/historico", label: "Histórico de planes", Icon: IconHistory },
-  ],
-};
+// Bloque 3 — Ejecución y Organización (ítems a nivel de bloque)
+const EXEC_ITEMS: NavItem[] = [
+  { href: "/semana", label: "Semana", Icon: IconCalendar },
+];
 
-// Utilidades al final
-const UTIL_ITEMS: NavItem[] = [
-  { href: "/dashboard-emocional", label: "Dashboard emocional", Icon: IconHeart },
-  { href: "/focus", label: "Focus", Icon: IconBolt },
+// Sub-ítems de Tareas (dentro de Bloque 3, anidados bajo la entrada Tareas)
+const TASKS_NEST: NavItem[] = [
+  { href: "/tareas/inbox", label: "Inbox", Icon: IconInbox },
+  { href: "/pipeline", label: "Prioridad", Icon: IconFlag },
+  { href: "/plan-diario", label: "Plan diario", Icon: IconSparkles },
+  { href: "/plan-diario/historico", label: "Histórico de planes", Icon: IconHistory },
+];
+
+// Bloque 4 — Revisión, Bienestar y Sistema
+const REVIEW_ITEMS: NavItem[] = [
+  { href: "/tareas/completadas", label: "Completadas", Icon: IconCheck },
   { href: "/calendario", label: "Calendario", Icon: IconCalendar },
+  { href: "/focus", label: "Focus", Icon: IconBolt },
   { href: "/estatus", label: "Estatus diario", Icon: IconClipboardCheck },
+];
+
+// Bloque 5 — Informes
+const REPORTS_ITEMS: NavItem[] = [
+  { href: "/dashboard-emocional", label: "Dashboard emocional", Icon: IconHeart },
   { href: "/informes", label: "Informes", Icon: IconChart },
+];
+
+// Otros — config, ayuda y salida
+const OTHER_ITEMS: NavItem[] = [
   { href: "/docs", label: "Metodología", Icon: IconBook },
   { href: "/configuracion", label: "Configuración", Icon: IconSettings },
 ];
@@ -126,36 +138,115 @@ function NavSection({
   );
 }
 
+function NestedLinks({
+  items,
+  pathname,
+  onNavigate,
+}: {
+  items: NavItem[];
+  pathname: string;
+  onNavigate?: () => void;
+}) {
+  return (
+    <div className="flex flex-col gap-1 pl-7">
+      {items.map((item) => {
+        const active = pathname.startsWith(item.href);
+        return (
+          <NavLink
+            key={item.href}
+            {...item}
+            active={active}
+            onNavigate={onNavigate}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+function SignOutButton({ onNavigate }: { onNavigate?: () => void }) {
+  const router = useRouter();
+  return (
+    <button
+      type="button"
+      onClick={async () => {
+        await createClient().auth.signOut();
+        router.push("/login");
+        router.refresh();
+        onNavigate?.();
+      }}
+      className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
+    >
+      <IconLogout className="h-4 w-4" aria-hidden />
+      Salir
+    </button>
+  );
+}
+
 function NavItems({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
+  const tareasActive = pathname.startsWith("/tareas");
+
   return (
     <nav className="flex flex-col gap-5">
-      <NavSection section={{ items: TOP_ITEMS }} pathname={pathname} onNavigate={onNavigate} />
-      {/* Sub-ítems de Metas — se anidan bajo la entrada Metas, con
-          indentación para sugerir jerarquía sin cambiar el orden global. */}
-      <div className="flex flex-col gap-1">
-        {TOP_ITEMS.find((x) => x.href === "/metas") && (
-          <div className="flex flex-col gap-1 pl-7">
-            {METAS_NEST.map((item) => {
-              const active =
-                item.href === "/metas"
-                  ? pathname === "/metas"
-                  : pathname.startsWith(item.href);
-              return (
-                <NavLink
-                  key={item.href}
-                  {...item}
-                  active={active}
-                  onNavigate={onNavigate}
-                />
-              );
-            })}
-          </div>
-        )}
-      </div>
-      <NavSection section={TASKS_SECTION} pathname={pathname} onNavigate={onNavigate} />
+      {/* Bloque 1 — Acción y captura rápida */}
+      <NavSection section={{ items: QUICK_ITEMS }} pathname={pathname} onNavigate={onNavigate} />
+
+      {/* Bloque 2 — Dirección y planificación estratégica */}
+      <NavSection
+        section={{ label: "Estrategia", items: STRATEGY_ITEMS }}
+        pathname={pathname}
+        onNavigate={onNavigate}
+      />
+      <NestedLinks
+        items={METAS_NEST}
+        pathname={pathname}
+        onNavigate={onNavigate}
+      />
+
+      {/* Bloque 3 — Ejecución y organización */}
+      <NavSection
+        section={{ label: "Ejecución", items: EXEC_ITEMS }}
+        pathname={pathname}
+        onNavigate={onNavigate}
+      />
+      <NavLink
+        href="/tareas"
+        label="Tareas"
+        Icon={IconList}
+        active={tareasActive}
+        onNavigate={onNavigate}
+      />
+      <NestedLinks
+        items={TASKS_NEST}
+        pathname={pathname}
+        onNavigate={onNavigate}
+      />
+
+      {/* Bloque 4 — Revisión, bienestar y sistema */}
+      <NavSection
+        section={{ label: "Revisión", items: REVIEW_ITEMS }}
+        pathname={pathname}
+        onNavigate={onNavigate}
+      />
+
+      {/* Bloque 5 — Informes */}
+      <NavSection
+        section={{ label: "Informes", items: REPORTS_ITEMS }}
+        pathname={pathname}
+        onNavigate={onNavigate}
+      />
+
+      {/* Otros — config + salir */}
       <div className="border-t border-border pt-4">
-        <NavSection section={{ items: UTIL_ITEMS }} pathname={pathname} onNavigate={onNavigate} />
+        <NavSection
+          section={{ items: OTHER_ITEMS }}
+          pathname={pathname}
+          onNavigate={onNavigate}
+        />
+        <div className="mt-1">
+          <SignOutButton onNavigate={onNavigate} />
+        </div>
       </div>
     </nav>
   );
@@ -201,10 +292,6 @@ export function Sidebar() {
               </button>
             </div>
             <NavItems onNavigate={() => setOpen(false)} />
-            <div className="mt-auto space-y-2 border-t border-border pt-4">
-              <ThemeToggle />
-              <SignOut />
-            </div>
           </aside>
         </div>
       )}
@@ -215,10 +302,6 @@ export function Sidebar() {
           fooday<span className="text-muted-foreground">·productivity</span>
         </div>
         <NavItems />
-        <div className="mt-auto space-y-2 border-t border-border px-3 pt-4">
-          <ThemeToggle />
-          <SignOut />
-        </div>
       </aside>
     </>
   );

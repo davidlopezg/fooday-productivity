@@ -6,10 +6,12 @@ import { fetchMetasConProgreso } from "@/lib/queries";
 import { marcarWig } from "@/lib/mutations";
 import { useData } from "@/lib/useData";
 import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
+import { EditarMetaModal } from "@/components/EditarMetaModal";
 import type { AmbitoMeta, MetaConPlan } from "@/lib/types";
 import {
   IconColumns,
   IconInbox,
+  IconPencil,
   IconPlus,
   IconTarget,
 } from "@/components/icons";
@@ -160,6 +162,7 @@ export default function MetasPage() {
   const [tagsSel, setTagsSel] = useState<Set<string>>(new Set());
   const [guardandoId, setGuardandoId] = useState<string | null>(null);
   const [errorWig, setErrorWig] = useState<string | null>(null);
+  const [editando, setEditando] = useState<MetaConPlan | null>(null);
 
   const wigs = useMemo(
     () =>
@@ -336,29 +339,48 @@ export default function MetasPage() {
                 m.es_wig ? "border-violet-500/40" : "border-border"
               }`}
             >
-              {/* Botón WIG (diana) */}
-              <button
-                type="button"
-                onClick={() => toggleWig(mp)}
-                disabled={guardandoId === m.id}
-                className={`absolute right-3 top-3 z-10 rounded-full p-1.5 transition-colors disabled:opacity-50 ${
-                  m.es_wig
-                    ? "bg-violet-500/20 text-violet-600 dark:text-violet-400"
-                    : "text-muted-foreground/40 hover:bg-accent hover:text-muted-foreground"
-                }`}
-                title={m.es_wig ? "Quitar de Enormemente Importantes" : "Marcar como WIG"}
-                aria-label={m.es_wig ? "Quitar de WIG" : "Marcar como WIG"}
-                aria-pressed={m.es_wig}
-              >
-                {guardandoId === m.id ? (
-                  <span className="block h-4 w-4 text-center text-[10px]">…</span>
-                ) : (
-                  <IconTarget className="h-4 w-4" />
-                )}
-              </button>
+              {/* Botones esquina superior derecha: WIG (diana) + Editar (lápiz) */}
+              <div className="absolute right-3 top-3 z-10 flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setEditando(mp);
+                  }}
+                  className="rounded-full p-1.5 text-muted-foreground/40 transition-colors hover:bg-accent hover:text-foreground"
+                  title="Editar meta"
+                  aria-label="Editar meta"
+                >
+                  <IconPencil className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    toggleWig(mp);
+                  }}
+                  disabled={guardandoId === m.id}
+                  className={`rounded-full p-1.5 transition-colors disabled:opacity-50 ${
+                    m.es_wig
+                      ? "bg-violet-500/20 text-violet-600 dark:text-violet-400"
+                      : "text-muted-foreground/40 hover:bg-accent hover:text-muted-foreground"
+                  }`}
+                  title={m.es_wig ? "Quitar de Enormemente Importantes" : "Marcar como WIG"}
+                  aria-label={m.es_wig ? "Quitar de WIG" : "Marcar como WIG"}
+                  aria-pressed={m.es_wig}
+                >
+                  {guardandoId === m.id ? (
+                    <span className="block h-4 w-4 text-center text-[10px]">…</span>
+                  ) : (
+                    <IconTarget className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
 
               <Link href={`/metas/detalle?id=${m.id}`} className="block">
-                <div className="flex items-start justify-between gap-3 pr-8">
+                <div className="flex items-start justify-between gap-3 pr-20">
                   <span className="text-xs font-medium text-muted-foreground">
                     {m.codigo ?? "—"}
                   </span>
@@ -446,6 +468,14 @@ export default function MetasPage() {
           </div>
         )}
       </div>
+
+      {editando && (
+        <EditarMetaModal
+          meta={editando.meta}
+          onClose={() => setEditando(null)}
+          onChanged={reload}
+        />
+      )}
     </div>
   );
 }

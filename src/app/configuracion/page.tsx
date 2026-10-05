@@ -3,9 +3,18 @@
 import { useEffect, useState } from "react";
 import { useConfig } from "@/lib/configStore";
 import { probarConexion } from "@/lib/plan";
+import { useTheme, type Theme } from "@/lib/themeStore";
+import { IconMoon, IconSun } from "@/components/icons";
+
+const TEMAS: { value: Theme; label: string; descripcion: string }[] = [
+  { value: "system", label: "Sistema", descripcion: "Sigue el ajuste del sistema operativo." },
+  { value: "light", label: "Claro", descripcion: "Fondo claro siempre." },
+  { value: "dark", label: "Oscuro", descripcion: "Fondo oscuro siempre." },
+];
 
 export default function ConfiguracionPage() {
   const { data, loading, save, diagnostic } = useConfig();
+  const { theme, setTheme } = useTheme();
 
   const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState(data.base_url);
@@ -78,6 +87,44 @@ export default function ConfiguracionPage() {
           Conecta tu cuenta de MiniMax para generar planes diarios con IA.
         </p>
       </header>
+
+      <section className="rounded-xl border border-border bg-card p-6 space-y-5">
+        <div className="flex items-center gap-3">
+          {theme === "dark" ? (
+            <IconMoon className="h-5 w-5 text-muted-foreground" />
+          ) : (
+            <IconSun className="h-5 w-5 text-muted-foreground" />
+          )}
+          <div>
+            <h2 className="text-base font-semibold">Tema</h2>
+            <p className="text-xs text-muted-foreground">
+              Elige cómo se ve la aplicación.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          {TEMAS.map((t) => {
+            const activo = theme === t.value;
+            return (
+              <button
+                key={t.value}
+                type="button"
+                onClick={() => setTheme(t.value)}
+                aria-pressed={activo}
+                className={`flex flex-col items-start gap-1 rounded-lg border px-4 py-3 text-left transition-colors ${
+                  activo
+                    ? "border-primary bg-primary/10 text-foreground"
+                    : "border-border bg-background text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+                }`}
+              >
+                <span className="text-sm font-medium">{t.label}</span>
+                <span className="text-[11px] leading-snug">{t.descripcion}</span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
 
       <section className="rounded-xl border border-border bg-card p-6 space-y-5">
         <div>
