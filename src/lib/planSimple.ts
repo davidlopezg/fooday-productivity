@@ -7,8 +7,10 @@
 //   • Sección B — timeblocking: nº bloques activos (1-4) + tareas asignadas
 //   • Sección C — una sugerencia gastronómica
 //
-// El input emocional es libre (texto), no múltiples selects. Las tareas
-// sueltas se persisten antes de generar (ver upsertTareaPorTitulo en mutations).
+// El input emocional es ESTRUCTURADO (5 selects que coinciden con el
+// Dashboard emocional: despertar, mente, cuerpo, rueda, necesidad), más
+// una reflexión libre opcional. Las tareas sueltas se persisten antes
+// de generar (ver upsertTareaPorTitulo en mutations).
 //
 // No toca plan.ts (informe rico viejo) — convive con él para no romper
 // la página de detalle que lee planes antiguos.
@@ -20,10 +22,13 @@ import type {
   PlanGeneradoSimple,
   Tarea,
 } from "@/lib/types";
+import type { EstadoEmocional } from "@/lib/plan";
 
 export type GenerarPlanSimpleOpts = {
-  /** Texto libre del estado emocional (Parte 1) */
-  estadoTexto: string;
+  /** Estado emocional estructurado (los 5 selects que coinciden con Dashboard emocional). */
+  estado: EstadoEmocional;
+  /** Reflexión libre opcional del usuario. */
+  reflexion?: string;
   /** Fecha YYYY-MM-DD */
   fecha: string;
   /** Tareas pendientes de BD (se ofrecen como candidatas a los bloques) */
@@ -60,9 +65,8 @@ function fechaToLarga(fecha: string): string {
 // ----------------------------------------------------------------------------
 
 function buildPrompt(opts: GenerarPlanSimpleOpts): string {
-  const { estadoTexto, fecha, tareas, tareasLibres, historial } = opts;
+  const { estado, reflexion, fecha, tareas, tareasLibres, historial } = opts;
   const fechaLarga = fechaToLarga(fecha);
-  const fechaCorta = fecha.slice(5); // MM-DD
 
   // Candidatas: BD + libres recién creadas. Cap a 25 para no abrumar al prompt.
   const candidatas = [...tareas, ...tareasLibres]
@@ -83,7 +87,7 @@ function buildPrompt(opts: GenerarPlanSimpleOpts): string {
         .slice(-5)
         .map(
           (p) =>
-            `- ${p.fecha} | sem=${p.semaforo ?? "?"} | despertar=${p.despertar ?? "?"} | mente=${p.mente ?? "?"} | cuerpo=${p.cuerpo ?? "?"} | resumen=${(p.resumen ?? "").slice(0, 100)}`,
+            `- ${p.fecha} | sem=${p.semaforo ?? "?"} | despertar=${p.despertar ?? "?"} | mente=${p.mente ?? "?"} | cuerpo=${p.cuerpo ?? "?"} | rueda=${p.rueda ?? "?"} | resumen=${(p.resumen ?? "").slice(0, 100)}`,
         )
         .join("\n")
     : "(sin histórico)";
@@ -101,9 +105,22 @@ FECHA: ${fecha} → ${fechaLarga}
 ============================================================
 
 ============================================================
-ESTADO EMOCIONAL (texto libre del usuario)
+ESTADO EMOCIONAL (5 dimensiones, escala 1-4; 4=mejor, 1=peor)
 ============================================================
-${estadoTexto.trim() || "(no facilitado)"}
+- 🌅 Despertar: ${estado.despertar}
+- 🧠 Mente: ${estado.mente}
+- 💪 Cuerpo: ${estado.cuerpo}
+- 🌀 Rueda del ratón: ${estado.rueda}
+- 🆘 Necesita: ${estado.necesidad}
+${
+  reflexion && reflexion.trim()
+    ? `
+Reflexión libre del usuario:
+"""
+${reflexion.trim()}
+"""`
+    : ""
+}
 
 ============================================================
 HISTÓRICO RECIENTE (últimos ${historial.length} planes)
@@ -139,10 +156,14 @@ D) CONTEXTO DEL DÍA (Sección A):
    - Ej: lunes → "toca revisar pagos/suscripciones"; viernes → "toca cerrar semana y dejar todo listo para el lunes".
    - 1-2 frases. Sin obviedades genéricas.
 
-E) SEMÁFORO: deduce del texto emocional.
-   - 🟢 VERDE → energía alta, puede asumir 3-4 bloques
-   - 🟡 AMARILLO → energía media, asume 2-3 bloques
-   - 🔴 ROJO → energía baja/sobrepasado, asume solo 1 bloque
+E) SEMÁFORO: deduce del estado emocional estructurado del usuario.
+   - Cada dimensión tiene una escala implícita 1-4 (4=mejor, 1=peor).
+   - Calcula la media de las 4 dimensiones numéricas (despertar, mente,
+     cuerpo, rueda). Ignora "necesidad" para el cálculo.
+   - 🟢 VERDE → media >= 3 → puede asumir 3-4 bloques
+   - 🟡 AMARILLO → media 2-3 → asume 2-3 bloques
+   - 🔴 ROJO → media < 2 → asume solo 1 bloque
+   - "necesidad" es lo que pide, no su nivel; tenlo en cuenta solo para la recomendación.
 
 F) TIMEBLOCKING (Sección B):
    - Tienes exactamente 4 bloques de 60 min cada uno: bloque 1 y 2 son MAÑANA (antes de comer); bloque 3 y 4 son TARDE (después de comer).

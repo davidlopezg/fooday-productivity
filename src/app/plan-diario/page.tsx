@@ -13,6 +13,7 @@ import {
 import { useData } from "@/lib/useData";
 import { useConfig } from "@/lib/configStore";
 import { generarPlanSimple } from "@/lib/planSimple";
+import type { EstadoEmocional } from "@/lib/plan";
 import type { PlanDiario, PlanGeneradoSimple, Tarea } from "@/lib/types";
 
 // ----------------------------------------------------------------------------
@@ -20,6 +21,19 @@ import type { PlanDiario, PlanGeneradoSimple, Tarea } from "@/lib/types";
 // ----------------------------------------------------------------------------
 
 const HOY = () => new Date().toISOString().slice(0, 10);
+
+// Las opciones coinciden EXACTAMENTE con los MAPAS del Dashboard emocional,
+// para que los valores se puedan graficar en el dashboard sin mapeos extra.
+const DESPIERTAR = ["Con energía", "Cansado pero estable", "Agotado", "Ansioso"];
+const MENTE = ["Relativamente clara", "Acelerada", "Nublada", "Oscura"];
+const CUERPO = ["Liviano", "Tenso", "Dolorido", "Me cuesta habitarlo"];
+const RUEDA = [
+  "No, estoy presente",
+  "Un poco",
+  "Sí, todo me arrastra",
+  "Totalmente sobrepasado",
+];
+const NECESIDAD = ["Calma", "Claridad", "Contención", "Esperanza", "Nada"];
 
 const SEM_COLOR: Record<"verde" | "amarillo" | "rojo", string> = {
   verde: "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
@@ -63,7 +77,8 @@ type PlanLocal = PlanGeneradoSimple & {
   planId: string | null;
   fecha: string;
   fecha_larga: string;
-  estadoEmocionalTexto: string;
+  estado: EstadoEmocional;
+  reflexion: string;
   notas: string;
   guardadoAt: number;
 };
@@ -78,7 +93,14 @@ export default function PlanDiarioPage() {
   const historialQ = useData<PlanDiario[]>(() => fetchHistorialEmocional(7), []);
 
   // ── Parte 1: input ──
-  const [estadoTexto, setEstadoTexto] = useState("");
+  const [estado, setEstado] = useState<EstadoEmocional>({
+    despertar: "Cansado pero estable",
+    mente: "Acelerada",
+    cuerpo: "Tenso",
+    rueda: "Sí, todo me arrastra",
+    necesidad: "Claridad",
+  });
+  const [reflexion, setReflexion] = useState("");
   const [tareaNueva, setTareaNueva] = useState("");
   const [tareasLibres, setTareasLibres] = useState<TareaLibre[]>([]);
   const [errorTarea, setErrorTarea] = useState<string | null>(null);
@@ -154,10 +176,6 @@ export default function PlanDiarioPage() {
       setError("Configura primero tu API key en /configuracion.");
       return;
     }
-    if (!estadoTexto.trim()) {
-      setError('Escribe primero cómo te sientes hoy en "¿Cómo te sientes?"');
-      return;
-    }
     setGenerando(true);
     setError(null);
     try {
@@ -193,7 +211,8 @@ export default function PlanDiarioPage() {
           model: config.data.model,
         },
         {
-          estadoTexto,
+          estado,
+          reflexion,
           fecha,
           tareas: tareasQ.data,
           tareasLibres: tareasLibresConId,
@@ -205,7 +224,8 @@ export default function PlanDiarioPage() {
       const planId = await guardarPlanDiarioSimple({
         fecha,
         fecha_larga,
-        estadoEmocionalTexto: estadoTexto,
+        estado,
+        reflexion,
         plan,
       });
 
@@ -214,7 +234,8 @@ export default function PlanDiarioPage() {
         planId,
         fecha,
         fecha_larga,
-        estadoEmocionalTexto: estadoTexto,
+        estado,
+        reflexion,
         notas: "",
         guardadoAt: Date.now(),
       });
@@ -238,7 +259,14 @@ export default function PlanDiarioPage() {
 
   function empezarDeNuevo() {
     setPlanLocal(null);
-    setEstadoTexto("");
+    setEstado({
+      despertar: "Cansado pero estable",
+      mente: "Acelerada",
+      cuerpo: "Tenso",
+      rueda: "Sí, todo me arrastra",
+      necesidad: "Claridad",
+    });
+    setReflexion("");
     setTareasLibres([]);
     setTareaNueva("");
     setError(null);
@@ -251,6 +279,8 @@ export default function PlanDiarioPage() {
 
   const input =
     "w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring";
+  const selectCls =
+    "h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring";
 
   return (
     <div className="space-y-6">
@@ -259,7 +289,7 @@ export default function PlanDiarioPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Plan diario</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            ¿Cómo te sientes? + tareas + IA = plan ejecutable para hoy.
+            Estado emocional (5 dimensiones) + tareas + IA = plan ejecutable para hoy.
           </p>
         </div>
         <div className="flex gap-2 text-xs">
@@ -290,27 +320,55 @@ export default function PlanDiarioPage() {
           Parte 1 — Captura
         </h2>
         <p className="mb-5 text-xs text-muted-foreground">
-          Cuéntame cómo estás y, si quieres, añade tareas sueltas. La IA se
-          encarga del resto.
+          Marca cómo estás hoy en las 5 dimensiones. Alimentan el Dashboard emocional.
         </p>
 
-        {/* 1A — ¿Cómo te sientes? */}
-        <label className="block">
-          <span className="mb-1 flex items-center gap-2 text-sm font-medium">
-            <span>¿Cómo te sientes?</span>
-            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary">
-              Principal
-            </span>
-          </span>
-          <textarea
-            className={`${input} min-h-[100px]`}
-            value={estadoTexto}
-            onChange={(e) => setEstadoTexto(e.target.value)}
-            placeholder='Ej: "Estoy cansado, con la cabeza nublada, pero con ganas de cerrar el bug del cliente antes de comer."'
-          />
-        </label>
+        {/* 1A — Estado emocional (5 dimensiones, mismo vocabulario que Dashboard emocional) */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          {([
+            ["despertar", "🌅 ¿Cómo te has despertado?", DESPIERTAR],
+            ["mente", "🧠 ¿Cómo está tu mente?", MENTE],
+            ["cuerpo", "💪 ¿Cómo habita tu cuerpo?", CUERPO],
+            ["rueda", "🌀 ¿Rueda del ratón?", RUEDA],
+            ["necesidad", "🆘 ¿Qué necesitas hoy?", NECESIDAD],
+          ] as const).map(([k, label, opts]) => (
+            <label key={k} className="block">
+              <span className="mb-1 block text-xs font-medium text-muted-foreground">
+                {label}
+              </span>
+              <select
+                className={selectCls}
+                value={estado[k]}
+                onChange={(e) =>
+                  setEstado({ ...estado, [k]: e.target.value })
+                }
+              >
+                {opts.map((o) => (
+                  <option key={o} value={o}>
+                    {o}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ))}
+        </div>
 
-        {/* 1B — Otras tareas */}
+        {/* 1B — Reflexión opcional (desahogo) */}
+        <details className="mt-5 rounded-md border border-border">
+          <summary className="cursor-pointer select-none px-3 py-2 text-sm font-medium hover:bg-muted/50">
+            💬 Reflexión / desahogo (opcional)
+          </summary>
+          <div className="p-3">
+            <textarea
+              className={`${input} min-h-[80px]`}
+              value={reflexion}
+              onChange={(e) => setReflexion(e.target.value)}
+              placeholder="¿Qué tienes en la cabeza hoy? Sin filtro. La IA lo usará como contexto adicional."
+            />
+          </div>
+        </details>
+
+        {/* 1C — Otras tareas */}
         <div className="mt-5">
           <label className="block">
             <span className="mb-1 flex items-center gap-2 text-sm font-medium">
@@ -408,11 +466,11 @@ export default function PlanDiarioPage() {
           )}
         </div>
 
-        {/* 1C — Botón Generar Plan */}
+        {/* 1D — Botón Generar Plan */}
         <div className="mt-6 flex flex-wrap items-center gap-3">
           <button
             onClick={generar}
-            disabled={generando || !config.data.minimax_api_key || !estadoTexto.trim()}
+            disabled={generando || !config.data.minimax_api_key}
             className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <IconBolt className="h-4 w-4" />
@@ -511,9 +569,9 @@ function PlanGeneradoView({
           <h2 className="text-xl font-bold tracking-tight">
             📅 {plan.fecha_larga}
           </h2>
-          {plan.estadoEmocionalTexto && (
+          {plan.estado && (
             <p className="mt-1 text-xs italic text-muted-foreground">
-              "{plan.estadoEmocionalTexto}"
+              🌅 {plan.estado.despertar} · 🧠 {plan.estado.mente} · 💪 {plan.estado.cuerpo} · 🌀 {plan.estado.rueda} · 🆘 {plan.estado.necesidad}
             </p>
           )}
         </div>

@@ -641,11 +641,24 @@ export async function upsertTareaPorTitulo(titulo: string): Promise<UpsertTareaR
  * Guarda el plan diario completo en su forma simple (Parte 2):
  * cabecera con análisis A + nº de bloques + filas en plan_diario_tareas
  * con bloque_num/tipo_tarea + sugerencia de comida C.
+ *
+ * Si recibe `estado` (5 dimensiones), también persiste en las columnas
+ * v2 (`despertar`, `mente`, `cuerpo`, `rueda`, `necesidad`) para que el
+ * Dashboard emocional pueda graficarlas.
  */
 export async function guardarPlanDiarioSimple(payload: {
   fecha: string;
   fecha_larga?: string;
-  estadoEmocionalTexto: string;
+  /** Estado emocional estructurado (los 5 selects). Se persiste en columnas v2. */
+  estado: {
+    despertar: string;
+    mente: string;
+    cuerpo: string;
+    rueda: string;
+    necesidad: string;
+  };
+  /** Reflexión libre opcional. Se persiste en `planes_diarios.reflexion`. */
+  reflexion?: string;
   plan: PlanGeneradoSimple;
 }): Promise<string> {
   const supabase = createClient();
@@ -661,14 +674,22 @@ export async function guardarPlanDiarioSimple(payload: {
     .eq("fecha", payload.fecha);
   const num_generacion = (count ?? 0) + 1;
 
+  const estadoTexto = [
+    payload.estado.despertar,
+    payload.estado.mente,
+    payload.estado.cuerpo,
+    payload.estado.rueda,
+    payload.estado.necesidad,
+  ].join(" · ");
+
   const { data: plan, error } = await supabase
     .from("planes_diarios")
     .insert({
       owner_id: user.id,
       fecha: payload.fecha,
       fecha_larga: payload.fecha_larga ?? null,
-      estado_emocional_texto: payload.estadoEmocionalTexto.trim() || null,
-      semaforo: payload.plan.semaforo,
+      // v3 columnas
+      estado_emocional_texto: estadoTexto || null,
       analisis_emocional_ia: payload.plan.analisis_emocional || null,
       tendencia_ia: payload.plan.tendencia || null,
       recomendacion_psicologica_ia: payload.plan.recomendacion_psicologica || null,
@@ -677,6 +698,14 @@ export async function guardarPlanDiarioSimple(payload: {
       comida_titulo: payload.plan.comida.titulo || null,
       comida_descripcion: payload.plan.comida.descripcion || null,
       comida_motivo: payload.plan.comida.motivo || null,
+      // v2 columnas (alimentan Dashboard emocional)
+      semaforo: payload.plan.semaforo,
+      despertar: payload.estado.despertar || null,
+      mente: payload.estado.mente || null,
+      cuerpo: payload.estado.cuerpo || null,
+      rueda: payload.estado.rueda || null,
+      necesidad: payload.estado.necesidad || null,
+      reflexion: payload.reflexion?.trim() || null,
       resumen: payload.plan.analisis_emocional || null,
       recomendacion: payload.plan.recomendacion_psicologica || null,
       num_generacion,
