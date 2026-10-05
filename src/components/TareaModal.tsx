@@ -12,6 +12,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import {
+  IconBolt,
   IconDownload,
   IconFile,
   IconSparkles,
@@ -31,6 +32,7 @@ import {
 } from "@/lib/mutations";
 import { fetchAdjuntosTarea } from "@/lib/queries";
 import { useConfig } from "@/lib/configStore";
+import { usePomodoro } from "@/lib/pomodoroStore";
 import { generarCriterioTerminacionIA } from "@/lib/plan";
 import type { Subtarea, Tarea, TareaAdjunto } from "@/lib/types";
 
@@ -51,6 +53,8 @@ function SubtareasEditor({
   onLimpiar,
   onMover,
   tieneKey,
+  tareaId,
+  tareaTitulo,
 }: {
   subtareas: Subtarea[];
   onChange: (next: Subtarea[]) => void;
@@ -60,6 +64,8 @@ function SubtareasEditor({
   onLimpiar: () => void;
   onMover: (idx: number, dir: -1 | 1) => void;
   tieneKey: boolean;
+  tareaId: string;
+  tareaTitulo: string;
 }) {
   function actualizar(idx: number, patch: Partial<Subtarea>) {
     onChange(subtareas.map((s, i) => (i === idx ? { ...s, ...patch } : s)));
@@ -73,6 +79,7 @@ function SubtareasEditor({
       { descripcion: "", tiempo_estimado_min: 5, hecho: false },
     ]);
   }
+  const { iniciar, objetivo } = usePomodoro();
 
   const hechas = subtareas.filter((s) => s.hecho).length;
   const total = subtareas.length;
@@ -145,7 +152,11 @@ function SubtareasEditor({
       )}
 
       <ul className="space-y-1.5">
-        {subtareas.map((s, idx) => (
+        {subtareas.map((s, idx) => {
+          const enCurso =
+            objetivo?.tarea_id === tareaId &&
+            objetivo.subtarea_descripcion === s.descripcion.trim();
+          return (
           <li
             key={idx}
             className="flex items-start gap-2 rounded-md border border-border bg-background px-2 py-1.5"
@@ -167,6 +178,29 @@ function SubtareasEditor({
               }`}
             />
             <div className="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!s.descripcion.trim()) return;
+                  iniciar({
+                    tarea_id: tareaId,
+                    tarea_titulo: tareaTitulo,
+                    subtarea_id: null, // el editor aún no tiene IDs persistidos
+                    subtarea_descripcion: s.descripcion.trim(),
+                  });
+                }}
+                disabled={!s.descripcion.trim()}
+                title={enCurso ? "Foco en curso — abrir Focus" : "Iniciar pomodoro sobre esta subtarea"}
+                aria-label={enCurso ? "Foco en curso" : "Iniciar pomodoro sobre esta subtarea"}
+                className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold transition-colors ${
+                  enCurso
+                    ? "border-violet-500 bg-violet-500/10 text-violet-600 dark:text-violet-400"
+                    : "border-border text-muted-foreground hover:border-violet-500/40 hover:bg-violet-500/5 hover:text-violet-600 dark:hover:text-violet-400"
+                } disabled:opacity-40`}
+              >
+                <IconBolt className="h-3 w-3" />
+                Focus
+              </button>
               <input
                 type="number"
                 min={1}
@@ -217,7 +251,8 @@ function SubtareasEditor({
               </button>
             </div>
           </li>
-        ))}
+          );
+        })}
       </ul>
 
       <button
@@ -855,6 +890,8 @@ export function EditarModal({
             onLimpiar={limpiarSubtareas}
             onMover={moverSubtarea}
             tieneKey={!!cfg.minimax_api_key}
+            tareaId={tarea.id}
+            tareaTitulo={tarea.titulo}
           />
         </div>
 

@@ -234,6 +234,33 @@ export interface PlanDiarioBorrador {
   created_at: string;
 }
 
+// ============================================================================
+// Pomodoro / Focus
+// ============================================================================
+
+export type PomodoroFase = "focus" | "descanso_corto" | "descanso_largo";
+
+/** Fila persistida en `pomodoro_sesiones` — un pomodoro TERMINADO. */
+export interface PomodoroSesion {
+  id: string;
+  owner_id: string;
+  tarea_id: string;
+  subtarea_id: string | null;
+  started_at: string;
+  ended_at: string;
+  duracion_seg: number;
+  fase: PomodoroFase;
+  created_at: string;
+}
+
+/** Estado del timer que vive solo en cliente (localStorage + memoria). */
+export interface PomodoroObjetivo {
+  tarea_id: string;
+  tarea_titulo: string;
+  subtarea_id: string | null;
+  subtarea_descripcion: string | null;
+}
+
 export interface Captura {
   id: string;
   fecha: string;

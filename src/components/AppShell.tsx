@@ -5,6 +5,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Sidebar } from "@/components/Sidebar";
 import { ConfigProvider } from "@/lib/configStore";
+import { PomodoroProvider } from "@/lib/pomodoroStore";
+import { PomodoroWidget } from "@/components/PomodoroWidget";
 
 /**
  * Shell de la SPA: comprueba sesión (cliente) y muestra el sidebar.
@@ -66,20 +68,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <ConfigProvider>
-      {/*
-        Móvil: columna → [barra superior] encima de [main].
-        Escritorio: fila → [sidebar] a la izquierda de [main].
-        Sin el `flex-col` la barra superior se convertía en un item flex
-        y empujaba todo el contenido a la derecha (bug real en móvil).
-      */}
-      <div className="flex min-h-screen flex-col md:flex-row">
-        <Sidebar />
-        <main className="safe-b min-w-0 flex-1">
-          <div className="mx-auto w-full max-w-6xl px-4 py-6 md:px-8 md:py-10">
-            {children}
-          </div>
-        </main>
-      </div>
+      <PomodoroProvider>
+        {/*
+          Móvil: columna → [barra superior] encima de [main].
+          Escritorio: fila → [sidebar] a la izquierda de [main].
+          Sin el `flex-col` la barra superior se convertía en un item flex
+          y empujaba todo el contenido a la derecha (bug real en móvil).
+        */}
+        <div className="flex min-h-screen flex-col md:flex-row">
+          <Sidebar />
+          <main className="safe-b min-w-0 flex-1">
+            <div className="mx-auto w-full max-w-6xl px-4 py-6 md:px-8 md:py-10">
+              {children}
+            </div>
+          </main>
+        </div>
+        <PomodoroWidget />
+      </PomodoroProvider>
     </ConfigProvider>
   );
 }

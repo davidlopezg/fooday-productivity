@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type SVGProps } from "react";
 import {
+  IconBolt,
   IconCalendar,
   IconCheck,
   IconCompass,
@@ -49,6 +50,7 @@ const TASKS_SECTION: NavSection = {
 // Utilidades al final
 const UTIL_ITEMS: NavItem[] = [
   { href: "/dashboard-emocional", label: "Dashboard emocional", Icon: IconHeart },
+  { href: "/focus", label: "Focus", Icon: IconBolt },
   { href: "/configuracion", label: "Configuración", Icon: IconSettings },
 ];
 

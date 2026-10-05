@@ -9,6 +9,7 @@ import type {
   PlanDiarioSubtarea,
   PlanDiarioTarea,
   PlanSemanalTarea,
+  PomodoroSesion,
   Ritual,
   Tarea,
   TareaAdjunto,
@@ -385,4 +386,37 @@ export async function fetchAdjuntosCount(
     map.set(id, (map.get(id) ?? 0) + 1);
   }
   return map;
+}
+
+// ============================================================================
+// Pomodoro / Focus
+// ============================================================================
+
+/** Sesiones pomodoro de los últimos N días, ordenado por ended_at desc. */
+export async function fetchPomodoroSesiones(
+  dias = 30,
+): Promise<PomodoroSesion[]> {
+  const desde = new Date(Date.now() - dias * 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await createClient()
+    .from("pomodoro_sesiones")
+    .select("*")
+    .eq("fase", "focus")
+    .gte("ended_at", desde)
+    .order("ended_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as PomodoroSesion[];
+}
+
+/** Sesiones del día en curso, para mostrar el histórico en /focus. */
+export async function fetchPomodoroHoy(): Promise<PomodoroSesion[]> {
+  const h = new Date().toISOString().slice(0, 10);
+  const { data, error } = await createClient()
+    .from("pomodoro_sesiones")
+    .select("*")
+    .eq("fase", "focus")
+    .gte("ended_at", `${h}T00:00:00.000Z`)
+    .lte("ended_at", `${h}T23:59:59.999Z`)
+    .order("ended_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as PomodoroSesion[];
 }

@@ -191,3 +191,16 @@ export const IconBolt = (p: IconProps) => (
     <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z" />
   </svg>
 );
+
+export const IconPlay = (p: IconProps) => (
+  <svg {...base} {...p}>
+    <path d="M7 4.5v15l13-7.5z" />
+  </svg>
+);
+
+export const IconPause = (p: IconProps) => (
+  <svg {...base} {...p}>
+    <rect x="6" y="4.5" width="4" height="15" rx="1" />
+    <rect x="14" y="4.5" width="4" height="15" rx="1" />
+  </svg>
+);
