@@ -223,6 +223,7 @@ export async function fetchPlanes(opts?: { desde?: string; hasta?: string; limit
   let q2 = supabase
     .from("planes_diarios")
     .select(`id,fecha,semaforo,resumen,recomendacion,num_generacion,created_at,
+            despertar,mente,cuerpo,rueda,necesidad,notas,
             tendencia_ia,contexto_dia_ia,num_bloques_activos,
             comida_titulo,comida_descripcion,comida_motivo`)
     .order("fecha", { ascending: false })
