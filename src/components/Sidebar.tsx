@@ -41,22 +41,14 @@ const QUICK_ITEMS: NavItem[] = [
 const STRATEGY_ITEMS: NavItem[] = [
   { href: "/norte", label: "Norte", Icon: IconCompass },
   { href: "/metas", label: "Metas", Icon: IconTarget },
+  { href: "/metas/plan", label: "Plan trimestral", Icon: IconCalendar },
   { href: "/proyectos", label: "Proyectos", Icon: IconFolder },
 ];
 
-// Plan trimestral — vive como sub-ítem de Metas, dentro del Bloque 2.
-// El "Inbox" NO vive aquí: es de tareas, no de metas.
-const METAS_NEST: NavItem[] = [
-  { href: "/metas/plan", label: "Plan trimestral", Icon: IconCalendar },
-];
-
-// Bloque 3 — Ejecución y Organización (ítems a nivel de bloque)
+// Bloque 3 — Ejecución y Organización
 const EXEC_ITEMS: NavItem[] = [
   { href: "/semana", label: "Semana", Icon: IconCalendar },
-];
-
-// Sub-ítems de Tareas (dentro de Bloque 3, anidados bajo la entrada Tareas)
-const TASKS_NEST: NavItem[] = [
+  { href: "/tareas", label: "Tareas", Icon: IconList },
   { href: "/tareas/inbox", label: "Inbox", Icon: IconInbox },
   { href: "/pipeline", label: "Prioridad", Icon: IconFlag },
   { href: "/plan-diario", label: "Plan diario", Icon: IconSparkles },
@@ -138,32 +130,6 @@ function NavSection({
   );
 }
 
-function NestedLinks({
-  items,
-  pathname,
-  onNavigate,
-}: {
-  items: NavItem[];
-  pathname: string;
-  onNavigate?: () => void;
-}) {
-  return (
-    <div className="flex flex-col gap-1 pl-7">
-      {items.map((item) => {
-        const active = pathname.startsWith(item.href);
-        return (
-          <NavLink
-            key={item.href}
-            {...item}
-            active={active}
-            onNavigate={onNavigate}
-          />
-        );
-      })}
-    </div>
-  );
-}
-
 function SignOutButton({ onNavigate }: { onNavigate?: () => void }) {
   const router = useRouter();
   return (
@@ -185,7 +151,6 @@ function SignOutButton({ onNavigate }: { onNavigate?: () => void }) {
 
 function NavItems({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
-  const tareasActive = pathname.startsWith("/tareas");
 
   return (
     <nav className="flex flex-col gap-5">
@@ -198,27 +163,10 @@ function NavItems({ onNavigate }: { onNavigate?: () => void }) {
         pathname={pathname}
         onNavigate={onNavigate}
       />
-      <NestedLinks
-        items={METAS_NEST}
-        pathname={pathname}
-        onNavigate={onNavigate}
-      />
 
       {/* Bloque 3 — Ejecución y organización */}
       <NavSection
         section={{ label: "Ejecución", items: EXEC_ITEMS }}
-        pathname={pathname}
-        onNavigate={onNavigate}
-      />
-      <NavLink
-        href="/tareas"
-        label="Tareas"
-        Icon={IconList}
-        active={tareasActive}
-        onNavigate={onNavigate}
-      />
-      <NestedLinks
-        items={TASKS_NEST}
         pathname={pathname}
         onNavigate={onNavigate}
       />
