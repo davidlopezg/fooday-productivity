@@ -10,6 +10,8 @@ import {
   upsertTareaPorTitulo,
   guardarPlanDiarioSimple,
   guardarNotasPlan,
+  renombrarTareaPlan,
+  moverTareaABloque,
 } from "@/lib/mutations";
 import { useData } from "@/lib/useData";
 import { useConfig } from "@/lib/configStore";
@@ -254,7 +256,7 @@ export default function PlanDiarioPage() {
       );
 
       const fecha_larga = fechaToLargaLocal(fecha);
-      const planId = await guardarPlanDiarioSimple({
+      const { planId, tareas } = await guardarPlanDiarioSimple({
         fecha,
         fecha_larga,
         estado,
@@ -262,8 +264,30 @@ export default function PlanDiarioPage() {
         plan,
       });
 
+      // Hidrata los bloques con los IDs reales de BD para poder editarlos.
+      const bloquesConId = tareas
+        .filter((t) => t.bloque_num !== null)
+        .map((t) => {
+          const ia = plan.tu_dia_optimizado.bloques.find(
+            (b) => b.bloque_num === t.bloque_num,
+          );
+          return {
+            bloque_num: t.bloque_num as 1 | 2 | 3 | 4,
+            tipo: (ia?.tipo ?? "profunda") as "profunda" | "rapida",
+            tarea_id: t.tarea_id,
+            titulo_libre: t.titulo_libre ?? ia?.titulo_libre ?? "",
+            tiempo_min: 60,
+            plan_tarea_id: t.id,
+          };
+        })
+        .sort((a, b) => a.bloque_num - b.bloque_num);
+
       setPlanLocal({
         ...plan,
+        tu_dia_optimizado: {
+          ...plan.tu_dia_optimizado,
+          bloques: bloquesConId,
+        },
         planId,
         fecha,
         fecha_larga,
@@ -287,6 +311,56 @@ export default function PlanDiarioPage() {
       setNotasEstado({ status: "guardado", timestamp: Date.now() });
     } catch (e) {
       setNotasEstado({ status: "error", mensaje: (e as Error).message });
+    }
+  }
+
+  async function renombrarBloque(planTareaId: string, nuevoTitulo: string) {
+    if (!planLocal) return;
+    try {
+      await renombrarTareaPlan(planTareaId, nuevoTitulo);
+      setPlanLocal({
+        ...planLocal,
+        tu_dia_optimizado: {
+          ...planLocal.tu_dia_optimizado,
+          bloques: planLocal.tu_dia_optimizado.bloques.map((b) =>
+            b.plan_tarea_id === planTareaId ? { ...b, titulo_libre: nuevoTitulo } : b,
+          ),
+        },
+      });
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
+  async function moverBloque(planTareaId: string, nuevoBloqueNum: 1 | 2 | 3 | 4) {
+    if (!planLocal?.planId) return;
+    const bloques = planLocal.tu_dia_optimizado.bloques;
+    const source = bloques.find((b) => b.plan_tarea_id === planTareaId);
+    if (!source) return;
+    const oldBloqueNum = source.bloque_num;
+    if (oldBloqueNum === nuevoBloqueNum) return;
+
+    // Swap local (optimista) para que la UI responda al instante
+    const swapped = bloques.map((b) => {
+      if (b.bloque_num === nuevoBloqueNum && b.plan_tarea_id !== planTareaId) {
+        return { ...b, bloque_num: oldBloqueNum };
+      }
+      if (b.plan_tarea_id === planTareaId) {
+        return { ...b, bloque_num: nuevoBloqueNum };
+      }
+      return b;
+    });
+    setPlanLocal({
+      ...planLocal,
+      tu_dia_optimizado: { ...planLocal.tu_dia_optimizado, bloques: swapped },
+    });
+
+    try {
+      await moverTareaABloque(planLocal.planId, planTareaId, nuevoBloqueNum);
+    } catch (e) {
+      setError((e as Error).message);
+      // Rollback en caso de error
+      setPlanLocal({ ...planLocal });
     }
   }
 
@@ -599,6 +673,8 @@ export default function PlanDiarioPage() {
           onNotasChange={(texto) => setPlanLocal({ ...planLocal, notas: texto })}
           onGuardarNotas={guardarNotas}
           onEmpezarDeNuevo={empezarDeNuevo}
+          onRenombrarBloque={renombrarBloque}
+          onMoverBloque={moverBloque}
         />
       )}
 
@@ -648,6 +724,8 @@ function PlanGeneradoView({
   onNotasChange,
   onGuardarNotas,
   onEmpezarDeNuevo,
+  onRenombrarBloque,
+  onMoverBloque,
 }: {
   plan: PlanLocal;
   notasEstado:
@@ -658,6 +736,8 @@ function PlanGeneradoView({
   onNotasChange: (texto: string) => void;
   onGuardarNotas: () => void;
   onEmpezarDeNuevo: () => void;
+  onRenombrarBloque: (planTareaId: string, nuevoTitulo: string) => void;
+  onMoverBloque: (planTareaId: string, nuevoBloqueNum: 1 | 2 | 3 | 4) => void;
 }) {
   const semaforo = plan.semaforo;
 
@@ -692,55 +772,62 @@ function PlanGeneradoView({
       </header>
 
       {/* ============================================================
-          SECCIÓN A — Resultado Psicológico
+          SECCIÓN 1 — Resumen
+      ============================================================ */}
+      <section className="rounded-xl border border-border bg-card p-6">
+        <SectionHeader emoji="📌" titulo="1. Resumen" />
+        <p className="text-sm leading-relaxed">{plan.resumen}</p>
+      </section>
+
+      {/* ============================================================
+          SECCIÓN 2 — Recomendación
+      ============================================================ */}
+      <section className="rounded-xl border border-border bg-card p-6">
+        <SectionHeader emoji="🆘" titulo="2. Recomendación" />
+        <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed">
+          {plan.recomendacion
+            .split(/(?:;|\n|(?:^|\s)-\s)/)
+            .map((s) => s.trim())
+            .filter(Boolean)
+            .map((s, i) => (
+              <li key={i}>{s}</li>
+            ))}
+        </ul>
+      </section>
+
+      {/* ============================================================
+          SECCIÓN 3 — Lectura Psicológica
       ============================================================ */}
       <section className="rounded-xl border border-border bg-card p-6">
         <SectionHeader
           emoji="🧠"
-          titulo="Resultado Psicológico"
-          subtitulo="Lectura de tu estado + tendencia + recomendación + contexto del día."
+          titulo="3. Lectura psicológica"
+          subtitulo="Lo del día + análisis del histórico."
         />
-
         <div className="space-y-4">
-          <SubBloque titulo="Análisis del estado actual">
-            <p className="text-sm leading-relaxed">{plan.analisis_emocional}</p>
+          <SubBloque titulo="Lo del día">
+            <p className="text-sm leading-relaxed">
+              {plan.lectura_psicologica.lo_del_dia}
+            </p>
           </SubBloque>
-
-          <SubBloque titulo="Tendencia vs histórico">
-            <p className="text-sm leading-relaxed">{plan.tendencia}</p>
-          </SubBloque>
-
-          <SubBloque titulo="Recomendación accionable">
-            <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed">
-              {plan.recomendacion_psicologica
-                .split(/(?:;|\n|(?:^|\s)-\s)/)
-                .map((s) => s.trim())
-                .filter(Boolean)
-                .map((s, i) => (
-                  <li key={i}>{s}</li>
-                ))}
-            </ul>
-          </SubBloque>
-
-          <SubBloque titulo="Contexto del día">
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              {plan.contexto_dia}
+          <SubBloque titulo="Análisis del histórico">
+            <p className="text-sm leading-relaxed">
+              {plan.lectura_psicologica.analisis_historico}
             </p>
           </SubBloque>
         </div>
       </section>
 
       {/* ============================================================
-          SECCIÓN B — Timeblocking
+          SECCIÓN 4 — Tu día optimizado
       ============================================================ */}
       <section className="rounded-xl border border-border bg-card p-6">
         <SectionHeader
           emoji="⏱️"
-          titulo="Timeblocking"
-          subtitulo={`${plan.num_bloques_activos} de 4 bloques activos · cada bloque son 60 min estrictos.`}
+          titulo="4. Tu día optimizado"
+          subtitulo={`${plan.tu_dia_optimizado.num_bloques_activos} de 4 bloques activos · cada bloque son 60 min estrictos.`}
         />
 
-        {/* Grid 2x2 con línea horizontal divisoria (mediodía) */}
         <div className="relative">
           {/* Línea horizontal que representa el mediodía */}
           <div className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2">
@@ -755,58 +842,20 @@ function PlanGeneradoView({
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {([1, 2, 3, 4] as const).map((n) => {
-              const bloque = plan.bloques.find((b) => b.bloque_num === n);
+              const bloque = plan.tu_dia_optimizado.bloques.find(
+                (b) => b.bloque_num === n,
+              );
               const activo = bloque !== undefined;
 
               return (
-                <div
+                <BloqueBlock
                   key={n}
-                  className={`relative rounded-lg border p-4 ${
-                    activo
-                      ? "border-primary/30 bg-primary/5"
-                      : "border-dashed border-border bg-muted/30 opacity-60"
-                  }`}
-                >
-                  <div className="mb-2 flex items-center justify-between">
-                    <span className="text-xs font-semibold uppercase tracking-wide">
-                      {BLOQUE_LABELS[n]}
-                    </span>
-                    <span className="rounded-full bg-background px-2 py-0.5 text-[10px] text-muted-foreground">
-                      {BLOQUE_HORARIO[n]}
-                    </span>
-                  </div>
-
-                  {activo ? (
-                    <div>
-                      <div className="mb-1 flex flex-wrap items-center gap-2">
-                        <span
-                          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-                            bloque.tipo === "profunda"
-                              ? "border border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-300"
-                              : "border border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300"
-                          }`}
-                        >
-                          {bloque.tipo}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground">
-                          60 min
-                        </span>
-                      </div>
-                      <p className="text-sm font-medium leading-snug">
-                        {bloque.titulo_libre}
-                      </p>
-                      <p className="mt-1 text-[11px] text-muted-foreground">
-                        {bloque.tarea_id
-                          ? "📌 vinculada a tarea en BD"
-                          : "✨ tarea propuesta por la IA"}
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="flex h-[60px] items-center justify-center text-xs italic text-muted-foreground">
-                      bloque desactivado
-                    </div>
-                  )}
-                </div>
+                  num={n}
+                  bloque={bloque}
+                  activo={activo}
+                  onRenombrarBloque={onRenombrarBloque}
+                  onMoverBloque={onMoverBloque}
+                />
               );
             })}
           </div>
@@ -820,32 +869,28 @@ function PlanGeneradoView({
       </section>
 
       {/* ============================================================
-          SECCIÓN C — Sugerencia de Comida
+          SECCIÓN 5 — Propuesta de comida
       ============================================================ */}
       <section className="rounded-xl border border-border bg-card p-6">
-        <SectionHeader
-          emoji="🍽️"
-          titulo="Sugerencia de comida"
-          subtitulo="Una sola recomendación adaptada a tu estado y al día de hoy."
-        />
+        <SectionHeader emoji="🍽️" titulo="5. Propuesta de comida" />
 
         <div className="rounded-lg border border-border bg-gradient-to-br from-amber-500/5 via-orange-500/5 to-rose-500/5 p-5">
           <h3 className="text-lg font-bold tracking-tight">
-            {plan.comida.titulo || "—"}
+            {plan.propuesta_comida.titulo || "—"}
           </h3>
           <p className="mt-2 text-sm leading-relaxed">
-            {plan.comida.descripcion}
+            {plan.propuesta_comida.descripcion}
           </p>
-          {plan.comida.motivo && (
+          {plan.propuesta_comida.motivo && (
             <p className="mt-3 border-t border-border/60 pt-3 text-xs italic text-muted-foreground">
-              💡 {plan.comida.motivo}
+              💡 {plan.propuesta_comida.motivo}
             </p>
           )}
         </div>
       </section>
 
       {/* ============================================================
-          Notas del día
+          SECCIÓN 6 — Notas del día
       ============================================================ */}
       <section className="rounded-xl border border-border bg-card p-5">
         <h3 className="mb-2 text-sm font-semibold tracking-tight">
@@ -956,4 +1001,143 @@ function fechaToLargaLocal(fecha: string): string {
     year: "numeric",
     timeZone: "UTC",
   });
+}
+
+// ============================================================================
+// Bloque individual: muestra datos + permite renombrar y mover a otro bloque.
+// ============================================================================
+
+function BloqueBlock({
+  num,
+  bloque,
+  activo,
+  onRenombrarBloque,
+  onMoverBloque,
+}: {
+  num: 1 | 2 | 3 | 4;
+  bloque: PlanGeneradoSimple["tu_dia_optimizado"]["bloques"][number] | undefined;
+  activo: boolean;
+  onRenombrarBloque: (planTareaId: string, nuevoTitulo: string) => void;
+  onMoverBloque: (planTareaId: string, nuevoBloqueNum: 1 | 2 | 3 | 4) => void;
+}) {
+  const [editando, setEditando] = useState(false);
+  // Inicialización perezosa: solo se evalúa en mount; updates se gestionan con key+remount.
+  const [borrador, setBorrador] = useState(() => bloque?.titulo_libre ?? "");
+
+  if (!activo || !bloque) {
+    return (
+      <div className="rounded-lg border border-dashed border-border bg-muted/30 p-4 opacity-60">
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-xs font-semibold uppercase tracking-wide">
+            {BLOQUE_LABELS[num]}
+          </span>
+          <span className="rounded-full bg-background px-2 py-0.5 text-[10px] text-muted-foreground">
+            {BLOQUE_HORARIO[num]}
+          </span>
+        </div>
+        <div className="flex h-[60px] items-center justify-center text-xs italic text-muted-foreground">
+          bloque desactivado
+        </div>
+      </div>
+    );
+  }
+
+  const editable = !!bloque.plan_tarea_id;
+
+  function commitRename() {
+    if (!bloque?.plan_tarea_id) return;
+    const limpio = borrador.trim();
+    if (limpio && limpio !== bloque.titulo_libre) {
+      onRenombrarBloque(bloque.plan_tarea_id, limpio);
+    } else {
+      setBorrador(bloque.titulo_libre);
+    }
+    setEditando(false);
+  }
+
+  return (
+    <div
+      className={`relative rounded-lg border p-4 ${
+        editable
+          ? "border-primary/30 bg-primary/5"
+          : "border-primary/30 bg-primary/5"
+      }`}
+    >
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="text-xs font-semibold uppercase tracking-wide">
+          {BLOQUE_LABELS[num]}
+        </span>
+        <div className="flex items-center gap-1.5">
+          <span className="rounded-full bg-background px-2 py-0.5 text-[10px] text-muted-foreground">
+            {BLOQUE_HORARIO[num]}
+          </span>
+          <select
+            aria-label={`Mover bloque ${num} a`}
+            className="h-7 rounded-md border border-border bg-background px-2 text-[11px] outline-none hover:bg-muted"
+            value={num}
+            onChange={(e) => {
+              const nuevo = Number(e.target.value) as 1 | 2 | 3 | 4;
+              if (bloque.plan_tarea_id) onMoverBloque(bloque.plan_tarea_id, nuevo);
+            }}
+          >
+            {[1, 2, 3, 4].map((b) => (
+              <option key={b} value={b}>
+                ↔ Mover a bloque {b}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="mb-1 flex flex-wrap items-center gap-2">
+        <span
+          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+            bloque.tipo === "profunda"
+              ? "border border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-300"
+              : "border border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300"
+          }`}
+        >
+          {bloque.tipo}
+        </span>
+        <span className="text-[10px] text-muted-foreground">60 min</span>
+      </div>
+
+      {editable ? (
+        editando ? (
+          <input
+            autoFocus
+            value={borrador}
+            onChange={(e) => setBorrador(e.target.value)}
+            onBlur={commitRename}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                commitRename();
+              } else if (e.key === "Escape") {
+                setBorrador(bloque.titulo_libre);
+                setEditando(false);
+              }
+            }}
+            className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1 text-sm font-medium outline-none focus:ring-2 focus:ring-ring"
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setEditando(true)}
+            className="mt-1 w-full rounded-md px-2 py-1 text-left text-sm font-medium leading-snug hover:bg-background"
+            title="Click para renombrar"
+          >
+            {bloque.titulo_libre}
+          </button>
+        )
+      ) : (
+        <p className="mt-1 text-sm font-medium leading-snug">{bloque.titulo_libre}</p>
+      )}
+
+      <p className="mt-1 text-[11px] text-muted-foreground">
+        {bloque.tarea_id ? "📌 vinculada a tarea en BD" : "✨ tarea propuesta por la IA"}
+        {editable && !editando && " · click para editar"}
+      </p>
+    </div>
+  );
 }

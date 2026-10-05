@@ -128,6 +128,11 @@ export default function PlanDetallePage() {
     );
   }
 
+  // Plan v3 (Parte 1+2): tiene analisis_emocional_ia o num_bloques_activos pero NO informe_json.
+  if (!plan.informe_json && (plan.analisis_emocional_ia || plan.num_bloques_activos)) {
+    return <PlanV3View plan={plan} />;
+  }
+
   // Si el plan NO tiene informe_json (planes antiguos o generaciones previas a v3)
   if (!plan.informe_json) {
     return (
@@ -654,6 +659,160 @@ function TablaSencilla({ headers, filas }: { headers: string[]; filas: string[][
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+// ============================================================================
+// Plan v3 (Parte 1+2) — vista nativa del plan simple.
+// ============================================================================
+
+function PlanV3View({ plan }: { plan: PlanCompleto }) {
+  const semaforo = (plan.semaforo ?? "amarillo") as "verde" | "amarillo" | "rojo";
+  const tareasPorBloque = plan.tareas
+    .filter((t) => t.bloque_num !== null && t.bloque_num !== undefined)
+    .sort((a, b) => (a.bloque_num ?? 0) - (b.bloque_num ?? 0));
+  const numBloques = plan.num_bloques_activos ?? tareasPorBloque.length ?? 0;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Link href="/plan-diario/historico" className="text-sm underline">
+          ← Volver al histórico
+        </Link>
+      </div>
+
+      <section className={`space-y-6 rounded-2xl border-2 bg-card p-6 ${SEM_FUERTE[semaforo]}`}>
+        <header>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">
+                📅 {plan.fecha_larga ?? plan.fecha}
+              </h1>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Generación #{plan.num_generacion} · plan v3
+              </p>
+            </div>
+            <span className={`inline-block rounded-full border px-3 py-1 text-xs font-medium ${SEM[semaforo]}`}>
+              {semaforo.toUpperCase()}
+            </span>
+          </div>
+          {plan.estado_emocional_texto && (
+            <p className="mt-3 text-xs italic text-muted-foreground">
+              {plan.estado_emocional_texto}
+            </p>
+          )}
+        </header>
+
+        {/* 1. Resumen */}
+        {plan.resumen && (
+          <Section titulo="1. Resumen">
+            <p className="text-sm leading-relaxed">{plan.resumen}</p>
+          </Section>
+        )}
+
+        {/* 2. Recomendación */}
+        {plan.recomendacion && (
+          <Section titulo="2. Recomendación">
+            <p className="text-sm leading-relaxed whitespace-pre-wrap">
+              {plan.recomendacion}
+            </p>
+          </Section>
+        )}
+
+        {/* 3. Lectura psicológica */}
+        {(plan.analisis_emocional_ia || plan.tendencia_ia) && (
+          <Section titulo="3. Lectura psicológica">
+            {plan.analisis_emocional_ia && (
+              <div className="mb-3">
+                <h3 className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Lo del día
+                </h3>
+                <p className="text-sm leading-relaxed">{plan.analisis_emocional_ia}</p>
+              </div>
+            )}
+            {plan.tendencia_ia && (
+              <div>
+                <h3 className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Análisis del histórico
+                </h3>
+                <p className="text-sm leading-relaxed">{plan.tendencia_ia}</p>
+              </div>
+            )}
+          </Section>
+        )}
+
+        {/* 4. Tu día optimizado */}
+        {tareasPorBloque.length > 0 && (
+          <Section titulo={`4. Tu día optimizado (${numBloques} de 4 bloques activos)`}>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {tareasPorBloque.map((t) => (
+                <div
+                  key={t.id}
+                  className="rounded-md border border-primary/30 bg-primary/5 p-3"
+                >
+                  <div className="mb-1 flex items-center justify-between">
+                    <span className="text-xs font-semibold uppercase tracking-wide">
+                      Bloque {t.bloque_num}
+                    </span>
+                    {t.tipo_tarea && (
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                          t.tipo_tarea === "profunda"
+                            ? "border border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-300"
+                            : "border border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300"
+                        }`}
+                      >
+                        {t.tipo_tarea}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm font-medium leading-snug">{t.titulo_libre ?? "—"}</p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    {t.tarea_id ? "📌 vinculada a tarea en BD" : "✨ tarea propuesta por la IA"}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
+
+        {/* 5. Propuesta de comida */}
+        {plan.comida_titulo && (
+          <Section titulo="5. Propuesta de comida">
+            <div className="rounded-lg border border-border bg-gradient-to-br from-amber-500/5 via-orange-500/5 to-rose-500/5 p-4">
+              <h3 className="text-base font-bold tracking-tight">{plan.comida_titulo}</h3>
+              {plan.comida_descripcion && (
+                <p className="mt-1 text-sm leading-relaxed">{plan.comida_descripcion}</p>
+              )}
+              {plan.comida_motivo && (
+                <p className="mt-2 border-t border-border/60 pt-2 text-xs italic text-muted-foreground">
+                  💡 {plan.comida_motivo}
+                </p>
+              )}
+            </div>
+          </Section>
+        )}
+
+        {/* 6. Notas del día */}
+        {plan.notas && (
+          <Section titulo="6. Notas del día">
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">{plan.notas}</p>
+          </Section>
+        )}
+
+        {/* Reflexión libre (no es una de las 6 secciones, queda como extra) */}
+        {plan.reflexion && (
+          <details className="text-xs">
+            <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+              💬 Reflexión libre del formulario
+            </summary>
+            <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
+              {plan.reflexion}
+            </p>
+          </details>
+        )}
+      </section>
     </div>
   );
 }

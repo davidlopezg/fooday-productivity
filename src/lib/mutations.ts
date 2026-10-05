@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/client";
 import type {
   InformePlan,
+  PlanDiarioTarea,
   PlanGeneradoSimple,
   Subtarea,
   TareaAdjunto,
@@ -660,7 +661,7 @@ export async function guardarPlanDiarioSimple(payload: {
   /** Reflexión libre opcional. Se persiste en `planes_diarios.reflexion`. */
   reflexion?: string;
   plan: PlanGeneradoSimple;
-}): Promise<string> {
+}): Promise<{ planId: string; tareas: PlanDiarioTarea[] }> {
   const supabase = createClient();
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.user) throw new Error("No autenticado");
@@ -688,26 +689,32 @@ export async function guardarPlanDiarioSimple(payload: {
       owner_id: user.id,
       fecha: payload.fecha,
       fecha_larga: payload.fecha_larga ?? null,
-      // v3 columnas
-      estado_emocional_texto: estadoTexto || null,
-      analisis_emocional_ia: payload.plan.analisis_emocional || null,
-      tendencia_ia: payload.plan.tendencia || null,
-      recomendacion_psicologica_ia: payload.plan.recomendacion_psicologica || null,
-      contexto_dia_ia: payload.plan.contexto_dia || null,
-      num_bloques_activos: payload.plan.num_bloques_activos,
-      comida_titulo: payload.plan.comida.titulo || null,
-      comida_descripcion: payload.plan.comida.descripcion || null,
-      comida_motivo: payload.plan.comida.motivo || null,
+      // 6 secciones finales del plan
+      resumen: payload.plan.resumen || null,
+      recomendacion: payload.plan.recomendacion || null,
+      // Lectura psicológica mapeada a 2 columnas v3 (lo del día + histórico)
+      analisis_emocional_ia:
+        payload.plan.lectura_psicologica.lo_del_dia || null,
+      tendencia_ia:
+        payload.plan.lectura_psicologica.analisis_historico || null,
+      // Tu día optimizado
+      num_bloques_activos: payload.plan.tu_dia_optimizado.num_bloques_activos,
+      // Propuesta de comida
+      comida_titulo: payload.plan.propuesta_comida.titulo || null,
+      comida_descripcion: payload.plan.propuesta_comida.descripcion || null,
+      comida_motivo: payload.plan.propuesta_comida.motivo || null,
       // v2 columnas (alimentan Dashboard emocional)
       semaforo: payload.plan.semaforo,
+      estado_emocional_texto: estadoTexto || null,
       despertar: payload.estado.despertar || null,
       mente: payload.estado.mente || null,
       cuerpo: payload.estado.cuerpo || null,
       rueda: payload.estado.rueda || null,
       necesidad: payload.estado.necesidad || null,
       reflexion: payload.reflexion?.trim() || null,
-      resumen: payload.plan.analisis_emocional || null,
-      recomendacion: payload.plan.recomendacion_psicologica || null,
+      // Legacy (no se reescriben en planes v3 nuevos, pero las dejamos en BD
+      // por compat con planes v2 antiguos que pudiera haber).
+      // recomendacion_psicologica_ia y contexto_dia_ia quedan en NULL.
       num_generacion,
       origen: "ia",
     })
@@ -717,8 +724,10 @@ export async function guardarPlanDiarioSimple(payload: {
   const planId = plan.id as string;
 
   // Filas en plan_diario_tareas (una por bloque activo)
-  if (payload.plan.bloques.length > 0) {
-    const filas = payload.plan.bloques.map((b, i) => ({
+  let tareas: PlanDiarioTarea[] = [];
+  const bloques = payload.plan.tu_dia_optimizado.bloques;
+  if (bloques.length > 0) {
+    const filas = bloques.map((b, i) => ({
       plan_diario_id: planId,
       tarea_id: b.tarea_id ?? null,
       tipo: "imprescindible" as const,
@@ -731,11 +740,96 @@ export async function guardarPlanDiarioSimple(payload: {
       bloque_cognitivo: null,
       es_tarea_libre: b.tarea_id == null,
     }));
-    const { error: errTareas } = await supabase.from("plan_diario_tareas").insert(filas);
+    const { data: inserted, error: errTareas } = await supabase
+      .from("plan_diario_tareas")
+      .insert(filas)
+      .select("*");
     if (errTareas) throw errTareas;
+    tareas = (inserted ?? []) as PlanDiarioTarea[];
   }
 
-  return planId;
+  return { planId, tareas };
+}
+
+// ============================================================================
+// Edición de bloques del plan (post-generación)
+// ============================================================================
+
+/**
+ * Renombra el `titulo_libre` de una tarea del plan.
+ * No toca la tarea en BD si `es_tarea_libre=false` (en ese caso, el nombre
+ * viene de la tarea original; el usuario tendría que editar la tarea en /tareas).
+ */
+export async function renombrarTareaPlan(id: string, titulo: string): Promise<void> {
+  const limpio = titulo.trim();
+  if (!limpio) throw new Error("El título no puede estar vacío");
+  const { error } = await createClient()
+    .from("plan_diario_tareas")
+    .update({ titulo_libre: limpio })
+    .eq("id", id);
+  if (error) throw new Error(`No se pudo renombrar: ${error.message}`);
+}
+
+/**
+ * Mueve una tarea de un bloque a otro dentro del mismo plan.
+ * Si el bloque destino ya tiene una tarea, las SWAPpea (origen→destino,
+ * destino→origen) en una sola operación atómica via CASE.
+ *
+ * No hace nada si source.bloque_num === nuevoBloqueNum.
+ */
+export async function moverTareaABloque(
+  planId: string,
+  sourceTareaId: string,
+  nuevoBloqueNum: 1 | 2 | 3 | 4,
+): Promise<void> {
+  const supabase = createClient();
+
+  // 1) Lee origen y (si existe) destino
+  const { data: src, error: e1 } = await supabase
+    .from("plan_diario_tareas")
+    .select("id, bloque_num")
+    .eq("id", sourceTareaId)
+    .eq("plan_diario_id", planId)
+    .maybeSingle();
+  if (e1) throw new Error(`No se pudo leer el origen: ${e1.message}`);
+  if (!src) throw new Error("Tarea origen no encontrada en este plan");
+  if (src.bloque_num === nuevoBloqueNum) return; // nada que hacer
+
+  const { data: dst, error: e2 } = await supabase
+    .from("plan_diario_tareas")
+    .select("id")
+    .eq("plan_diario_id", planId)
+    .eq("bloque_num", nuevoBloqueNum)
+    .neq("id", sourceTareaId)
+    .maybeSingle();
+  if (e2) throw new Error(`No se pudo leer el destino: ${e2.message}`);
+
+  if (!dst) {
+    // Bloque destino vacío → simple UPDATE
+    const { error } = await supabase
+      .from("plan_diario_tareas")
+      .update({ bloque_num: nuevoBloqueNum })
+      .eq("id", sourceTareaId);
+    if (error) throw new Error(`No se pudo mover: ${error.message}`);
+    return;
+  }
+
+  // Swap en 2 pasos. No hay UNIQUE sobre (plan_diario_id, bloque_num)
+  // y la CHECK solo limita el rango a 1-4, así que ambas tareas pueden
+  // coincidir en `nuevoBloqueNum` momentáneamente sin romper nada.
+  // Paso 1: origen → nuevoBloqueNum (coincide con dst por un instante).
+  const { error: e3 } = await supabase
+    .from("plan_diario_tareas")
+    .update({ bloque_num: nuevoBloqueNum })
+    .eq("id", sourceTareaId);
+  if (e3) throw new Error(`No se pudo mover (paso 1): ${e3.message}`);
+
+  // Paso 2: destino → bloque antiguo del origen.
+  const { error: e4 } = await supabase
+    .from("plan_diario_tareas")
+    .update({ bloque_num: src.bloque_num })
+    .eq("id", dst.id);
+  if (e4) throw new Error(`No se pudo mover (paso 2): ${e4.message}`);
 }
 
 

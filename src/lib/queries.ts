@@ -220,33 +220,51 @@ export async function fetchPlanCompleto(
 /** Histórico paginado de planes (incluye todas las generaciones del mismo día) */
 export async function fetchPlanes(opts?: { desde?: string; hasta?: string; limit?: number }) {
   const supabase = createClient();
-  let q = supabase
+  let q2 = supabase
     .from("planes_diarios")
-    .select("id,fecha,semaforo,resumen,recomendacion,num_generacion,created_at")
+    .select(`id,fecha,semaforo,resumen,recomendacion,num_generacion,created_at,
+            tendencia_ia,contexto_dia_ia,num_bloques_activos,
+            comida_titulo,comida_descripcion,comida_motivo`)
     .order("fecha", { ascending: false })
     .order("num_generacion", { ascending: false })
     .limit(opts?.limit ?? 200);
-  if (opts?.desde) q = q.gte("fecha", opts.desde);
-  if (opts?.hasta) q = q.lte("fecha", opts.hasta);
-  const { data: planes } = await q;
+  if (opts?.desde) q2 = q2.gte("fecha", opts.desde);
+  if (opts?.hasta) q2 = q2.lte("fecha", opts.hasta);
+  const { data: planes } = await q2;
   if (!planes || planes.length === 0) return [];
-  // cuenta tareas y hechas por plan
+  // Trae tareas para conteo + estructura de bloques (timeblocking 1-4).
   const ids = planes.map((p) => p.id);
   const { data: conteos } = await supabase
     .from("plan_diario_tareas")
-    .select("plan_diario_id,hecho")
+    .select("plan_diario_id,hecho,titulo_libre,bloque_num,tipo_tarea,tarea_id,orden")
     .in("plan_diario_id", ids);
+  type TareaHist = {
+    plan_diario_id: string;
+    hecho: boolean;
+    titulo_libre: string | null;
+    bloque_num: number | null;
+    tipo_tarea: string | null;
+    tarea_id: string | null;
+    orden: number;
+  };
+  const tareasPorPlan = new Map<string, TareaHist[]>();
   const agg = new Map<string, { total: number; hechas: number }>();
-  for (const t of conteos ?? []) {
+  for (const t of (conteos ?? []) as TareaHist[]) {
     const a = agg.get(t.plan_diario_id) ?? { total: 0, hechas: 0 };
     a.total++;
     if (t.hecho) a.hechas++;
     agg.set(t.plan_diario_id, a);
+    const arr = tareasPorPlan.get(t.plan_diario_id) ?? [];
+    arr.push(t);
+    tareasPorPlan.set(t.plan_diario_id, arr);
   }
   return planes.map((p) => ({
     ...(p as unknown as PlanDiario),
     tareas_total: agg.get(p.id)?.total ?? 0,
     tareas_hechas: agg.get(p.id)?.hechas ?? 0,
+    tareas_bloques: (tareasPorPlan.get(p.id) ?? [])
+      .filter((t) => t.bloque_num !== null)
+      .sort((a, b) => (a.bloque_num ?? 0) - (b.bloque_num ?? 0) || a.orden - b.orden),
   }));
 }
 

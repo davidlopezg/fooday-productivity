@@ -156,56 +156,40 @@ PRIORIDAD 3 — Solo si las 2 anteriores no cubren los bloques activos.
 ${listaBacklog}
 
 ============================================================
-REGLAS DEL PLAN
+REGLAS DEL PLAN (6 secciones finales)
 ============================================================
 
-A) ANÁLISIS EMOCIONAL (Sección A):
-   - Lee el texto del usuario. NO juzgues, NO psicologices de más.
-   - Extrae: tono (positivo/negativo/neutro), carga (baja/media/alta), foco (claro/borroso).
-   - Máx 4 frases.
+A) RESUMEN (sección 1):
+   - Síntesis en 2-3 frases del estado emocional + a dónde apunta el día.
+   - Tono cercano, en primera persona del plan hacia él.
+   - Incluye un guiño al día de la semana si aporta (ej: lunes → pagos; viernes → cierre).
 
-B) TENDENCIA (Sección A):
-   - Compara el estado de hoy con el histórico (los últimos registros).
-   - Indica si va a mejor ⬆️, se mantiene =, o va a peor ⬇️.
-   - Si hay patrón repetido (mismo síntoma >3 días), nómbralo en 1 frase.
-   - Máx 3 frases.
-
-C) RECOMENDACIÓN ACCIONABLE (Sección A):
+B) RECOMENDACIÓN (sección 2):
    - 2-4 acciones concretas para hoy. Empiezan con verbo en imperativo.
-   - Ej: "Sal a caminar 20 min antes del primer bloque de trabajo."
+   - Ej: "Sal a caminar 20 min antes del primer bloque."
 
-D) CONTEXTO DEL DÍA (Sección A):
-   - Lee el día de la semana (${fechaLarga}) y propón un guiño breve.
-   - Ej: lunes → "toca revisar pagos/suscripciones"; viernes → "toca cerrar semana y dejar todo listo para el lunes".
-   - 1-2 frases. Sin obviedades genéricas.
+C) LECTURA PSICOLÓGICA (sección 3) — 2 subcampos:
+   - lo_del_dia: análisis del estado emocional de HOY (2-4 frases). Tono neutro, no juzgar.
+   - analisis_historico: compara con los últimos planes. ⬆️/=/⬇️. Si hay patrón repetido (>3 días), nómbralo.
 
-E) SEMÁFORO: deduce del estado emocional estructurado del usuario.
-   - Cada dimensión tiene una escala implícita 1-4 (4=mejor, 1=peor).
-   - Calcula la media de las 4 dimensiones numéricas (despertar, mente,
-     cuerpo, rueda). Ignora "necesidad" para el cálculo.
-   - 🟢 VERDE → media >= 3 → puede asumir 3-4 bloques
-   - 🟡 AMARILLO → media 2-3 → asume 2-3 bloques
-   - 🔴 ROJO → media < 2 → asume solo 1 bloque
-   - "necesidad" es lo que pide, no su nivel; tenlo en cuenta solo para la recomendación.
-
-F) TIMEBLOCKING (Sección B):
-   - Tienes exactamente 4 bloques de 60 min cada uno: bloque 1 y 2 son MAÑANA (antes de comer); bloque 3 y 4 son TARDE (después de comer).
-   - Num_bloques_activos: 1 a 4 según el semáforo (regla E).
-   - ASIGNACIÓN DE TAREAS A BLOQUES (orden de prioridad):
+D) TU DÍA OPTIMIZADO (sección 4):
+   - 4 bloques de 60 min: 1-2 mañana, 3-4 tarde.
+   - num_bloques_activos: 1-4 según el semáforo.
+     🟢 VERDE → 3-4 bloques · 🟡 AMARILLO → 2-3 bloques · 🔴 ROJO → 1 bloque
+   - Prioridad de asignación:
      1º Tareas PROGRAMADAS PARA HOY (compromiso explícito de David).
      2º Tareas AÑADIDAS EN ESTA SESIÓN.
      3º Resto del BACKLOG (último recurso).
-   - Si un bloque se queda sin tarea de ninguna fuente, propón una abstracta ("Paseo consciente de 60 min").
-   - Asigna UNA tarea por bloque (las primeras num_bloques_activos ranuras).
-   - Una tarea PROFUNDA ocupa el bloque entero (60 min). Tareas RÁPIDAS pueden agruparse: pon UNA sola línea con " + " entre varias (ej: "Revisar correo + llamar gestoría + agendar médico") que ocupe el bloque entero.
-   - Ordena por: (1) prioridad de fuente (regla arriba), (2) estado emocional (tareas ligeras si rojo, profundas si verde), (3) prioridad de la tarea, (4) tipo (profunda antes que rápida salvo que el cuerpo pida pausa).
-   - Las tareas deben salir de alguna de las 3 listas. Puedes referenciarlas por su nº en cada lista. Si ninguna sirve, propón una tarea abstracta ("Paseo consciente de 60 min") como tarea libre.
+   - Orden: (1) prioridad de fuente, (2) estado emocional (ligeras si rojo), (3) prioridad de la tarea, (4) tipo (profunda antes que rápida salvo que el cuerpo pida pausa).
+   - Si un bloque se queda sin tarea, propón una abstracta ("Paseo consciente de 60 min").
 
-G) COMIDA (Sección C):
+E) PROPUESTA DE COMIDA (sección 5):
    - UNA sola sugerencia gastronómica para la comida principal de hoy.
-   - Título corto (2-5 palabras).
-   - Descripción: 1-2 frases de qué es.
-   - Motivo: 1 frase explicando por qué encaja con su estado emocional y/o el día de la semana.
+   - Título corto (2-5 palabras). Descripción: 1-2 frases. Motivo: 1 frase.
+
+F) NOTAS DEL DÍA (sección 6):
+   - NO se rellena por ti. Lo escribe David al final del día.
+   - Ignóralo en tu respuesta.
 
 ============================================================
 FORMATO DE SALIDA — JSON ESTRICTO
@@ -214,20 +198,24 @@ Devuelve SOLO este JSON, sin texto fuera, sin markdown. No uses saltos de línea
 
 {
   "semaforo": "verde|amarillo|rojo",
-  "analisis_emocional": "<2-4 frases>",
-  "tendencia": "<2-3 frases con flecha ⬆️|=|⬇️>",
-  "recomendacion_psicologica": "<2-4 acciones separadas por ; o en una sola frase con guiones>",
-  "contexto_dia": "<1-2 frases con guiño al día de la semana>",
-  "num_bloques_activos": <1|2|3|4>,
-  "bloques": [
-    {
-      "bloque_num": 1,
-      "tipo": "profunda|rapida",
-      "titulo_libre": "<título de la tarea asignada al bloque>",
-      "tiempo_min": 60
-    }
-  ],
-  "comida": {
+  "resumen": "<2-3 frases incluyendo guiño al día de la semana si aplica>",
+  "recomendacion": "<2-4 acciones separadas por ; o en una sola frase con guiones>",
+  "lectura_psicologica": {
+    "lo_del_dia": "<2-4 frases>",
+    "analisis_historico": "<2-3 frases con flecha ⬆️|=|⬇️>"
+  },
+  "tu_dia_optimizado": {
+    "num_bloques_activos": <1|2|3|4>,
+    "bloques": [
+      {
+        "bloque_num": 1,
+        "tipo": "profunda|rapida",
+        "titulo_libre": "<título de la tarea asignada al bloque>",
+        "tiempo_min": 60
+      }
+    ]
+  },
+  "propuesta_comida": {
     "titulo": "<2-5 palabras>",
     "descripcion": "<1-2 frases>",
     "motivo": "<1 frase>"
@@ -235,8 +223,8 @@ Devuelve SOLO este JSON, sin texto fuera, sin markdown. No uses saltos de línea
 }
 
 Notas:
-- "bloques" contiene exactamente num_bloques_activos elementos, con bloque_num 1..num_bloques_activos en orden.
-- "tiempo_min" siempre 60 (cada bloque son 60 min estrictos).
+- "tu_dia_optimizado.bloques" contiene exactamente num_bloques_activos elementos, con bloque_num 1..num_bloques_activos en orden.
+- "tiempo_min" siempre 60.
 - Tono: profesional pero cercano, en español de España.`;
 }
 
@@ -362,7 +350,11 @@ export function sanearPlanSimple(raw: unknown, candidatas: Tarea[]): PlanGenerad
     ? (r.semaforo as PlanGeneradoSimple["semaforo"])
     : "amarillo";
 
-  const numBloquesRaw = Number(r.num_bloques_activos);
+  // Tu día optimizado: la IA devuelve tu_dia_optimizado.{num_bloques_activos, bloques}
+  // pero aceptamos el shape antiguo {num_bloques_activos, bloques} por compat.
+  const diaOpt =
+    (r.tu_dia_optimizado as Record<string, unknown> | undefined) ?? r;
+  const numBloquesRaw = Number(diaOpt.num_bloques_activos);
   const numBloques: 1 | 2 | 3 | 4 = ([1, 2, 3, 4] as const).includes(
     numBloquesRaw as 1 | 2 | 3 | 4,
   )
@@ -373,7 +365,9 @@ export function sanearPlanSimple(raw: unknown, candidatas: Tarea[]): PlanGenerad
         ? 2
         : 3;
 
-  const bloquesRaw = Array.isArray(r.bloques) ? (r.bloques as Array<Record<string, unknown>>) : [];
+  const bloquesRaw = Array.isArray(diaOpt.bloques)
+    ? (diaOpt.bloques as Array<Record<string, unknown>>)
+    : [];
   const candidatasPorTitulo = new Map(
     candidatas.map((t) => [normalizarTitulo(t.titulo), t] as const),
   );
@@ -395,22 +389,39 @@ export function sanearPlanSimple(raw: unknown, candidatas: Tarea[]): PlanGenerad
     });
   }
 
-  const comidaRaw = (r.comida ?? {}) as Record<string, unknown>;
-  const comida: PlanGeneradoSimple["comida"] = {
+  // Propuesta de comida: la IA devuelve propuesta_comida.* pero aceptamos
+  // el shape antiguo {comida.*} por compat.
+  const comidaRaw =
+    (r.propuesta_comida as Record<string, unknown> | undefined) ??
+    ((r.comida as Record<string, unknown> | undefined) ?? {});
+  const propuestaComida: PlanGeneradoSimple["propuesta_comida"] = {
     titulo: String(comidaRaw.titulo ?? "—").slice(0, 100),
     descripcion: String(comidaRaw.descripcion ?? "").slice(0, 500),
     motivo: String(comidaRaw.motivo ?? "").slice(0, 300),
   };
 
+  // Lectura psicológica: la IA devuelve lectura_psicologica.{lo_del_dia, analisis_historico}
+  // pero aceptamos los campos antiguos {analisis_emocional, tendencia} por compat.
+  const lectura =
+    (r.lectura_psicologica as Record<string, unknown> | undefined) ?? {};
+  const loDelDia = String(lectura.lo_del_dia ?? r.analisis_emocional ?? "").slice(0, 1500);
+  const analisisHist = String(
+    lectura.analisis_historico ?? r.tendencia ?? "",
+  ).slice(0, 1000);
+
   return {
     semaforo,
-    analisis_emocional: String(r.analisis_emocional ?? "").slice(0, 1500),
-    tendencia: String(r.tendencia ?? "").slice(0, 1000),
-    recomendacion_psicologica: String(r.recomendacion_psicologica ?? "").slice(0, 1500),
-    contexto_dia: String(r.contexto_dia ?? "").slice(0, 500),
-    num_bloques_activos: numBloques,
-    bloques,
-    comida,
+    resumen: String(r.resumen ?? "").slice(0, 1000),
+    recomendacion: String(r.recomendacion ?? r.recomendacion_psicologica ?? "").slice(0, 1500),
+    lectura_psicologica: {
+      lo_del_dia: loDelDia,
+      analisis_historico: analisisHist,
+    },
+    tu_dia_optimizado: {
+      num_bloques_activos: numBloques,
+      bloques,
+    },
+    propuesta_comida: propuestaComida,
   };
 }
 

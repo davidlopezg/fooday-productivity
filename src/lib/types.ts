@@ -162,6 +162,16 @@ export interface PlanDiario {
   origen: string | null;
   fecha_larga: string | null;
   informe_json: InformePlan | null;
+  /** v3 columnas (planes generados por el formulario nuevo Parte 1+2). */
+  estado_emocional_texto?: string | null;
+  analisis_emocional_ia?: string | null;
+  tendencia_ia?: string | null;
+  recomendacion_psicologica_ia?: string | null;
+  contexto_dia_ia?: string | null;
+  num_bloques_activos?: number | null;
+  comida_titulo?: string | null;
+  comida_descripcion?: string | null;
+  comida_motivo?: string | null;
 }
 
 export type BloqueEnergia = "regular" | "estrategia" | "ejecucion" | "mecanica";
@@ -180,6 +190,10 @@ export interface PlanDiarioTarea {
   bloque_energia: BloqueEnergia | null;
   bloque_cognitivo: BloqueCognitivo | null;
   es_tarea_libre: boolean;
+  /** Bloque del timeblocking 1-4 (null si la tarea no está en bloques). */
+  bloque_num: 1 | 2 | 3 | 4 | null;
+  /** "profunda" = bloque entero · "rapida" = micro-tarea. */
+  tipo_tarea: "profunda" | "rapida" | null;
 }
 
 export interface PlanDiarioSubtarea {
@@ -387,25 +401,38 @@ export interface BloqueTareaPlan {
   titulo_libre: string;
   /** Tiempo estimado en minutos (60 = bloque entero) */
   tiempo_min: number;
+  /** id de la fila en plan_diario_tareas (lo añade la UI tras guardar, para edición). */
+  plan_tarea_id?: string;
 }
 
-/** Plan generado por la IA en la nueva estructura A+B+C */
+/**
+ * Plan diario v3 — estructura de 6 secciones que se muestra al usuario
+ * Y se persiste en el histórico. La IA devuelve este JSON; la UI lo pinta
+ * tal cual; la mutación lo mapea a las columnas de `planes_diarios`.
+ */
 export interface PlanGeneradoSimple {
   semaforo: "verde" | "amarillo" | "rojo";
-  /** Sección A — análisis del estado actual introducido */
-  analisis_emocional: string;
-  /** Sección A — comparación con el histórico (tendencia) */
-  tendencia: string;
-  /** Sección A — recomendación accionable */
-  recomendacion_psicologica: string;
-  /** Sección A — contexto del día de la semana (ej: "Hoy es lunes, tocan pagos…") */
-  contexto_dia: string;
-  /** Sección B — nº de bloques activos (1-4) decidido por la IA según el estado */
-  num_bloques_activos: 1 | 2 | 3 | 4;
-  /** Sección B — tareas asignadas a cada bloque activo */
-  bloques: BloqueTareaPlan[];
-  /** Sección C — sugerencia gastronómica */
-  comida: ComidaSugerida;
+
+  /** 1. Resumen del día (2-3 frases). */
+  resumen: string;
+
+  /** 2. Recomendación (2-4 acciones en imperativo). */
+  recomendacion: string;
+
+  /** 3. Lectura psicológica: lo del día + análisis del histórico. */
+  lectura_psicologica: {
+    lo_del_dia: string;
+    analisis_historico: string;
+  };
+
+  /** 4. Tu día optimizado — nº de bloques activos + 1 fila por bloque. */
+  tu_dia_optimizado: {
+    num_bloques_activos: 1 | 2 | 3 | 4;
+    bloques: BloqueTareaPlan[];
+  };
+
+  /** 5. Propuesta de comida para hoy. */
+  propuesta_comida: ComidaSugerida;
 }
 
 export interface InformePlan {

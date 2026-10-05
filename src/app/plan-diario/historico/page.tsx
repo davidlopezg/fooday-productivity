@@ -9,6 +9,14 @@ import type { PlanDiario } from "@/lib/types";
 type PlanConConteo = PlanDiario & {
   tareas_total: number;
   tareas_hechas: number;
+  tareas_bloques: Array<{
+    bloque_num: number | null;
+    titulo_libre: string | null;
+    tipo_tarea: string | null;
+    tarea_id: string | null;
+    hecho: boolean;
+    orden: number;
+  }>;
 };
 
 const SEM: Record<string, string> = {
@@ -131,59 +139,124 @@ export default function PlanDiarioHistoricoPage() {
                       {isExpanded && (
                         <tr className="bg-muted/20">
                           <td colSpan={7} className="px-4 py-4">
-                            <div className="grid gap-3 sm:grid-cols-2">
-                              <div>
-                                <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                  Estado emocional
-                                </h4>
-                                <ul className="mt-1 space-y-0.5 text-xs">
-                                  <li>
-                                    <strong>Despertar:</strong> {p.despertar ?? "—"}
-                                  </li>
-                                  <li>
-                                    <strong>Mente:</strong> {p.mente ?? "—"}
-                                  </li>
-                                  <li>
-                                    <strong>Cuerpo:</strong> {p.cuerpo ?? "—"}
-                                  </li>
-                                  <li>
-                                    <strong>Rueda:</strong> {p.rueda ?? "—"}
-                                  </li>
-                                  <li>
-                                    <strong>Necesita:</strong> {p.necesidad ?? "—"}
-                                  </li>
-                                </ul>
+                            <div className="grid gap-4">
+                              {/* Cabecera emocional rápida */}
+                              <div className="rounded-md border border-border bg-background p-3 text-xs">
+                                <span className="font-semibold uppercase tracking-wide text-muted-foreground">
+                                  Estado emocional:
+                                </span>{" "}
+                                🌅 {p.despertar ?? "—"} · 🧠 {p.mente ?? "—"} · 💪 {p.cuerpo ?? "—"} · 🌀 {p.rueda ?? "—"} · 🆘 {p.necesidad ?? "—"}
                               </div>
-                              <div>
-                                <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                  Reflexión
-                                </h4>
-                                <p className="mt-1 whitespace-pre-wrap text-xs text-muted-foreground">
-                                  {p.reflexion ?? "—"}
-                                </p>
-                              </div>
-                              <div className="sm:col-span-2">
-                                <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                  Resumen completo
-                                </h4>
-                                <p className="mt-1 whitespace-pre-wrap text-xs">{p.resumen ?? "—"}</p>
-                              </div>
-                              <div className="sm:col-span-2">
-                                <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                  Recomendación completa
-                                </h4>
-                                <p className="mt-1 whitespace-pre-wrap text-xs text-muted-foreground">
+
+                              {/* 1. Resumen */}
+                              <Section titulo="1. Resumen" emoji="📌">
+                                <p className="text-xs whitespace-pre-wrap">{p.resumen ?? "—"}</p>
+                              </Section>
+
+                              {/* 2. Recomendación */}
+                              <Section titulo="2. Recomendación" emoji="🆘">
+                                <p className="text-xs whitespace-pre-wrap text-muted-foreground">
                                   {p.recomendacion ?? "—"}
                                 </p>
-                              </div>
-                              <div className="sm:col-span-2">
-                                <Link
-                                  href={`/plan-diario/detalle?id=${p.id}`}
-                                  className="text-xs text-primary underline underline-offset-4"
+                              </Section>
+
+                              {/* 3. Lectura psicológica */}
+                              <Section titulo="3. Lectura psicológica" emoji="🧠">
+                                <div className="space-y-2">
+                                  <div>
+                                    <h5 className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                      Lo del día
+                                    </h5>
+                                    <p className="mt-0.5 text-xs whitespace-pre-wrap">
+                                      {p.analisis_emocional_ia ?? "—"}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <h5 className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                      Análisis del histórico
+                                    </h5>
+                                    <p className="mt-0.5 text-xs whitespace-pre-wrap">
+                                      {p.tendencia_ia ?? "—"}
+                                    </p>
+                                  </div>
+                                </div>
+                              </Section>
+
+                              {/* 4. Tu día optimizado */}
+                              {p.tareas_bloques.length > 0 && (
+                                <Section
+                                  titulo={`4. Tu día optimizado (${p.num_bloques_activos ?? p.tareas_bloques.length} de 4)`}
+                                  emoji="⏱️"
                                 >
-                                  Ver plan completo (con tareas, subtareas, bloques, borradores) →
-                                </Link>
-                              </div>
+                                  <ul className="space-y-1">
+                                    {p.tareas_bloques.map((t) => (
+                                      <li
+                                        key={`${t.bloque_num}-${t.orden}`}
+                                        className="flex items-center gap-2 rounded-md border border-border bg-background px-2 py-1 text-xs"
+                                      >
+                                        <span className="shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                                          B{t.bloque_num}
+                                        </span>
+                                        <span className="flex-1 truncate">
+                                          {t.titulo_libre ?? "—"}
+                                        </span>
+                                        {t.tipo_tarea && (
+                                          <span className="shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                            {t.tipo_tarea}
+                                          </span>
+                                        )}
+                                        {t.tarea_id && (
+                                          <span className="shrink-0 text-[10px] text-muted-foreground">
+                                            📌
+                                          </span>
+                                        )}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </Section>
+                              )}
+
+                              {/* 5. Propuesta de comida */}
+                              {p.comida_titulo && (
+                                <Section titulo="5. Propuesta de comida" emoji="🍽️">
+                                  <p className="text-sm font-medium">{p.comida_titulo}</p>
+                                  {p.comida_descripcion && (
+                                    <p className="mt-0.5 text-xs text-muted-foreground">
+                                      {p.comida_descripcion}
+                                    </p>
+                                  )}
+                                  {p.comida_motivo && (
+                                    <p className="mt-1 text-xs italic text-muted-foreground">
+                                      💡 {p.comida_motivo}
+                                    </p>
+                                  )}
+                                </Section>
+                              )}
+
+                              {/* 6. Notas del día */}
+                              {p.notas && (
+                                <Section titulo="6. Notas del día" emoji="📓">
+                                  <p className="text-xs whitespace-pre-wrap">{p.notas}</p>
+                                </Section>
+                              )}
+
+                              {p.reflexion && (
+                                <details className="text-xs">
+                                  <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                                    Ver reflexión libre
+                                  </summary>
+                                  <p className="mt-1 whitespace-pre-wrap text-muted-foreground">
+                                    {p.reflexion}
+                                  </p>
+                                </details>
+                              )}
+
+                              <Link
+                                href={`/plan-diario/detalle?id=${p.id}`}
+                                className="text-xs text-primary underline underline-offset-4"
+                              >
+                                Ver plan completo (vista detalle) →
+                              </Link>
                             </div>
                           </td>
                         </tr>
@@ -196,6 +269,26 @@ export default function PlanDiarioHistoricoPage() {
           </div>
         )}
       </section>
+    </div>
+  );
+}
+
+function Section({
+  emoji,
+  titulo,
+  children,
+}: {
+  emoji: string;
+  titulo: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-md border border-border bg-card p-3">
+      <h4 className="mb-1.5 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+        <span>{emoji}</span>
+        <span>{titulo}</span>
+      </h4>
+      {children}
     </div>
   );
 }
