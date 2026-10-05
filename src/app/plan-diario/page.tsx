@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
   fetchTareas,
@@ -400,21 +401,21 @@ export default function PlanDiarioPage() {
           </p>
         </div>
         <div className="flex gap-2 text-xs">
-          <a
+          <Link
             href="/plan-diario/historico"
             className="rounded-md border border-border px-3 py-1.5 hover:bg-muted"
           >
             📋 Histórico
-          </a>
+          </Link>
         </div>
       </header>
 
       {!config.data.minimax_api_key && !config.loading && (
         <div className="rounded-md border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-600 dark:text-amber-400">
           Aún no has configurado tu API key.{" "}
-          <a href="/configuracion" className="underline underline-offset-4">
+          <Link href="/configuracion" className="underline underline-offset-4">
             Ir a Configuración
-          </a>
+          </Link>
           .
         </div>
       )}
@@ -501,12 +502,12 @@ export default function PlanDiarioPage() {
           ) : tareasProgramadasHoy.length === 0 ? (
             <div className="rounded-md border border-dashed border-border bg-muted/30 px-3 py-3 text-xs text-muted-foreground">
               No has marcado tareas para hoy en{" "}
-              <a
+              <Link
                 href="/semana"
                 className="font-medium text-foreground underline underline-offset-4"
               >
                 /semana
-              </a>
+              </Link>
               .
             </div>
           ) : (
@@ -529,13 +530,13 @@ export default function PlanDiarioPage() {
                       </span>
                     )}
                   </div>
-                  <a
+                  <Link
                     href="/semana"
                     className="shrink-0 rounded p-1 text-xs text-muted-foreground hover:bg-background hover:text-foreground"
                     title="Editar en /semana"
                   >
                     ↗
-                  </a>
+                  </Link>
                 </li>
               ))}
             </ul>
