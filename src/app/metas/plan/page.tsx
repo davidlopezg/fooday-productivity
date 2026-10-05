@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useState } from "react";
 import { fetchPlanTrimestral } from "@/lib/queries";
+import { ensurePeriodosAnio } from "@/lib/mutations";
 import { useData } from "@/lib/useData";
 import type { Meta, Periodo, ResultadoPeriodo, Tarea } from "@/lib/types";
-import { IconArrowLeft } from "@/components/icons";
+import { IconArrowLeft, IconPlus } from "@/components/icons";
 import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
 
 function pct(value: number) {
@@ -160,6 +161,8 @@ function ScorecardKR({
 
 export default function PlanTrimestralPage() {
   const [anio, setAnio] = useState(new Date().getFullYear());
+  const [creandoPeriodos, setCreandoPeriodos] = useState(false);
+  const [errorCrear, setErrorCrear] = useState<string | null>(null);
 
   const planQ = useData<{
     periodos: Periodo[];
@@ -218,15 +221,54 @@ export default function PlanTrimestralPage() {
           Error: {planQ.error}
         </div>
       ) : (planQ.data?.periodos.length ?? 0) === 0 ? (
-        <div className="rounded-xl border border-dashed border-border bg-muted/30 p-8 text-center text-sm text-muted-foreground">
-          No hay trimestres creados para {anio}.{" "}
-          <Link
-            href="/metas/nueva"
-            className="font-medium text-foreground underline underline-offset-4"
+        <div className="rounded-xl border border-dashed border-border bg-muted/30 p-8 text-center">
+          <p className="text-sm text-muted-foreground">
+            No hay trimestres creados para {anio}. El plan trimestral necesita
+            los 4 periodos (Q1–Q4) para poder mostrar resultados y scorecards.
+          </p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Es un paso único. Luego puedes añadir resultados a cada trimestre
+            desde el detalle de cada meta.
+          </p>
+          <button
+            type="button"
+            disabled={creandoPeriodos}
+            onClick={async () => {
+              setCreandoPeriodos(true);
+              setErrorCrear(null);
+              try {
+                await ensurePeriodosAnio(anio);
+                await planQ.reload();
+              } catch (e) {
+                setErrorCrear(
+                  e instanceof Error
+                    ? e.message
+                    : "No se pudieron crear los trimestres",
+                );
+              } finally {
+                setCreandoPeriodos(false);
+              }
+            }}
+            className="mt-5 inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
           >
-            Crea una meta
-          </Link>{" "}
-          con la opción «Auto-generar 4 trimestres» o ve al detalle de una meta y pulsa «Asegurar {anio} Q1–Q4».
+            <IconPlus className="h-4 w-4" />
+            {creandoPeriodos ? "Creando…" : `Crear Q1–Q4 de ${anio}`}
+          </button>
+          {errorCrear && (
+            <p className="mt-3 text-xs text-red-600 dark:text-red-400">
+              {errorCrear}
+            </p>
+          )}
+          <div className="mt-6 border-t border-border pt-4 text-xs text-muted-foreground">
+            ¿Prefieres empezar por una meta?{" "}
+            <Link
+              href="/metas/nueva"
+              className="font-medium text-foreground underline underline-offset-4"
+            >
+              Crea una meta con trimestres auto-generados
+            </Link>
+            .
+          </div>
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

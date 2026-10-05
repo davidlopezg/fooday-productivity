@@ -71,6 +71,29 @@ export const AYUDA_POR_RUTA: Record<
           "Es el parking temporal. Procesarlas (clasificarlas en tarea / problema / idea) debe hacerse en menos de 24h, idealmente al final de cada mañana o al iniciar el día siguiente. Si se acumulan más de 15, vuelve a procesarlas antes de añadir nuevas.",
         pilar: 4,
       },
+      {
+        titulo: "No confundir con /tareas/inbox",
+        cuerpo:
+          "/captura es el inbox de pensamiento suelto (cualquier texto: tareas, ideas, problemas, pagos). /tareas/inbox es distinto: solo contiene tareas (filas de la tabla) que aún no están vinculadas al plan trimestral.",
+        pilar: 4,
+      },
+    ],
+  },
+  "/tareas/inbox": {
+    pilares: [2, 4],
+    items: [
+      {
+        titulo: "Conceptualmente hay DOS inboxes distintos",
+        cuerpo:
+          "/captura es el inbox de pensamiento suelto (efecto Zeigarnik): cualquier cosa que se te ocurra va como texto libre, sin estructura previa. ESTE inbox (/tareas/inbox) es distinto: solo contiene tareas (filas de la tabla tareas) que o no tienen meta asignada, o tienen meta pero ningún trimestre concreto. Es el triaje de tareas antes de meterlas en el plan trimestral.",
+        pilar: 4,
+      },
+      {
+        titulo: "Cuándo usarlo",
+        cuerpo:
+          "Cuando tengas tareas 'huérfanas' (sin meta) o tareas de una meta que aún no has repartido por trimestres. Procesarlas es meterlas en algún resultado_periodo o dejarlas como sueltas a propósito. La regla: este inbox debería estar cerca de cero. Si crece semana tras semana, tienes más trabajo del que tu plan puede ejecutar — replantéate prioridades.",
+        pilar: 2,
+      },
     ],
   },
   "/metas": {

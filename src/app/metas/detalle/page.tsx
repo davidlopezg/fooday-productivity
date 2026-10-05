@@ -459,7 +459,7 @@ function AsignarExistente({
   if (candidatos.length === 0) {
     return (
       <p className="mt-2 rounded-md border border-border bg-muted/30 p-2 text-xs text-muted-foreground">
-        No hay tareas en la bandeja. Crea una primero o asigna desde /metas/inbox.
+        No hay tareas en la bandeja. Crea una primero o asigna desde /tareas/inbox.
       </p>
     );
   }

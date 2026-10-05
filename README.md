@@ -65,6 +65,7 @@ npm run dev
 | `/` | **Hoy** | Semáforo + plan del día + contadores |
 | `/captura` | **Captura** | Inbox rápido (vaciar cabeza) |
 | `/tareas` | **Tareas** | Pendientes, marcar hechas |
+| `/tareas/inbox` | **Inbox** | Tareas sin asignar a meta o trimestre (triaje) |
 | `/calendario` | **Calendario** | Time-blocking: 4 bloques fijos × 7 días |
 | `/focus` | **Focus** | Pomodoro + pre-flight check (silenciar / cerrar email / criterio) |
 | `/semana` | **Semana** | Pipeline semanal con drag & drop |

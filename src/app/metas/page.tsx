@@ -67,7 +67,7 @@ export default function MetasPage() {
         <div className="flex flex-wrap items-center gap-2">
           <HelpDrawer title="Metas" items={AYUDA_POR_RUTA["/metas"]?.items ?? []} />
           <Link
-            href="/metas/inbox"
+            href="/tareas/inbox"
             className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-2 text-sm font-medium hover:bg-accent"
           >
             <IconInbox className="h-4 w-4" />

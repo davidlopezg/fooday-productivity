@@ -41,11 +41,10 @@ const TOP_ITEMS: NavItem[] = [
   { href: "/semana", label: "Semana", Icon: IconCalendar },
 ];
 
-// Sub-ítems del bloque Metas (Plan trimestral, Inbox de metas).
-// Se renderizan como "nido" debajo de "Metas" en la sidebar.
+// Sub-ítems del bloque Metas (solo Plan trimestral).
+// El "Inbox" NO vive aquí: es de tareas, no de metas. Está en TASKS_SECTION.
 const METAS_NEST: NavItem[] = [
   { href: "/metas/plan", label: "Plan trimestral", Icon: IconCalendar },
-  { href: "/metas/inbox", label: "Inbox", Icon: IconInbox },
 ];
 
 // Sección Tareas
@@ -53,6 +52,7 @@ const TASKS_SECTION: NavSection = {
   label: "Tareas",
   items: [
     { href: "/tareas", label: "Tareas", Icon: IconList },
+    { href: "/tareas/inbox", label: "Inbox", Icon: IconInbox },
     { href: "/tareas/completadas", label: "Completadas", Icon: IconCheck },
     { href: "/pipeline", label: "Prioridad", Icon: IconFlag },
     { href: "/plan-diario", label: "Plan diario", Icon: IconSparkles },

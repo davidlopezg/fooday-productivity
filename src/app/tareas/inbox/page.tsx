@@ -19,6 +19,7 @@ import type {
   TareaSinMeta,
 } from "@/lib/types";
 import { IconArrowLeft, IconInbox, IconPlus } from "@/components/icons";
+import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
 
 export default function InboxPage() {
   const inboxQ = useData<TareaSinMeta[]>(fetchTareasSinMeta, [], []);
@@ -49,22 +50,26 @@ export default function InboxPage() {
   return (
     <div className="space-y-6">
       <Link
-        href="/metas"
+        href="/tareas"
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
       >
         <IconArrowLeft className="h-4 w-4" />
-        Todas las metas
+        Todas las tareas
       </Link>
 
       <header>
-        <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
-          <IconInbox className="h-5 w-5" />
-          Inbox
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Tareas sin asignar a ningún trimestre/resultado. Decide después si
-          encajan en una meta o las dejas sueltas.
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
+              <IconInbox className="h-5 w-5" />
+              Inbox de tareas
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Tareas que o no tienen meta asignada, o tienen meta pero ningún trimestre/resultado concreto. Distínguelo del <Link href="/captura" className="font-medium text-foreground underline-offset-4 hover:underline">/captura</Link> (que es para pensamiento suelto, no para tareas).
+            </p>
+          </div>
+          <HelpDrawer title="Inbox de tareas" items={AYUDA_POR_RUTA["/tareas/inbox"]?.items ?? []} />
+        </div>
       </header>
 
       {/* Captura rápida */}
