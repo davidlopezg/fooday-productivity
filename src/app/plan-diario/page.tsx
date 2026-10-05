@@ -250,6 +250,10 @@ export default function PlanDiarioPage() {
           recurrencia_dia_mes: null,
           recurrencia_ultima_generada: null,
           resultado_periodo_id: null,
+          ambito: null,
+          tags: [],
+          es_wig: false,
+          wig_orden: null,
         }));
 
       const plan = await generarPlanSimple(

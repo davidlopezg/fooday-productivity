@@ -48,6 +48,69 @@ const ESTADOS = ["pendiente", "en_progreso", "bloqueada", "hecha", "archivada"];
 const DIAS_SEMANA_LBL = ["D", "L", "M", "X", "J", "V", "S"];
 
 // ============================================================================
+// Editor de ÁMBITO + TAGS — migration 0019 (4DX para tareas)
+// Ámbito separa personal/profesional; tags sirven para filtrar/agrupar.
+// ============================================================================
+function AmbitoTagsEditor({
+  ambito,
+  onAmbitoChange,
+  tagsInput,
+  onTagsInputChange,
+}: {
+  ambito: "personal" | "profesional" | null;
+  onAmbitoChange: (v: "personal" | "profesional" | null) => void;
+  tagsInput: string;
+  onTagsInputChange: (v: string) => void;
+}) {
+  const field =
+    "h-9 w-full rounded-md border border-input bg-background px-2 text-sm outline-none focus:ring-2 focus:ring-ring";
+  return (
+    <section className="rounded-lg border border-border bg-muted/30 p-3">
+      <div className="mb-2 flex items-center gap-2">
+        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Ámbito y tags
+        </span>
+      </div>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <label className="block">
+          <span className="mb-1 block text-[11px] text-muted-foreground">
+            ¿Personal o profesional?
+          </span>
+          <select
+            className={field}
+            value={ambito ?? ""}
+            onChange={(e) =>
+              onAmbitoChange(
+                (e.target.value || null) as "personal" | "profesional" | null,
+              )
+            }
+          >
+            <option value="">— Sin clasificar —</option>
+            <option value="personal">👤 Personal</option>
+            <option value="profesional">💼 Profesional</option>
+          </select>
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-[11px] text-muted-foreground">
+            Tags (separadas por coma)
+          </span>
+          <input
+            className={field}
+            value={tagsInput}
+            onChange={(e) => onTagsInputChange(e.target.value)}
+            placeholder="salud, familia, app…"
+          />
+        </label>
+      </div>
+      <p className="mt-1.5 text-[11px] text-muted-foreground">
+        Los tags sirven para filtrar en /tareas. El ámbito te ayuda a ver el
+        balance personal/profesional.
+      </p>
+    </section>
+  );
+}
+
+// ============================================================================
 // Editor de Recurrencia (diaria / semanal / mensual) + selector de Proyecto
 // ---------------------------------------------------------------------------
 // Se usa dentro de CrearModal y EditarModal. La recurrencia se guarda
@@ -878,6 +941,12 @@ export function EditarModal({
     dias_semana: tarea.recurrencia_dias_semana ?? null,
     dia_mes: tarea.recurrencia_dia_mes ?? null,
   });
+  const [ambito, setAmbito] = useState<"personal" | "profesional" | null>(
+    tarea.ambito ?? null,
+  );
+  const [tagsInput, setTagsInput] = useState<string>(
+    (tarea.tags ?? []).join(", "),
+  );
   const [subtareas, setSubtareas] = useState<Subtarea[]>(
     Array.isArray(tarea.subtareas) ? (tarea.subtareas as unknown as Subtarea[]) : [],
   );
@@ -920,6 +989,10 @@ export function EditarModal({
     setGuardarError(null);
     startTransition(async () => {
       try {
+        const tagsLimpios = tagsInput
+          .split(",")
+          .map((s) => s.trim().toLowerCase())
+          .filter((s) => s.length > 0);
         await actualizarTarea({
           id: tarea.id,
           titulo: form.titulo,
@@ -933,6 +1006,8 @@ export function EditarModal({
           esfuerzo: form.esfuerzo || null,
           criterio_terminacion: form.criterio_terminacion.trim() || null,
           proyecto_id: proyectoId,
+          ambito: ambito,
+          tags: tagsLimpios,
         });
         // Recurrencia: si cambia, se actualiza. Si antes era distinta
         // (incluida null), se sobreescribe con el setRecurrencia.
@@ -1031,6 +1106,13 @@ export function EditarModal({
 
           <AdjuntosEditor tareaId={tarea.id} cola={[]} setCola={() => {}} onUpload={() => {}} />
 
+          <AmbitoTagsEditor
+            ambito={ambito}
+            onAmbitoChange={setAmbito}
+            tagsInput={tagsInput}
+            onTagsInputChange={setTagsInput}
+          />
+
           <SubtareasEditor
             subtareas={subtareas}
             onChange={setSubtareas}
@@ -1117,6 +1199,8 @@ export function CrearModal({
   });
   const [proyectoId, setProyectoId] = useState<string | null>(null);
   const [recurrencia, setRecurrenciaState] = useState<Recurrencia>({ tipo: null });
+  const [ambito, setAmbito] = useState<"personal" | "profesional" | null>(null);
+  const [tagsInput, setTagsInput] = useState<string>("");
   const [subtareas, setSubtareas] = useState<Subtarea[]>([]);
   const [subtareasAbierto, setSubtareasAbierto] = useState(false);
   const [adjuntosCola, setAdjuntosCola] = useState<PendingFile[]>([]);
@@ -1148,6 +1232,11 @@ export function CrearModal({
           }))
           .filter((s) => s.descripcion.length > 0);
 
+        const tagsLimpios = tagsInput
+          .split(",")
+          .map((s) => s.trim().toLowerCase())
+          .filter((s) => s.length > 0);
+
         const creada = await crearTareaConIA(
           {
             titulo: form.titulo.trim(),
@@ -1159,6 +1248,8 @@ export function CrearModal({
             capa: form.capa || null,
             pts: form.pts ? Number(form.pts) : null,
             esfuerzo: form.esfuerzo || null,
+            ambito: ambito,
+            tags: tagsLimpios,
             criterio_terminacion_manual: form.criterio_terminacion.trim() || null,
             subtareas_manuales:
               subtareasLimpias.length > 0 ? subtareasLimpias : null,
@@ -1331,6 +1422,13 @@ export function CrearModal({
             tareaId={null}
             cola={adjuntosCola}
             setCola={setAdjuntosCola}
+          />
+
+          <AmbitoTagsEditor
+            ambito={ambito}
+            onAmbitoChange={setAmbito}
+            tagsInput={tagsInput}
+            onTagsInputChange={setTagsInput}
           />
 
           <ProyectoRecurrenciaEditor

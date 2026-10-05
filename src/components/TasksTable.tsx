@@ -9,6 +9,7 @@ import {
   desarchivarTarea,
   eliminarTarea,
   marcarHecha,
+  marcarTareaWig,
   reabrirTarea,
 } from "@/lib/mutations";
 import { fetchProyectos } from "@/lib/queries";
@@ -20,6 +21,7 @@ import {
   IconPencil,
   IconSearch,
   IconSparkles,
+  IconTarget,
   IconTrash,
   IconX,
 } from "@/components/icons";
@@ -47,6 +49,20 @@ const TONO_ESTADO: Record<string, string> = {
     "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
   archivada: "bg-muted text-muted-foreground border-border",
 };
+
+const TONO_AMBITO: Record<string, string> = {
+  personal:
+    "bg-pink-500/10 text-pink-700 dark:text-pink-300 border-pink-500/20",
+  profesional:
+    "bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/20",
+};
+
+const AMBITO_LABEL: Record<string, string> = {
+  personal: "👤 Personal",
+  profesional: "💼 Profesional",
+};
+
+type FiltroAmbit = "todas" | "personal" | "profesional";
 
 function Badge({ tone, children }: { tone: string; children: React.ReactNode }) {
   return (
@@ -169,13 +185,26 @@ export function TasksTable({
   const [estado, setEstado] = useState("activas");
   const [prioridad, setPrioridad] = useState("todas");
   const [capa, setCapa] = useState("todas");
+  const [ambito, setAmbito] = useState<FiltroAmbit>("todas");
+  const [tagsSel, setTagsSel] = useState<Set<string>>(new Set());
   const [editando, setEditando] = useState<Tarea | null>(null);
   const [creando, setCreando] = useState(false);
+  const [guardandoWigId, setGuardandoWigId] = useState<string | null>(null);
+  const [errorWig, setErrorWig] = useState<string | null>(null);
   const { data: proyectos } = useData(() => fetchProyectos(), []);
   const proyectoById = useMemo(
     () => new Map(proyectos.map((p) => [p.id, p])),
     [proyectos],
   );
+
+  /** Todos los tags únicos de las tareas del usuario, ordenados alfabéticamente. */
+  const todosLosTags = useMemo(() => {
+    const s = new Set<string>();
+    for (const t of tareas) {
+      for (const tg of t.tags ?? []) s.add(tg);
+    }
+    return Array.from(s).sort((a, b) => a.localeCompare(b, "es"));
+  }, [tareas]);
 
   const filtradas = useMemo(() => {
     return tareas.filter((t) => {
@@ -186,13 +215,47 @@ export function TasksTable({
       if (prioridad !== "todas" && t.prioridad !== prioridad) return false;
       if (capa !== "todas" && t.capa !== capa) return false;
       if (proyectoFiltroQS && t.proyecto_id !== proyectoFiltroQS) return false;
+      if (ambito !== "todas" && t.ambito !== ambito) return false;
+      if (
+        tagsSel.size > 0 &&
+        !(t.tags ?? []).some((tg) => tagsSel.has(tg))
+      )
+        return false;
       if (q) {
         const s = `${t.titulo} ${t.codigo ?? ""} ${t.descripcion ?? ""}`.toLowerCase();
         if (!s.includes(q.toLowerCase())) return false;
       }
       return true;
     });
-  }, [tareas, estado, prioridad, capa, q, proyectoFiltroQS]);
+  }, [tareas, estado, prioridad, capa, q, proyectoFiltroQS, ambito, tagsSel]);
+
+  function toggleTag(t: string) {
+    setTagsSel((prev) => {
+      const next = new Set(prev);
+      if (next.has(t)) next.delete(t);
+      else next.add(t);
+      return next;
+    });
+  }
+
+  async function toggleWig(t: Tarea) {
+    setErrorWig(null);
+    setGuardandoWigId(t.id);
+    try {
+      const ok = await marcarTareaWig(t.id, !t.es_wig);
+      if (!ok) {
+        setErrorWig(
+          "Ya tienes 3 tareas marcadas como WIG. Quita una antes de añadir otra.",
+        );
+      } else {
+        onChanged();
+      }
+    } catch (e) {
+      setErrorWig(e instanceof Error ? e.message : "No se pudo actualizar");
+    } finally {
+      setGuardandoWigId(null);
+    }
+  }
 
   const proyectoFiltro = proyectoFiltroQS ? proyectoById.get(proyectoFiltroQS) : null;
 
@@ -245,6 +308,11 @@ export function TasksTable({
             </option>
           ))}
         </select>
+        <select value={ambito} onChange={(e) => setAmbito(e.target.value as FiltroAmbit)} className={inputCls}>
+          <option value="todas">Ámbito</option>
+          <option value="personal">👤 Personal</option>
+          <option value="profesional">💼 Profesional</option>
+        </select>
         <span className="ml-auto text-xs text-muted-foreground">
           {filtradas.length} / {tareas.length}
         </span>
@@ -255,6 +323,49 @@ export function TasksTable({
           + Nueva tarea
         </button>
       </div>
+
+      {/* Filtro por tags (chips) */}
+      {todosLosTags.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-border bg-card p-2 text-xs">
+          <span className="px-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Tags
+          </span>
+          {todosLosTags.map((tg) => {
+            const activo = tagsSel.has(tg);
+            return (
+              <button
+                key={tg}
+                type="button"
+                onClick={() => toggleTag(tg)}
+                aria-pressed={activo}
+                className={`rounded-full border px-2.5 py-1 transition-colors ${
+                  activo
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground"
+                }`}
+              >
+                #{tg}
+                {activo && <span className="ml-1">×</span>}
+              </button>
+            );
+          })}
+          {tagsSel.size > 0 && (
+            <button
+              type="button"
+              onClick={() => setTagsSel(new Set())}
+              className="ml-auto text-[11px] text-muted-foreground underline-offset-4 hover:underline"
+            >
+              limpiar ({tagsSel.size})
+            </button>
+          )}
+        </div>
+      )}
+
+      {errorWig && (
+        <p className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+          {errorWig}
+        </p>
+      )}
 
       {proyectoFiltro && (
         <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-xs">
@@ -280,15 +391,41 @@ export function TasksTable({
         {filtradas.map((t) => {
           const nAdj = adjuntosCount?.get(t.id) ?? 0;
           return (
-            <li key={t.id} className="rounded-xl border border-border bg-card p-3">
+            <li
+              key={t.id}
+              className={`rounded-xl border bg-card p-3 ${
+                t.es_wig ? "border-violet-500/40" : "border-border"
+              }`}
+            >
               <div className="flex items-start gap-1">
                 <div className="min-w-0 flex-1">
-                  <div
-                    className={`text-sm font-medium ${
-                      t.estado === "hecha" ? "line-through opacity-60" : ""
-                    }`}
-                  >
-                    {t.titulo}
+                  <div className="flex items-start gap-2">
+                    <div
+                      className={`min-w-0 flex-1 text-sm font-medium ${
+                        t.estado === "hecha" ? "line-through opacity-60" : ""
+                      }`}
+                    >
+                      {t.titulo}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => toggleWig(t)}
+                      disabled={guardandoWigId === t.id}
+                      className={`shrink-0 rounded-full p-1 transition-colors disabled:opacity-50 ${
+                        t.es_wig
+                          ? "bg-violet-500/20 text-violet-600 dark:text-violet-400"
+                          : "text-muted-foreground/40 hover:bg-accent hover:text-muted-foreground"
+                      }`}
+                      title={t.es_wig ? `WIG #${t.wig_orden ?? "?"} — quitar` : "Marcar como WIG"}
+                      aria-label={t.es_wig ? "Quitar de WIG" : "Marcar como WIG"}
+                      aria-pressed={t.es_wig}
+                    >
+                      {guardandoWigId === t.id ? (
+                        <span className="block text-center text-[10px]">…</span>
+                      ) : (
+                        <IconTarget className="h-3.5 w-3.5" />
+                      )}
+                    </button>
                   </div>
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                     <Badge tone={TONO_ESTADO[t.estado] ?? TONO_ESTADO.pendiente}>
@@ -298,6 +435,16 @@ export function TasksTable({
                       <Badge tone={TONO_PRIORIDAD[t.prioridad] ?? TONO_PRIORIDAD.media}>
                         {t.prioridad.toUpperCase()}
                       </Badge>
+                    )}
+                    {t.ambito && (
+                      <Badge tone={TONO_AMBITO[t.ambito]}>
+                        {AMBITO_LABEL[t.ambito]}
+                      </Badge>
+                    )}
+                    {t.es_wig && (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-violet-500/40 bg-violet-500/10 px-1.5 py-0.5 text-[11px] font-semibold text-violet-700 dark:text-violet-300">
+                        🎯 WIG #{t.wig_orden ?? "?"}
+                      </span>
                     )}
                     {t.proyecto_id && proyectoById.get(t.proyecto_id) && (
                       <span
@@ -334,6 +481,14 @@ export function TasksTable({
                         {nAdj}
                       </span>
                     )}
+                    {(t.tags ?? []).map((tg) => (
+                      <span
+                        key={tg}
+                        className="rounded-full border border-border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                      >
+                        #{tg}
+                      </span>
+                    ))}
                   </div>
                 </div>
                 <TareaAcciones t={t} run={run} onEditar={() => setEditando(t)} />
@@ -366,7 +521,9 @@ export function TasksTable({
             {filtradas.map((t) => (
               <tr
                 key={t.id}
-                className="border-b border-border/60 last:border-0 hover:bg-accent/40"
+                className={`border-b border-border/60 last:border-0 hover:bg-accent/40 ${
+                  t.es_wig ? "bg-violet-500/[0.03]" : ""
+                }`}
               >
                 <td className="max-w-[380px] px-3 py-3">
                   <div className="flex items-start gap-2">
@@ -375,12 +532,55 @@ export function TasksTable({
                         <IconCheck className="h-4 w-4" />
                       </span>
                     ) : null}
-                    <div className="min-w-0">
-                      <div className={t.estado === "hecha" ? "line-through opacity-60" : ""}>
-                        {t.titulo}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start gap-2">
+                        <div className={`min-w-0 flex-1 ${t.estado === "hecha" ? "line-through opacity-60" : ""}`}>
+                          {t.titulo}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => toggleWig(t)}
+                          disabled={guardandoWigId === t.id}
+                          className={`shrink-0 rounded-full p-1 transition-colors disabled:opacity-50 ${
+                            t.es_wig
+                              ? "bg-violet-500/20 text-violet-600 dark:text-violet-400"
+                              : "text-muted-foreground/40 hover:bg-accent hover:text-muted-foreground"
+                          }`}
+                          title={t.es_wig ? `WIG #${t.wig_orden ?? "?"} — quitar` : "Marcar como WIG"}
+                          aria-label={t.es_wig ? "Quitar de WIG" : "Marcar como WIG"}
+                          aria-pressed={t.es_wig}
+                        >
+                          {guardandoWigId === t.id ? (
+                            <span className="block text-center text-[10px]">…</span>
+                          ) : (
+                            <IconTarget className="h-3.5 w-3.5" />
+                          )}
+                        </button>
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
                         {t.codigo && <span>{t.codigo}</span>}
+                        {t.ambito && (
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${
+                              TONO_AMBITO[t.ambito]
+                            }`}
+                          >
+                            {AMBITO_LABEL[t.ambito]}
+                          </span>
+                        )}
+                        {t.es_wig && (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-violet-500/40 bg-violet-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700 dark:text-violet-300">
+                            🎯 WIG #{t.wig_orden ?? "?"}
+                          </span>
+                        )}
+                        {(t.tags ?? []).map((tg) => (
+                          <span
+                            key={tg}
+                            className="rounded-full border border-border bg-muted px-1.5 py-0.5 text-[10px]"
+                          >
+                            #{tg}
+                          </span>
+                        ))}
                         {t.proyecto_id && proyectoById.get(t.proyecto_id) && (
                           <span
                             className="inline-flex items-center gap-1 rounded-full border border-border px-1.5 py-0.5 text-[10px] font-medium"

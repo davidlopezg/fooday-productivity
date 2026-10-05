@@ -54,6 +54,12 @@ export const AYUDA_POR_RUTA: Record<
           "Sin metas concretas para hoy, el cerebro opera en piloto automático y entra en modo reactivo (responder mensajes, hacer lo fácil). Por eso /plan diario es la pantalla del mediodía: lo que escribas ahí guía el resto del día.",
         pilar: 2,
       },
+      {
+        titulo: "Dos paneles WIG: metas y tareas",
+        cuerpo:
+          "El panel violeta son los WIGs de METAS (qué resultados quieres). El panel fucsia son los WIGs de TAREAS (qué 3 tareas concretas los sostienen). Si los WIGs-metas no avanzan, mira primero las WIGs-tareas.",
+        pilar: 2,
+      },
     ],
   },
   "/captura": {
@@ -137,13 +143,31 @@ export const AYUDA_POR_RUTA: Record<
     ],
   },
   "/tareas": {
-    pilares: [1, 3],
+    pilares: [1, 2, 3],
     items: [
       {
         titulo: "Esta es tu lista, no tu plan",
         cuerpo:
           "El listado de tareas es la materia prima. El plan real está en /calendario (qué harás a qué hora) y en /plan-diario (qué harás hoy). Si la lista crece sin asignar bloques, vuelves al modo reactivo.",
         pilar: 1,
+      },
+      {
+        titulo: "WIGs también sobre tareas (máx 3)",
+        cuerpo:
+          "Además de los WIGs de /metas, las tareas concretas que los ejecutan pueden ascender a WIG con la diana 🎯. Cap independiente de 3. Es la capa de ejecución: si no avanzan estas 3 tareas, tus WIGs de metas no avanzan.",
+        pilar: 2,
+      },
+      {
+        titulo: "Personal vs profesional",
+        cuerpo:
+          "Marca cada tarea como 👤 Personal o 💼 Profesional. Sirve para ver el balance (filtra por ámbito) y para que el plan diario sepa qué energía va a cada esfera. Sin clasificar = limbo.",
+        pilar: 2,
+      },
+      {
+        titulo: "Tags para agrupar, no para archivar",
+        cuerpo:
+          "Usa tags (#salud, #familia, #sol-de-nit) para filtrar y agrupar tareas transversales. Los chips bajo la barra de filtros son AND con el resto de filtros.",
+        pilar: 3,
       },
       {
         titulo: "Auditoría 20/80: máximo 3 críticas por día",

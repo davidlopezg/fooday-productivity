@@ -146,6 +146,40 @@ export async function fetchWigs(): Promise<
   });
 }
 
+/** Tareas marcadas como WIG (Wildly Important Goal — capa de ejecución).
+ *  Ordenadas por wig_orden asc. Solo trae columnas ligeras — pensado para
+ *  el panel de /Hoy, no para vistas de detalle. */
+export async function fetchWigTareas(): Promise<
+  Array<{
+    id: string;
+    titulo: string;
+    ambito: import("@/lib/types").AmbitoTarea | null;
+    tags: string[];
+    wig_orden: number | null;
+    estado: string;
+    prioridad: string | null;
+    meta_id: string | null;
+  }>
+> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("tareas")
+    .select("id,titulo,ambito,tags,wig_orden,estado,prioridad,meta_id")
+    .eq("es_wig", true)
+    .order("wig_orden", { ascending: true, nullsFirst: false });
+  if (error) throw error;
+  return (data ?? []) as Array<{
+    id: string;
+    titulo: string;
+    ambito: import("@/lib/types").AmbitoTarea | null;
+    tags: string[];
+    wig_orden: number | null;
+    estado: string;
+    prioridad: string | null;
+    meta_id: string | null;
+  }>;
+}
+
 export async function fetchRituales(): Promise<Ritual[]> {
   const { data } = await createClient()
     .from("rituales")

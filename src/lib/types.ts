@@ -198,6 +198,8 @@ export interface TareaAdjunto {
   created_at: string;
 }
 
+export type AmbitoTarea = "personal" | "profesional";
+
 export interface Tarea {
   id: string;
   area_id: string | null;
@@ -218,6 +220,14 @@ export interface Tarea {
   /** Fecha dura de finalización (YYYY-MM-DD). Null si no se ha fijado.
    *  Aparece automáticamente en /plan-diario cuando coincide con HOY. */
   fecha_fin: string | null;
+  /** Migration 0019: ámbito personal vs profesional. Null = sin clasificar. */
+  ambito: AmbitoTarea | null;
+  /** Etiquetas libres para filtrar/agrupar. */
+  tags: string[];
+  /** Wildly Important Goal (4DX) sobre tareas: máx 3 a la vez. */
+  es_wig: boolean;
+  /** Posición en el panel WIG de tareas (1-3). */
+  wig_orden: number | null;
   /** Subtareas (desglose) — vienen con la tarea al hacer nested select. */
   subtareas: TareaSubtarea[] | null;
   /** Frase "Esta tarea está HECHA cuando __________". */

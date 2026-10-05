@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { fetchContadores, fetchPlanHoy, fetchTareas, fetchWigs } from "@/lib/queries";
+import { fetchContadores, fetchPlanHoy, fetchTareas, fetchWigTareas, fetchWigs } from "@/lib/queries";
 import { useData } from "@/lib/useData";
 import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
 import { IconTarget } from "@/components/icons";
-import type { PlanDiario, PlanDiarioTarea, Tarea } from "@/lib/types";
+import type { AmbitoTarea, PlanDiario, PlanDiarioTarea, Tarea } from "@/lib/types";
 
 const SEMAFORO: Record<string, string> = {
   verde: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
@@ -21,29 +21,38 @@ const TONO_PRIORIDAD: Record<string, string> = {
   baja: "text-muted-foreground",
 };
 
+const AMBITO_LABEL_TAREA: Record<AmbitoTarea, string> = {
+  personal: "👤 Personal",
+  profesional: "💼 Profesional",
+};
+
 type Wig = Awaited<ReturnType<typeof fetchWigs>>[number];
+type WigTarea = Awaited<ReturnType<typeof fetchWigTareas>>[number];
 
 type Data = {
   plan: (PlanDiario & { tareas: PlanDiarioTarea[] }) | null;
   contadores: { tareasPendientes: number; metasActivas: number; capturasPendientes: number };
   pendientes: Tarea[];
   wigs: Wig[];
+  wigTareas: WigTarea[];
 };
 
 export default function HoyPage() {
   const { data, loading } = useData<Data>(async () => {
-    const [plan, contadores, pendientes, wigs] = await Promise.all([
+    const [plan, contadores, pendientes, wigs, wigTareas] = await Promise.all([
       fetchPlanHoy(),
       fetchContadores(),
       fetchTareas("pendiente"),
       fetchWigs(),
+      fetchWigTareas(),
     ]);
-    return { plan, contadores, pendientes, wigs };
+    return { plan, contadores, pendientes, wigs, wigTareas };
   }, {
     plan: null,
     contadores: { tareasPendientes: 0, metasActivas: 0, capturasPendientes: 0 },
     pendientes: [],
     wigs: [],
+    wigTareas: [],
   });
 
   const stats = [
@@ -124,6 +133,11 @@ export default function HoyPage() {
                   >
                     {w.titulo}
                   </Link>
+                  {w.ambito && (
+                    <span className="hidden shrink-0 rounded-full border border-border bg-background px-1.5 py-0.5 text-[10px] text-muted-foreground sm:inline">
+                      {w.ambito === "personal" ? "👤" : "💼"}
+                    </span>
+                  )}
                   <span className="hidden shrink-0 text-[11px] tabular-nums text-muted-foreground sm:inline">
                     {w.tareas_hechas}/{w.total_tareas}
                   </span>
@@ -136,6 +150,64 @@ export default function HoyPage() {
                 </li>
               );
             })}
+          </ul>
+        </section>
+      )}
+
+      {/* Tareas WIG — capa de ejecución de los WIGs de metas */}
+      {data.wigTareas.length > 0 && (
+        <section
+          className="rounded-xl border-2 border-fuchsia-500/40 bg-gradient-to-br from-fuchsia-500/10 to-violet-500/5 p-5"
+          aria-label="Tareas enormemente importantes"
+        >
+          <header className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="flex items-center gap-2 font-semibold tracking-tight">
+              <IconTarget className="h-5 w-5 text-fuchsia-500" />
+              Tareas Enormemente Importantes
+            </h2>
+            <Link
+              href="/tareas"
+              className="text-xs text-muted-foreground underline-offset-4 hover:underline"
+            >
+              editar
+            </Link>
+          </header>
+          <p className="mb-3 text-xs text-muted-foreground">
+            Las {data.wigTareas.length} tareas concretas (de las 3 máx) que sostienen
+            tus WIGs de arriba. Si no avanzan los WIGs, mira aquí primero.
+          </p>
+          <ul className="space-y-2">
+            {data.wigTareas.map((w) => (
+              <li
+                key={w.id}
+                className="flex items-center gap-3 rounded-lg border border-fuchsia-500/30 bg-background/70 px-3 py-2.5"
+              >
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-fuchsia-500/20 text-sm font-bold tabular-nums text-fuchsia-700 dark:text-fuchsia-300">
+                  {w.wig_orden ?? "?"}
+                </span>
+                <span
+                  className={`min-w-0 flex-1 truncate text-sm font-medium ${
+                    w.estado === "hecha" ? "line-through opacity-60" : ""
+                  }`}
+                >
+                  {w.titulo}
+                </span>
+                {w.ambito && (
+                  <span className="hidden shrink-0 rounded-full border border-border bg-background px-1.5 py-0.5 text-[10px] text-muted-foreground sm:inline">
+                    {AMBITO_LABEL_TAREA[w.ambito]}
+                  </span>
+                )}
+                {w.prioridad && (
+                  <span
+                    className={`shrink-0 text-[11px] font-medium uppercase ${
+                      TONO_PRIORIDAD[w.prioridad] ?? "text-muted-foreground"
+                    }`}
+                  >
+                    {w.prioridad}
+                  </span>
+                )}
+              </li>
+            ))}
           </ul>
         </section>
       )}

@@ -61,6 +61,8 @@ export interface TareaCampos {
   criterio_terminacion?: string | null;
   proyecto_id?: string | null;
   fecha_fin?: string | null;
+  ambito?: "personal" | "profesional" | null;
+  tags?: string[];
 }
 
 export async function actualizarTarea(datos: TareaCampos) {
@@ -96,6 +98,8 @@ export async function crearTarea(datos: {
   criterio_terminacion?: string | null;
   proyecto_id?: string | null;
   fecha_fin?: string | null;
+  ambito?: "personal" | "profesional" | null;
+  tags?: string[];
   subtareas?: Subtarea[] | null;
 }): Promise<TareaCreada> {
   const supabase = createClient();
@@ -117,6 +121,8 @@ export async function crearTarea(datos: {
       criterio_terminacion: datos.criterio_terminacion ?? null,
       proyecto_id: datos.proyecto_id ?? null,
       fecha_fin: datos.fecha_fin ?? null,
+      ambito: datos.ambito ?? null,
+      tags: datos.tags ?? [],
       origen: "manual",
     })
     .select("id,titulo")
@@ -158,6 +164,8 @@ export async function crearTareaConIA(
     pts?: number | null;
     esfuerzo?: string | null;
     fecha_fin?: string | null;
+    ambito?: "personal" | "profesional" | null;
+    tags?: string[];
     /** Si el usuario escribió algo manualmente, NO se sobreescribe con IA. */
     criterio_terminacion_manual?: string | null;
     /** Si el usuario metió subtareas a mano, NO se sobreescribe con IA. */
@@ -195,6 +203,8 @@ export async function crearTareaConIA(
     pts: datos.pts,
     esfuerzo: datos.esfuerzo,
     fecha_fin: datos.fecha_fin ?? null,
+    ambito: datos.ambito ?? null,
+    tags: datos.tags ?? [],
     criterio_terminacion: criterioManual,
     subtareas: subtareasLimpias,
   });
@@ -1461,6 +1471,18 @@ export async function actualizarMeta(
 export async function marcarWig(metaId: string, esWig: boolean): Promise<boolean> {
   const { data, error } = await createClient().rpc("toggle_meta_wig", {
     p_meta_id: metaId,
+    p_es_wig: esWig,
+  });
+  if (error) throw new Error(`No se pudo actualizar el WIG: ${error.message}`);
+  return data === true;
+}
+
+/** Marca/desmarca una tarea como WIG (Wildly Important Goal — capa de ejecución).
+ *  Cap independiente de los WIGs de metas: máx 3 WIG-tareas.
+ *  Devuelve `true` si se aplicó, `false` si ya había 3 WIG-tareas. */
+export async function marcarTareaWig(tareaId: string, esWig: boolean): Promise<boolean> {
+  const { data, error } = await createClient().rpc("toggle_tarea_wig", {
+    p_tarea_id: tareaId,
     p_es_wig: esWig,
   });
   if (error) throw new Error(`No se pudo actualizar el WIG: ${error.message}`);
