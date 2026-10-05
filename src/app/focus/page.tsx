@@ -15,9 +15,12 @@ import {
   IconCheck,
   IconPause,
   IconPlay,
+  IconShield,
   IconX,
 } from "@/components/icons";
-import type { PomodoroFase, PomodoroSesion } from "@/lib/types";
+import type { PomodoroFase, PomodoroSesion, PreFlightCheck } from "@/lib/types";
+import { PreFlightChecklist } from "@/components/PreFlightChecklist";
+import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
 
 // ----------------------------------------------------------------------------
 // Helpers de UI locales
@@ -57,6 +60,7 @@ export default function FocusPage() {
     restante,
     corriendo,
     objetivo,
+    preFlight,
     pomodorosHoy,
     iniciar,
     descansar,
@@ -70,6 +74,13 @@ export default function FocusPage() {
   const [duracionFocoMin, setDuracionFocoMinLocal] = useState<number>(25);
   const { setDuracionFocoMin } = usePomodoro();
 
+  // Estado del pre-flight: cuando hay un objetivo pendiente de confirmar,
+  // mostramos el checklist antes de arrancar el timer.
+  const [preflightPendiente, setPreflightPendiente] = useState<{
+    titulo: string;
+    subtarea: string | null;
+  } | null>(null);
+
   const sesionesQ = useData<PomodoroSesion[]>(fetchPomodoroHoy, []);
   const sesiones = sesionesQ.data;
   const totalSegHoy = sesiones.reduce((acc, s) => acc + s.duracion_seg, 0);
@@ -77,12 +88,37 @@ export default function FocusPage() {
 
   // ---- Handlers ----------------------------------------------------------
   function handleIniciarFoco() {
+    // Si ya hay un timer corriendo o en pausa, no abrimos pre-flight.
+    if (corriendo || restante < DURACIONES_SEG.focus) return;
+    setPreflightPendiente({
+      titulo: "Foco libre",
+      subtarea: null,
+    });
+  }
+
+  function handleConfirmarPreflight(check: PreFlightCheck) {
+    if (!preflightPendiente) return;
+    iniciar(
+      {
+        tarea_id: "libre",
+        tarea_titulo: preflightPendiente.titulo,
+        subtarea_id: null,
+        subtarea_descripcion: preflightPendiente.subtarea,
+      },
+      check,
+    );
+    setPreflightPendiente(null);
+  }
+
+  function handleSaltarPreflight() {
+    if (!preflightPendiente) return;
     iniciar({
       tarea_id: "libre",
-      tarea_titulo: "Foco libre",
+      tarea_titulo: preflightPendiente.titulo,
       subtarea_id: null,
-      subtarea_descripcion: null,
+      subtarea_descripcion: preflightPendiente.subtarea,
     });
+    setPreflightPendiente(null);
   }
 
   function handleDuracionFoco(min: number) {
@@ -94,14 +130,45 @@ export default function FocusPage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
-          <IconBolt className="h-6 w-6 text-violet-500" />
-          Focus
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Temporizador pomodoro. Empieza un foco desde una subtarea o en modo libre.
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
+              <IconBolt className="h-6 w-6 text-violet-500" />
+              Focus
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Temporizador pomodoro. Empieza un foco desde una subtarea o en modo libre.
+            </p>
+          </div>
+          <HelpDrawer title="Focus" items={AYUDA_POR_RUTA["/focus"]?.items ?? []} />
+        </div>
       </header>
+
+      {/* ------------------ Pre-flight check (cuando se va a iniciar foco) ------------------ */}
+      {preflightPendiente && (
+        <PreFlightChecklist
+          tareaTitulo={preflightPendiente.titulo}
+          subtareaDescripcion={preflightPendiente.subtarea}
+          onConfirm={handleConfirmarPreflight}
+          onSkip={handleSaltarPreflight}
+        />
+      )}
+
+      {/* ------------------ Indicador de pre-flight completado (timer en curso) ------------------ */}
+      {preFlight && corriendo && fase === "focus" && objetivo?.tarea_id === "libre" && (
+        <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300">
+          <IconShield className="h-4 w-4" />
+          <span className="font-medium">Pre-vuelo confirmado</span>
+          {preFlight.criterioExito && (
+            <>
+              <span className="text-muted-foreground">·</span>
+              <span className="text-muted-foreground">
+                Criterio: {preFlight.criterioExito}
+              </span>
+            </>
+          )}
+        </div>
+      )}
 
       {/* ------------------ Reloj grande ------------------ */}
       <section
@@ -134,13 +201,13 @@ export default function FocusPage() {
 
           {/* Controles */}
           <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-            {fase === "focus" && !corriendo && restante === DURACIONES_SEG.focus ? (
+            {fase === "focus" && !corriendo && restante === DURACIONES_SEG.focus && !preflightPendiente ? (
               <button
                 onClick={handleIniciarFoco}
                 className="inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-bold text-violet-700 shadow-md transition-transform hover:scale-105 active:scale-100"
               >
-                <IconPlay className="h-4 w-4" />
-                {ETIQUETAS_BOTON_FASE.focus}
+                <IconShield className="h-4 w-4" />
+                Preparar foco
               </button>
             ) : corriendo ? (
               <button

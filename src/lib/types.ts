@@ -225,6 +225,10 @@ export interface Tarea {
   /** FK opcional a `resultados_periodo` (migration 0015). Null = bandeja
    *  de entrada (tarea suelta, sin meta o meta sin resultado). */
   resultado_periodo_id: string | null;
+  /** Tiempos del registro (la BD los devuelve siempre; reflejados aquí
+   *  para poder ordenar por `created_at` sin casts). */
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface Ritual {
@@ -485,6 +489,12 @@ export interface PomodoroSesion {
   duracion_seg: number;
   fase: PomodoroFase;
   created_at: string;
+  /** Pre-flight check [10-12]: silencié el móvil. */
+  pre_silencio_notif: boolean | null;
+  /** Pre-flight check: cerré email/mensajería. */
+  pre_cerre_email: boolean | null;
+  /** Pre-flight check: criterio de éxito declarado por el usuario. */
+  pre_criterio_exito: string | null;
 }
 
 /** Estado del timer que vive solo en cliente (localStorage + memoria). */
@@ -493,6 +503,30 @@ export interface PomodoroObjetivo {
   tarea_titulo: string;
   subtarea_id: string | null;
   subtarea_descripcion: string | null;
+}
+
+/** Respuestas del checklist pre-pomodoro. Se pasa al iniciar() y se graba
+ *  con la sesión completada. */
+export interface PreFlightCheck {
+  silencioNotif: boolean;
+  cerreEmail: boolean;
+  criterioExito: string;
+}
+
+/** Time-blocking (migrations 0017): un bloque horario de una fecha con su
+ *  tarea asignada (o NULL = bloque libre). numero_bloque ∈ {1,2,3,4}. */
+export interface CalendarioBloque {
+  id: string;
+  fecha: string;        // YYYY-MM-DD
+  numero_bloque: 1 | 2 | 3 | 4;
+  tarea_id: string | null;
+  nota: string | null;
+}
+
+/** Vista enriquecida: bloque + tarea anidada (si la hay). La monta la app
+ *  con un join en cliente (N pequeño: solo los bloques de una semana). */
+export interface CalendarioBloqueConTarea extends CalendarioBloque {
+  tarea: Tarea | null;
 }
 
 export interface Captura {

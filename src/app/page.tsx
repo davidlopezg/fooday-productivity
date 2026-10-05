@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { fetchContadores, fetchPlanHoy, fetchTareas } from "@/lib/queries";
 import { useData } from "@/lib/useData";
+import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
 import type { PlanDiario, PlanDiarioTarea, Tarea } from "@/lib/types";
 
 const SEMAFORO: Record<string, string> = {
@@ -48,15 +49,20 @@ export default function HoyPage() {
   return (
     <div className="space-y-8">
       <header>
-        <h1 className="text-2xl font-bold tracking-tight">Hoy</h1>
-        <p className="mt-1 text-sm capitalize text-muted-foreground">
-          {new Date().toLocaleDateString("es-ES", {
-            weekday: "long",
-            day: "numeric",
-            month: "long",
-            year: "numeric",
-          })}
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Hoy</h1>
+            <p className="mt-1 text-sm capitalize text-muted-foreground">
+              {new Date().toLocaleDateString("es-ES", {
+                weekday: "long",
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+              })}
+            </p>
+          </div>
+          <HelpDrawer title="Hoy" items={AYUDA_POR_RUTA["/"]?.items ?? []} />
+        </div>
       </header>
 
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">

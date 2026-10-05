@@ -8,6 +8,7 @@ import {
   fetchTareasCompletadas,
 } from "@/lib/queries";
 import { useData } from "@/lib/useData";
+import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
 import type { PomodoroSesion, Proyecto, Tarea } from "@/lib/types";
 
 const DIAS_OPCIONES = [7, 30, 90, 365];
@@ -117,6 +118,8 @@ export default function InformesPage() {
             Tu productividad en números. {loading ? "Cargando…" : null}
           </p>
         </div>
+        <div className="flex items-center gap-2">
+          <HelpDrawer title="Informes" items={AYUDA_POR_RUTA["/informes"]?.items ?? []} />
         <div className="flex gap-1 rounded-md border border-border bg-card p-1 text-xs">
           {DIAS_OPCIONES.map((d) => (
             <button
@@ -131,6 +134,7 @@ export default function InformesPage() {
               {d === 365 ? "1 año" : `${d}d`}
             </button>
           ))}
+        </div>
         </div>
       </header>
 

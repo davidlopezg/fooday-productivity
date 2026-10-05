@@ -1,9 +1,13 @@
 import { createClient } from "@/lib/supabase/client";
 import type {
   Area,
+  CalendarioBloque,
+  CalendarioBloqueConTarea,
   Captura,
   EstatusConComidas,
   Meta,
+  MetaConPlan,
+  Periodo,
   PlanDiario,
   PlanDiarioBloque,
   PlanDiarioBorrador,
@@ -12,11 +16,14 @@ import type {
   PlanSemanalTarea,
   PomodoroSesion,
   Proyecto,
+  ResultadoConTareas,
+  ResultadoPeriodo,
   Ritual,
   Tarea,
   TareaAdjunto,
   TareaComentario,
   TareaSubtarea,
+  TareaSinMeta,
 } from "@/lib/types";
 
 const HOY = () => new Date().toISOString().slice(0, 10);
@@ -563,4 +570,417 @@ export async function fetchHabitosHistorico(
     .toISOString()
     .slice(0, 10);
   return fetchEstatusList({ desde });
+}
+
+// ============================================================================
+// Plan trimestral (migration 0015)
+// Capa nueva: metas → periodos → resultados → tareas. No modifica
+// nada de lo anterior; solo lee de las tablas nuevas y de `metas` / `tareas`.
+// ============================================================================
+
+/** Periodos del owner. Opcionalmente filtrados por tipo y/o año. */
+export async function fetchPeriodos(opts?: {
+  tipo?: "trimestre" | "mes" | "custom";
+  anio?: number;
+}): Promise<Periodo[]> {
+  let q = createClient()
+    .from("periodos")
+    .select("id,tipo,anio,numero,nombre,fecha_inicio,fecha_fin")
+    .order("anio", { ascending: false })
+    .order("tipo")
+    .order("numero");
+  if (opts?.tipo) q = q.eq("tipo", opts.tipo);
+  if (opts?.anio != null) q = q.eq("anio", opts.anio);
+  const { data, error } = await q;
+  if (error) throw error;
+  return (data ?? []) as Periodo[];
+}
+
+/** Resultados_periodo de una meta (o de todas si metaId=null). */
+export async function fetchResultadosPeriodo(
+  metaId?: string,
+): Promise<ResultadoPeriodo[]> {
+  let q = createClient()
+    .from("resultados_periodo")
+    .select("id,meta_id,periodo_id,titulo,descripcion,metrica,valor_objetivo,valor_actual,unidad,estado,peso,orden")
+    .order("orden");
+  if (metaId) q = q.eq("meta_id", metaId);
+  const { data, error } = await q;
+  if (error) throw error;
+  return (data ?? []) as ResultadoPeriodo[];
+}
+
+/** Tareas de un resultado (no se usa en fetchMetaConPlan porque ya las
+ *  trae con filtro; queda por si en el futuro se quiere "tareas de un
+ *  resultado concreto" sin tener que cargar toda la meta). */
+export async function fetchTareasDeResultado(
+  resultadoId: string,
+): Promise<Tarea[]> {
+  const { data, error } = await createClient()
+    .from("tareas")
+    .select("*, subtareas:tareas_subtareas(*)")
+    .eq("resultado_periodo_id", resultadoId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return ordenarSubtareas((data ?? []) as Tarea[]);
+}
+
+/** Tareas sin meta asignada = "bandeja de entrada" del plan.
+ *  Incluye dos subtipos: sin meta en absoluto, o con meta pero sin
+ *  resultado_periodo concreto. La UI puede distinguirlas por
+ *  `tiene_meta_sin_resultado`. */
+export async function fetchTareasSinMeta(): Promise<TareaSinMeta[]> {
+  const supabase = createClient();
+  // 1) Tareas que no tienen ningún resultado_periodo_id Y tampoco meta_id
+  //    (bandeja de entrada global).
+  const { data: sinNada, error: e1 } = await supabase
+    .from("tareas")
+    .select("*, subtareas:tareas_subtareas(*)")
+    .is("meta_id", null)
+    .is("resultado_periodo_id", null)
+    .order("created_at", { ascending: false });
+  if (e1) throw e1;
+  // 2) Tareas que SÍ tienen meta pero NO tienen resultado_periodo_id
+  //    (bandeja dentro de la meta — el usuario aún no las ha repartido
+  //    por trimestres).
+  const { data: conMetaSinRes, error: e2 } = await supabase
+    .from("tareas")
+    .select("*, subtareas:tareas_subtareas(*)")
+    .not("meta_id", "is", null)
+    .is("resultado_periodo_id", null)
+    .order("created_at", { ascending: false });
+  if (e2) throw e2;
+  const a = ordenarSubtareas((sinNada ?? []) as Tarea[]).map((t) => ({
+    tarea: t,
+    tiene_meta_sin_resultado: false,
+  }));
+  const b = ordenarSubtareas((conMetaSinRes ?? []) as Tarea[]).map((t) => ({
+    tarea: t,
+    tiene_meta_sin_resultado: true,
+  }));
+  return [...a, ...b];
+}
+
+/** Detalle completo de UNA meta: sus resultados, los periodos de esos
+ *  resultados, y las tareas de cada resultado. Devuelve también métricas
+ *  agregadas (progreso, total/hechas) ya calculadas en cliente. */
+export async function fetchMetaConPlan(metaId: string): Promise<MetaConPlan | null> {
+  const supabase = createClient();
+
+  const [metaRes, resultadosRes, periodosRes, tareasRes] = await Promise.all([
+    supabase.from("metas").select("*").eq("id", metaId).maybeSingle(),
+    supabase
+      .from("resultados_periodo")
+      .select("id,meta_id,periodo_id,titulo,descripcion,metrica,valor_objetivo,valor_actual,unidad,estado,peso,orden")
+      .eq("meta_id", metaId)
+      .order("orden"),
+    supabase
+      .from("periodos")
+      .select("id,tipo,anio,numero,nombre,fecha_inicio,fecha_fin"),
+    supabase
+      .from("tareas")
+      .select("*, subtareas:tareas_subtareas(*)")
+      .in("estado", ["pendiente", "en_progreso", "bloqueada", "hecha", "descartada"])
+      .not("resultado_periodo_id", "is", null)
+      .order("created_at", { ascending: false }),
+  ]);
+
+  if (metaRes.error) throw metaRes.error;
+  if (!metaRes.data) return null;
+  if (resultadosRes.error) throw resultadosRes.error;
+  if (periodosRes.error) throw periodosRes.error;
+  if (tareasRes.error) throw tareasRes.error;
+
+  const periodosById = new Map<string, Periodo>(
+    ((periodosRes.data ?? []) as Periodo[]).map((p) => [p.id, p]),
+  );
+  // Solo nos interesan las tareas cuyos resultados pertenecen a ESTA meta.
+  const resultadosIds = new Set(
+    ((resultadosRes.data ?? []) as ResultadoPeriodo[]).map((r) => r.id),
+  );
+  const tareas = ordenarSubtareas((tareasRes.data ?? []) as Tarea[]).filter(
+    (t) => t.resultado_periodo_id && resultadosIds.has(t.resultado_periodo_id),
+  );
+  const tareasPorResultado = new Map<string, Tarea[]>();
+  for (const t of tareas) {
+    if (!t.resultado_periodo_id) continue;
+    const arr = tareasPorResultado.get(t.resultado_periodo_id) ?? [];
+    arr.push(t);
+    tareasPorResultado.set(t.resultado_periodo_id, arr);
+  }
+
+  const resultados: ResultadoConTareas[] = (
+    (resultadosRes.data ?? []) as ResultadoPeriodo[]
+  )
+    .map((r) => {
+      const periodo = periodosById.get(r.periodo_id);
+      if (!periodo) return null; // periodo borrado → ignoramos el resultado
+      return {
+        ...r,
+        periodo,
+        tareas: (tareasPorResultado.get(r.id) ?? []).slice().sort(
+          (a, b) => +new Date(b.created_at ?? 0) - +new Date(a.created_at ?? 0),
+        ),
+      } as ResultadoConTareas;
+    })
+    .filter((r): r is ResultadoConTareas => r !== null)
+    .sort((a, b) => a.periodo.anio - b.periodo.anio || a.periodo.numero - b.periodo.numero);
+
+  const total_tareas = tareas.length;
+  const tareas_hechas = tareas.filter((t) => t.estado === "hecha").length;
+  const progreso = calcularProgreso(resultados);
+
+  return {
+    meta: metaRes.data as Meta,
+    resultados,
+    total_tareas,
+    tareas_hechas,
+    progreso,
+  };
+}
+
+/** Lista de metas con su progreso agregado (para la página /metas).
+ *  Hace un solo lote de queries y calcula en cliente. */
+export async function fetchMetasConProgreso(): Promise<MetaConPlan[]> {
+  const supabase = createClient();
+  const [metasRes, resultadosRes, tareasRes] = await Promise.all([
+    supabase.from("metas").select("*").order("codigo", { ascending: true, nullsFirst: false }),
+    supabase
+      .from("resultados_periodo")
+      .select("id,meta_id,periodo_id,titulo,descripcion,metrica,valor_objetivo,valor_actual,unidad,estado,peso,orden"),
+    supabase
+      .from("tareas")
+      .select("id,meta_id,resultado_periodo_id,estado")
+      .not("resultado_periodo_id", "is", null),
+  ]);
+  if (metasRes.error) throw metasRes.error;
+  if (resultadosRes.error) throw resultadosRes.error;
+  if (tareasRes.error) throw tareasRes.error;
+
+  const metas = (metasRes.data ?? []) as Meta[];
+  const resultados = (resultadosRes.data ?? []) as ResultadoPeriodo[];
+  const tareas = (tareasRes.data ?? []) as Array<
+    Pick<Tarea, "id" | "meta_id" | "resultado_periodo_id" | "estado">
+  >;
+
+  const resultadosPorMeta = new Map<string, ResultadoPeriodo[]>();
+  for (const r of resultados) {
+    const arr = resultadosPorMeta.get(r.meta_id) ?? [];
+    arr.push(r);
+    resultadosPorMeta.set(r.meta_id, arr);
+  }
+  const tareasPorResultado = new Map<string, Array<Pick<Tarea, "estado">>>();
+  for (const t of tareas) {
+    if (!t.resultado_periodo_id) continue;
+    const arr = tareasPorResultado.get(t.resultado_periodo_id) ?? [];
+    arr.push(t);
+    tareasPorResultado.set(t.resultado_periodo_id, arr);
+  }
+
+  return metas.map((m) => {
+    const resDeMeta = resultadosPorMeta.get(m.id) ?? [];
+    // Construimos ResultadoConTareas "esqueleto" (sin periodo, sin tareas
+    // completas) para poder reutilizar `calcularProgreso`. Como solo
+    // necesitamos las tareas, las rellenamos desde el map.
+    const esqueletos: ResultadoConTareas[] = resDeMeta.map((r) => ({
+      ...r,
+      periodo: { id: r.periodo_id, tipo: "trimestre", anio: 0, numero: 0, nombre: "", fecha_inicio: "", fecha_fin: "" },
+      tareas: ((tareasPorResultado.get(r.id) ?? []) as unknown as Tarea[]),
+    }));
+    const total_tareas = resDeMeta.reduce(
+      (acc, r) => acc + (tareasPorResultado.get(r.id)?.length ?? 0),
+      0,
+    );
+    const tareas_hechas = resDeMeta.reduce(
+      (acc, r) =>
+        acc +
+        (tareasPorResultado.get(r.id) ?? []).filter((t) => t.estado === "hecha").length,
+      0,
+    );
+    return {
+      meta: m,
+      resultados: esqueletos,
+      total_tareas,
+      tareas_hechas,
+      progreso: calcularProgreso(esqueletos),
+    };
+  });
+}
+
+/** Plan trimestral de un año: los 4 trimestres con TODAS las metas que
+ *  tienen resultados en cada trimestre. Útil para la vista Q1-Q4. */
+export async function fetchPlanTrimestral(anio: number): Promise<{
+  periodos: Periodo[];
+  /** Clave = periodo_id, valor = resultados con su meta y tareas. */
+  porTrimestre: Map<
+    string,
+    Array<{ meta: Meta; resultado: ResultadoPeriodo; tareas: Tarea[] }>
+  >;
+}> {
+  const supabase = createClient();
+  // 1) Periodos del año.
+  const { data: periodosData, error: eP } = await supabase
+    .from("periodos")
+    .select("id,tipo,anio,numero,nombre,fecha_inicio,fecha_fin")
+    .eq("tipo", "trimestre")
+    .eq("anio", anio)
+    .order("numero");
+  if (eP) throw eP;
+  const periodos = (periodosData ?? []) as Periodo[];
+  if (periodos.length === 0) {
+    return { periodos: [], porTrimestre: new Map() };
+  }
+  const periodoIds = periodos.map((p) => p.id);
+
+  // 2) Resultados de esos periodos + sus metas.
+  const { data: resData, error: eR } = await supabase
+    .from("resultados_periodo")
+    .select("id,meta_id,periodo_id,titulo,descripcion,metrica,valor_objetivo,valor_actual,unidad,estado,peso,orden")
+    .in("periodo_id", periodoIds)
+    .order("orden");
+  if (eR) throw eR;
+  const resultados = (resData ?? []) as ResultadoPeriodo[];
+  if (resultados.length === 0) {
+    return { periodos, porTrimestre: new Map() };
+  }
+
+  const metaIds = Array.from(new Set(resultados.map((r) => r.meta_id)));
+  const { data: metasData, error: eM } = await supabase
+    .from("metas")
+    .select("*")
+    .in("id", metaIds);
+  if (eM) throw eM;
+  const metasById = new Map<string, Meta>(
+    ((metasData ?? []) as Meta[]).map((m) => [m.id, m]),
+  );
+
+  // 3) Tareas de esos resultados.
+  const resultadoIds = resultados.map((r) => r.id);
+  const { data: tareasData, error: eT } = await supabase
+    .from("tareas")
+    .select("*, subtareas:tareas_subtareas(*)")
+    .in("resultado_periodo_id", resultadoIds)
+    .order("created_at", { ascending: false });
+  if (eT) throw eT;
+  const tareasPorResultado = new Map<string, Tarea[]>();
+  for (const t of ordenarSubtareas((tareasData ?? []) as Tarea[])) {
+    if (!t.resultado_periodo_id) continue;
+    const arr = tareasPorResultado.get(t.resultado_periodo_id) ?? [];
+    arr.push(t);
+    tareasPorResultado.set(t.resultado_periodo_id, arr);
+  }
+
+  // 4) Agrupar por trimestre.
+  const porTrimestre = new Map<
+    string,
+    Array<{ meta: Meta; resultado: ResultadoPeriodo; tareas: Tarea[] }>
+  >();
+  for (const p of periodos) porTrimestre.set(p.id, []);
+  for (const r of resultados) {
+    const meta = metasById.get(r.meta_id);
+    if (!meta) continue;
+    const arr = porTrimestre.get(r.periodo_id) ?? [];
+    arr.push({
+      meta,
+      resultado: r,
+      tareas: tareasPorResultado.get(r.id) ?? [],
+    });
+    porTrimestre.set(r.periodo_id, arr);
+  }
+  return { periodos, porTrimestre };
+}
+
+// ---------------------------------------------------------------------------
+// Helper: progreso 0..1 de un conjunto de resultados.
+//   progreso_resultado = tareas_hechas / total_tareas (0 si no hay tareas)
+//   progreso_meta      = media ponderada por `peso` de cada resultado
+// Si no hay resultados, progreso = 0.
+// ---------------------------------------------------------------------------
+function calcularProgreso(resultados: ResultadoConTareas[]): number {
+  if (resultados.length === 0) return 0;
+  let suma = 0;
+  let pesoTotal = 0;
+  for (const r of resultados) {
+    const total = r.tareas.length;
+    const hechas = r.tareas.filter((t) => t.estado === "hecha").length;
+    const p = total === 0 ? 0 : hechas / total;
+    suma += p * (r.peso || 1);
+    pesoTotal += r.peso || 1;
+  }
+  return pesoTotal === 0 ? 0 : suma / pesoTotal;
+}
+
+// ============================================================================
+// Calendario / Time-blocking (migration 0017)
+// ============================================================================
+
+/** Devuelve los bloques (4/día) entre `desde` y `hasta` (YYYY-MM-DD) ya
+ *  enriquecidos con la tarea anidada (si la hay). Si no hay fila para un
+ *  (fecha, bloque), devuelve un placeholder con tarea=null. */
+export async function fetchCalendarioSemana(opts: {
+  desde: string;
+  hasta: string;
+}): Promise<CalendarioBloqueConTarea[]> {
+  const supabase = createClient();
+  const { data: bloques, error } = await supabase
+    .from("calendario_bloques")
+    .select("*")
+    .gte("fecha", opts.desde)
+    .lte("fecha", opts.hasta)
+    .order("fecha")
+    .order("numero_bloque");
+  if (error) throw error;
+
+  const tareasIds = Array.from(
+    new Set(((bloques ?? []) as CalendarioBloque[]).map((b) => b.tarea_id).filter((id): id is string => !!id)),
+  );
+  const { data: tareasData } = tareasIds.length
+    ? await supabase.from("tareas").select("*, subtareas:tareas_subtareas(*)").in("id", tareasIds)
+    : { data: [] };
+  const tareasById = new Map<string, Tarea>(
+    ((tareasData ?? []) as Tarea[]).map((t) => [t.id, t]),
+  );
+
+  return ((bloques ?? []) as CalendarioBloque[]).map((b) => ({
+    ...b,
+    tarea: b.tarea_id ? tareasById.get(b.tarea_id) ?? null : null,
+  }));
+}
+
+/** Upsert: asigna (o reemplaza) la tarea de un bloque. Si `tareaId` es null,
+ *  queda como bloque libre con `nota`. */
+export async function upsertBloque(opts: {
+  fecha: string;
+  numeroBloque: 1 | 2 | 3 | 4;
+  tareaId: string | null;
+  nota?: string | null;
+}) {
+  const supabase = createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) throw new Error("Sin sesión");
+  const { error } = await supabase.from("calendario_bloques").upsert(
+    {
+      owner_id: session.user.id,
+      fecha: opts.fecha,
+      numero_bloque: opts.numeroBloque,
+      tarea_id: opts.tareaId,
+      nota: opts.nota ?? null,
+    },
+    { onConflict: "owner_id,fecha,numero_bloque" },
+  );
+  if (error) throw error;
+}
+
+/** Quita la asignación de un bloque (lo deja libre). */
+export async function limpiarBloque(opts: {
+  fecha: string;
+  numeroBloque: 1 | 2 | 3 | 4;
+}) {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("calendario_bloques")
+    .delete()
+    .eq("fecha", opts.fecha)
+    .eq("numero_bloque", opts.numeroBloque);
+  if (error) throw error;
 }

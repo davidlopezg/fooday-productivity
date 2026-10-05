@@ -20,6 +20,7 @@ import { useData } from "@/lib/useData";
 import type { EstadoTarea, Meta, Prioridad, Tarea } from "@/lib/types";
 import { useConfig } from "@/lib/configStore";
 import { IconBolt, IconSparkles } from "@/components/icons";
+import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
 import {
   generarPriorizacion,
   type PriorizacionInmediata,
@@ -299,6 +300,7 @@ export default function PipelinePage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <HelpDrawer title="Pipeline" items={AYUDA_POR_RUTA["/pipeline"]?.items ?? []} />
           <label className="flex items-center gap-2 text-sm text-muted-foreground">
             <input
               type="checkbox"

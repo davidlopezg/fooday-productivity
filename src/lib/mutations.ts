@@ -5,8 +5,11 @@ import type {
   EstatusDiario,
   HabitoEstado,
   InformePlan,
+  Meta,
+  Periodo,
   PlanDiarioTarea,
   PlanGeneradoSimple,
+  ResultadoPeriodo,
   Subtarea,
   TareaAdjunto,
   TareaSubtarea,
@@ -1400,4 +1403,178 @@ export async function setHabitos(
     })
     .eq("id", estatusId);
   if (error) throw new Error(`No se pudieron guardar los hábitos: ${error.message}`);
+}
+
+// ============================================================================
+// Plan trimestral (migration 0015)
+// CRUD de metas (que hasta ahora solo se creaban desde el ETL) +
+// CRUD de resultados_periodo + asignación tarea↔resultado.
+// ============================================================================
+
+/** Crea una meta. La tabla `metas` ya existe desde 0001, pero no había
+ *  flujo en la app para crearlas. Esta función es el camino "oficial"
+ *  desde la UI; el ETL sigue funcionando como siempre. */
+export async function crearMeta(datos: {
+  titulo: string;
+  descripcion?: string | null;
+  estado?: Meta["estado"];
+  prioridad?: Meta["prioridad"];
+  area_id?: string | null;
+  codigo?: string | null;
+  plazo?: string | null;
+}): Promise<Meta> {
+  const { data, error } = await createClient()
+    .from("metas")
+    .insert({
+      titulo: datos.titulo.trim(),
+      descripcion: datos.descripcion?.trim() ?? null,
+      estado: datos.estado ?? "sin_empezar",
+      prioridad: datos.prioridad ?? "media",
+      area_id: datos.area_id ?? null,
+      codigo: datos.codigo?.trim() || null,
+      plazo: datos.plazo?.trim() || null,
+    })
+    .select("*")
+    .single();
+  if (error || !data) throw new Error(`No se pudo crear la meta: ${error?.message}`);
+  return data as Meta;
+}
+
+export async function actualizarMeta(
+  id: string,
+  campos: Partial<Pick<Meta, "titulo" | "descripcion" | "estado" | "prioridad" | "area_id" | "plazo">>,
+): Promise<void> {
+  const { error } = await createClient()
+    .from("metas")
+    .update(campos)
+    .eq("id", id);
+  if (error) throw new Error(`No se pudo actualizar la meta: ${error.message}`);
+}
+
+export async function archivarMeta(id: string, archivada = true): Promise<void> {
+  await actualizarMeta(id, {
+    estado: archivada ? "archivada" : "sin_empezar",
+  });
+}
+
+/** Asegura que existen los 4 trimestres del año (idempotente) llamando
+ *  a la RPC `ensure_periodos_anio`. Devuelve la lista completa. */
+export async function ensurePeriodosAnio(anio: number): Promise<Periodo[]> {
+  const { data, error } = await createClient().rpc("ensure_periodos_anio", {
+    p_anio: anio,
+  });
+  if (error) throw new Error(`No se pudieron crear los periodos: ${error.message}`);
+  return (data ?? []) as Periodo[];
+}
+
+/** Crea un resultado esperado en (meta, periodo). Falla con UNIQUE
+ *  violation si ya existe uno — el caller debería comprobar antes. */
+export async function crearResultadoPeriodo(datos: {
+  meta_id: string;
+  periodo_id: string;
+  titulo: string;
+  descripcion?: string | null;
+  metrica?: string | null;
+  valor_objetivo?: number | null;
+  unidad?: string | null;
+  peso?: number;
+  estado?: ResultadoPeriodo["estado"];
+}): Promise<ResultadoPeriodo> {
+  const { data, error } = await createClient()
+    .from("resultados_periodo")
+    .insert({
+      meta_id: datos.meta_id,
+      periodo_id: datos.periodo_id,
+      titulo: datos.titulo.trim(),
+      descripcion: datos.descripcion?.trim() || null,
+      metrica: datos.metrica?.trim() || null,
+      valor_objetivo: datos.valor_objetivo ?? null,
+      unidad: datos.unidad?.trim() || null,
+      peso: datos.peso ?? 1,
+      estado: datos.estado ?? "pendiente",
+    })
+    .select(
+      "id,meta_id,periodo_id,titulo,descripcion,metrica,valor_objetivo,valor_actual,unidad,estado,peso,orden",
+    )
+    .single();
+  if (error || !data)
+    throw new Error(
+      `No se pudo crear el resultado: ${error?.message ?? "sin datos"}`,
+    );
+  return data as ResultadoPeriodo;
+}
+
+export async function actualizarResultadoPeriodo(
+  id: string,
+  campos: Partial<
+    Pick<
+      ResultadoPeriodo,
+      | "titulo"
+      | "descripcion"
+      | "metrica"
+      | "valor_objetivo"
+      | "valor_actual"
+      | "unidad"
+      | "estado"
+      | "peso"
+      | "orden"
+    >
+  >,
+): Promise<void> {
+  const { error } = await createClient()
+    .from("resultados_periodo")
+    .update(campos)
+    .eq("id", id);
+  if (error) throw new Error(`No se pudo actualizar el resultado: ${error.message}`);
+}
+
+export async function eliminarResultadoPeriodo(id: string): Promise<void> {
+  const { error } = await createClient()
+    .from("resultados_periodo")
+    .delete()
+    .eq("id", id);
+  if (error) throw new Error(`No se pudo eliminar el resultado: ${error.message}`);
+}
+
+/**
+ * Asigna (o desasigna) una tarea a un resultado_periodo. Si el resultado
+ * existe, se actualiza también `tareas.meta_id` para mantener ambas FK
+ * sincronizadas (es el ÚNICO punto que toca `meta_id` desde la app).
+ *
+ * - resultadoId === null  → la tarea vuelve a la bandeja (meta_id=null,
+ *                            resultado_periodo_id=null).
+ * - resultadoId !== null  → la tarea se asigna al resultado; meta_id se
+ *                            rellena con el meta_id del resultado.
+ */
+export async function asignarTareaResultado(
+  tareaId: string,
+  resultadoId: string | null,
+): Promise<void> {
+  const supabase = createClient();
+  if (resultadoId === null) {
+    const { error } = await supabase
+      .from("tareas")
+      .update({ resultado_periodo_id: null, meta_id: null })
+      .eq("id", tareaId);
+    if (error)
+      throw new Error(`No se pudo desasignar la tarea: ${error.message}`);
+    return;
+  }
+  // Lee el meta_id del resultado para sincronizar las dos FKs.
+  const { data: r, error: eR } = await supabase
+    .from("resultados_periodo")
+    .select("meta_id")
+    .eq("id", resultadoId)
+    .maybeSingle();
+  if (eR) throw new Error(`No se pudo leer el resultado: ${eR.message}`);
+  if (!r) throw new Error("Resultado no encontrado");
+  const { error } = await supabase
+    .from("tareas")
+    .update({
+      resultado_periodo_id: resultadoId,
+      meta_id: (r as { meta_id: string }).meta_id,
+    })
+    .eq("id", tareaId);
+  if (error)
+    throw new Error(`No se pudo asignar la tarea: ${error.message}`);
 }

@@ -19,7 +19,7 @@ import { useData } from "@/lib/useData";
 import { useConfig } from "@/lib/configStore";
 import { generarPlanSimple } from "@/lib/planSimple";
 import type { EstadoEmocional } from "@/lib/plan";
-import { getCurrentISOWeek } from "@/lib/semana";
+import { getCurrentISOWeek, BLOQUE_HORARIO } from "@/lib/semana";
 import type {
   PlanDiario,
   PlanGeneradoSimple,
@@ -59,12 +59,7 @@ const BLOQUE_LABELS: Record<1 | 2 | 3 | 4, string> = {
   4: "Bloque 4",
 };
 
-const BLOQUE_HORARIO: Record<1 | 2 | 3 | 4, string> = {
-  1: "11:00 – 12:00",
-  2: "12:00 – 13:00",
-  3: "15:00 – 16:00",
-  4: "16:00 – 17:00",
-};
+// BLOQUE_HORARIO se importa desde @/lib/semana (migration 0017 lo reusa también).
 
 // ----------------------------------------------------------------------------
 // Tipos locales
@@ -254,6 +249,7 @@ export default function PlanDiarioPage() {
           recurrencia_dias_semana: null,
           recurrencia_dia_mes: null,
           recurrencia_ultima_generada: null,
+          resultado_periodo_id: null,
         }));
 
       const plan = await generarPlanSimple(
@@ -417,6 +413,8 @@ export default function PlanDiarioPage() {
             Estado emocional (5 dimensiones) + tareas + IA = plan ejecutable para hoy.
           </p>
         </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <HelpDrawer title="Plan diario" items={AYUDA_POR_RUTA["/plan-diario"]?.items ?? []} />
         <div className="flex gap-2 text-xs">
           <Link
             href="/plan-diario/historico"
@@ -424,6 +422,7 @@ export default function PlanDiarioPage() {
           >
             📋 Histórico
           </Link>
+        </div>
         </div>
       </header>
 
@@ -1059,6 +1058,7 @@ function SemaforoDot({ semaforo }: { semaforo: "verde" | "amarillo" | "rojo" }) 
 }
 
 import { IconBolt } from "@/components/icons";
+import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
 
 function fechaToLargaLocal(fecha: string): string {
   const [y, m, d] = fecha.split("-").map(Number);

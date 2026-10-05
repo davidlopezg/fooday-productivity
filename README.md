@@ -65,9 +65,17 @@ npm run dev
 | `/` | **Hoy** | Semáforo + plan del día + contadores |
 | `/captura` | **Captura** | Inbox rápido (vaciar cabeza) |
 | `/tareas` | **Tareas** | Pendientes, marcar hechas |
-| `/semana` | **Semana** | Rituales fijos |
+| `/calendario` | **Calendario** | Time-blocking: 4 bloques fijos × 7 días |
+| `/focus` | **Focus** | Pomodoro + pre-flight check (silenciar / cerrar email / criterio) |
+| `/semana` | **Semana** | Pipeline semanal con drag & drop |
 | `/metas` | **Metas / OKR** | Cards de metas |
+| `/metas/plan` | **Plan trimestral** | Q1–Q4 con scorecard de KRs y proyección lineal |
+| `/estatus` | **Estatus diario** | 9 hábitos + cierre cognitivo + auditoría 20/80 |
+| `/pipeline` | **Pipeline** | Kanban por prioridad + motor IA de priorización |
+| `/plan-diario` | **Plan diario** | Estado emocional + plan generado por IA |
+| `/informes` | **Informes** | KPIs + heatmap de foco |
 | `/norte` | **Norte** | Propósito, valores, visión |
+| `/docs` | **Metodología** | Los 5 pilares (Deep Work, Metas, Tiempo, Hábitos, Descanso) |
 
 ---
 

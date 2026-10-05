@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState, type SVGProps } from "react";
 import {
   IconBolt,
+  IconBook,
   IconCalendar,
   IconChart,
   IconCheck,
@@ -40,6 +41,13 @@ const TOP_ITEMS: NavItem[] = [
   { href: "/semana", label: "Semana", Icon: IconCalendar },
 ];
 
+// Sub-ítems del bloque Metas (Plan trimestral, Inbox de metas).
+// Se renderizan como "nido" debajo de "Metas" en la sidebar.
+const METAS_NEST: NavItem[] = [
+  { href: "/metas/plan", label: "Plan trimestral", Icon: IconCalendar },
+  { href: "/metas/inbox", label: "Inbox", Icon: IconInbox },
+];
+
 // Sección Tareas
 const TASKS_SECTION: NavSection = {
   label: "Tareas",
@@ -56,8 +64,10 @@ const TASKS_SECTION: NavSection = {
 const UTIL_ITEMS: NavItem[] = [
   { href: "/dashboard-emocional", label: "Dashboard emocional", Icon: IconHeart },
   { href: "/focus", label: "Focus", Icon: IconBolt },
+  { href: "/calendario", label: "Calendario", Icon: IconCalendar },
   { href: "/estatus", label: "Estatus diario", Icon: IconClipboardCheck },
   { href: "/informes", label: "Informes", Icon: IconChart },
+  { href: "/docs", label: "Metodología", Icon: IconBook },
   { href: "/configuracion", label: "Configuración", Icon: IconSettings },
 ];
 
@@ -121,6 +131,28 @@ function NavItems({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <nav className="flex flex-col gap-5">
       <NavSection section={{ items: TOP_ITEMS }} pathname={pathname} onNavigate={onNavigate} />
+      {/* Sub-ítems de Metas — se anidan bajo la entrada Metas, con
+          indentación para sugerir jerarquía sin cambiar el orden global. */}
+      <div className="flex flex-col gap-1">
+        {TOP_ITEMS.find((x) => x.href === "/metas") && (
+          <div className="flex flex-col gap-1 pl-7">
+            {METAS_NEST.map((item) => {
+              const active =
+                item.href === "/metas"
+                  ? pathname === "/metas"
+                  : pathname.startsWith(item.href);
+              return (
+                <NavLink
+                  key={item.href}
+                  {...item}
+                  active={active}
+                  onNavigate={onNavigate}
+                />
+              );
+            })}
+          </div>
+        )}
+      </div>
       <NavSection section={TASKS_SECTION} pathname={pathname} onNavigate={onNavigate} />
       <div className="border-t border-border pt-4">
         <NavSection section={{ items: UTIL_ITEMS }} pathname={pathname} onNavigate={onNavigate} />

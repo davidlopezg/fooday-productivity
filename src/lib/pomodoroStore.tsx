@@ -38,7 +38,7 @@ import {
   sonarFinDescanso,
   sonarFinFase,
 } from "@/lib/pomodoro";
-import type { PomodoroFase, PomodoroObjetivo } from "@/lib/types";
+import type { PomodoroFase, PomodoroObjetivo, PreFlightCheck } from "@/lib/types";
 
 // ----------------------------------------------------------------------------
 // Estado persistido en localStorage
@@ -48,6 +48,7 @@ type EstadoGuardado = {
   endAt: number; // epoch ms
   corriendo: boolean;
   objetivo: PomodoroObjetivo | null;
+  preFlight: PreFlightCheck | null;
   pomodorosHoy: number; // contador cliente, se rehidrata desde Supabase
   fechaContador: string; // YYYY-MM-DD — si cambia, el contador se resetea
 };
@@ -77,6 +78,7 @@ function readLS(): EstadoGuardado | null {
       endAt: parsed.endAt,
       corriendo: parsed.corriendo,
       objetivo: (parsed.objetivo as PomodoroObjetivo | null) ?? null,
+      preFlight: (parsed.preFlight as PreFlightCheck | null) ?? null,
       pomodorosHoy: typeof parsed.pomodorosHoy === "number" ? parsed.pomodorosHoy : 0,
       fechaContador: typeof parsed.fechaContador === "string" ? parsed.fechaContador : hoy(),
     };
@@ -100,6 +102,7 @@ function estadoInicial(): {
   endAt: number;
   corriendo: boolean;
   objetivo: PomodoroObjetivo | null;
+  preFlight: PreFlightCheck | null;
   pomodorosHoy: number;
   fechaContador: string;
   restante: number;
@@ -111,6 +114,7 @@ function estadoInicial(): {
       endAt: 0,
       corriendo: false,
       objetivo: null,
+      preFlight: null,
       pomodorosHoy: 0,
       fechaContador: hoy(),
       restante: DURACION_FOCO_DEFECTO_SEG,
@@ -158,10 +162,11 @@ type PomodoroContextValue = {
   restante: number; // segundos que faltan
   corriendo: boolean;
   objetivo: PomodoroObjetivo | null;
+  preFlight: PreFlightCheck | null;
   pomodorosHoy: number;
 
   /** Inicia un pomodoro de foco para una subtarea concreta. */
-  iniciar: (objetivo: PomodoroObjetivo) => void;
+  iniciar: (objetivo: PomodoroObjetivo, preFlight?: PreFlightCheck) => void;
   /** Pausa (no graba nada). Reanuda con reanudar(). */
   pausar: () => void;
   reanudar: () => void;
@@ -192,6 +197,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
   const [endAt, setEndAt] = useState<number>(initial.endAt);
   const [corriendo, setCorriendo] = useState<boolean>(initial.corriendo);
   const [objetivo, setObjetivo] = useState<PomodoroObjetivo | null>(initial.objetivo);
+  const [preFlight, setPreFlight] = useState<PreFlightCheck | null>(initial.preFlight);
   const [pomodorosHoy, setPomodorosHoy] = useState<number>(initial.pomodorosHoy);
   const [fechaContador, setFechaContador] = useState<string>(initial.fechaContador);
   const [restante, setRestante] = useState<number>(initial.restante);
@@ -225,6 +231,9 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
           started_at: startedAt.toISOString(),
           ended_at: new Date().toISOString(),
           duracion_seg: durSeg,
+          pre_silencio_notif: preFlight?.silencioNotif ?? null,
+          pre_cerre_email: preFlight?.cerreEmail ?? null,
+          pre_criterio_exito: preFlight?.criterioExito?.trim() || null,
         });
         setPomodorosHoy((p) => p + 1);
       }
@@ -241,7 +250,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     setCorriendo(false);
     endedRef.current = false;
     setRestante(DURACIONES_SEG[next]);
-  }, [fase, endAt, objetivo]);
+  }, [fase, endAt, objetivo, preFlight]);
 
   // --------------------------------------------------------------------------
   // Tick del timer (1s). Recalcula contra el reloj de pared para que
@@ -269,10 +278,11 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
       endAt,
       corriendo,
       objetivo,
+      preFlight,
       pomodorosHoy,
       fechaContador,
     });
-  }, [fase, endAt, corriendo, objetivo, pomodorosHoy, fechaContador]);
+  }, [fase, endAt, corriendo, objetivo, preFlight, pomodorosHoy, fechaContador]);
 
   // --------------------------------------------------------------------------
   // Carga el contador de hoy desde Supabase (fuente de verdad cross-device).
@@ -336,13 +346,14 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
   // --------------------------------------------------------------------------
   // API pública
   // --------------------------------------------------------------------------
-  const iniciar = useCallback((obj: PomodoroObjetivo) => {
+  const iniciar = useCallback((obj: PomodoroObjetivo, pf?: PreFlightCheck) => {
     void desbloquearAudio();
     void pedirPermisoNotificaciones();
     const end = Date.now() + duracionFocoRef.current * 1000;
     endedRef.current = false;
     setFase("focus");
     setObjetivo(obj);
+    setPreFlight(pf ?? null);
     setEndAt(end);
     setCorriendo(true);
     setRestante(Math.ceil(duracionFocoRef.current));
@@ -383,6 +394,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     setEndAt(0);
     setCorriendo(false);
     setObjetivo(null);
+    setPreFlight(null);
     setRestante(duracionFocoRef.current);
   }, []);
 
@@ -413,6 +425,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
       restante,
       corriendo,
       objetivo,
+      preFlight,
       pomodorosHoy,
       iniciar,
       pausar,
@@ -427,6 +440,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
       restante,
       corriendo,
       objetivo,
+      preFlight,
       pomodorosHoy,
       iniciar,
       pausar,
@@ -450,6 +464,9 @@ type SesionInsert = {
   started_at: string;
   ended_at: string;
   duracion_seg: number;
+  pre_silencio_notif: boolean | null;
+  pre_cerre_email: boolean | null;
+  pre_criterio_exito: string | null;
 };
 
 async function grabarSesion(row: SesionInsert) {
@@ -470,6 +487,9 @@ async function grabarSesion(row: SesionInsert) {
       ended_at: row.ended_at,
       duracion_seg: row.duracion_seg,
       fase: "focus",
+      pre_silencio_notif: row.pre_silencio_notif,
+      pre_cerre_email: row.pre_cerre_email,
+      pre_criterio_exito: row.pre_criterio_exito,
     });
     if (error) throw error;
   } catch (e) {

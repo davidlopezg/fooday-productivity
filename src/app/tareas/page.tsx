@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { fetchAdjuntosCount, fetchTareas } from "@/lib/queries";
 import { useData } from "@/lib/useData";
 import { TasksTable } from "@/components/TasksTable";
+import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
 import type { Tarea } from "@/lib/types";
 
 export default function TareasPage() {
@@ -35,10 +36,15 @@ export default function TareasPage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-bold tracking-tight">Tareas</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Filtra, edita, archiva o elimina. {loading ? "…" : tareas.length} tareas en total.
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Tareas</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Filtra, edita, archiva o elimina. {loading ? "…" : tareas.length} tareas en total.
+            </p>
+          </div>
+          <HelpDrawer title="Tareas" items={AYUDA_POR_RUTA["/tareas"]?.items ?? []} />
+        </div>
       </header>
       {adjError && (
         <p className="rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-600 dark:text-amber-400">

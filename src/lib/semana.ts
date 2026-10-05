@@ -5,6 +5,17 @@
 // ============================================================================
 
 export type DiaSemana = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+export type NumeroBloque = 1 | 2 | 3 | 4;
+
+/** Horario de los 4 bloques de trabajo profundo del día. Los bloques 1 y 2
+ *  son antes de comer; 3 y 4 después. Total = 4h, que es el techo
+ *  sostenible del pilar 5. */
+export const BLOQUE_HORARIO: Record<NumeroBloque, string> = {
+  1: "11:00 – 12:00",
+  2: "12:00 – 13:00",
+  3: "15:00 – 16:00",
+  4: "16:00 – 17:00",
+};
 
 export interface DiaSemanaInfo {
   id: DiaSemana;

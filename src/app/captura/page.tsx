@@ -4,6 +4,7 @@ import { useState } from "react";
 import { fetchCapturasPendientes } from "@/lib/queries";
 import { crearCaptura } from "@/lib/mutations";
 import { useData } from "@/lib/useData";
+import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
 import type { Captura } from "@/lib/types";
 
 export default function CapturaPage() {
@@ -37,10 +38,15 @@ export default function CapturaPage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-bold tracking-tight">Captura</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Vuelca lo que tengas en la cabeza. Luego se clasificará en su rama.
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Captura</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Vuelca lo que tengas en la cabeza. Luego se clasificará en su rama.
+            </p>
+          </div>
+          <HelpDrawer title="Captura" items={AYUDA_POR_RUTA["/captura"]?.items ?? []} />
+        </div>
       </header>
 
       <form onSubmit={onSubmit} className="space-y-3 rounded-xl border border-border bg-card p-5">

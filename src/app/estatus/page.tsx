@@ -7,6 +7,7 @@ import { useData } from "@/lib/useData";
 import { calcularScoreHabitos } from "@/lib/estatus";
 import { ScoreHabitos } from "@/components/ScoreHabitos";
 import { IconClipboardCheck, IconPlus } from "@/components/icons";
+import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
 import type { EstatusConComidas } from "@/lib/types";
 
 const DIAS_OPCIONES = [7, 30, 90, 365];
@@ -44,6 +45,7 @@ export default function EstatusListadoPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <HelpDrawer title="Estatus diario" items={AYUDA_POR_RUTA["/estatus"]?.items ?? []} />
           <div className="flex gap-1 rounded-md border border-border bg-card p-1 text-xs">
             {DIAS_OPCIONES.map((d) => (
               <button
