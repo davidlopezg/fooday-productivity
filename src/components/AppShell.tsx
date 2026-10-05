@@ -7,6 +7,7 @@ import { Sidebar } from "@/components/Sidebar";
 import { ConfigProvider } from "@/lib/configStore";
 import { PomodoroProvider } from "@/lib/pomodoroStore";
 import { PomodoroWidget } from "@/components/PomodoroWidget";
+import { ThemeProvider } from "@/lib/themeStore";
 
 /**
  * Shell de la SPA: comprueba sesión (cliente) y muestra el sidebar.
@@ -67,6 +68,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
+    <ThemeProvider>
     <ConfigProvider>
       <PomodoroProvider>
         {/*
@@ -86,5 +88,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <PomodoroWidget />
       </PomodoroProvider>
     </ConfigProvider>
+    </ThemeProvider>
   );
 }

@@ -6,9 +6,12 @@ import { useState, type SVGProps } from "react";
 import {
   IconBolt,
   IconCalendar,
+  IconChart,
   IconCheck,
+  IconClipboardCheck,
   IconCompass,
   IconFlag,
+  IconFolder,
   IconHeart,
   IconHistory,
   IconHome,
@@ -21,6 +24,7 @@ import {
   IconX,
 } from "@/components/icons";
 import { SignOut } from "@/components/SignOut";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 type IconComponent = (p: SVGProps<SVGSVGElement>) => React.ReactElement;
 type NavItem = { href: string; label: string; Icon: IconComponent };
@@ -32,6 +36,7 @@ const TOP_ITEMS: NavItem[] = [
   { href: "/captura", label: "Capturar", Icon: IconInbox },
   { href: "/norte", label: "Norte", Icon: IconCompass },
   { href: "/metas", label: "Metas", Icon: IconTarget },
+  { href: "/proyectos", label: "Proyectos", Icon: IconFolder },
   { href: "/semana", label: "Semana", Icon: IconCalendar },
 ];
 
@@ -51,6 +56,8 @@ const TASKS_SECTION: NavSection = {
 const UTIL_ITEMS: NavItem[] = [
   { href: "/dashboard-emocional", label: "Dashboard emocional", Icon: IconHeart },
   { href: "/focus", label: "Focus", Icon: IconBolt },
+  { href: "/estatus", label: "Estatus diario", Icon: IconClipboardCheck },
+  { href: "/informes", label: "Informes", Icon: IconChart },
   { href: "/configuracion", label: "Configuración", Icon: IconSettings },
 ];
 
@@ -162,7 +169,8 @@ export function Sidebar() {
               </button>
             </div>
             <NavItems onNavigate={() => setOpen(false)} />
-            <div className="mt-auto border-t border-border pt-4">
+            <div className="mt-auto space-y-2 border-t border-border pt-4">
+              <ThemeToggle />
               <SignOut />
             </div>
           </aside>
@@ -175,7 +183,8 @@ export function Sidebar() {
           fooday<span className="text-muted-foreground">·productivity</span>
         </div>
         <NavItems />
-        <div className="mt-auto border-t border-border px-3 pt-4">
+        <div className="mt-auto space-y-2 border-t border-border px-3 pt-4">
+          <ThemeToggle />
           <SignOut />
         </div>
       </aside>

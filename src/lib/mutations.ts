@@ -1,5 +1,9 @@
 import { createClient } from "@/lib/supabase/client";
 import type {
+  ComidaInput,
+  EstatusConComidas,
+  EstatusDiario,
+  HabitoEstado,
   InformePlan,
   PlanDiarioTarea,
   PlanGeneradoSimple,
@@ -14,6 +18,12 @@ export async function marcarHecha(id: string) {
     .from("tareas")
     .update({ estado: "hecha", completada_at: new Date().toISOString() })
     .eq("id", id);
+  // ponytail: la recurrencia es un side-effect de "hecha". Si la IA está
+  // apagada o la RPC falla, NO se rompe el marcar-hecha principal: el error
+  // se loguea y el usuario lo verá en el log de consola.
+  await intentarClonarRecurrente(id).catch((e) =>
+    console.warn("[marcarHecha] clonación recurrente falló:", e),
+  );
 }
 
 export async function reabrirTarea(id: string) {
@@ -46,6 +56,7 @@ export interface TareaCampos {
   pts?: number | null;
   esfuerzo?: string | null;
   criterio_terminacion?: string | null;
+  proyecto_id?: string | null;
 }
 
 export async function actualizarTarea(datos: TareaCampos) {
@@ -79,6 +90,7 @@ export async function crearTarea(datos: {
   pts?: number | null;
   esfuerzo?: string | null;
   criterio_terminacion?: string | null;
+  proyecto_id?: string | null;
   subtareas?: Subtarea[] | null;
 }): Promise<TareaCreada> {
   const supabase = createClient();
@@ -98,6 +110,7 @@ export async function crearTarea(datos: {
       pts: datos.pts ?? null,
       esfuerzo: datos.esfuerzo ?? null,
       criterio_terminacion: datos.criterio_terminacion ?? null,
+      proyecto_id: datos.proyecto_id ?? null,
       origen: "manual",
     })
     .select("id,titulo")
@@ -1066,4 +1079,320 @@ export async function aplicarPropuestaIA(payload: {
     .upsert(filas, { onConflict: "owner_id,anio,semana_iso,tarea_id" });
   if (error) throw new Error(`No se pudo aplicar la propuesta: ${error.message}`);
   return filas.length;
+}
+
+// ============================================================================
+// Proyectos — CRUD (migration 0012)
+// ============================================================================
+import type { Proyecto, RecurrenciaTipo, TareaComentario } from "@/lib/types";
+
+export async function crearProyecto(datos: {
+  nombre: string;
+  color?: string;
+  descripcion?: string | null;
+}): Promise<Proyecto> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("proyectos")
+    .insert({
+      nombre: datos.nombre.trim(),
+      color: datos.color ?? "#64748b",
+      descripcion: datos.descripcion?.trim() ?? null,
+    })
+    .select("id,nombre,color,descripcion,orden,archivado")
+    .single();
+  if (error || !data) throw new Error(`No se pudo crear el proyecto: ${error?.message}`);
+  return data as Proyecto;
+}
+
+export async function actualizarProyecto(id: string, campos: Partial<Proyecto>): Promise<void> {
+  const { error } = await createClient()
+    .from("proyectos")
+    .update(campos)
+    .eq("id", id);
+  if (error) throw new Error(`No se pudo actualizar: ${error.message}`);
+}
+
+export async function archivarProyecto(id: string, archivado = true): Promise<void> {
+  await actualizarProyecto(id, { archivado });
+}
+
+export async function eliminarProyecto(id: string): Promise<void> {
+  const { error } = await createClient().from("proyectos").delete().eq("id", id);
+  if (error) throw new Error(`No se pudo eliminar: ${error.message}`);
+}
+
+// ============================================================================
+// Comentarios — migration 0012
+// ============================================================================
+/** Extrae @tags del cuerpo (lowercase, sin @, sin duplicados). */
+function extraerTags(cuerpo: string): string[] {
+  const matches = cuerpo.match(/@([\p{L}\p{N}_-]+)/gu) ?? [];
+  return Array.from(new Set(matches.map((m) => m.slice(1).toLowerCase())));
+}
+
+export async function crearComentario(datos: {
+  tarea_id: string;
+  cuerpo: string;
+}): Promise<TareaComentario> {
+  const cuerpo = datos.cuerpo.trim();
+  if (!cuerpo) throw new Error("El comentario no puede estar vacío");
+  const tags = extraerTags(cuerpo);
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("tarea_comentarios")
+    .insert({ tarea_id: datos.tarea_id, cuerpo, tags })
+    .select("id,tarea_id,cuerpo,tags,created_at")
+    .single();
+  if (error || !data) throw new Error(`No se pudo guardar el comentario: ${error?.message}`);
+  return data as TareaComentario;
+}
+
+export async function eliminarComentario(id: string): Promise<void> {
+  const { error } = await createClient()
+    .from("tarea_comentarios")
+    .delete()
+    .eq("id", id);
+  if (error) throw new Error(`No se pudo eliminar: ${error.message}`);
+}
+
+// ============================================================================
+// Recurrencia — migration 0012
+// ============================================================================
+export interface Recurrencia {
+  tipo: RecurrenciaTipo;
+  dias_semana?: number[] | null;
+  dia_mes?: number | null;
+}
+
+/** Calcula la siguiente fecha en la que debe aparecer la tarea, dado el patrón
+ *  y la fecha actual. Devuelve null si no toca generar.
+ *
+ *  Reglas:
+ *   - 'diaria'  → +1 día desde HOY (mientras se marque hecha cada día, sale otra).
+ *   - 'semanal' → próximo día de la semana que esté en `dias_semana` (>= HOY).
+ *   - 'mensual' → próximo `dia_mes` del mes actual o el siguiente.
+ */
+function siguienteFechaRecurrencia(
+  hoy: Date,
+  rec: Recurrencia,
+): string | null {
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  if (rec.tipo === "diaria") {
+    const next = new Date(hoy);
+    next.setDate(next.getDate() + 1);
+    return iso(next);
+  }
+  if (rec.tipo === "semanal" && rec.dias_semana && rec.dias_semana.length > 0) {
+    // Busca el próximo día de la semana (0=Dom..6=Sáb) en los próximos 7 días
+    for (let offset = 1; offset <= 7; offset++) {
+      const d = new Date(hoy);
+      d.setDate(d.getDate() + offset);
+      if (rec.dias_semana.includes(d.getDay())) return iso(d);
+    }
+    return null;
+  }
+  if (rec.tipo === "mensual" && rec.dia_mes && rec.dia_mes >= 1 && rec.dia_mes <= 28) {
+    const target = new Date(hoy.getFullYear(), hoy.getMonth(), rec.dia_mes);
+    if (target <= hoy) target.setMonth(target.getMonth() + 1);
+    return iso(target);
+  }
+  return null;
+}
+
+/** Si la tarea es recurrente, clona una nueva instancia con la siguiente fecha.
+ *  Si NO es recurrente, no hace nada (devuelve null). */
+export async function intentarClonarRecurrente(tareaId: string): Promise<string | null> {
+  const supabase = createClient();
+  const { data: t, error } = await supabase
+    .from("tareas")
+    .select("id, recurrencia_tipo, recurrencia_dias_semana, recurrencia_dia_mes, recurrencia_ultima_generada")
+    .eq("id", tareaId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!t) return null;
+  const tipo = (t as { recurrencia_tipo: RecurrenciaTipo }).recurrencia_tipo;
+  if (!tipo) return null;
+
+  const rec: Recurrencia = {
+    tipo,
+    dias_semana: (t as { recurrencia_dias_semana: number[] | null }).recurrencia_dias_semana,
+    dia_mes: (t as { recurrencia_dia_mes: number | null }).recurrencia_dia_mes,
+  };
+  const hoy = new Date();
+  const nuevaFecha = siguienteFechaRecurrencia(hoy, rec);
+  if (!nuevaFecha) return null;
+
+  const { data: nuevaId, error: err2 } = await supabase.rpc("clone_recurring_task", {
+    p_tarea_id: tareaId,
+    p_nueva_fecha: nuevaFecha,
+  });
+  if (err2) throw err2;
+  return (nuevaId as string) ?? null;
+}
+
+/** Actualiza los campos de recurrencia de una tarea (o la quita si tipo=null). */
+export async function setRecurrencia(
+  tareaId: string,
+  rec: Recurrencia,
+): Promise<void> {
+  const update: Record<string, unknown> = {
+    recurrencia_tipo: rec.tipo,
+  };
+  if (rec.tipo === "semanal") {
+    update.recurrencia_dias_semana = rec.dias_semana ?? [];
+    update.recurrencia_dia_mes = null;
+  } else if (rec.tipo === "mensual") {
+    update.recurrencia_dia_mes = rec.dia_mes ?? 1;
+    update.recurrencia_dias_semana = null;
+  } else if (rec.tipo === "diaria") {
+    update.recurrencia_dias_semana = null;
+    update.recurrencia_dia_mes = null;
+  } else {
+    update.recurrencia_dias_semana = null;
+    update.recurrencia_dia_mes = null;
+    update.recurrencia_ultima_generada = null;
+  }
+  const { error } = await createClient().from("tareas").update(update).eq("id", tareaId);
+  if (error) throw new Error(`No se pudo guardar la recurrencia: ${error.message}`);
+}
+
+// ============================================================================
+// Estatus diario — migration 0013
+// ============================================================================
+
+/** Datos del formulario de estatus (sin id/created_at/updated_at/comidas). */
+export type EstatusInput = Omit<EstatusDiario, "id" | "created_at" | "updated_at"> & {
+  /** Comidas a reemplazar (si se pasan, se borra y reinserta). */
+  comidas?: ComidaInput[];
+};
+
+/** Inserta o actualiza (UPSERT por owner_id+fecha) una entrada de estatus.
+ *  Si se pasan `comidas`, reemplaza la lista completa.
+ *  Devuelve la fila resultante con su id y comidas anidadas. */
+export async function upsertEstatus(
+  fecha: string,
+  datos: EstatusInput,
+): Promise<EstatusConComidas> {
+  const supabase = createClient();
+
+  // 1) Separa comidas del resto (las comidas van en tabla aparte)
+  const { comidas: _comidas, ...cabecera } = datos;
+  void _comidas;
+
+  // 2) Prepara la fila para upsert. NO pasamos owner_id: la RLS
+  //    (default auth.uid()) lo asigna automáticamente al insertar.
+  const fila: Record<string, unknown> = { fecha };
+  for (const [k, v] of Object.entries(cabecera)) {
+    if (k === "fecha" || k === "comidas") continue;
+    if (v === undefined) continue; // omite undefineds
+    fila[k] = v;
+  }
+
+  const { data: upserted, error } = await supabase
+    .from("estatus_diarios")
+    .upsert(fila, { onConflict: "owner_id,fecha" })
+    .select("id")
+    .single();
+  if (error) {
+    console.error("[upsertEstatus] Supabase error:", error);
+    throw new Error(`No se pudo guardar el estatus: ${error.message}`);
+  }
+  if (!upserted) {
+    throw new Error("No se pudo guardar el estatus — la base de datos no devolvió confirmación.");
+  }
+  const estatusId = upserted.id as string;
+
+  // 3) Reemplaza comidas si se pasaron
+  if (datos.comidas !== undefined) {
+    await reemplazarComidasEstatus(estatusId, datos.comidas);
+  }
+
+  // 4) Devuelve la fila persistida con sus comidas
+  const { fetchEstatusPorId } = await import("@/lib/queries");
+  const result = await fetchEstatusPorId(estatusId);
+  if (!result) throw new Error("Estatus guardado pero no se pudo recargar.");
+  return result;
+}
+
+/** Borra todas las comidas de un estatus y reinserta las nuevas (ordenadas). */
+export async function reemplazarComidasEstatus(
+  estatusId: string,
+  comidas: ComidaInput[],
+): Promise<void> {
+  const supabase = createClient();
+  const { error: delErr } = await supabase
+    .from("estatus_comidas")
+    .delete()
+    .eq("estatus_id", estatusId);
+  if (delErr) {
+    console.warn("[reemplazarComidasEstatus] borrando:", delErr);
+  }
+  const limpias = comidas
+    .map((c) => ({
+      estatus_id: estatusId,
+      hora: c.hora && c.hora.length > 0 ? c.hora : null,
+      descripcion: c.descripcion.trim(),
+      orden: 0,
+    }))
+    .filter((c) => c.descripcion.length > 0);
+  limpias.forEach((c, i) => {
+    c.orden = i;
+  });
+  if (limpias.length === 0) return;
+  const { error: insErr } = await supabase.from("estatus_comidas").insert(limpias);
+  if (insErr) {
+    console.error("[reemplazarComidasEstatus] insertando:", insErr);
+    throw new Error(`No se pudieron guardar las comidas: ${insErr.message}`);
+  }
+}
+
+/** Elimina un estatus completo (cascada a sus comidas). */
+export async function eliminarEstatus(id: string): Promise<void> {
+  const { error } = await createClient().from("estatus_diarios").delete().eq("id", id);
+  if (error) throw new Error(`No se pudo eliminar el estatus: ${error.message}`);
+}
+
+/** Actualiza SOLO la reflexión narrativa del agente (campo reflexion_agente). */
+export async function setReflexionAgente(
+  id: string,
+  reflexion: string | null,
+): Promise<void> {
+  const { error } = await createClient()
+    .from("estatus_diarios")
+    .update({ reflexion_agente: reflexion })
+    .eq("id", id);
+  if (error) throw new Error(`No se pudo guardar la reflexión: ${error.message}`);
+}
+
+/** Marca los 9 hábitos de golpe (atajo usado por el toggle grid). */
+export async function setHabitos(
+  estatusId: string,
+  habitos: {
+    qigong: HabitoEstado | null;
+    caminar: HabitoEstado | null;
+    ducha: HabitoEstado | null;
+    meditacion: HabitoEstado | null;
+    desayuno: HabitoEstado | null;
+    vaciado_mental: HabitoEstado | null;
+    comida_siesta: HabitoEstado | null;
+    estatus: HabitoEstado | null;
+    tres_cosas_buenas: HabitoEstado | null;
+  },
+): Promise<void> {
+  const { error } = await createClient()
+    .from("estatus_diarios")
+    .update({
+      habito_qigong: habitos.qigong,
+      habito_caminar: habitos.caminar,
+      habito_ducha: habitos.ducha,
+      habito_meditacion: habitos.meditacion,
+      habito_desayuno: habitos.desayuno,
+      habito_vaciado_mental: habitos.vaciado_mental,
+      habito_comida_siesta: habitos.comida_siesta,
+      habito_estatus: habitos.estatus,
+      habito_3_cosas_buenas: habitos.tres_cosas_buenas,
+    })
+    .eq("id", estatusId);
+  if (error) throw new Error(`No se pudieron guardar los hábitos: ${error.message}`);
 }

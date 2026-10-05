@@ -26,6 +26,29 @@ export interface Area {
   orden: number;
 }
 
+// ============================================================================
+// Proyectos (agrupan tareas) — migration 0012
+// ============================================================================
+export interface Proyecto {
+  id: string;
+  nombre: string;
+  color: string | null;
+  descripcion: string | null;
+  orden: number;
+  archivado: boolean;
+}
+
+export type RecurrenciaTipo = "diaria" | "semanal" | "mensual" | null;
+
+/** Comentario en una tarea, con @tags extraídos del cuerpo. */
+export interface TareaComentario {
+  id: string;
+  tarea_id: string;
+  cuerpo: string;
+  tags: string[];
+  created_at: string;
+}
+
 export interface Proposito {
   id: string;
   area_id: string | null;
@@ -116,6 +139,16 @@ export interface Tarea {
   subtareas: TareaSubtarea[] | null;
   /** Frase "Esta tarea está HECHA cuando __________". */
   criterio_terminacion: string | null;
+  /** Proyecto al que pertenece (null = sin proyecto). */
+  proyecto_id: string | null;
+  /** Recurrencia: si no es null, la tarea se clona al marcarla como hecha. */
+  recurrencia_tipo: RecurrenciaTipo;
+  /** Días de la semana (0=Dom..6=Sáb) cuando es 'semanal'. */
+  recurrencia_dias_semana: number[] | null;
+  /** Día del mes (1..28) cuando es 'mensual'. */
+  recurrencia_dia_mes: number | null;
+  /** Última fecha en la que se generó la siguiente copia. */
+  recurrencia_ultima_generada: string | null;
 }
 
 export interface Ritual {
@@ -233,6 +266,131 @@ export interface PlanDiarioBorrador {
   prompt_usado: string | null;
   created_at: string;
 }
+
+// ============================================================================
+// Estatus diario (migration 0013)
+// Una entrada por día del usuario con productividad, hábitos, comidas, etc.
+// Adaptación app del agente `agente-estatus-diario`.
+// ============================================================================
+
+/** Estado de un hábito en un día concreto. 'no' = no cumplido. */
+export type HabitoEstado = "hecho" | "parcial" | "no";
+
+/** Identificadores canónicos de los 9 hábitos personales (orden estable). */
+export const HABITOS_IDS = [
+  "qigong",
+  "caminar",
+  "ducha",
+  "meditacion",
+  "desayuno",
+  "vaciado_mental",
+  "comida_siesta",
+  "estatus",
+  "tres_cosas_buenas",
+] as const;
+export type HabitoId = (typeof HABITOS_IDS)[number];
+
+/** Metadata de cada hábito: nombre legible, emoji y momento del día. */
+export interface HabitoMeta {
+  id: HabitoId;
+  nombre: string;
+  emoji: string;
+  momento: string;
+  opcional?: boolean;
+}
+
+export const HABITOS_META: HabitoMeta[] = [
+  { id: "qigong", nombre: "Qi Gong 2 min", emoji: "🧘", momento: "Mañana" },
+  { id: "caminar", nombre: "Caminar", emoji: "🚶", momento: "Mañana" },
+  { id: "ducha", nombre: "Ducha", emoji: "🚿", momento: "Mañana", opcional: true },
+  { id: "meditacion", nombre: "Meditación Silva", emoji: "🌙", momento: "Mañana" },
+  { id: "desayuno", nombre: "Desayuno sentado y sin móvil", emoji: "🍽️", momento: "Mañana" },
+  { id: "vaciado_mental", nombre: "Vaciado mental 3 min", emoji: "🧠", momento: "Antes de comida" },
+  { id: "comida_siesta", nombre: "Comida y siesta sin móvil", emoji: "🥗", momento: "Mediodía" },
+  { id: "estatus", nombre: "Estatus", emoji: "📝", momento: "Noche (cierre)" },
+  { id: "tres_cosas_buenas", nombre: "3 cosas buenas antes de dormir", emoji: "✨", momento: "Noche" },
+];
+
+/** Fila persistida en `estatus_diarios` (1 por día por owner). */
+export interface EstatusDiario {
+  id: string;
+  fecha: string; // YYYY-MM-DD
+  // Productividad
+  tareas_profesionales: string | null;
+  tareas_personales: string | null;
+  trabajo_futuro_ideal: string | null;
+  tareas_nuevas: string | null;
+  correos_importantes: string | null;
+  tareas_no_terminadas: string | null;
+  // Emocional / mental
+  estado_emocional: string | null;
+  pensamientos_emociones: string | null;
+  bloqueos_procrastinacion: string | null;
+  ideas_nuevas: string | null;
+  agradecimientos: string | null;
+  lo_que_hiciste_bien: string | null;
+  // Relaciones
+  tiempo_pareja: string | null;
+  tiempo_hija: string | null;
+  tareas_hogar: string | null;
+  // Bienestar
+  uso_movil_min: number | null;
+  acto_de_bondad: string | null;
+  cuido_cuerpo: string | null;
+  mente_subconsciente: string | null;
+  // 9 hábitos (nullable = aún no respondido)
+  habito_qigong: HabitoEstado | null;
+  habito_caminar: HabitoEstado | null;
+  habito_ducha: HabitoEstado | null;
+  habito_meditacion: HabitoEstado | null;
+  habito_desayuno: HabitoEstado | null;
+  habito_vaciado_mental: HabitoEstado | null;
+  habito_comida_siesta: HabitoEstado | null;
+  habito_estatus: HabitoEstado | null;
+  habito_3_cosas_buenas: HabitoEstado | null;
+  // Auditoría 20/80
+  audit_tareas_criticas: number | null;
+  audit_termino_3_principales: boolean | null;
+  audit_anadio_sin_terminar: boolean | null;
+  audit_eran_20_80: "si" | "no" | "parcial" | null;
+  audit_sintio: "cumpli" | "corri" | "nada" | null;
+  // Cierre Cognitivo (5 preguntas)
+  cierre_que_consigo: string | null;
+  cierre_queda_abierto: string | null;
+  cierre_decisiones_tomadas: string | null;
+  cierre_carga_mental: string | null;
+  cierre_primer_problema_manana: string | null;
+  // Salida emocional / micro-acción
+  podes_soltar: string | null;
+  micro_accion_manana: string | null;
+  // Semáforo
+  semaforo: Semaforo | null;
+  // Veredicto narrativo del agente LLM (opcional)
+  reflexion_agente: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Fila de `estatus_comidas` (1:N con estatus_diarios). */
+export interface EstatusComida {
+  id: string;
+  estatus_id: string;
+  hora: string | null; // "HH:MM:SS" o null
+  descripcion: string;
+  orden: number;
+  created_at: string;
+}
+
+/** Forma "wire" de una comida (sin id/estatus_id) — para el formulario. */
+export interface ComidaInput {
+  hora: string | null; // "HH:MM" o ""
+  descripcion: string;
+}
+
+/** Estatus con sus comidas anidadas (lo que devuelven los fetches compuestos). */
+export type EstatusConComidas = EstatusDiario & {
+  comidas: EstatusComida[];
+};
 
 // ============================================================================
 // Pomodoro / Focus

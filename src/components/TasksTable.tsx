@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { useSearchParams } from "next/navigation";
 import type { Subtarea, Tarea } from "@/lib/types";
 import {
   actualizarTarea,
@@ -10,6 +11,8 @@ import {
   marcarHecha,
   reabrirTarea,
 } from "@/lib/mutations";
+import { fetchProyectos } from "@/lib/queries";
+import { useData } from "@/lib/useData";
 import {
   IconArchive,
   IconCheck,
@@ -132,6 +135,8 @@ export function TasksTable({
   adjuntosCount?: Map<string, number>;
   onChanged: () => void;
 }) {
+  const searchParams = useSearchParams();
+  const proyectoFiltroQS = searchParams.get("proyecto");
   const [pending, startTransition] = useTransition();
   const [q, setQ] = useState("");
   const [estado, setEstado] = useState("activas");
@@ -139,6 +144,11 @@ export function TasksTable({
   const [capa, setCapa] = useState("todas");
   const [editando, setEditando] = useState<Tarea | null>(null);
   const [creando, setCreando] = useState(false);
+  const { data: proyectos } = useData(() => fetchProyectos(), []);
+  const proyectoById = useMemo(
+    () => new Map(proyectos.map((p) => [p.id, p])),
+    [proyectos],
+  );
 
   const filtradas = useMemo(() => {
     return tareas.filter((t) => {
@@ -148,13 +158,16 @@ export function TasksTable({
         return false;
       if (prioridad !== "todas" && t.prioridad !== prioridad) return false;
       if (capa !== "todas" && t.capa !== capa) return false;
+      if (proyectoFiltroQS && t.proyecto_id !== proyectoFiltroQS) return false;
       if (q) {
         const s = `${t.titulo} ${t.codigo ?? ""} ${t.descripcion ?? ""}`.toLowerCase();
         if (!s.includes(q.toLowerCase())) return false;
       }
       return true;
     });
-  }, [tareas, estado, prioridad, capa, q]);
+  }, [tareas, estado, prioridad, capa, q, proyectoFiltroQS]);
+
+  const proyectoFiltro = proyectoFiltroQS ? proyectoById.get(proyectoFiltroQS) : null;
 
   function run(fn: () => Promise<void>) {
     startTransition(async () => {
@@ -216,6 +229,25 @@ export function TasksTable({
         </button>
       </div>
 
+      {proyectoFiltro && (
+        <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-xs">
+          <span
+            className="inline-block h-2.5 w-2.5 rounded-sm"
+            style={{ backgroundColor: proyectoFiltro.color ?? "#64748b" }}
+            aria-hidden
+          />
+          <span>
+            Filtrando por proyecto: <strong>{proyectoFiltro.nombre}</strong>
+          </span>
+          <a
+            href="/tareas"
+            className="ml-auto rounded px-2 py-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+          >
+            quitar filtro
+          </a>
+        </div>
+      )}
+
       {/* Lista de tarjetas (movil): la tabla de 760px obliga a scroll lateral */}
       <ul className="space-y-2 md:hidden">
         {filtradas.map((t) => {
@@ -239,6 +271,22 @@ export function TasksTable({
                       <Badge tone={TONO_PRIORIDAD[t.prioridad] ?? TONO_PRIORIDAD.media}>
                         {t.prioridad.toUpperCase()}
                       </Badge>
+                    )}
+                    {t.proyecto_id && proyectoById.get(t.proyecto_id) && (
+                      <span
+                        className="inline-flex items-center gap-1 rounded-full border border-border px-1.5 py-0.5 text-[11px] font-medium"
+                        style={{
+                          backgroundColor: `${proyectoById.get(t.proyecto_id)?.color ?? "#64748b"}1A`,
+                          color: proyectoById.get(t.proyecto_id)?.color ?? undefined,
+                        }}
+                      >
+                        📁 {proyectoById.get(t.proyecto_id)?.nombre}
+                      </span>
+                    )}
+                    {t.recurrencia_tipo && (
+                      <span className="inline-flex items-center gap-0.5 rounded-full border border-border bg-background px-1.5 py-0.5 text-[11px] text-muted-foreground">
+                        🔁 {t.recurrencia_tipo}
+                      </span>
                     )}
                     {t.capa && (
                       <span className="text-[11px] text-muted-foreground">{t.capa}</span>
@@ -305,6 +353,22 @@ export function TasksTable({
                       </div>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         {t.codigo && <span>{t.codigo}</span>}
+                        {t.proyecto_id && proyectoById.get(t.proyecto_id) && (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-full border border-border px-1.5 py-0.5 text-[10px] font-medium"
+                            style={{
+                              backgroundColor: `${proyectoById.get(t.proyecto_id)?.color ?? "#64748b"}1A`,
+                              color: proyectoById.get(t.proyecto_id)?.color ?? undefined,
+                            }}
+                          >
+                            📁 {proyectoById.get(t.proyecto_id)?.nombre}
+                          </span>
+                        )}
+                        {t.recurrencia_tipo && (
+                          <span className="rounded-full border border-border bg-background px-1.5 py-0.5 text-[10px]">
+                            🔁 {t.recurrencia_tipo}
+                          </span>
+                        )}
                         {(() => {
                           const n = adjuntosCount?.get(t.id) ?? 0;
                           return n > 0 ? (

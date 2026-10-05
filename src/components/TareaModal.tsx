@@ -27,19 +27,151 @@ import {
   eliminarAdjunto,
   MAX_ADJUNTO_BYTES,
   reemplazarSubtareasTarea,
+  setRecurrencia,
   signedUrlAdjunto,
   subirAdjuntos,
+  type Recurrencia,
 } from "@/lib/mutations";
-import { fetchAdjuntosTarea } from "@/lib/queries";
+import { fetchAdjuntosTarea, fetchProyectos } from "@/lib/queries";
 import { useConfig } from "@/lib/configStore";
 import { usePomodoro } from "@/lib/pomodoroStore";
 import { generarCriterioTerminacionIA } from "@/lib/plan";
-import type { Subtarea, Tarea, TareaAdjunto } from "@/lib/types";
+import { useData } from "@/lib/useData";
+import { ComentariosTarea } from "@/components/ComentariosTarea";
+import type { Proyecto, RecurrenciaTipo, Subtarea, Tarea, TareaAdjunto } from "@/lib/types";
+import { IconRepeat } from "@/components/icons";
 
 export type PendingFile = { file: File; status: "pendiente" };
 
 const PRIORIDADES = ["critica", "urgente", "alta", "media", "baja"];
 const ESTADOS = ["pendiente", "en_progreso", "bloqueada", "hecha", "archivada"];
+const DIAS_SEMANA_LBL = ["D", "L", "M", "X", "J", "V", "S"];
+
+// ============================================================================
+// Editor de Recurrencia (diaria / semanal / mensual) + selector de Proyecto
+// ---------------------------------------------------------------------------
+// Se usa dentro de CrearModal y EditarModal. La recurrencia se guarda
+// aparte (setRecurrencia) porque solo se aplica a tareas ya creadas — un
+// solo insert no admite los 3 campos a la vez sin acoplarlos más.
+// ============================================================================
+function ProyectoRecurrenciaEditor({
+  proyectos,
+  proyectoId,
+  onProyectoChange,
+  recurrencia,
+  onRecurrenciaChange,
+}: {
+  proyectos: Proyecto[];
+  proyectoId: string | null;
+  onProyectoChange: (v: string | null) => void;
+  recurrencia: Recurrencia;
+  onRecurrenciaChange: (r: Recurrencia) => void;
+}) {
+  const field =
+    "h-9 w-full rounded-md border border-input bg-background px-2 text-sm outline-none focus:ring-2 focus:ring-ring";
+  return (
+    <section className="rounded-lg border border-border bg-muted/30 p-3">
+      <div className="mb-2 flex items-center gap-2">
+        <IconRepeat className="h-3.5 w-3.5 text-muted-foreground" />
+        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Proyecto y recurrencia
+        </span>
+      </div>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <label className="block">
+          <span className="mb-1 block text-[11px] text-muted-foreground">Proyecto</span>
+          <select
+            className={field}
+            value={proyectoId ?? ""}
+            onChange={(e) => onProyectoChange(e.target.value || null)}
+          >
+            <option value="">— Sin proyecto —</option>
+            {proyectos.map((p) => (
+              <option key={p.id} value={p.id}>{p.nombre}</option>
+            ))}
+          </select>
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-[11px] text-muted-foreground">Repetir</span>
+          <select
+            className={field}
+            value={recurrencia.tipo ?? ""}
+            onChange={(e) => {
+              const v = (e.target.value || null) as RecurrenciaTipo;
+              onRecurrenciaChange({
+                tipo: v,
+                dias_semana: v === "semanal" ? [1, 2, 3, 4, 5] : null,
+                dia_mes: v === "mensual" ? 1 : null,
+              });
+            }}
+          >
+            <option value="">— No repetir —</option>
+            <option value="diaria">Cada día</option>
+            <option value="semanal">Cada semana (días…)</option>
+            <option value="mensual">Cada mes (día…)</option>
+          </select>
+        </label>
+      </div>
+
+      {recurrencia.tipo === "semanal" && (
+        <div className="mt-2">
+          <span className="mb-1 block text-[11px] text-muted-foreground">
+            Días de la semana
+          </span>
+          <div className="flex gap-1">
+            {DIAS_SEMANA_LBL.map((lbl, i) => {
+              const activo = (recurrencia.dias_semana ?? []).includes(i);
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => {
+                    const cur = recurrencia.dias_semana ?? [];
+                    const next = activo ? cur.filter((d) => d !== i) : [...cur, i].sort();
+                    onRecurrenciaChange({ ...recurrencia, dias_semana: next });
+                  }}
+                  className={`h-8 w-8 rounded-md border text-xs font-semibold ${
+                    activo
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-background text-muted-foreground hover:border-foreground"
+                  }`}
+                >
+                  {lbl}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {recurrencia.tipo === "mensual" && (
+        <div className="mt-2 flex items-center gap-2">
+          <span className="text-[11px] text-muted-foreground">Día del mes:</span>
+          <input
+            type="number"
+            min={1}
+            max={28}
+            value={recurrencia.dia_mes ?? 1}
+            onChange={(e) =>
+              onRecurrenciaChange({
+                ...recurrencia,
+                dia_mes: Math.max(1, Math.min(28, Number(e.target.value) || 1)),
+              })
+            }
+            className="h-8 w-16 rounded-md border border-input bg-background px-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+          />
+          <span className="text-[11px] text-muted-foreground">(1–28)</span>
+        </div>
+      )}
+
+      {recurrencia.tipo && (
+        <p className="mt-2 text-[11px] text-muted-foreground">
+          Al marcarla como hecha, se creará automáticamente una nueva copia.
+        </p>
+      )}
+    </section>
+  );
+}
 
 // ============================================================================
 // Editor de subtareas (desglose al máximo) — usado por EditarModal
@@ -716,6 +848,7 @@ export function EditarModal({
   onChanged: () => void;
 }) {
   const { data: cfg } = useConfig();
+  const { data: proyectos } = useData<Proyecto[]>(() => fetchProyectos(), []);
   const [form, setForm] = useState<{
     titulo: string;
     descripcion: string;
@@ -736,6 +869,12 @@ export function EditarModal({
     pts: tarea.pts != null ? String(tarea.pts) : "",
     esfuerzo: tarea.esfuerzo ?? "",
     criterio_terminacion: tarea.criterio_terminacion ?? "",
+  });
+  const [proyectoId, setProyectoId] = useState<string | null>(tarea.proyecto_id ?? null);
+  const [recurrencia, setRecurrenciaState] = useState<Recurrencia>({
+    tipo: tarea.recurrencia_tipo ?? null,
+    dias_semana: tarea.recurrencia_dias_semana ?? null,
+    dia_mes: tarea.recurrencia_dia_mes ?? null,
   });
   const [subtareas, setSubtareas] = useState<Subtarea[]>(
     Array.isArray(tarea.subtareas) ? (tarea.subtareas as unknown as Subtarea[]) : [],
@@ -790,7 +929,11 @@ export function EditarModal({
           pts: form.pts ? Number(form.pts) : null,
           esfuerzo: form.esfuerzo || null,
           criterio_terminacion: form.criterio_terminacion.trim() || null,
+          proyecto_id: proyectoId,
         });
+        // Recurrencia: si cambia, se actualiza. Si antes era distinta
+        // (incluida null), se sobreescribe con el setRecurrencia.
+        await setRecurrencia(tarea.id, recurrencia);
         const limpias = subtareas
           .map((s) => ({
             descripcion: s.descripcion.trim(),
@@ -893,6 +1036,16 @@ export function EditarModal({
             tareaId={tarea.id}
             tareaTitulo={tarea.titulo}
           />
+
+          <ProyectoRecurrenciaEditor
+            proyectos={proyectos}
+            proyectoId={proyectoId}
+            onProyectoChange={setProyectoId}
+            recurrencia={recurrencia}
+            onRecurrenciaChange={setRecurrenciaState}
+          />
+
+          <ComentariosTarea tareaId={tarea.id} />
         </div>
 
         <div className="flex shrink-0 items-center justify-between gap-2 border-t border-border px-5 py-4">
@@ -931,6 +1084,7 @@ export function CrearModal({
   onCreated?: (tareaId: string) => void | Promise<void>;
 }) {
   const { data: cfg } = useConfig();
+  const { data: proyectos } = useData<Proyecto[]>(() => fetchProyectos(), []);
   const [form, setForm] = useState<{
     titulo: string;
     descripcion: string;
@@ -952,6 +1106,8 @@ export function CrearModal({
     esfuerzo: "",
     criterio_terminacion: "",
   });
+  const [proyectoId, setProyectoId] = useState<string | null>(null);
+  const [recurrencia, setRecurrenciaState] = useState<Recurrencia>({ tipo: null });
   const [subtareas, setSubtareas] = useState<Subtarea[]>([]);
   const [subtareasAbierto, setSubtareasAbierto] = useState(false);
   const [adjuntosCola, setAdjuntosCola] = useState<PendingFile[]>([]);
@@ -1004,6 +1160,19 @@ export function CrearModal({
             onProgress: (m) => setIaMsg(m),
           },
         );
+
+        // Proyecto y recurrencia (post-creación, no bloquea la creación):
+        // si falla, la tarea ya está creada, no se pierde nada.
+        if (proyectoId) {
+          await actualizarTarea({ id: creada.id, proyecto_id: proyectoId }).catch(
+            (e) => console.warn("[CrearModal] set proyecto falló:", e),
+          );
+        }
+        if (recurrencia.tipo) {
+          await setRecurrencia(creada.id, recurrencia).catch((e) =>
+            console.warn("[CrearModal] set recurrencia falló:", e),
+          );
+        }
 
         if (tieneAdjuntos) {
           setAdjMsg(`⏳ Subiendo ${adjuntosCola.length} adjunto(s)…`);
@@ -1148,6 +1317,14 @@ export function CrearModal({
             tareaId={null}
             cola={adjuntosCola}
             setCola={setAdjuntosCola}
+          />
+
+          <ProyectoRecurrenciaEditor
+            proyectos={proyectos}
+            proyectoId={proyectoId}
+            onProyectoChange={setProyectoId}
+            recurrencia={recurrencia}
+            onRecurrenciaChange={setRecurrenciaState}
           />
         </div>
 

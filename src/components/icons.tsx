@@ -204,3 +204,53 @@ export const IconPause = (p: IconProps) => (
     <rect x="14" y="4.5" width="4" height="15" rx="1" />
   </svg>
 );
+
+export const IconSun = (p: IconProps) => (
+  <svg {...base} {...p}>
+    <circle cx="12" cy="12" r="4" />
+    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+  </svg>
+);
+
+export const IconMoon = (p: IconProps) => (
+  <svg {...base} {...p}>
+    <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" />
+  </svg>
+);
+
+export const IconFolder = (p: IconProps) => (
+  <svg {...base} {...p}>
+    <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
+  </svg>
+);
+
+export const IconChart = (p: IconProps) => (
+  <svg {...base} {...p}>
+    <path d="M3 3v18h18" />
+    <path d="M7 14l4-4 3 3 5-6" />
+  </svg>
+);
+
+export const IconRepeat = (p: IconProps) => (
+  <svg {...base} {...p}>
+    <path d="M17 1l4 4-4 4" />
+    <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+    <path d="M7 23l-4-4 4-4" />
+    <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+  </svg>
+);
+
+export const IconClipboardCheck = (p: IconProps) => (
+  <svg {...base} {...p}>
+    <rect x="6" y="4" width="12" height="18" rx="2" />
+    <path d="M9 4V3a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v1" />
+    <path d="m9 13 2 2 4-4" />
+  </svg>
+);
+
+export const IconPlus = (p: IconProps) => (
+  <svg {...base} {...p}>
+    <path d="M12 5v14M5 12h14" />
+  </svg>
+);
+

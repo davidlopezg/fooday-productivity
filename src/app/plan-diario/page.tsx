@@ -225,6 +225,7 @@ export default function PlanDiarioPage() {
           // El resto de campos no se usan en `buildPrompt`/`sanearPlanSimple`
           area_id: null,
           meta_id: null,
+          proyecto_id: null,
           codigo: null,
           descripcion: null,
           capa: null,
@@ -237,6 +238,10 @@ export default function PlanDiarioPage() {
           completada_at: null,
           subtareas: null,
           criterio_terminacion: null,
+          recurrencia_tipo: null,
+          recurrencia_dias_semana: null,
+          recurrencia_dia_mes: null,
+          recurrencia_ultima_generada: null,
         }));
 
       const plan = await generarPlanSimple(

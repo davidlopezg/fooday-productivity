@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/client";
 import type {
   Area,
   Captura,
+  EstatusConComidas,
   Meta,
   PlanDiario,
   PlanDiarioBloque,
@@ -10,9 +11,11 @@ import type {
   PlanDiarioTarea,
   PlanSemanalTarea,
   PomodoroSesion,
+  Proyecto,
   Ritual,
   Tarea,
   TareaAdjunto,
+  TareaComentario,
   TareaSubtarea,
 } from "@/lib/types";
 
@@ -419,4 +422,145 @@ export async function fetchPomodoroHoy(): Promise<PomodoroSesion[]> {
     .order("ended_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as PomodoroSesion[];
+}
+
+// ============================================================================
+// Proyectos — migration 0012
+// ============================================================================
+export async function fetchProyectos(opts?: { includeArchivados?: boolean }): Promise<Proyecto[]> {
+  let q = createClient()
+    .from("proyectos")
+    .select("id,nombre,color,descripcion,orden,archivado")
+    .order("orden")
+    .order("nombre");
+  if (!opts?.includeArchivados) q = q.eq("archivado", false);
+  const { data, error } = await q;
+  if (error) throw error;
+  return (data ?? []) as Proyecto[];
+}
+
+/** Tareas del owner agrupadas por proyecto (id → nº tareas activas). */
+export async function fetchProyectosConConteo(): Promise<Array<Proyecto & { total_tareas: number; tareas_hechas: number }>> {
+  const supabase = createClient();
+  const [proyectosRes, tareasRes] = await Promise.all([
+    supabase.from("proyectos").select("id,nombre,color,descripcion,orden,archivado").order("orden"),
+    supabase.from("tareas").select("proyecto_id,estado").not("proyecto_id", "is", null),
+  ]);
+  if (proyectosRes.error) throw proyectosRes.error;
+  if (tareasRes.error) throw tareasRes.error;
+  const proyectos = (proyectosRes.data ?? []) as Proyecto[];
+  const conteo = new Map<string, { total: number; hechas: number }>();
+  for (const t of tareasRes.data ?? []) {
+    const pid = (t as { proyecto_id: string }).proyecto_id;
+    if (!pid) continue;
+    const c = conteo.get(pid) ?? { total: 0, hechas: 0 };
+    c.total++;
+    if ((t as { estado: string }).estado === "hecha") c.hechas++;
+    conteo.set(pid, c);
+  }
+  return proyectos.map((p) => ({
+    ...p,
+    total_tareas: conteo.get(p.id)?.total ?? 0,
+    tareas_hechas: conteo.get(p.id)?.hechas ?? 0,
+  }));
+}
+
+// ============================================================================
+// Comentarios — migration 0012
+// ============================================================================
+export async function fetchComentariosTarea(tareaId: string): Promise<TareaComentario[]> {
+  const { data, error } = await createClient()
+    .from("tarea_comentarios")
+    .select("id,tarea_id,cuerpo,tags,created_at")
+    .eq("tarea_id", tareaId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as TareaComentario[];
+}
+
+/** Comentarios que contienen un @tag concreto (p.ej. "maria"). */
+export async function fetchComentariosPorTag(tag: string): Promise<TareaComentario[]> {
+  const { data, error } = await createClient()
+    .from("tarea_comentarios")
+    .select("id,tarea_id,cuerpo,tags,created_at")
+    .contains("tags", [tag.toLowerCase().replace(/^@/, "")])
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as TareaComentario[];
+}
+
+// ============================================================================
+// Estatus diario — migration 0013
+// ============================================================================
+
+/** Lista las entradas de estatus con sus comidas anidadas.
+ *  Opcionalmente filtrada por rango [desde, hasta] (YYYY-MM-DD). */
+export async function fetchEstatusList(
+  opts?: { desde?: string; hasta?: string; limit?: number },
+): Promise<EstatusConComidas[]> {
+  const supabase = createClient();
+  let q = supabase
+    .from("estatus_diarios")
+    .select("*, comidas:estatus_comidas(*)")
+    .order("fecha", { ascending: false })
+    .limit(opts?.limit ?? 365);
+  if (opts?.desde) q = q.gte("fecha", opts.desde);
+  if (opts?.hasta) q = q.lte("fecha", opts.hasta);
+  const { data, error } = await q;
+  if (error) throw error;
+  return ((data ?? []) as EstatusConComidas[]).map((e) => ({
+    ...e,
+    comidas: ((e.comidas ?? []) as EstatusConComidas["comidas"]).slice().sort(
+      (a, b) => a.orden - b.orden,
+    ),
+  }));
+}
+
+/** Una entrada concreta por fecha (YYYY-MM-DD) o null si no existe. */
+export async function fetchEstatusPorFecha(
+  fecha: string,
+): Promise<EstatusConComidas | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("estatus_diarios")
+    .select("*, comidas:estatus_comidas(*)")
+    .eq("fecha", fecha)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  const e = data as EstatusConComidas;
+  e.comidas = ((e.comidas ?? []) as EstatusConComidas["comidas"]).slice().sort(
+    (a, b) => a.orden - b.orden,
+  );
+  return e;
+}
+
+/** Una entrada concreta por id (para edición). */
+export async function fetchEstatusPorId(
+  id: string,
+): Promise<EstatusConComidas | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("estatus_diarios")
+    .select("*, comidas:estatus_comidas(*)")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  const e = data as EstatusConComidas;
+  e.comidas = ((e.comidas ?? []) as EstatusConComidas["comidas"]).slice().sort(
+    (a, b) => a.orden - b.orden,
+  );
+  return e;
+}
+
+/** Histórico plano (sin comidas) de los últimos N días — para cálculos
+ *  de score / rachas / patrón semanal. No incluye el día de HOY. */
+export async function fetchHabitosHistorico(
+  dias: number,
+): Promise<EstatusConComidas[]> {
+  const desde = new Date(Date.now() - dias * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
+  return fetchEstatusList({ desde });
 }
