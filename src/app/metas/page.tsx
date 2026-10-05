@@ -157,6 +157,7 @@ export default function MetasPage() {
   );
 
   const [filtro, setFiltro] = useState<Filtro>("todas");
+  const [tagsSel, setTagsSel] = useState<Set<string>>(new Set());
   const [guardandoId, setGuardandoId] = useState<string | null>(null);
   const [errorWig, setErrorWig] = useState<string | null>(null);
 
@@ -168,10 +169,34 @@ export default function MetasPage() {
     [metas],
   );
 
+  /** Todos los tags únicos de las metas del usuario, ordenados alfabéticamente. */
+  const todosLosTags = useMemo(() => {
+    const s = new Set<string>();
+    for (const m of metas) {
+      for (const t of m.meta.tags ?? []) s.add(t);
+    }
+    return Array.from(s).sort((a, b) => a.localeCompare(b, "es"));
+  }, [metas]);
+
   const filtradas = useMemo(() => {
-    if (filtro === "todas") return metas;
-    return metas.filter((m) => m.meta.ambito === filtro);
-  }, [metas, filtro]);
+    let res = metas;
+    if (filtro !== "todas") res = res.filter((m) => m.meta.ambito === filtro);
+    if (tagsSel.size > 0) {
+      res = res.filter((m) =>
+        (m.meta.tags ?? []).some((t) => tagsSel.has(t)),
+      );
+    }
+    return res;
+  }, [metas, filtro, tagsSel]);
+
+  function toggleTag(t: string) {
+    setTagsSel((prev) => {
+      const next = new Set(prev);
+      if (next.has(t)) next.delete(t);
+      else next.add(t);
+      return next;
+    });
+  }
 
   async function toggleWig(mp: MetaConPlan) {
     setErrorWig(null);
@@ -263,6 +288,43 @@ export default function MetasPage() {
           </button>
         ))}
       </div>
+
+      {/* Filtro por tags (AND con el filtro de ámbito) */}
+      {todosLosTags.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-border bg-card p-2 text-xs">
+          <span className="px-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Tags
+          </span>
+          {todosLosTags.map((t) => {
+            const activo = tagsSel.has(t);
+            return (
+              <button
+                key={t}
+                type="button"
+                onClick={() => toggleTag(t)}
+                aria-pressed={activo}
+                className={`rounded-full border px-2.5 py-1 transition-colors ${
+                  activo
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground"
+                }`}
+              >
+                #{t}
+                {activo && <span className="ml-1">×</span>}
+              </button>
+            );
+          })}
+          {tagsSel.size > 0 && (
+            <button
+              type="button"
+              onClick={() => setTagsSel(new Set())}
+              className="ml-auto text-[11px] text-muted-foreground underline-offset-4 hover:underline"
+            >
+              limpiar ({tagsSel.size})
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2">
         {filtradas.map((mp) => {
@@ -378,7 +440,9 @@ export default function MetasPage() {
         )}
         {!loading && metas.length > 0 && filtradas.length === 0 && (
           <div className="col-span-full rounded-xl border border-dashed border-border bg-muted/30 p-6 text-center text-sm text-muted-foreground">
-            No hay metas en este ámbito.
+            {tagsSel.size > 0
+              ? `No hay metas con los tags seleccionados${filtro !== "todas" ? ` en el ámbito ${filtro}` : ""}.`
+              : `No hay metas en este ámbito.`}
           </div>
         )}
       </div>

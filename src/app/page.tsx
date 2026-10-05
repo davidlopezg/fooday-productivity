@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { fetchContadores, fetchPlanHoy, fetchTareas } from "@/lib/queries";
+import { fetchContadores, fetchPlanHoy, fetchTareas, fetchWigs } from "@/lib/queries";
 import { useData } from "@/lib/useData";
 import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
+import { IconTarget } from "@/components/icons";
 import type { PlanDiario, PlanDiarioTarea, Tarea } from "@/lib/types";
 
 const SEMAFORO: Record<string, string> = {
@@ -20,24 +21,29 @@ const TONO_PRIORIDAD: Record<string, string> = {
   baja: "text-muted-foreground",
 };
 
+type Wig = Awaited<ReturnType<typeof fetchWigs>>[number];
+
 type Data = {
   plan: (PlanDiario & { tareas: PlanDiarioTarea[] }) | null;
   contadores: { tareasPendientes: number; metasActivas: number; capturasPendientes: number };
   pendientes: Tarea[];
+  wigs: Wig[];
 };
 
 export default function HoyPage() {
   const { data, loading } = useData<Data>(async () => {
-    const [plan, contadores, pendientes] = await Promise.all([
+    const [plan, contadores, pendientes, wigs] = await Promise.all([
       fetchPlanHoy(),
       fetchContadores(),
       fetchTareas("pendiente"),
+      fetchWigs(),
     ]);
-    return { plan, contadores, pendientes };
+    return { plan, contadores, pendientes, wigs };
   }, {
     plan: null,
     contadores: { tareasPendientes: 0, metasActivas: 0, capturasPendientes: 0 },
     pendientes: [],
+    wigs: [],
   });
 
   const stats = [
@@ -79,6 +85,60 @@ export default function HoyPage() {
           </Link>
         ))}
       </section>
+
+      {/* WIGs del día — recordatorio de foco */}
+      {data.wigs.length > 0 && (
+        <section
+          className="rounded-xl border-2 border-violet-500/40 bg-gradient-to-br from-violet-500/10 to-fuchsia-500/5 p-5"
+          aria-label="Metas enormemente importantes"
+        >
+          <header className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="flex items-center gap-2 font-semibold tracking-tight">
+              <IconTarget className="h-5 w-5 text-violet-500" />
+              Enormemente Importantes
+            </h2>
+            <Link
+              href="/metas"
+              className="text-xs text-muted-foreground underline-offset-4 hover:underline"
+            >
+              editar WIGs
+            </Link>
+          </header>
+          <ul className="space-y-2">
+            {data.wigs.map((w) => {
+              const pct =
+                w.total_tareas === 0
+                  ? 0
+                  : Math.round((w.tareas_hechas / w.total_tareas) * 100);
+              return (
+                <li
+                  key={w.id}
+                  className="flex items-center gap-3 rounded-lg border border-violet-500/30 bg-background/70 px-3 py-2.5"
+                >
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-500/20 text-sm font-bold tabular-nums text-violet-700 dark:text-violet-300">
+                    {w.wig_orden ?? "?"}
+                  </span>
+                  <Link
+                    href={`/metas/detalle?id=${w.id}`}
+                    className="min-w-0 flex-1 truncate text-sm font-medium hover:underline"
+                  >
+                    {w.titulo}
+                  </Link>
+                  <span className="hidden shrink-0 text-[11px] tabular-nums text-muted-foreground sm:inline">
+                    {w.tareas_hechas}/{w.total_tareas}
+                  </span>
+                  <div className="hidden h-1.5 w-24 overflow-hidden rounded-full bg-muted sm:block">
+                    <div
+                      className="h-full rounded-full bg-violet-500"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       <section className="rounded-xl border border-border bg-card p-6">
         <h2 className="mb-4 font-semibold tracking-tight">Plan de hoy</h2>

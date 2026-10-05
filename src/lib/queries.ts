@@ -92,6 +92,60 @@ export async function fetchMetas(): Promise<Meta[]> {
   return (data ?? []) as Meta[];
 }
 
+/** WIGs activos del usuario, ordenados por wig_orden.
+ *  Incluye métricas rápidas: total_tareas y tareas_hechas (sin unir periodos).
+ *  Pensada para /Hoy donde no se necesita el scorecard completo. */
+export async function fetchWigs(): Promise<
+  Array<{
+    id: string;
+    codigo: string | null;
+    titulo: string;
+    ambito: Meta["ambito"];
+    tags: string[];
+    wig_orden: number | null;
+    plazo: string | null;
+    total_tareas: number;
+    tareas_hechas: number;
+  }>
+> {
+  const supabase = createClient();
+  const { data: metas, error: e1 } = await supabase
+    .from("metas")
+    .select("id,codigo,titulo,ambito,tags,wig_orden,plazo")
+    .eq("es_wig", true)
+    .order("wig_orden", { ascending: true, nullsFirst: false });
+  if (e1) throw e1;
+  const wigs = (metas ?? []) as Meta[];
+  if (wigs.length === 0) return [];
+  const ids = wigs.map((m) => m.id);
+  const { data: tareas, error: e2 } = await supabase
+    .from("tareas")
+    .select("meta_id,estado")
+    .in("meta_id", ids);
+  if (e2) throw e2;
+  const counts = new Map<string, { total: number; hechas: number }>();
+  for (const t of (tareas ?? []) as Array<{ meta_id: string; estado: string }>) {
+    const c = counts.get(t.meta_id) ?? { total: 0, hechas: 0 };
+    c.total++;
+    if (t.estado === "hecha") c.hechas++;
+    counts.set(t.meta_id, c);
+  }
+  return wigs.map((m) => {
+    const c = counts.get(m.id) ?? { total: 0, hechas: 0 };
+    return {
+      id: m.id,
+      codigo: m.codigo,
+      titulo: m.titulo,
+      ambito: m.ambito,
+      tags: m.tags ?? [],
+      wig_orden: m.wig_orden,
+      plazo: m.plazo,
+      total_tareas: c.total,
+      tareas_hechas: c.hechas,
+    };
+  });
+}
+
 export async function fetchRituales(): Promise<Ritual[]> {
   const { data } = await createClient()
     .from("rituales")
