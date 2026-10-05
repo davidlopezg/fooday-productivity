@@ -13,6 +13,7 @@ import {
   guardarNotasPlan,
   renombrarTareaPlan,
   moverTareaABloque,
+  marcarHecha,
 } from "@/lib/mutations";
 import { useData } from "@/lib/useData";
 import { useConfig } from "@/lib/configStore";
@@ -127,6 +128,16 @@ export default function PlanDiarioPage() {
     return tareasQ.data.filter((t) => ids.has(t.id));
   }, [planSemanalQ.data, tareasQ.data, today]);
 
+  // Tareas activas cuya fecha_fin es HOY (no requieren asignación manual).
+  const tareasVencenHoy = useMemo<Tarea[]>(() => {
+    const hoy = HOY();
+    return tareasQ.data.filter(
+      (t) =>
+        t.fecha_fin === hoy &&
+        (t.estado === "pendiente" || t.estado === "en_progreso" || t.estado === "bloqueada"),
+    );
+  }, [tareasQ.data]);
+
   // ── Parte 1: input ──
   const [estado, setEstado] = useState<EstadoEmocional>({
     despertar: "Cansado pero estable",
@@ -236,6 +247,7 @@ export default function PlanDiarioPage() {
           origen: null,
           notas: null,
           completada_at: null,
+          fecha_fin: null,
           subtareas: null,
           criterio_terminacion: null,
           recurrencia_tipo: null,
@@ -481,7 +493,57 @@ export default function PlanDiarioPage() {
           </div>
         </details>
 
-        {/* 1C — Tareas programadas para HOY (read-only, vienen de /semana) */}
+        {/* 1C — Vencen hoy (fecha_fin = hoy, no requieren asignación manual) */}
+        {tareasVencenHoy.length > 0 && (
+          <div className="mt-5">
+            <div className="mb-1 flex items-center gap-2 text-sm font-medium">
+              <span>⏰ Vencen hoy</span>
+              <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                Por fecha de finalización
+              </span>
+              <span className="ml-auto text-xs text-muted-foreground">
+                {tareasVencenHoy.length} tarea{tareasVencenHoy.length === 1 ? "" : "s"}
+              </span>
+            </div>
+            <p className="mb-2 text-xs text-muted-foreground">
+              Tareas activas cuya fecha de finalización es hoy. Márcalas como hechas desde aquí sin salirte.
+            </p>
+            <ul className="space-y-1.5">
+              {tareasVencenHoy.map((t) => (
+                <li
+                  key={t.id}
+                  className="flex items-center justify-between gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-sm"
+                >
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="truncate">{t.titulo}</span>
+                    {t.prioridad && (
+                      <span className="shrink-0 rounded-full border border-border bg-background px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                        {t.prioridad}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await marcarHecha(t.id);
+                        tareasQ.reload();
+                      } catch (e) {
+                        console.error("[plan-diario] marcarHecha falló:", e);
+                      }
+                    }}
+                    className="shrink-0 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[11px] font-medium text-emerald-700 hover:bg-emerald-500/20 dark:text-emerald-300"
+                    title="Marcar como hecha"
+                  >
+                    ✓ Hecha
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* 1D — Tareas programadas para HOY (read-only, vienen de /semana) */}
         <div className="mt-5">
           <div className="mb-1 flex items-center gap-2 text-sm font-medium">
             <span>📅 Programadas para hoy</span>

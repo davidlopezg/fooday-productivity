@@ -855,6 +855,7 @@ export function EditarModal({
     prioridad: string;
     estado: string;
     deadline: string;
+    fecha_fin: string;
     capa: string;
     pts: string;
     esfuerzo: string;
@@ -865,6 +866,7 @@ export function EditarModal({
     prioridad: tarea.prioridad ?? "media",
     estado: tarea.estado,
     deadline: tarea.deadline ?? "",
+    fecha_fin: tarea.fecha_fin ?? "",
     capa: tarea.capa ?? "",
     pts: tarea.pts != null ? String(tarea.pts) : "",
     esfuerzo: tarea.esfuerzo ?? "",
@@ -925,6 +927,7 @@ export function EditarModal({
           prioridad: form.prioridad,
           estado: form.estado,
           deadline: form.deadline || null,
+          fecha_fin: form.fecha_fin || null,
           capa: form.capa || null,
           pts: form.pts ? Number(form.pts) : null,
           esfuerzo: form.esfuerzo || null,
@@ -1009,8 +1012,12 @@ export function EditarModal({
               <input className={field} value={form.capa} onChange={(e) => setForm({ ...form, capa: e.target.value })} />
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs text-muted-foreground">Deadline</span>
-              <input className={field} value={form.deadline} onChange={(e) => setForm({ ...form, deadline: e.target.value })} />
+              <span className="mb-1 block text-xs text-muted-foreground">Deadline (nota)</span>
+              <input className={field} value={form.deadline} onChange={(e) => setForm({ ...form, deadline: e.target.value })} placeholder="esta semana, mañana…" />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs text-muted-foreground">Fecha finalización</span>
+              <input type="date" className={field} value={form.fecha_fin} onChange={(e) => setForm({ ...form, fecha_fin: e.target.value })} />
             </label>
             <label className="block">
               <span className="mb-1 block text-xs text-muted-foreground">Pts</span>
@@ -1091,6 +1098,7 @@ export function CrearModal({
     prioridad: string;
     estado: string;
     deadline: string;
+    fecha_fin: string;
     capa: string;
     pts: string;
     esfuerzo: string;
@@ -1101,6 +1109,7 @@ export function CrearModal({
     prioridad: "media",
     estado: "pendiente",
     deadline: "",
+    fecha_fin: "",
     capa: "",
     pts: "",
     esfuerzo: "",
@@ -1146,6 +1155,7 @@ export function CrearModal({
             prioridad: form.prioridad,
             estado: form.estado,
             deadline: form.deadline || null,
+            fecha_fin: form.fecha_fin || null,
             capa: form.capa || null,
             pts: form.pts ? Number(form.pts) : null,
             esfuerzo: form.esfuerzo || null,
@@ -1270,8 +1280,12 @@ export function CrearModal({
               <input className={field} value={form.capa} onChange={(e) => setForm({ ...form, capa: e.target.value })} />
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs text-muted-foreground">Deadline</span>
-              <input className={field} value={form.deadline} onChange={(e) => setForm({ ...form, deadline: e.target.value })} />
+              <span className="mb-1 block text-xs text-muted-foreground">Deadline (nota)</span>
+              <input className={field} value={form.deadline} onChange={(e) => setForm({ ...form, deadline: e.target.value })} placeholder="esta semana, mañana…" />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs text-muted-foreground">Fecha finalización</span>
+              <input type="date" className={field} value={form.fecha_fin} onChange={(e) => setForm({ ...form, fecha_fin: e.target.value })} />
             </label>
             <label className="block">
               <span className="mb-1 block text-xs text-muted-foreground">Pts</span>

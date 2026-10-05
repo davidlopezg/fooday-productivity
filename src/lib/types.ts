@@ -83,6 +83,76 @@ export interface Meta {
   plazo: string | null;
 }
 
+// ============================================================================
+// Plan trimestral (migration 0015)
+// Capa nueva: metas → periodos → resultados → tareas. La tabla `metas` y
+// `tareas` no se modifican (salvo +1 columna `resultado_periodo_id` en
+// tareas). Convive con `okrs` / `key_results` / `hitos` ya existentes.
+// ============================================================================
+
+/** Fila persistida en `periodos`. Rango temporal con tipo flexible
+ *  (trimestre / mes / custom) para soportar tanto Q1-Q4 como meses o
+ *  rangos libres. */
+export interface Periodo {
+  id: string;
+  tipo: "trimestre" | "mes" | "custom";
+  anio: number;
+  numero: number;
+  nombre: string;
+  fecha_inicio: string; // YYYY-MM-DD
+  fecha_fin: string;    // YYYY-MM-DD
+}
+
+export type EstadoResultado =
+  | "pendiente"
+  | "en_progreso"
+  | "completado"
+  | "descartado";
+
+/** Fila persistida en `resultados_periodo` (resultado esperado por
+ *  trimestre/mes dentro de una meta). */
+export interface ResultadoPeriodo {
+  id: string;
+  meta_id: string;
+  periodo_id: string;
+  titulo: string;
+  descripcion: string | null;
+  metrica: string | null;
+  valor_objetivo: number | null;
+  valor_actual: number | null;
+  unidad: string | null;
+  estado: EstadoResultado;
+  peso: number;
+  orden: number;
+}
+
+/** Vista agregada: un resultado con su periodo y sus tareas anidadas.
+ *  Es lo que devuelve `fetchMetaConPlan` y `fetchPlanTrimestral`. */
+export interface ResultadoConTareas extends ResultadoPeriodo {
+  periodo: Periodo;
+  tareas: Tarea[];
+}
+
+/** Meta con sus resultados (cada uno con su periodo + tareas) y
+ *  métricas calculadas en cliente. */
+export interface MetaConPlan {
+  meta: Meta;
+  resultados: ResultadoConTareas[];
+  /** Nº total de tareas vinculadas (en todos los resultados). */
+  total_tareas: number;
+  /** Nº de tareas hechas. */
+  tareas_hechas: number;
+  /** Progreso 0..1 (media ponderada por peso de resultado). */
+  progreso: number;
+}
+
+/** Solo las tareas sin meta asignada — la "bandeja de entrada" del plan. */
+export interface TareaSinMeta {
+  tarea: Tarea;
+  /** True si tiene meta pero no resultado_periodo; false si no tiene ni meta. */
+  tiene_meta_sin_resultado: boolean;
+}
+
 /**
  * Forma "wire" de una subtarea — la que produce/acepta la IA y la UI
  * (sin id, sin tarea_id). Cuando la subtarea ya está persistida, se usa
@@ -135,6 +205,9 @@ export interface Tarea {
   origen: string | null;
   notas: string | null;
   completada_at: string | null;
+  /** Fecha dura de finalización (YYYY-MM-DD). Null si no se ha fijado.
+   *  Aparece automáticamente en /plan-diario cuando coincide con HOY. */
+  fecha_fin: string | null;
   /** Subtareas (desglose) — vienen con la tarea al hacer nested select. */
   subtareas: TareaSubtarea[] | null;
   /** Frase "Esta tarea está HECHA cuando __________". */
@@ -149,6 +222,9 @@ export interface Tarea {
   recurrencia_dia_mes: number | null;
   /** Última fecha en la que se generó la siguiente copia. */
   recurrencia_ultima_generada: string | null;
+  /** FK opcional a `resultados_periodo` (migration 0015). Null = bandeja
+   *  de entrada (tarea suelta, sin meta o meta sin resultado). */
+  resultado_periodo_id: string | null;
 }
 
 export interface Ritual {

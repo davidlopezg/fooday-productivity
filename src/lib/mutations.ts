@@ -57,6 +57,7 @@ export interface TareaCampos {
   esfuerzo?: string | null;
   criterio_terminacion?: string | null;
   proyecto_id?: string | null;
+  fecha_fin?: string | null;
 }
 
 export async function actualizarTarea(datos: TareaCampos) {
@@ -91,6 +92,7 @@ export async function crearTarea(datos: {
   esfuerzo?: string | null;
   criterio_terminacion?: string | null;
   proyecto_id?: string | null;
+  fecha_fin?: string | null;
   subtareas?: Subtarea[] | null;
 }): Promise<TareaCreada> {
   const supabase = createClient();
@@ -111,6 +113,7 @@ export async function crearTarea(datos: {
       esfuerzo: datos.esfuerzo ?? null,
       criterio_terminacion: datos.criterio_terminacion ?? null,
       proyecto_id: datos.proyecto_id ?? null,
+      fecha_fin: datos.fecha_fin ?? null,
       origen: "manual",
     })
     .select("id,titulo")
@@ -151,6 +154,7 @@ export async function crearTareaConIA(
     capa?: string | null;
     pts?: number | null;
     esfuerzo?: string | null;
+    fecha_fin?: string | null;
     /** Si el usuario escribió algo manualmente, NO se sobreescribe con IA. */
     criterio_terminacion_manual?: string | null;
     /** Si el usuario metió subtareas a mano, NO se sobreescribe con IA. */
@@ -187,6 +191,7 @@ export async function crearTareaConIA(
     capa: datos.capa,
     pts: datos.pts,
     esfuerzo: datos.esfuerzo,
+    fecha_fin: datos.fecha_fin ?? null,
     criterio_terminacion: criterioManual,
     subtareas: subtareasLimpias,
   });

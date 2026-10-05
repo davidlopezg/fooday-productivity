@@ -61,6 +61,33 @@ function Badge({ tone, children }: { tone: string; children: React.ReactNode }) 
 const inputCls =
   "h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring";
 
+/** Pinta la fecha_fin con color segun su estado vs hoy.
+ *  Devuelve null si no hay fecha_fin (en ese caso, el caller hace fallback a `deadline` texto). */
+function FechaFinCell({ fecha_fin }: { fecha_fin: string | null }) {
+  if (!fecha_fin) return null;
+  const d = new Date(fecha_fin + "T00:00:00");
+  if (isNaN(d.getTime())) return null;
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  const diff = Math.round((d.getTime() - hoy.getTime()) / 86400000);
+  const lbl = d.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit" });
+  if (diff < 0) {
+    return (
+      <span className="text-[11px] font-medium text-red-600 dark:text-red-400">
+        ⚠️ {lbl}
+      </span>
+    );
+  }
+  if (diff === 0) {
+    return (
+      <span className="text-[11px] font-medium text-amber-600 dark:text-amber-400">
+        📍 {lbl} (hoy)
+      </span>
+    );
+  }
+  return <span className="text-[11px] text-muted-foreground">📅 {lbl}</span>;
+}
+
 /** Acciones de una tarea. Compartidas por la tabla (escritorio) y las tarjetas (movil). */
 function TareaAcciones({
   t,
@@ -291,7 +318,8 @@ export function TasksTable({
                     {t.capa && (
                       <span className="text-[11px] text-muted-foreground">{t.capa}</span>
                     )}
-                    {t.deadline && (
+                    <FechaFinCell fecha_fin={t.fecha_fin} />
+                    {!t.fecha_fin && t.deadline && (
                       <span className="text-[11px] text-muted-foreground">📅 {t.deadline}</span>
                     )}
                     {t.pts != null && (
@@ -397,7 +425,15 @@ export function TasksTable({
                   )}
                 </td>
                 <td className="px-3 py-3 text-muted-foreground">{t.capa ?? "—"}</td>
-                <td className="px-3 py-3 text-muted-foreground">{t.deadline ?? "—"}</td>
+                <td className="px-3 py-3">
+                  <FechaFinCell fecha_fin={t.fecha_fin} />
+                  {!t.fecha_fin && t.deadline && (
+                    <span className="text-muted-foreground">{t.deadline}</span>
+                  )}
+                  {!t.fecha_fin && !t.deadline && (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </td>
                 <td className="px-3 py-3 text-muted-foreground">{t.pts ?? "—"}</td>
                 <td className="px-3 py-3">
                   <Badge tone={TONO_ESTADO[t.estado] ?? TONO_ESTADO.pendiente}>
