@@ -71,6 +71,8 @@ export interface Vision {
   orden: number;
 }
 
+export type AmbitoMeta = "personal" | "profesional";
+
 export interface Meta {
   id: string;
   area_id: string | null;
@@ -81,6 +83,14 @@ export interface Meta {
   prioridad: Prioridad | null;
   rice: number | null;
   plazo: string | null;
+  /** Migration 0018: ámbito personal vs profesional. Null = sin clasificar. */
+  ambito: AmbitoMeta | null;
+  /** Etiquetas libres para filtrar/agrupar (p.ej. ['salud','finanzas']). */
+  tags: string[];
+  /** Wildly Important Goal (4DX): meta de alto impacto seleccionada. Máx 3. */
+  es_wig: boolean;
+  /** Posición en el panel WIG (1-3). Único por owner cuando es_wig=true. */
+  wig_orden: number | null;
 }
 
 // ============================================================================

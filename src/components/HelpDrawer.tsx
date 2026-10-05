@@ -100,6 +100,18 @@ export const AYUDA_POR_RUTA: Record<
     pilares: [2],
     items: [
       {
+        titulo: "Enfoque en lo Enormemente Importante (WIG)",
+        cuerpo:
+          "Solo un pequeño número de metas de alto impacto a la vez — idealmente 1 a 3. La simplicidad en el número de objetivos permite concentrar la energía con la intensidad suficiente para generar resultados reales. Usa la diana 🎯 para ascender una meta a WIG. Si intentas sostener 10 metas 'importantes' a la vez, no sostienes ninguna.",
+        pilar: 2,
+      },
+      {
+        titulo: "Personal vs profesional: dos ámbitos, un solo tú",
+        cuerpo:
+          "Clasificar por ámbito te permite ver si estás descuidando una esfera (típico: todo profesional, nada personal, y a los 3 meses el cuerpo pasa factura). Filtra por ámbito para ver el balance. La meta de salud y la de familia compiten con la de negocio por tu energía: el panel WIG te obliga a elegir.",
+        pilar: 2,
+      },
+      {
         titulo: "Cada meta debe tener Key Results medibles",
         cuerpo:
           "Una meta sin KR medible es un deseo. El Scorecard de /metas/plan te dice si vas en línea, por encima o por debajo del ritmo esperado para el trimestre. Si una meta no aparece en el scorecard, plantéate archivarla.",

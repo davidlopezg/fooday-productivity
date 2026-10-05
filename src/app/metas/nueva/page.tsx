@@ -6,7 +6,7 @@ import { useState } from "react";
 import { crearMeta, ensurePeriodosAnio } from "@/lib/mutations";
 import { fetchAreas } from "@/lib/queries";
 import { useData } from "@/lib/useData";
-import type { Area } from "@/lib/types";
+import type { AmbitoMeta, Area } from "@/lib/types";
 import { IconX } from "@/components/icons";
 
 const ESTADOS = [
@@ -16,6 +16,11 @@ const ESTADOS = [
   "completada",
 ] as const;
 const PRIORIDADES = ["critica", "alta", "media", "baja"] as const;
+
+const AMBITOS: Array<{ id: AmbitoMeta; label: string }> = [
+  { id: "personal", label: "👤 Personal" },
+  { id: "profesional", label: "💼 Profesional" },
+];
 
 export default function NuevaMetaPage() {
   const router = useRouter();
@@ -27,6 +32,8 @@ export default function NuevaMetaPage() {
   const [prioridad, setPrioridad] = useState<(typeof PRIORIDADES)[number]>("media");
   const [plazo, setPlazo] = useState("");
   const [areaId, setAreaId] = useState<string>("");
+  const [ambito, setAmbito] = useState<AmbitoMeta | "">("");
+  const [tags, setTags] = useState("");
   const [autoTrimestres, setAutoTrimestres] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +53,11 @@ export default function NuevaMetaPage() {
         prioridad,
         area_id: areaId || null,
         plazo: plazo.trim() || null,
+        ambito: ambito || null,
+        tags: tags
+          .split(",")
+          .map((t) => t.trim().replace(/^#/, ""))
+          .filter(Boolean),
       });
       if (autoTrimestres) {
         // Mejor esfuerzo: si falla, no bloquea la creación de la meta.
@@ -154,6 +166,35 @@ export default function NuevaMetaPage() {
               value={plazo}
               onChange={(e) => setPlazo(e.target.value)}
               placeholder="p.ej. 2026-Q3"
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium">Ámbito</span>
+            <select
+              className={field}
+              value={ambito}
+              onChange={(e) => setAmbito(e.target.value as AmbitoMeta | "")}
+            >
+              <option value="">— Sin clasificar —</option>
+              {AMBITOS.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block sm:col-span-2">
+            <span className="mb-1 block text-xs font-medium">
+              Tags{" "}
+              <span className="font-normal text-muted-foreground">
+                (separadas por coma, sin #)
+              </span>
+            </span>
+            <input
+              className={field}
+              value={tags}
+              onChange={(e) => setTags(e.target.value)}
+              placeholder="p.ej. salud, ansiedad, hábitos"
             />
           </label>
         </div>

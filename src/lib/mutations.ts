@@ -1422,6 +1422,8 @@ export async function crearMeta(datos: {
   area_id?: string | null;
   codigo?: string | null;
   plazo?: string | null;
+  ambito?: Meta["ambito"];
+  tags?: string[];
 }): Promise<Meta> {
   const { data, error } = await createClient()
     .from("metas")
@@ -1433,6 +1435,8 @@ export async function crearMeta(datos: {
       area_id: datos.area_id ?? null,
       codigo: datos.codigo?.trim() || null,
       plazo: datos.plazo?.trim() || null,
+      ambito: datos.ambito ?? null,
+      tags: datos.tags ?? [],
     })
     .select("*")
     .single();
@@ -1442,13 +1446,25 @@ export async function crearMeta(datos: {
 
 export async function actualizarMeta(
   id: string,
-  campos: Partial<Pick<Meta, "titulo" | "descripcion" | "estado" | "prioridad" | "area_id" | "plazo">>,
+  campos: Partial<Pick<Meta, "titulo" | "descripcion" | "estado" | "prioridad" | "area_id" | "plazo" | "ambito" | "tags">>,
 ): Promise<void> {
   const { error } = await createClient()
     .from("metas")
     .update(campos)
     .eq("id", id);
   if (error) throw new Error(`No se pudo actualizar la meta: ${error.message}`);
+}
+
+/** Marca/desmarca una meta como WIG (Wildly Important Goal).
+ *  Llamada a la RPC `toggle_meta_wig` que respeta el límite de 3.
+ *  Devuelve `true` si se aplicó, `false` si ya había 3 WIGs. */
+export async function marcarWig(metaId: string, esWig: boolean): Promise<boolean> {
+  const { data, error } = await createClient().rpc("toggle_meta_wig", {
+    p_meta_id: metaId,
+    p_es_wig: esWig,
+  });
+  if (error) throw new Error(`No se pudo actualizar el WIG: ${error.message}`);
+  return data === true;
 }
 
 export async function archivarMeta(id: string, archivada = true): Promise<void> {
