@@ -25,12 +25,21 @@ const VERSION_CHECK_SCRIPT = `
   try {
     var v = ${JSON.stringify(APP_VERSION)};
     var bp = ${JSON.stringify(basePath)};
+
+    // Guard anti-bucle: máximo 3 recargas por versión. Si tras 3 sigue
+    // habiendo mismatch, paramos para no dejar al usuario encerrado en
+    // un loop (defensa por si version.json se publica malformado).
+    var key = '_vrc_' + v;
+    var n = parseInt(sessionStorage.getItem(key) || '0', 10);
+    if (n >= 3) return;
+
     var u = (bp || '') + '/version.json?_=' + Date.now();
     fetch(u, { cache: 'no-store', credentials: 'omit' })
       .then(function(r){ return r && r.ok ? r.json() : null; })
       .catch(function(){ return null; })
       .then(function(d){
         if (d && d.version && d.version !== v) {
+          sessionStorage.setItem(key, String(n + 1));
           var url = new URL(window.location.href);
           url.searchParams.set('_v', Date.now());
           window.location.replace(url.toString());

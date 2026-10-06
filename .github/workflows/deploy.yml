@@ -32,7 +32,11 @@ jobs:
           # Para GitHub Pages de proyecto: /<nombre-del-repo>
           NEXT_PUBLIC_BASE_PATH: /${{ github.event.repository.name }}
       - name: Escribir version.json
-        run: echo "{\"version\":\"${{ github.sha }}\",\"t\":$(date +%s)000}" > out/version.json
+        # IMPORTANTE: tiene que ser el SHORT SHA (7 chars) para coincidir
+        # con NEXT_PUBLIC_APP_VERSION que se inyecta en next.config.ts
+        # (también .slice(0, 7)). Si no coinciden, el script anti-cache del
+        # layout entraría en bucle infinito de recargas.
+        run: echo "{\"version\":\"${GITHUB_SHA:0:7}\",\"t\":$(date +%s)000}" > out/version.json
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
