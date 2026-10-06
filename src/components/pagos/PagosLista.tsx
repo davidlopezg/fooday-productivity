@@ -67,10 +67,10 @@ function proximoLunesISO(): string {
 
 type Tab = "lunes" | "pendientes" | "historico";
 
-const TABS: { key: Tab; label: string }[] = [
-  { key: "lunes", label: "Este lunes" },
-  { key: "pendientes", label: "Pendientes" },
-  { key: "historico", label: "Histórico" },
+const TABS: { key: Tab; label: string; descripcion: string }[] = [
+  { key: "lunes", label: "Este lunes", descripcion: "¿Qué hago esta semana?" },
+  { key: "pendientes", label: "Pendientes", descripcion: "¿Qué me queda por hacer en total?" },
+  { key: "historico", label: "Histórico", descripcion: "¿Qué ya está cerrado?" },
 ];
 
 export function PagosLista() {
@@ -177,21 +177,26 @@ export function PagosLista() {
     <div className="space-y-4">
       {/* Cabecera con tabs + botón nuevo */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex gap-1 rounded-lg border border-border bg-card p-1">
-          {TABS.map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => setTab(t.key)}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                tab === t.key
-                  ? "bg-accent text-accent-foreground"
-                  : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
+        <div>
+          <div className="flex gap-1 rounded-lg border border-border bg-card p-1">
+            {TABS.map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => setTab(t.key)}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  tab === t.key
+                    ? "bg-accent text-accent-foreground"
+                    : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-1.5 px-1 text-xs italic text-muted-foreground">
+            {TABS.find((t) => t.key === tab)?.descripcion}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           {/* Buscador */}
