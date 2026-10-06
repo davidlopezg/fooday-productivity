@@ -16,7 +16,7 @@ import {
   type EstadoPago,
   type PagoConUrgencia,
 } from "@/lib/pagos/types";
-import { IconPlus } from "@/components/icons";
+import { IconPlus, IconSearch, IconX } from "@/components/icons";
 
 /** Estado del modal activo. Solo uno a la vez. */
 type ModalState =
@@ -24,6 +24,21 @@ type ModalState =
   | { tipo: "editar"; pago: PagoConUrgencia }
   | { tipo: "parcial"; pago: PagoConUrgencia }
   | null;
+
+/** Filtra una lista de pagos por texto libre (proveedor o concepto).
+ *  Case-insensitive, ignora acentos. */
+function filtrarPagos(
+  pagos: PagoConUrgencia[],
+  busqueda: string,
+): PagoConUrgencia[] {
+  if (!busqueda.trim()) return pagos;
+  const norm = (s: string) =>
+    s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const q = norm(busqueda.trim());
+  return pagos.filter(
+    (p) => norm(p.proveedor).includes(q) || norm(p.concepto).includes(q),
+  );
+}
 
 const fmtEUR = (n: number) =>
   new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(n);
@@ -59,6 +74,7 @@ export function PagosLista() {
   const [tab, setTab] = useState<Tab>("lunes");
   const [refreshKey, setRefreshKey] = useState(0);
   const [modal, setModal] = useState<ModalState>(null);
+  const [busqueda, setBusqueda] = useState("");
 
   // Datos del tab "lunes": programado para el próximo lunes + urgentes pr. 7d
   const lunesISO = useMemo(() => proximoLunesISO(), []);
@@ -99,7 +115,16 @@ export function PagosLista() {
       .catch((e) => console.warn("[pagos] refresh_vencidos falló:", e));
   }, []);
 
-  const reload = () => setRefreshKey((k) => k + 1);
+  /** Refresco robusto: actualiza `vencido` en la BD + cambia el key
+   *  para que `useData` revalide. Usar SIEMPRE después de una mutación. */
+  const reload = () => {
+    // Sincrono en la firma (devuelve void) para encajar con el tipo
+    // `onChanged: () => void` que espera PagoCard. La promesa del refresh
+    // se lanza en background; al resolverse, cambia el refreshKey.
+    refreshPagosVencidos()
+      .catch((e) => console.warn("[pagos] refresh_vencidos falló:", e))
+      .finally(() => setRefreshKey((k) => k + 1));
+  };
 
   const isLoading =
     lunesQ.loading ||
@@ -123,6 +148,24 @@ export function PagosLista() {
     0,
   );
 
+  // Filtrado por búsqueda (cliente, sin query nueva)
+  const lunesFiltrados = useMemo(
+    () => filtrarPagos(lunesQ.data, busqueda),
+    [lunesQ.data, busqueda],
+  );
+  const urgentesFiltrados = useMemo(
+    () => filtrarPagos(urgentesQ.data, busqueda),
+    [urgentesQ.data, busqueda],
+  );
+  const pendientesFiltrados = useMemo(
+    () => filtrarPagos(pendientesQ.data, busqueda),
+    [pendientesQ.data, busqueda],
+  );
+  const historicoFiltrado = useMemo(
+    () => filtrarPagos(historicoQ.data, busqueda),
+    [historicoQ.data, busqueda],
+  );
+
   return (
     <div className="space-y-4">
       {/* Cabecera con tabs + botón nuevo */}
@@ -143,15 +186,59 @@ export function PagosLista() {
             </button>
           ))}
         </div>
-        <button
-          type="button"
-          onClick={() => setModal({ tipo: "crear" })}
-          className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground shadow-sm hover:opacity-90"
-        >
-          <IconPlus className="h-4 w-4" />
-          Nuevo pago
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Buscador */}
+          <div className="relative">
+            <IconSearch className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="search"
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              placeholder="Buscar proveedor o concepto…"
+              className="h-9 w-56 rounded-md border border-input bg-background pl-8 pr-8 text-sm outline-none focus:ring-2 focus:ring-ring"
+            />
+            {busqueda && (
+              <button
+                type="button"
+                onClick={() => setBusqueda("")}
+                aria-label="Limpiar búsqueda"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+              >
+                <IconX className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setModal({ tipo: "crear" })}
+            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground shadow-sm hover:opacity-90"
+          >
+            <IconPlus className="h-4 w-4" />
+            Nuevo pago
+          </button>
+        </div>
       </div>
+
+      {/* Banner "filtrando" */}
+      {busqueda && (
+        <div className="flex items-center justify-between rounded-md border border-blue-500/20 bg-blue-500/5 px-3 py-2 text-xs">
+          <span>
+            Filtrando por &quot;<strong>{busqueda}</strong>&quot;:{" "}
+            {tab === "lunes"
+              ? `${lunesFiltrados.length} del lunes + ${urgentesFiltrados.length} urgentes`
+              : tab === "pendientes"
+              ? `${pendientesFiltrados.length} pendientes`
+              : `${historicoFiltrado.length} históricos`}
+          </span>
+          <button
+            type="button"
+            onClick={() => setBusqueda("")}
+            className="rounded px-2 py-0.5 text-blue-700 hover:bg-blue-500/10 dark:text-blue-300"
+          >
+            Limpiar
+          </button>
+        </div>
+      )}
 
       {error && (
         <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-4 text-sm">
@@ -173,8 +260,8 @@ export function PagosLista() {
         <TabEsteLunes
           lunesISO={lunesISO}
           lunesDate={lunesDate}
-          pagosLunes={lunesQ.data}
-          pagosUrgentes={urgentesQ.data}
+          pagosLunes={lunesFiltrados}
+          pagosUrgentes={urgentesFiltrados}
           totalLunes={totalLunes}
           totalUrgentes={totalUrgentes}
           onChanged={reload}
@@ -186,7 +273,7 @@ export function PagosLista() {
 
       {tab === "pendientes" && (
         <TabPendientes
-          pagos={pendientesQ.data}
+          pagos={pendientesFiltrados}
           total={totalPendientes}
           onChanged={reload}
           onEdit={(pago) => setModal({ tipo: "editar", pago })}
@@ -197,7 +284,7 @@ export function PagosLista() {
 
       {tab === "historico" && (
         <TabHistorico
-          pagos={historicoQ.data}
+          pagos={historicoFiltrado}
           onEdit={(pago) => setModal({ tipo: "editar", pago })}
           loading={historicoQ.loading}
         />

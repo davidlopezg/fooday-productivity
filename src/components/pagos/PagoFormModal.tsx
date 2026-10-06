@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { Modal } from "@/components/pagos/Modal";
+import { SubirFactura } from "@/components/pagos/SubirFactura";
+import { detectarCategoria, type FacturaExtraida } from "@/lib/pagos/parser-pdf";
 import {
   CATEGORIAS_PAGO,
   CATEGORIA_ICONO,
@@ -190,6 +192,22 @@ export function PagoFormModal({
       )}
 
       <form id="pago-form" onSubmit={handleSubmit} className="space-y-3">
+        {/* Subir PDF (solo en modo crear) */}
+        {modo === "crear" && (
+          <SubirFactura
+            onAplicar={(datos: FacturaExtraida) => {
+              if (datos.proveedor) setProveedor(datos.proveedor);
+              if (datos.concepto) setConcepto(datos.concepto);
+              if (datos.importe != null) setImporteTotal(datos.importe.toFixed(2));
+              if (datos.fechaEmision) setFechaEmision(datos.fechaEmision);
+              if (datos.fechaVencimiento) setFechaVencimiento(datos.fechaVencimiento);
+              if (datos.proveedor || datos.concepto) {
+                setCategoria(detectarCategoria(datos.proveedor ?? "", datos.concepto ?? ""));
+              }
+            }}
+          />
+        )}
+
         <div className="grid grid-cols-2 gap-3">
           <Field label="Proveedor" required>
             <input
