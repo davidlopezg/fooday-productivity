@@ -211,6 +211,197 @@ export default function DocsPage() {
         </section>
       ))}
 
+      {/* =====================================================================
+          Apéndice · Evidencia científica sobre bloques de enfoque profundo
+          Respaldo cuantitativo y experimental a los pilares 1, 3 y 5.
+         ===================================================================== */}
+      <section className="rounded-2xl border-2 border-emerald-500/30 bg-gradient-to-br from-emerald-500/5 to-sky-500/5 p-6 sm:p-8">
+        <header>
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+            Apéndice · Evidencia científica
+          </div>
+          <h2 className="mt-1 text-2xl font-bold tracking-tight">
+            Por qué ~4 horas de enfoque profundo superan a 16 horas de trabajo fragmentado
+          </h2>
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+            Aunque tus fuentes{" "}
+            <strong>no contienen un estudio estadístico específico sobre el "1% de los autónomos más ricos del mundo"</strong>,
+            sí ofrecen abundante evidencia científica (incluyendo experimentos de neurociencia,
+            psicología del rendimiento y un metaanálisis cuantitativo masivo) que demuestra por
+            qué trabajar en{" "}
+            <strong>bloques reducidos de alta concentración (alrededor de 4 horas diarias)</strong>{" "}
+            es inmensamente más efectivo y productivo que vivir estresado trabajando jornadas de
+            16 horas [1-3].
+          </p>
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+            A continuación se detallan los hallazgos clave extraídos de tus fuentes:
+          </p>
+        </header>
+
+        <hr className="my-6 border-border" />
+
+        {/* ── 1. Límite cognitivo ── */}
+        <h3 className="text-base font-semibold">
+          1. El límite cognitivo del cerebro (~4 horas de enfoque profundo)
+        </h3>
+        <ul className="mt-3 space-y-3 text-sm leading-relaxed text-muted-foreground">
+          <li className="flex gap-2">
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+            <span>
+              <strong>Límite biológico de la concentración</strong>: Las investigaciones sobre
+              rendimiento experto de K. Anders Ericsson revelan que la capacidad del cerebro para
+              sostener un trabajo cognitivamente exigente (trabajo profundo) tiene un límite de{" "}
+              <strong>máximo 4 horas diarias</strong> en personas altamente entrenadas (y
+              alrededor de 1 hora en principiantes) [2, 4, 5]. Intentar forzar más horas de
+              concentración intensa produce rendimientos decrecientes drásticos [4, 6].
+            </span>
+          </li>
+          <li className="flex gap-2">
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+            <div>
+              <strong>La fórmula del rendimiento de élite</strong>: La producción de alto valor
+              no depende del tiempo total sentado, sino de la intensidad:
+              <div className="my-3 rounded-lg border border-emerald-500/30 bg-background/80 px-4 py-3 text-center font-mono text-sm">
+                <span className="font-semibold text-emerald-700 dark:text-emerald-300">
+                  Trabajo de Alta Calidad Producido
+                </span>
+                {" = ("}
+                <span className="font-semibold">Tiempo Invertido</span>
+                {") × ("}
+                <span className="font-semibold">Intensidad de Enfoque</span>
+                {")"}
+              </div>
+              Un profesional que concentra su energía en 4 horas de enfoque total produce más y
+              mejor resultado que quien diluye 16 horas en un estado de semi-distracción [7-9].
+            </div>
+          </li>
+        </ul>
+
+        {/* ── 2. Costo cognitivo ── */}
+        <h3 className="mt-6 text-base font-semibold">
+          2. El costo cognitivo de las jornadas de 16 horas (Trabajo superficial y disperso)
+        </h3>
+        <ul className="mt-3 space-y-3 text-sm leading-relaxed text-muted-foreground">
+          <li className="flex gap-2">
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+            <span>
+              <strong>Residuo de atención</strong>: Los experimentos de la investigadora Sophie
+              Leroy demuestran que al cambiar constantemente entre tareas o responder mensajes
+              mientras se trabaja (típico de las jornadas de 16 horas saturadas de emails e
+              interrupciones), la atención no se traslada de inmediato. Queda un{" "}
+              <strong>"residuo de atención"</strong> pegado a la tarea anterior que degrada
+              gravemente el rendimiento en la siguiente actividad [10-13].
+            </span>
+          </li>
+          <li className="flex gap-2">
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+            <span>
+              <strong>El "impuesto" del cambio de contexto</strong>: Shiftear continuamente entre
+              tareas principales y tareas secundarias puede consumir hasta un{" "}
+              <strong>40% del tiempo productivo</strong> en puras pérdidas de tracción mental
+              [14].
+            </span>
+          </li>
+          <li className="flex gap-2">
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+            <span>
+              <strong>Estar ocupado no es producir valor</strong>: En el trabajo del conocimiento,
+              la "ocupación visible" (<em>busyness as a proxy for productivity</em>) imita la
+              productividad industrial de fábrica, pero genera muy poco valor real [15, 16].
+              Además, agota la fuerza de voluntad, que funciona como un recurso biológico finito
+              que se degrada con el uso continuo [17].
+            </span>
+          </li>
+        </ul>
+
+        {/* ── 3. Metaanálisis PLOS ONE ── */}
+        <h3 className="mt-6 text-base font-semibold">
+          3. Metaanálisis científico sobre gestión del tiempo y bienestar (PLOS ONE)
+        </h3>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          Un metaanálisis de <strong>158 estudios científicos con 53,957 participantes</strong>{" "}
+          (realizado por Aeon et al.) evaluó cuantitativamente el impacto de estructurar y
+          proteger el tiempo [3, 18, 19]:
+        </p>
+        <ul className="mt-3 space-y-3 text-sm leading-relaxed text-muted-foreground">
+          <li className="flex gap-2">
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+            <span>
+              <strong>Rendimiento laboral</strong>: Estructurar el día y proteger los bloques de
+              enfoque se relaciona de forma sólida y positiva con un mejor rendimiento en el
+              trabajo (<code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">r = 0.259</code>)
+              y una reducción directa del estrés psicológico [20, 21].
+            </span>
+          </li>
+          <li className="flex gap-2">
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+            <span>
+              <strong>Impacto superior en el bienestar</strong>: La gestión estructurada del
+              tiempo tiene un impacto <strong>aún más fuerte en la satisfacción con la vida</strong>
+              {" "}(<code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">r = 0.426</code>)
+              {" "}<strong>que en la sola productividad</strong> [22, 23]. Esto desmiente la idea de
+              que trabajar hasta el agotamiento sea la vía para destacar, demostrando que la
+              organización del tiempo protege contra el distrés psicológico y la ansiedad
+              [21, 24, 25].
+            </span>
+          </li>
+        </ul>
+
+        {/* ── 4. Shutdown / Desconexión ── */}
+        <h3 className="mt-6 text-base font-semibold">
+          4. La necesidad de la desconexión total (<em>Shutdown</em>)
+        </h3>
+        <ul className="mt-3 space-y-3 text-sm leading-relaxed text-muted-foreground">
+          <li className="flex gap-2">
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+            <span>
+              <strong>Teoría de Restauración de la Atención (ART)</strong>: La concentración
+              requiere "atención dirigida", un recurso mental limitado [26]. Desconectar
+              completamente del trabajo al final de la jornada permite que los centros de atención
+              se recarguen, garantizando la energía mental para rendir al máximo al día siguiente
+              [27-29].
+            </span>
+          </li>
+          <li className="flex gap-2">
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+            <span>
+              <strong>Efecto Zeigarnik y mente inconsciente</strong>: Desconectar mediante un plan
+              explícito al final del día libera la carga cognitiva y permite que la mente
+              inconsciente procese problemas complejos durante el descanso sin la interferencia
+              del estrés [27, 30, 31].
+            </span>
+          </li>
+        </ul>
+
+        {/* ── 5. Casos de élite ── */}
+        <h3 className="mt-6 text-base font-semibold">
+          5. Resultados de élite documentados con bloques de enfoque
+        </h3>
+        <ul className="mt-3 space-y-3 text-sm leading-relaxed text-muted-foreground">
+          <li className="flex gap-2">
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+            <span>
+              <strong>Casos académicos y profesionales de alto rendimiento</strong>: Casos
+              documentados en la literatura académica —como el del profesor Adam Grant en Wharton o
+              la investigadora Radhika Nagpal en Harvard— demuestran que fijar límites estrictos
+              de horario y trabajar en bloques consolidados de trabajo profundo permitió{" "}
+              <strong>duplicar y triplicar su producción de resultados de élite</strong> en
+              comparación con colegas que trabajaban 12 o 16 horas diarias de forma fragmentada
+              [1, 32-35].
+            </span>
+          </li>
+        </ul>
+
+        <hr className="my-6 border-border" />
+
+        <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4">
+          <p className="text-sm font-medium leading-relaxed text-emerald-700 dark:text-emerald-300">
+            🧠 ¿Quieres que analicemos cómo estructurar una rutina diaria de 4 bloques de
+            enfoque adaptada específicamente a tu actividad como autónomo?
+          </p>
+        </div>
+      </section>
+
       <footer className="rounded-2xl border border-dashed border-border bg-muted/30 p-6 text-center text-sm text-muted-foreground">
         ¿Falta algo? Cada botón "Por qué existe esto" en las pantallas de la
         app apunta a esta página. La metodología no es dogma: si algo no
