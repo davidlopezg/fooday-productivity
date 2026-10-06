@@ -23,6 +23,7 @@ import {
   IconSettings,
   IconSparkles,
   IconTarget,
+  IconWallet,
   IconX,
 } from "@/components/icons";
 import { createClient } from "@/lib/supabase/client";
@@ -51,6 +52,7 @@ const EXEC_ITEMS: NavItem[] = [
   { href: "/tareas", label: "Tareas", Icon: IconList },
   { href: "/tareas/inbox", label: "Inbox", Icon: IconInbox },
   { href: "/pipeline", label: "Prioridad", Icon: IconFlag },
+  { href: "/pagos", label: "Pagos", Icon: IconWallet },
   { href: "/plan-diario", label: "Plan diario", Icon: IconSparkles },
   { href: "/plan-diario/historico", label: "Histórico de planes", Icon: IconHistory },
 ];

@@ -297,3 +297,21 @@ export const IconLogout = (p: IconProps) => (
   </svg>
 );
 
+/** Monedero — para el módulo de Pagos. */
+export const IconWallet = (p: IconProps) => (
+  <svg {...base} {...p}>
+    <path d="M3 7c0-1.1.9-2 2-2h13a2 2 0 0 1 2 2v1H6a3 3 0 0 0 0 6h14" />
+    <path d="M3 7v10a2 2 0 0 0 2 2h16V8a2 2 0 0 0-2-2" />
+    <circle cx="17" cy="13" r="1.25" fill="currentColor" stroke="none" />
+  </svg>
+);
+
+/** Triángulo de alerta. */
+export const IconAlertTriangle = (p: IconProps) => (
+  <svg {...base} {...p}>
+    <path d="M10.3 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+    <line x1="12" y1="9" x2="12" y2="13" />
+    <line x1="12" y1="17" x2="12.01" y2="17" />
+  </svg>
+);
+
