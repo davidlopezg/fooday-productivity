@@ -126,9 +126,36 @@ export async function crearPago(opts: {
   fechaPagoProgramada?: string | null;
   notas?: string | null;
 }): Promise<string> {
+  // 1) Verificar que hay sesión activa y leer el user.id EXPLÍCITAMENTE.
+  //    Pasamos owner_id al INSERT en vez de depender del default auth.uid()
+  //    para evitar race conditions / sesiones mezcladas que hacen que el
+  //    row se guarde con un owner_id distinto al tuyo.
+  const client = createClient();
+  const { data: sessData, error: sessError } = await client.auth.getSession();
+  if (sessError) {
+    throw new Error(`No se pudo verificar la sesión: ${sessError.message}`);
+  }
+  if (!sessData.session) {
+    throw new Error(
+      "Tu sesión ha caducado. Recarga la página (F5) y vuelve a iniciar sesión.",
+    );
+  }
+  const ownerId = sessData.session.user.id;
+  if (!ownerId) {
+    throw new Error("La sesión no tiene user.id. Cierra sesión y vuelve a entrar.");
+  }
+
+  // 2) Refrescar la sesión si está a punto de expirar.
+  await client.auth.refreshSession().catch(() => {
+    // noop
+  });
+
+  // 3) INSERT con owner_id EXPLÍCITO. Sin esto, dependemos de auth.uid()
+  //    en el servidor, que a veces devuelve un UUID que no es el de tu sesión.
   const { data, error } = await db()
     .from("pagos")
     .insert({
+      owner_id: ownerId,
       proveedor: opts.proveedor,
       concepto: opts.concepto,
       categoria: opts.categoria,
@@ -141,10 +168,48 @@ export async function crearPago(opts: {
       estado: opts.fechaPagoProgramada ? "programado" : "pendiente",
       notas: opts.notas ?? null,
     })
-    .select("id")
+    .select("id, owner_id, proveedor, concepto")
     .single();
-  if (error) throw new Error(`No se pudo crear el pago: ${error.message}`);
-  return (data as { id: string }).id;
+
+  if (error) {
+    let msg = error.message;
+    if (error.code === "42501" || /row-level security/i.test(msg)) {
+      msg = "Permiso denegado por RLS. Recarga la página o revisa que estés autenticado.";
+    } else if (/owner_id/i.test(msg) && /null/i.test(msg)) {
+      msg = "Sesión caducada. Recarga la página (F5) y vuelve a iniciar sesión.";
+    }
+    console.error("[crearPago] fallo:", error);
+    throw new Error(`No se pudo crear el pago: ${msg}`);
+  }
+  if (!data || !data.id) {
+    throw new Error(
+      "El INSERT se ejecutó pero no devolvió un id. Mira la consola del navegador.",
+    );
+  }
+
+  // 4) VERIFICACIÓN POST-INSERT: leemos la fila que acabamos de crear.
+  //    Esto detecta el caso "INSERT OK pero SELECT no lo ve" (que era el
+  //    bug original). Si no la encontramos, lanzamos error claro.
+  const { data: verificado, error: errVer } = await db()
+    .from("pagos")
+    .select("id")
+    .eq("id", data.id)
+    .maybeSingle();
+  if (errVer) {
+    throw new Error(
+      `INSERT aparentemente OK pero falló la verificación: ${errVer.message}`,
+    );
+  }
+  if (!verificado) {
+    throw new Error(
+      "El INSERT se ejecutó pero la fila no se persistió (no se encuentra al releerla). " +
+        "Esto indica un problema de RLS asimétrico: la policy de INSERT permite " +
+        "escribir pero la de SELECT filtra tu propia fila. Dile a tu developer.",
+    );
+  }
+
+  console.log("[crearPago] OK y verificado:", data.id);
+  return data.id;
 }
 
 /** Edita un pago existente. Solo campos permitidos (no se toca importe_pagado

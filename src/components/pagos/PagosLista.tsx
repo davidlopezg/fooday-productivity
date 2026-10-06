@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useData } from "@/lib/useData";
 import {
   fetchPagosConUrgencia,
@@ -73,6 +74,7 @@ const TABS: { key: Tab; label: string }[] = [
 ];
 
 export function PagosLista() {
+  const router = useRouter();
   const [tab, setTab] = useState<Tab>("lunes");
   const [refreshKey, setRefreshKey] = useState(0);
   const [modal, setModal] = useState<ModalState>(null);
@@ -118,14 +120,17 @@ export function PagosLista() {
   }, []);
 
   /** Refresco robusto: actualiza `vencido` en la BD + cambia el key
-   *  para que `useData` revalide. Usar SIEMPRE después de una mutación. */
-  const reload = () => {
-    // Sincrono en la firma (devuelve void) para encajar con el tipo
-    // `onChanged: () => void` que espera PagoCard. La promesa del refresh
-    // se lanza en background; al resolverse, cambia el refreshKey.
-    refreshPagosVencidos()
-      .catch((e) => console.warn("[pagos] refresh_vencidos falló:", e))
-      .finally(() => setRefreshKey((k) => k + 1));
+   *  para que `useData` revalide + fuerza un router.refresh() de Next.js
+   *  para que el servidor también recargue. Devuelve Promise para que
+   *  el caller pueda hacer `await reload()`. */
+  const reload = async () => {
+    try {
+      await refreshPagosVencidos();
+    } catch (e) {
+      console.warn("[pagos] refresh_vencidos falló:", e);
+    }
+    setRefreshKey((k) => k + 1);
+    router.refresh();
   };
 
   const isLoading =

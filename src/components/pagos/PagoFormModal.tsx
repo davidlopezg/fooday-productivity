@@ -126,10 +126,14 @@ export function PagoFormModal({
             // explícitamente con "Quitar programación" del menú).
           }
         }
-        onSaved();
+        // Recarga robusta: refresca vencidos + cambia refreshKey + Next.js refresh
+        await onSaved();
         onClose();
       } catch (err) {
-        setError(errorMessage(err));
+        // Mostramos el error de forma MUY visible (banner arriba, no solo footer)
+        const msg = errorMessage(err);
+        console.error("[PagoFormModal] error:", err);
+        setError(msg);
       }
     });
   };
@@ -155,8 +159,8 @@ export function PagoFormModal({
       footer={
         <div className="flex items-center justify-between gap-2">
           {error ? (
-            <p className="flex-1 text-xs text-red-600 dark:text-red-400">
-              {error}
+            <p className="flex-1 text-xs font-medium text-red-600 dark:text-red-400">
+              ⚠️ {error}
             </p>
           ) : (
             <span className="flex-1" />
@@ -182,6 +186,23 @@ export function PagoFormModal({
         </div>
       }
     >
+      {/* Banner de error bien grande, ARRIBA del formulario, para que
+          no se te escape en móvil */}
+      {error && (
+        <div
+          role="alert"
+          className="mb-4 rounded-lg border-2 border-red-500/40 bg-red-500/10 p-3 text-sm"
+        >
+          <p className="font-bold text-red-700 dark:text-red-300">
+            ⚠️ No se pudo guardar
+          </p>
+          <p className="mt-1 text-red-700 dark:text-red-300">{error}</p>
+          <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+            Prueba a <b>cerrar y volver a abrir la app</b>. Si persiste, en
+            tu móvil: menú del navegador → “Salir” y vuelve a entrar.
+          </p>
+        </div>
+      )}
       {pago && (
         <div className="mb-4 flex flex-wrap items-center gap-1.5">
           <span className="text-xs text-muted-foreground">Estado actual:</span>

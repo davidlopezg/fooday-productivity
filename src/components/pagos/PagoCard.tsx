@@ -84,7 +84,7 @@ function DiasCell({ dias }: { dias: number }) {
 export type PagoCardProps = {
   pago: PagoConUrgencia;
   /** Se llama tras cualquier mutación exitosa para refrescar la lista. */
-  onChanged: () => void;
+  onChanged: () => void | Promise<unknown>;
   /** Si true, oculta el botón PAGADO (p.ej. en histórico). */
   sinAcciones?: boolean;
   /** Si true, se permite editar/eliminar (modo admin). */
