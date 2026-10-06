@@ -311,7 +311,7 @@ export default function CalendarioPage() {
         Cierra el resto de pestañas, silencia notificaciones y coge una sola
         tarea del bloque. Si lo que toca es una micro-tarea operativa
         (email, WhatsApp, llamada), añádela al <strong>Bloque 3</strong>{" "}
-        de su día y procésala después en lote.
+        del día (donde esté libre) y procésala después en lote.
       </div>
 
       {/* Grid */}
@@ -477,15 +477,37 @@ function FilaBloque({
   mapaBloques: Map<string, CalendarioBloqueConTarea[]>;
   onClick: (fecha: string) => void;
 }) {
-  // Cuenta cuántas operativas hay en esta semana (para la cabecera del B3).
-  const conteoOperativas = Array.from(mapaBloques.values())
-    .filter((arr) => arr[0]?.numero_bloque === 3)
-    .reduce((acc, arr) => acc + arr.length, 0);
-
   const esOperativas = numBloque === 3;
   const headerTono = esOperativas
     ? "bg-sky-500/10 border-b-sky-500/30"
     : "bg-muted/20";
+
+  // Para el Bloque 3: cuenta operativas SOLO en días donde no está fijo
+  // (p.ej. viernes/sábado pueden tener B3 reservado para Servicio · Sol de Nit).
+  // También lista qué días están fijos para que el usuario lo vea de un vistazo.
+  const diasBloque3Info = useMemo(() => {
+    if (!esOperativas) return null;
+    const libres: string[] = [];
+    const fijos: string[] = [];
+    for (const d of DIAS_SEMANA) {
+      if (bloqueFijoDe(d.id, 3)) fijos.push(d.corto);
+      else libres.push(d.corto);
+    }
+    return { libres, fijos };
+  }, [esOperativas]);
+
+  const conteoOperativasLibres = useMemo(() => {
+    if (!esOperativas || !diasBloque3Info) return 0;
+    const libresSet = new Set(diasBloque3Info.libres);
+    return Array.from(mapaBloques.values())
+      .filter((arr) => {
+        if (arr[0]?.numero_bloque !== 3) return false;
+        const fecha = arr[0]?.fecha ?? "";
+        const dl = dias.find((x) => x.fecha === fecha);
+        return dl ? libresSet.has(dl.corto) : false;
+      })
+      .reduce((acc, arr) => acc + arr.length, 0);
+  }, [esOperativas, diasBloque3Info, mapaBloques, dias]);
 
   return (
     <>
@@ -499,12 +521,31 @@ function FilaBloque({
         <div className="text-[10px] text-muted-foreground">
           {BLOQUE_HORARIO[numBloque]}
         </div>
-        {esOperativas && (
-          <div
-            className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 dark:text-sky-300"
-            title="Límite por UI: 4 micro-tareas por día (emails, WhatsApp, llamadas)"
-          >
-            Operativas · {conteoOperativas}/4
+        {esOperativas && diasBloque3Info && (
+          <div className="mt-1.5 space-y-1">
+            {diasBloque3Info.libres.length > 0 ? (
+              <div
+                className="inline-flex items-center gap-1 rounded-full bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 dark:text-sky-300"
+                title="Límite por UI: 4 micro-tareas por día (emails, WhatsApp, llamadas)"
+              >
+                🛠️ Operativas · {conteoOperativasLibres}/4
+              </div>
+            ) : (
+              <div
+                className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary"
+                title="Todos los días tienen este bloque reservado"
+              >
+                🔒 Bloque fijo todos los días
+              </div>
+            )}
+            {diasBloque3Info.fijos.length > 0 && (
+              <div
+                className="text-[10px] text-muted-foreground"
+                title={`Días donde este bloque está reservado en BLOQUES_FIJOS`}
+              >
+                🔒 Fijos: {diasBloque3Info.fijos.join(", ")}
+              </div>
+            )}
           </div>
         )}
       </div>

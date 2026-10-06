@@ -184,9 +184,9 @@ export const BLOQUES_FIJOS: readonly BloqueFijo[] = [
     bloquea: true,
   },
   // ─── Viernes ───
-  // Bloques 2 y 3: servicio.
+  // Bloques 3 y 4: servicio.
   ...(
-    [2, 3] as const
+    [3, 4] as const
   ).map((n) => ({
     dia: 5 as DiaSemana,
     numeroBloque: n,
@@ -195,9 +195,9 @@ export const BLOQUES_FIJOS: readonly BloqueFijo[] = [
     bloquea: true,
   })),
   // ─── Sábado ───
-  // Bloques 2 y 3: servicio.
+  // Bloques 3 y 4: servicio.
   ...(
-    [2, 3] as const
+    [3, 4] as const
   ).map((n) => ({
     dia: 6 as DiaSemana,
     numeroBloque: n,
