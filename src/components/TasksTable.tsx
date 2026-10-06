@@ -26,6 +26,7 @@ import {
   IconX,
 } from "@/components/icons";
 import { CrearModal, EditarModal } from "./TareaModal";
+import { errorMessage } from "@/lib/errors";
 
 const CAPAS = ["CAPA 1", "CAPA 2", "CAPA 3"];
 const PRIORIDADES = ["critica", "urgente", "alta", "media", "baja"];
@@ -265,7 +266,7 @@ export function TasksTable({
         await fn();
         onChanged();
       } catch (e: unknown) {
-        console.error("[TasksTable] run falló:", e instanceof Error ? e.message : String(e));
+        console.error("[TasksTable] run falló:", errorMessage(e));
       }
     });
   }

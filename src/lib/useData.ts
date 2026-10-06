@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { errorMessage } from "@/lib/errors";
 
 /**
  * Carga datos de forma asíncrona con estado de loading, error y `reload()`.
@@ -39,7 +40,7 @@ export function useData<T>(
       })
       .catch((e: unknown) => {
         if (!alive) return;
-        const msg = e instanceof Error ? e.message : String(e ?? "Error desconocido");
+        const msg = errorMessage(e);
         setError(msg);
         setLoaded(true); // no se queda en loading eterno
         console.warn("[useData] load falló:", msg);
@@ -57,7 +58,7 @@ export function useData<T>(
         setLoaded(true);
       })
       .catch((e: unknown) => {
-        const msg = e instanceof Error ? e.message : String(e ?? "Error desconocido");
+        const msg = errorMessage(e);
         setError(msg);
         console.warn("[useData] reload falló:", msg);
       });

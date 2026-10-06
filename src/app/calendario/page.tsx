@@ -56,6 +56,7 @@ import {
 } from "@/components/icons";
 import type { CalendarioBloqueConTarea, Tarea } from "@/lib/types";
 import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
+import { errorMessage } from "@/lib/errors";
 
 const BLOQUES: Array<1 | 2 | 3 | 4> = [1, 2, 3, 4];
 
@@ -167,8 +168,7 @@ export default function CalendarioPage() {
           tareaId,
         });
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        setPopover({ ...popover, error: msg });
+        setPopover({ ...popover, error: errorMessage(e) });
         return;
       }
     }
@@ -190,8 +190,7 @@ export default function CalendarioPage() {
       setPopover({ ...popover, error: undefined });
       bloquesQ.reload();
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setPopover({ ...popover, error: msg });
+      setPopover({ ...popover, error: errorMessage(e) });
     }
   }
 
@@ -200,7 +199,7 @@ export default function CalendarioPage() {
       await quitarTareaDeBloque3({ bloqueId });
       bloquesQ.reload();
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = errorMessage(e);
       if (popover) setPopover({ ...popover, error: msg });
     }
   }
@@ -213,8 +212,7 @@ export default function CalendarioPage() {
         numeroBloque: popover.numeroBloque,
       });
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setPopover({ ...popover, error: msg });
+      setPopover({ ...popover, error: errorMessage(e) });
       return;
     }
     setPopover(null);

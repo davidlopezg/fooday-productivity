@@ -6,6 +6,7 @@ import { reabrirTarea } from "@/lib/mutations";
 import { useData } from "@/lib/useData";
 import type { Area, Prioridad, TareaSubtarea, Tarea } from "@/lib/types";
 import { IconCheck, IconX } from "@/components/icons";
+import { errorMessage } from "@/lib/errors";
 
 type TareaConArea = Tarea & { area: Area | null };
 
@@ -337,7 +338,7 @@ function TareaCompletadaRow({
       } catch (e: unknown) {
         console.error(
           "[TareasCompletadas] restaurar falló:",
-          e instanceof Error ? e.message : String(e),
+          errorMessage(e),
         );
       }
     });

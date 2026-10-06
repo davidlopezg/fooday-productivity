@@ -40,6 +40,7 @@ import { useData } from "@/lib/useData";
 import { ComentariosTarea } from "@/components/ComentariosTarea";
 import type { Proyecto, RecurrenciaTipo, Subtarea, Tarea, TareaAdjunto } from "@/lib/types";
 import { IconRepeat } from "@/components/icons";
+import { errorMessage } from "@/lib/errors";
 
 export type PendingFile = { file: File; status: "pendiente" };
 
@@ -1026,7 +1027,7 @@ export function EditarModal({
         onChanged();
         onClose();
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : String(e ?? "Error desconocido");
+        const msg = errorMessage(e);
         console.error("[editarTarea] falló:", msg);
         setGuardarError(msg);
       }
@@ -1299,7 +1300,7 @@ export function CrearModal({
         onChanged();
         onClose();
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : String(e ?? "Error desconocido");
+        const msg = errorMessage(e);
         console.error("[crearTarea] falló:", msg);
         setGuardarError(msg);
       }
