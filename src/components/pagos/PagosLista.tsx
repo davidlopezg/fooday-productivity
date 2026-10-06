@@ -315,7 +315,13 @@ export function PagosLista() {
         <PagoFormModal
           modo="crear"
           onClose={() => setModal(null)}
-          onSaved={reload}
+          // Al crear, saltamos a "Pendientes" para que el usuario vea el
+          // pago recién hecho. Por defecto, un pago nuevo sin fecha_pago_programada
+          // y con fecha_vencimiento > 7 días no aparece en "Este lunes".
+          onSaved={async () => {
+            await reload();
+            setTab("pendientes");
+          }}
         />
       )}
       {modal?.tipo === "editar" && (
