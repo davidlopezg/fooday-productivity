@@ -13,7 +13,7 @@
 // un solo sitio. Si cambias algo aquí, todas las pantallas lo reflejan.
 // ============================================================================
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { IconHelp, IconX } from "@/components/icons";
 
 export type HelpItem = {
@@ -21,6 +21,10 @@ export type HelpItem = {
   cuerpo: string;
   /** Pilar al que se vincula (1-5). Aparece como tag. */
   pilar?: 1 | 2 | 3 | 4 | 5;
+  /** Bloque estructurado opcional (tablas, listas, código...). Se renderiza
+   *  tras `cuerpo` dentro del mismo artículo. Útil para ejemplos plantillas
+   que no caben en un solo párrafo. */
+  extra?: ReactNode;
 };
 
 const ETIQUETAS_PILAR: Record<NonNullable<HelpItem["pilar"]>, string> = {
@@ -198,6 +202,246 @@ export const AYUDA_POR_RUTA: Record<
     pilares: [3, 1],
     items: [
       {
+        titulo: "Ejemplo: jornada tipo de 8h con el Productivity Stack",
+        cuerpo:
+          "Plantilla de referencia para una jornada real aplicando la pila de productividad (GTD como base de datos externa para vaciar la mente, Time Blocking en el calendario para defender el enfoque y Pomodoro para sprints). Úsala como guía al diseñar tus bloques del día en /calendario.",
+        pilar: 1,
+        extra: (
+          <div className="space-y-4">
+            {/* === Tabla de estructura === */}
+            <div>
+              <h4 className="mb-2 text-sm font-semibold">
+                📅 Estructura de la Jornada Diaria Tipo
+              </h4>
+              <div className="overflow-x-auto rounded-md border border-border bg-background">
+                <table className="w-full min-w-[640px] text-xs">
+                  <thead className="bg-muted/50 text-foreground">
+                    <tr>
+                      <th className="px-2 py-1.5 text-left font-semibold">Horario</th>
+                      <th className="px-2 py-1.5 text-left font-semibold">Bloque / Actividad</th>
+                      <th className="px-2 py-1.5 text-left font-semibold">Método</th>
+                      <th className="px-2 py-1.5 text-left font-semibold">Función Principal</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      {
+                        h: "08:30 - 09:00",
+                        a: "Claridad y Planificación",
+                        m: "GTD + Time Blocking",
+                        f: "Vaciar la mente de compromisos y definir los bloques del día [1, 2].",
+                        fuerte: true,
+                      },
+                      {
+                        h: "09:00 - 10:30",
+                        a: "BLOQUE DE FOCO 1",
+                        m: "Deep Work / Sprints",
+                        f: "Avance en la meta principal del 20% (sin email ni mensajes) [3, 4].",
+                        fuerte: true,
+                      },
+                      {
+                        h: "10:30 - 10:45",
+                        a: "Descanso Activo",
+                        m: "Pausa de recarga",
+                        f: "Caminar o despejarse sin pantallas para restaurar la atención [4, 5].",
+                        italica: true,
+                      },
+                      {
+                        h: "10:45 - 12:15",
+                        a: "BLOQUE DE FOCO 2",
+                        m: "Deep Work / Sprints",
+                        f: "Segunda sesión de creación o resolución de problemas complejos [6, 7].",
+                        fuerte: true,
+                      },
+                      {
+                        h: "12:15 - 13:15",
+                        a: "Bloque Operativo 1 (Loteado)",
+                        m: "Batching / Shallow Work",
+                        f: "Procesar en lote las micro-tareas (emails, llamadas, mensajes) [2, 3].",
+                        fuerte: true,
+                      },
+                      {
+                        h: "13:15 - 14:30",
+                        a: "Almuerzo y Descanso",
+                        m: "Desconexión Total",
+                        f: "Pausa prolongada para recuperar la energía cognitiva [5, 8].",
+                        italica: true,
+                      },
+                      {
+                        h: "14:30 - 16:00",
+                        a: "BLOQUE DE FOCO 3",
+                        m: "Deep Work / Sprints",
+                        f: "Tercer bloque de alta prioridad (entregables o proyectos clave) [6, 9].",
+                        fuerte: true,
+                      },
+                      {
+                        h: "16:00 - 16:15",
+                        a: "Descanso Activo",
+                        m: "Pausa breve",
+                        f: "Estiramiento y desconexión rápida de la pantalla [5].",
+                        italica: true,
+                      },
+                      {
+                        h: "16:15 - 17:15",
+                        a: "BLOQUE DE FOCO 4 / Desbordamiento",
+                        m: "Overflow Block",
+                        f: "Cuarto bloque de foco o tiempo de amortiguación si una tarea previa se alargó [10].",
+                        fuerte: true,
+                      },
+                      {
+                        h: "17:15 - 18:00",
+                        a: "Bloque Operativo 2 (Cierre)",
+                        m: "Batching / Tareas cortas",
+                        f: "Resolver facturación, solicitudes administrativas o gestiones finales [2].",
+                        fuerte: true,
+                      },
+                      {
+                        h: "18:00 - 18:15",
+                        a: "Ritual de Cierre (Shutdown)",
+                        m: "GTD + Shutdown Ritual",
+                        f: "Anotar la siguiente acción de lo incompleto, organizar mañana y desconectar [11, 12].",
+                        fuerte: true,
+                      },
+                    ].map((row, i) => (
+                      <tr key={i} className="border-t border-border align-top">
+                        <td className="px-2 py-1.5 font-mono">
+                          {row.fuerte ? <strong>{row.h}</strong> : <em>{row.h}</em>}
+                        </td>
+                        <td className="px-2 py-1.5">
+                          {row.fuerte ? <strong>{row.a}</strong> : <em>{row.a}</em>}
+                        </td>
+                        <td className="px-2 py-1.5">{row.m}</td>
+                        <td className="px-2 py-1.5">{row.f}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* === Cómo gestionar los detalles en la práctica === */}
+            <div>
+              <h4 className="mb-2 text-sm font-semibold">
+                🔑 Cómo gestionar los detalles en la práctica
+              </h4>
+              <ol className="space-y-3">
+                  <li>
+                      <strong>Gestión de las 20 micro-tareas de 10 minutos</strong>:
+                      <ul className="mt-1 space-y-1 pl-4">
+                          <li className="flex gap-1.5">
+                            <span>•</span>
+                            <span>
+                              Cuando surja una micro-tarea durante un bloque de foco
+                              (ej. enviar una factura, responder un mensaje no
+                              urgente), <strong>no la ejecutes de inmediato</strong>.
+                            </span>
+                          </li>
+                          <li className="flex gap-1.5">
+                            <span>•</span>
+                            <span>
+                              Anótala en tu lista de captura externa (GTD) en menos de
+                              5 segundos para liberar tu memoria de trabajo y evitar
+                              el residuo de atención [13, 14].
+                            </span>
+                          </li>
+                          <li className="flex gap-1.5">
+                            <span>•</span>
+                            <span>
+                              En los <strong>Bloques Operativos (12:15 y 17:15)</strong>,
+                              abres esa lista y ejecutas las micro-tareas en lote de
+                              forma continua, evitando la pérdida de hasta un{" "}
+                              <strong>40% de tiempo</strong> causada por cambiar de
+                              contexto constantemente [2, 3, 15].
+                            </span>
+                          </li>
+                      </ul>
+                  </li>
+                  <li>
+                      <strong>Qué hacer si una tarea queda a medias al terminar el bloque</strong>:
+                      <ul className="mt-1 space-y-1 pl-4">
+                          <li className="flex gap-1.5">
+                            <span>•</span>
+                            <span>
+                              Si el tiempo asignado a una tarea principal concluye y
+                              no has terminado, puedes usar el{" "}
+                              <strong>Bloque 4 como tiempo de desbordamiento</strong>{" "}
+                              (<em>Overflow Block</em>) [10].
+                            </span>
+                          </li>
+                          <li className="flex gap-1.5">
+                            <span>•</span>
+                            <span>
+                              Si la tarea debe continuar al día siguiente, aplica la
+                              regla de la <strong>siguiente acción física</strong>:
+                              escribe una nota explícita indicando en qué punto
+                              exacto te quedaste y cuál es el primer paso concreto
+                              para reanudar (ej.: <em>“Redactar la sección de
+                              conclusiones del informe”</em>) [12, 16].
+                            </span>
+                          </li>
+                          <li className="flex gap-1.5">
+                            <span>•</span>
+                            <span>
+                              Asigna en tu agenda el bloque del día siguiente en que
+                              la completarás. Las investigaciones demuestran que
+                              definir un plan concreto para una tarea pendiente
+                              elimina el <strong>efecto Zeigarnik</strong>, liberando
+                              al cerebro de rumiar sobre pendientes durante su
+                              tiempo libre [12, 17].
+                            </span>
+                          </li>
+                      </ul>
+                  </li>
+                  <li>
+                      <strong>El Ritual de Cierre (<em>Shutdown Ritual</em>) de las 18:00</strong>:
+                      <ul className="mt-1 space-y-1 pl-4">
+                          <li className="flex gap-1.5">
+                            <span>•</span>
+                            <span>
+                              Revisa la bandeja de entrada para verificar que no
+                              queden emergencias críticas [18].
+                            </span>
+                          </li>
+                          <li className="flex gap-1.5">
+                            <span>•</span>
+                            <span>
+                              Revisa que todos los pendientes y compromisos nuevos
+                              estén registrados en tu sistema [11, 18].
+                            </span>
+                          </li>
+                          <li className="flex gap-1.5">
+                            <span>•</span>
+                            <span>
+                              Verifica la agenda del día siguiente y deja trazados
+                              los bloques de tiempo [2, 18].
+                            </span>
+                          </li>
+                          <li className="flex gap-1.5">
+                            <span>•</span>
+                            <span>
+                              Emplea una frase explícita de cierre (como{" "}
+                              <em>“Desconexión completada”</em>) para señalarle al
+                              cerebro que es seguro liberar los pensamientos
+                              laborales hasta la mañana siguiente [11, 17].
+                            </span>
+                          </li>
+                      </ul>
+                  </li>
+                </ol>
+            </div>
+
+            {/* === Pregunta de cierre === */}
+            <div className="rounded-md border border-sky-500/30 bg-sky-500/10 p-3">
+              <p className="text-xs font-medium leading-relaxed text-sky-700 dark:text-sky-300">
+                🛠️ ¿Quieres que adaptemos este horario a tus horas de mayor energía
+                natural (mañanas o tardes) o prefieres convertir esta plantilla en
+                un documento de guía diario?
+              </p>
+            </div>
+          </div>
+        ),
+      },
+      {
         titulo: "Time-blocking: la palanca anti-cambio de contexto",
         cuerpo:
           "Asignar una tarea concreta a un bloque horario concreto (en lugar de 'hoy intento hacer X') reduce la pérdida de productividad por cambio de contexto hasta un 40%. La UI te recuerda si asignas más de 4 bloques/día.",
@@ -343,6 +587,11 @@ export function HelpDrawer({
                   <p className="text-sm leading-relaxed text-muted-foreground">
                     {item.cuerpo}
                   </p>
+                  {item.extra && (
+                    <div className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                      {item.extra}
+                    </div>
+                  )}
                 </article>
               ))}
             </div>
