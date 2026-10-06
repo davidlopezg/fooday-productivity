@@ -25,6 +25,8 @@ import {
   fetchTareas,
   upsertBloque,
   limpiarBloque,
+  agregarTareaABloque3,
+  quitarTareaDeBloque3,
 } from "@/lib/queries";
 import { useData } from "@/lib/useData";
 import {
@@ -105,11 +107,16 @@ export default function CalendarioPage() {
     [tareasQ.data],
   );
 
-  // Mapa (fecha, bloque) → fila
+  // Mapa (fecha, bloque) → array de filas.
+  // Bloques 1, 2 y 4 tienen 0 o 1 fila; el bloque 3 puede tener hasta 4
+  // (operativas en lote — migration 0020).
   const mapaBloques = useMemo(() => {
-    const m = new Map<string, CalendarioBloqueConTarea>();
+    const m = new Map<string, CalendarioBloqueConTarea[]>();
     for (const b of bloquesQ.data) {
-      m.set(`${b.fecha}-${b.numero_bloque}`, b);
+      const k = `${b.fecha}-${b.numero_bloque}`;
+      const arr = m.get(k) ?? [];
+      arr.push(b);
+      m.set(k, arr);
     }
     return m;
   }, [bloquesQ.data]);
@@ -138,12 +145,32 @@ export default function CalendarioPage() {
 
   async function asignar(tareaId: string | null) {
     if (!popover) return;
-    await upsertBloque({
+    // Para el Bloque 3 el upsert está deshabilitado; usa agregar/quitar.
+    if (popover.numeroBloque !== 3 && tareaId !== undefined) {
+      await upsertBloque({
+        fecha: popover.fecha,
+        numeroBloque: popover.numeroBloque,
+        tareaId,
+      });
+    }
+    setPopover(null);
+    bloquesQ.reload();
+  }
+
+  /** Añade una tarea al Bloque 3 (operativas en lote). Deja el popover
+   *  abierto para permitir añadir varias en sucesión. */
+  async function agregarAOperativas(tareaId: string) {
+    if (!popover) return;
+    if (popover.numeroBloque !== 3) return;
+    await agregarTareaABloque3({
       fecha: popover.fecha,
-      numeroBloque: popover.numeroBloque,
       tareaId,
     });
-    setPopover(null);
+    bloquesQ.reload();
+  }
+
+  async function quitarDeOperativas(bloqueId: string) {
+    await quitarTareaDeBloque3({ bloqueId });
     bloquesQ.reload();
   }
 
@@ -240,6 +267,16 @@ export default function CalendarioPage() {
         <Kpi label="Hoy" value={hoyCorto()} sub="día ISO actual" />
       </section>
 
+      {/* Banner recordatorio: el bloque está protegido contra multitarea. */}
+      <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-2.5 text-xs text-amber-700 dark:text-amber-300">
+        <strong className="font-semibold">Mientras trabajas en una tarea,
+        no trabajas en nada más.</strong>{" "}
+        Cierra el resto de pestañas, silencia notificaciones y coge una sola
+        tarea del bloque. Si lo que toca es una micro-tarea operativa
+        (email, WhatsApp, llamada), añádela al <strong>Bloque 3</strong>{" "}
+        de su día y procésala después en lote.
+      </div>
+
       {/* Grid */}
       <section className="overflow-x-auto rounded-xl border border-border bg-card">
         <div
@@ -280,7 +317,7 @@ export default function CalendarioPage() {
         <PopoverAsignar
           fecha={popover.fecha}
           numBloque={popover.numeroBloque}
-          bloqueActual={mapaBloques.get(`${popover.fecha}-${popover.numeroBloque}`) ?? null}
+          bloquesActuales={mapaBloques.get(`${popover.fecha}-${popover.numeroBloque}`) ?? []}
           fijo={bloqueFijoDe(
             (dias.find((d) => d.fecha === popover.fecha)?.id ?? 1) as DiaSemana,
             popover.numeroBloque,
@@ -289,6 +326,8 @@ export default function CalendarioPage() {
           onAsignar={asignar}
           onLimpiar={limpiar}
           onCerrar={() => setPopover(null)}
+          onAgregarOperativa={agregarAOperativas}
+          onQuitarOperativa={quitarDeOperativas}
         />
       )}
 
@@ -397,26 +436,52 @@ function FilaBloque({
 }: {
   numBloque: 1 | 2 | 3 | 4;
   dias: Array<{ id: number; corto: string; nombre: string; fecha: string; esHoy: boolean }>;
-  mapaBloques: Map<string, CalendarioBloqueConTarea>;
+  mapaBloques: Map<string, CalendarioBloqueConTarea[]>;
   onClick: (fecha: string) => void;
 }) {
+  // Cuenta cuántas operativas hay en esta semana (para la cabecera del B3).
+  const conteoOperativas = Array.from(mapaBloques.values())
+    .filter((arr) => arr[0]?.numero_bloque === 3)
+    .reduce((acc, arr) => acc + arr.length, 0);
+
+  const esOperativas = numBloque === 3;
+  const headerTono = esOperativas
+    ? "bg-sky-500/10 border-b-sky-500/30"
+    : "bg-muted/20";
+
   return (
     <>
-      <div className="border-b border-r border-border bg-muted/20 px-2 py-3 text-xs">
-        <div className="font-semibold">Bloque {numBloque}</div>
-        <div className="text-[10px] text-muted-foreground">{BLOQUE_HORARIO[numBloque]}</div>
+      <div
+        className={`border-b border-r border-border px-2 py-3 text-xs ${headerTono}`}
+      >
+        <div className="flex items-center gap-1.5 font-semibold">
+          Bloque {numBloque}
+          {esOperativas && <span aria-hidden>🛠️</span>}
+        </div>
+        <div className="text-[10px] text-muted-foreground">
+          {BLOQUE_HORARIO[numBloque]}
+        </div>
+        {esOperativas && (
+          <div
+            className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 dark:text-sky-300"
+            title="Límite por UI: 4 micro-tareas por día (emails, WhatsApp, llamadas)"
+          >
+            Operativas · {conteoOperativas}/4
+          </div>
+        )}
       </div>
       {dias.map((d) => {
-        const b = mapaBloques.get(`${d.fecha}-${numBloque}`);
+        const arr = mapaBloques.get(`${d.fecha}-${numBloque}`) ?? [];
         const fijo = bloqueFijoDe(d.id as DiaSemana, numBloque);
         return (
           <BloqueCell
             key={d.id}
             fecha={d.fecha}
             numBloque={numBloque}
-            bloque={b ?? null}
+            bloques={arr}
             fijo={fijo}
             esHoy={d.esHoy}
+            esOperativas={esOperativas}
             onClick={() => onClick(d.fecha)}
           />
         );
@@ -428,21 +493,20 @@ function FilaBloque({
 function BloqueCell({
   fecha,
   numBloque,
-  bloque,
+  bloques,
   fijo,
   esHoy,
+  esOperativas,
   onClick,
 }: {
   fecha: string;
   numBloque: 1 | 2 | 3 | 4;
-  bloque: CalendarioBloqueConTarea | null;
+  bloques: CalendarioBloqueConTarea[];
   fijo: BloqueFijo | null;
   esHoy: boolean;
+  esOperativas: boolean;
   onClick: () => void;
 }) {
-  const tarea = bloque?.tarea ?? null;
-  const tono = tarea ? (TONO_PRIORIDAD[tarea.prioridad ?? "media"] ?? TONO_PRIORIDAD.media) : "";
-
   // 1) Bloque fijo del sistema (no editable) → manda sobre la tarea.
   if (fijo) {
     return (
@@ -450,7 +514,7 @@ function BloqueCell({
         onClick={onClick}
         className={`group relative min-h-[90px] border-b border-r border-border p-2 text-left transition-colors last:border-r-0 ${
           esHoy ? "bg-violet-500/5" : ""
-        }`}
+        } ${esOperativas ? "bg-sky-500/[0.02]" : ""}`}
         aria-label={`Bloque ${numBloque} del ${fecha}: fijo · ${fijo.titulo}`}
         title={`Bloque fijo (no editable): ${fijo.titulo}`}
       >
@@ -472,7 +536,60 @@ function BloqueCell({
     );
   }
 
-  // 2) Celda normal: tarea asignada o libre.
+  // 2) Celda normal: cero, una o varias tareas.
+  const tareas = bloques.map((b) => b.tarea).filter((t): t is NonNullable<typeof t> => !!t);
+  const vacia = bloques.length === 0;
+
+  // 3) Fila de operativas (Bloque 3): render compacto con todas las tareas.
+  if (esOperativas) {
+    return (
+      <button
+        onClick={onClick}
+        className={`group relative min-h-[110px] border-b border-r border-border p-3 text-left transition-colors last:border-r-0 hover:bg-accent/30 ${
+          esHoy ? "bg-violet-500/5" : ""
+        } ${vacia ? "bg-sky-500/[0.03]" : ""}`}
+        aria-label={`Bloque 3 (operativas) del ${fecha}: ${tareas.length} tareas`}
+      >
+        {vacia ? (
+          <div className="flex h-full flex-col items-center justify-center gap-1 text-muted-foreground/40 transition-colors group-hover:text-muted-foreground">
+            <IconPlus className="h-4 w-4" />
+            <span className="text-[10px] font-medium uppercase">
+              + operativa
+            </span>
+          </div>
+        ) : (
+          <ul className="space-y-1">
+            {tareas.map((t) => (
+              <li
+                key={t.id}
+                className={`flex items-center gap-1 rounded border px-1.5 py-0.5 text-[11px] ${
+                  TONO_PRIORIDAD[t.prioridad ?? "media"] ?? TONO_PRIORIDAD.media
+                }`}
+              >
+                {t.prioridad === "critica" && (
+                  <IconFlag className="h-3 w-3 shrink-0" />
+                )}
+                <span className="line-clamp-1 flex-1 font-medium leading-tight">
+                  {t.titulo}
+                </span>
+              </li>
+            ))}
+            {bloques.length < 4 && (
+              <li className="flex items-center gap-1 rounded border border-dashed border-sky-500/40 px-1.5 py-0.5 text-[10px] font-medium text-sky-700 dark:text-sky-300">
+                <IconPlus className="h-3 w-3" />+ añadir operativa
+              </li>
+            )}
+          </ul>
+        )}
+      </button>
+    );
+  }
+
+  // 4) Bloques 1, 2 y 4: una sola tarea o libre.
+  const tarea = bloques[0]?.tarea ?? null;
+  const tono = tarea
+    ? (TONO_PRIORIDAD[tarea.prioridad ?? "media"] ?? TONO_PRIORIDAD.media)
+    : "";
   return (
     <button
       onClick={onClick}
@@ -507,21 +624,25 @@ function BloqueCell({
 function PopoverAsignar({
   fecha,
   numBloque,
-  bloqueActual,
+  bloquesActuales,
   fijo,
   tareas,
   onAsignar,
   onLimpiar,
   onCerrar,
+  onAgregarOperativa,
+  onQuitarOperativa,
 }: {
   fecha: string;
   numBloque: 1 | 2 | 3 | 4;
-  bloqueActual: CalendarioBloqueConTarea | null;
+  bloquesActuales: CalendarioBloqueConTarea[];
   fijo: BloqueFijo | null;
   tareas: Tarea[];
   onAsignar: (tareaId: string | null) => void;
   onLimpiar: () => void;
   onCerrar: () => void;
+  onAgregarOperativa: (tareaId: string) => Promise<void>;
+  onQuitarOperativa: (bloqueId: string) => Promise<void>;
 }) {
   const [busqueda, setBusqueda] = useState("");
   const fechaFmt = new Date(fecha).toLocaleDateString("es-ES", {
@@ -538,7 +659,15 @@ function PopoverAsignar({
       .slice(0, 20);
   }, [tareas, busqueda]);
 
-  // Si la celda es un bloque fijo, solo mostramos el aviso (no se puede asignar/limpiar).
+  const esOperativas = numBloque === 3;
+  const tareasAsignadas = bloquesActuales
+    .map((b) => b.tarea)
+    .filter((t): t is NonNullable<typeof t> => !!t);
+  const tareasAsignadasIds = new Set(bloquesActuales.map((b) => b.id));
+  const tareasAsignadasTareaIds = new Set(tareasAsignadas.map((t) => t.id));
+  const cupoLleno = bloquesActuales.length >= 4;
+
+  // Bloque fijo: solo aviso.
   if (fijo) {
     return (
       <div
@@ -603,6 +732,154 @@ function PopoverAsignar({
     );
   }
 
+  // ─── Bloque 3 (operativas): lista actual + buscador para sumar más. ───
+  if (esOperativas) {
+    return (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="popover-titulo"
+        onClick={onCerrar}
+      >
+        <div
+          className="w-full max-w-md rounded-xl border border-border bg-card p-5 shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <header className="mb-3 flex items-start justify-between">
+            <div>
+              <h2
+                id="popover-titulo"
+                className="flex items-center gap-2 text-base font-semibold tracking-tight"
+              >
+                🛠️ Operativas · Bloque 3
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                {fechaFmt} · {tareasAsignadas.length}/4
+              </p>
+            </div>
+            <button
+              onClick={onCerrar}
+              className="rounded-md p-1 hover:bg-accent"
+              aria-label="Cerrar"
+            >
+              <IconX className="h-4 w-4" />
+            </button>
+          </header>
+
+          {/* Lista actual */}
+          {tareasAsignadas.length > 0 && (
+            <div className="mb-3 space-y-1">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                En este bloque
+              </p>
+              <ul className="space-y-1">
+                {bloquesActuales.map((b) => (
+                  <li
+                    key={b.id}
+                    className={`flex items-center gap-2 rounded-md border px-2 py-1 text-xs ${
+                      b.tarea
+                        ? TONO_PRIORIDAD[b.tarea.prioridad ?? "media"] ?? TONO_PRIORIDAD.media
+                        : "border-border bg-muted/40"
+                    }`}
+                  >
+                    {b.tarea?.prioridad === "critica" && (
+                      <IconFlag className="h-3 w-3 shrink-0" />
+                    )}
+                    <span className="min-w-0 flex-1 truncate font-medium">
+                      {b.tarea?.titulo ?? "(vacía)"}
+                    </span>
+                    <button
+                      onClick={() => onQuitarOperativa(b.id)}
+                      className="shrink-0 rounded p-1 text-muted-foreground hover:bg-background hover:text-red-500"
+                      title="Quitar del bloque"
+                      aria-label="Quitar"
+                    >
+                      <IconX className="h-3 w-3" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Buscador para añadir más */}
+          {cupoLleno ? (
+            <p className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+              Has llegado al límite de 4 operativas en este bloque. Quita una
+              antes de añadir otra.
+            </p>
+          ) : (
+            <>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                Añadir operativa
+              </p>
+              <div className="relative">
+                <IconSearch className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <input
+                  autoFocus
+                  type="search"
+                  placeholder="Buscar tarea…"
+                  value={busqueda}
+                  onChange={(e) => setBusqueda(e.target.value)}
+                  className="w-full rounded-md border border-input bg-background py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
+
+              <ul className="mt-2 max-h-56 overflow-y-auto">
+                {filtradas.length === 0 ? (
+                  <li className="px-2 py-3 text-center text-xs text-muted-foreground">
+                    {busqueda ? "Sin coincidencias." : "No hay tareas activas."}
+                  </li>
+                ) : (
+                  filtradas.map((t) => (
+                    <li key={t.id}>
+                      <button
+                        onClick={() => {
+                          onAgregarOperativa(t.id);
+                          setBusqueda("");
+                        }}
+                        disabled={tareasAsignadasTareaIds.has(t.id)}
+                        className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm hover:bg-accent disabled:opacity-40"
+                      >
+                        {t.prioridad === "critica" && (
+                          <IconFlag className="h-3.5 w-3.5 shrink-0 text-red-500" />
+                        )}
+                        <span className="min-w-0 flex-1 truncate">{t.titulo}</span>
+                        {tareasAsignadasTareaIds.has(t.id) && (
+                          <IconCheck className="h-3.5 w-3.5 text-emerald-500" />
+                        )}
+                      </button>
+                    </li>
+                  ))
+                )}
+              </ul>
+            </>
+          )}
+
+          <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
+            <button
+              onClick={onLimpiar}
+              disabled={tareasAsignadas.length === 0}
+              className="inline-flex items-center gap-1 text-xs text-red-600 underline-offset-4 hover:underline disabled:opacity-40"
+            >
+              <IconTrash className="h-3 w-3" />
+              Vaciar bloque
+            </button>
+            <button
+              onClick={onCerrar}
+              className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Bloques 1, 2 y 4 (1 sola tarea): comportamiento clásico. ───
+  const bloqueActual = bloquesActuales[0] ?? null;
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"

@@ -534,13 +534,19 @@ export interface PreFlightCheck {
 }
 
 /** Time-blocking (migrations 0017): un bloque horario de una fecha con su
- *  tarea asignada (o NULL = bloque libre). numero_bloque ∈ {1,2,3,4}. */
+ *  tarea asignada (o NULL = bloque libre). A partir de la migration 0020,
+ *  el Bloque 3 puede contener hasta 4 filas (una por tarea operativa en
+ * lote); los bloques 1, 2 y 4 siguen siendo 1 fila por (fecha, bloque). */
 export interface CalendarioBloque {
   id: string;
   fecha: string;        // YYYY-MM-DD
   numero_bloque: 1 | 2 | 3 | 4;
   tarea_id: string | null;
   nota: string | null;
+  /** Orden dentro del (fecha, bloque). Para bloques 1, 2 y 4 siempre 0
+   *  (única tarea). Para Bloque 3 puede ser 0..N-1 según posición en la
+   *  lista de operativas en lote. */
+  orden: number;
 }
 
 /** Vista enriquecida: bloque + tarea anidada (si la hay). La monta la app

@@ -1002,9 +1002,10 @@ function calcularProgreso(resultados: ResultadoConTareas[]): number {
 // Calendario / Time-blocking (migration 0017)
 // ============================================================================
 
-/** Devuelve los bloques (4/día) entre `desde` y `hasta` (YYYY-MM-DD) ya
- *  enriquecidos con la tarea anidada (si la hay). Si no hay fila para un
- *  (fecha, bloque), devuelve un placeholder con tarea=null. */
+/** Devuelve los bloques entre `desde` y `hasta` (YYYY-MM-DD) ya
+ *  enriquecidos con la tarea anidada (si la hay). Para bloques 1, 2 y 4
+ *  hay a lo sumo 1 fila; para el bloque 3 puede haber hasta 4 (operativas
+ *  en lote — migration 0020). Ordenados por (fecha, numero_bloque, orden). */
 export async function fetchCalendarioSemana(opts: {
   desde: string;
   hasta: string;
@@ -1016,7 +1017,8 @@ export async function fetchCalendarioSemana(opts: {
     .gte("fecha", opts.desde)
     .lte("fecha", opts.hasta)
     .order("fecha")
-    .order("numero_bloque");
+    .order("numero_bloque")
+    .order("orden");
   if (error) throw error;
 
   const tareasIds = Array.from(
@@ -1036,13 +1038,20 @@ export async function fetchCalendarioSemana(opts: {
 }
 
 /** Upsert: asigna (o reemplaza) la tarea de un bloque. Si `tareaId` es null,
- *  queda como bloque libre con `nota`. */
+ *  queda como bloque libre con `nota`. Solo para bloques 1, 2 y 4 (los
+ *  tres llevan índice UNIQUE PARCIAL; ver migración 0020). Para el Bloque 3
+ *  usa `agregarTareaABloque3` / `quitarTareaDeBloque3`. */
 export async function upsertBloque(opts: {
   fecha: string;
   numeroBloque: 1 | 2 | 3 | 4;
   tareaId: string | null;
   nota?: string | null;
 }) {
+  if (opts.numeroBloque === 3) {
+    throw new Error(
+      "upsertBloque no soporta el Bloque 3 (multi-tarea). Usa agregarTareaABloque3.",
+    );
+  }
   const supabase = createClient();
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.user) throw new Error("Sin sesión");
@@ -1053,9 +1062,55 @@ export async function upsertBloque(opts: {
       numero_bloque: opts.numeroBloque,
       tarea_id: opts.tareaId,
       nota: opts.nota ?? null,
+      orden: 0,
     },
     { onConflict: "owner_id,fecha,numero_bloque" },
   );
+  if (error) throw error;
+}
+
+/** Añade una tarea al Bloque 3 (operativas en lote). El `orden` se asigna
+ *  como (max(orden)+1) de las filas existentes en (fecha, bloque=3), o 0
+ *  si el bloque está vacío. La UI limita a 4 filas; el backend no. */
+export async function agregarTareaABloque3(opts: {
+  fecha: string;
+  tareaId: string;
+}) {
+  const supabase = createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) throw new Error("Sin sesión");
+
+  // 1) siguiente orden = MAX(orden)+1 (o 0 si vacío)
+  const { data: existentes, error: errExistentes } = await supabase
+    .from("calendario_bloques")
+    .select("orden")
+    .eq("owner_id", session.user.id)
+    .eq("fecha", opts.fecha)
+    .eq("numero_bloque", 3);
+  if (errExistentes) throw errExistentes;
+  const nextOrden =
+    (existentes ?? []).reduce((acc, r) => Math.max(acc, r.orden ?? 0), -1) + 1;
+
+  // 2) insert
+  const { error } = await supabase.from("calendario_bloques").insert({
+    owner_id: session.user.id,
+    fecha: opts.fecha,
+    numero_bloque: 3,
+    tarea_id: opts.tareaId,
+    nota: null,
+    orden: nextOrden,
+  });
+  if (error) throw error;
+}
+
+/** Quita UNA tarea concreta del Bloque 3 (identificada por el id de la
+ *  fila en `calendario_bloques`). */
+export async function quitarTareaDeBloque3(opts: { bloqueId: string }) {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("calendario_bloques")
+    .delete()
+    .eq("id", opts.bloqueId);
   if (error) throw error;
 }
 
