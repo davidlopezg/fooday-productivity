@@ -268,10 +268,42 @@ export async function crearTareaConIA(
   return creada;
 }
 
-export async function crearCaptura(texto: string) {
+export async function crearCaptura(
+  texto: string,
+  rama?:
+    | "tarea"
+    | "problema"
+    | "reflexion"
+    | "idea"
+    | "pago"
+    | "maria"
+    | "sin_clasificar",
+) {
   const t = texto.trim();
   if (!t) return;
-  await createClient().from("capturas").insert({ texto: t, estado: "pendiente" });
+  await createClient().from("capturas").insert({
+    texto: t,
+    estado: "pendiente",
+    rama: rama ?? null,
+  });
+}
+
+/** Marca una captura como procesada y anota a dónde fue (p.ej. "pago:<id>"). */
+export async function marcarCapturaProcesada(
+  id: string,
+  destino: string,
+) {
+  const { error } = await createClient()
+    .from("capturas")
+    .update({ estado: "procesada", destino })
+    .eq("id", id);
+  if (error) throw new Error(`No se pudo marcar la captura: ${error.message}`);
+}
+
+/** Elimina una captura del inbox. */
+export async function eliminarCaptura(id: string) {
+  const { error } = await createClient().from("capturas").delete().eq("id", id);
+  if (error) throw new Error(`No se pudo eliminar: ${error.message}`);
 }
 
 /**

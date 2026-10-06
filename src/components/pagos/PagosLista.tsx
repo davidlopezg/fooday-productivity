@@ -12,17 +12,19 @@ import { refreshPagosVencidos } from "@/lib/pagos/mutations";
 import { PagoCard } from "@/components/pagos/PagoCard";
 import { PagoFormModal } from "@/components/pagos/PagoFormModal";
 import { PagoPagarParcialModal } from "@/components/pagos/PagoPagarParcialModal";
+import { RecurrentesManager } from "@/components/pagos/RecurrentesManager";
 import {
   type EstadoPago,
   type PagoConUrgencia,
 } from "@/lib/pagos/types";
-import { IconPlus, IconSearch, IconX } from "@/components/icons";
+import { IconPlus, IconRepeat, IconSearch, IconX } from "@/components/icons";
 
 /** Estado del modal activo. Solo uno a la vez. */
 type ModalState =
   | { tipo: "crear" }
   | { tipo: "editar"; pago: PagoConUrgencia }
   | { tipo: "parcial"; pago: PagoConUrgencia }
+  | { tipo: "recurrentes" }
   | null;
 
 /** Filtra una lista de pagos por texto libre (proveedor o concepto).
@@ -210,6 +212,15 @@ export function PagosLista() {
           </div>
           <button
             type="button"
+            onClick={() => setModal({ tipo: "recurrentes" })}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent"
+            title="Gestionar reglas recurrentes"
+          >
+            <IconRepeat className="h-4 w-4" />
+            Reglas
+          </button>
+          <button
+            type="button"
             onClick={() => setModal({ tipo: "crear" })}
             className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground shadow-sm hover:opacity-90"
           >
@@ -315,6 +326,12 @@ export function PagosLista() {
           pago={modal.pago}
           onClose={() => setModal(null)}
           onSaved={reload}
+        />
+      )}
+      {modal?.tipo === "recurrentes" && (
+        <RecurrentesManager
+          onClose={() => setModal(null)}
+          onChanged={reload}
         />
       )}
     </div>

@@ -4,6 +4,8 @@ import Link from "next/link";
 import { fetchContadores, fetchPlanHoy, fetchTareas, fetchWigTareas, fetchWigs } from "@/lib/queries";
 import { useData } from "@/lib/useData";
 import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
+import { PagosWidget } from "@/components/pagos/PagosWidget";
+import { PagosNotificaciones } from "@/components/pagos/PagosNotificaciones";
 import { IconTarget } from "@/components/icons";
 import type { AmbitoTarea, PlanDiario, PlanDiarioTarea, Tarea } from "@/lib/types";
 
@@ -63,6 +65,9 @@ export default function HoyPage() {
 
   return (
     <div className="space-y-8">
+      {/* Activa las notificaciones PWA del domingo por la noche. No pinta nada. */}
+      <PagosNotificaciones />
+
       <header>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -79,6 +84,9 @@ export default function HoyPage() {
           <HelpDrawer title="Hoy" items={AYUDA_POR_RUTA["/"]?.items ?? []} />
         </div>
       </header>
+
+      {/* Widget de pagos: lunes o próximos */}
+      <PagosWidget />
 
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {stats.map((c) => (

@@ -30,15 +30,20 @@ export function PagoFormModal({
   pago,
   onClose,
   onSaved,
+  initialConcepto,
 }: {
   modo: Modo;
   pago?: PagoConUrgencia;
   onClose: () => void;
   onSaved: () => void;
+  /** Pre-rellena el campo "Concepto" (útil desde captura rápida). */
+  initialConcepto?: string;
 }) {
   // ----- estado del formulario
   const [proveedor, setProveedor] = useState(pago?.proveedor ?? "");
-  const [concepto, setConcepto] = useState(pago?.concepto ?? "");
+  const [concepto, setConcepto] = useState(
+    pago?.concepto ?? initialConcepto ?? "",
+  );
   const [categoria, setCategoria] = useState<CategoriaPago>(
     pago?.categoria ?? "proveedor",
   );
