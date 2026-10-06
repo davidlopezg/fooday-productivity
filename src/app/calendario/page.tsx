@@ -29,11 +29,17 @@ import {
 import { useData } from "@/lib/useData";
 import {
   BLOQUE_HORARIO,
+  BLOQUES_FIJOS,
+  bloqueFijoDe,
+  bloquesFijosDe,
   DIAS_SEMANA,
   formatISOWeek,
   getCurrentISOWeek,
   isoWeekToMonday,
+  localYMD,
   shiftISOWeek,
+  type BloqueFijo,
+  type DiaSemana,
 } from "@/lib/semana";
 import {
   IconArrowLeft,
@@ -80,8 +86,8 @@ export default function CalendarioPage() {
     d.setDate(d.getDate() + 6);
     return d;
   }, [lunes]);
-  const desde = lunes.toISOString().slice(0, 10);
-  const hasta = domingo.toISOString().slice(0, 10);
+  const desde = localYMD(lunes);
+  const hasta = localYMD(domingo);
 
   const bloquesQ = useData<CalendarioBloqueConTarea[]>(
     () => fetchCalendarioSemana({ desde, hasta }),
@@ -108,15 +114,18 @@ export default function CalendarioPage() {
     return m;
   }, [bloquesQ.data]);
 
-  // Días de la semana (lunes a domingo) como YYYY-MM-DD
+  // Días de la semana (lunes a domingo) como YYYY-MM-DD local.
+  // Usamos localYMD (no toISOString) para evitar el bug de zona horaria:
+  // en CEST el toISOString() de un Date a 00:00 local cae al día anterior UTC.
   const dias = useMemo(() => {
+    const hoyLocal = localYMD(new Date());
     return DIAS_SEMANA.map((d, i) => {
       const f = new Date(lunes);
       f.setDate(lunes.getDate() + i);
       return {
         ...d,
-        fecha: f.toISOString().slice(0, 10),
-        esHoy: f.toISOString().slice(0, 10) === new Date().toISOString().slice(0, 10),
+        fecha: localYMD(f),
+        esHoy: localYMD(f) === hoyLocal,
       };
     });
   }, [lunes]);
@@ -272,6 +281,10 @@ export default function CalendarioPage() {
           fecha={popover.fecha}
           numBloque={popover.numeroBloque}
           bloqueActual={mapaBloques.get(`${popover.fecha}-${popover.numeroBloque}`) ?? null}
+          fijo={bloqueFijoDe(
+            (dias.find((d) => d.fecha === popover.fecha)?.id ?? 1) as DiaSemana,
+            popover.numeroBloque,
+          )}
           tareas={tareasActivas}
           onAsignar={asignar}
           onLimpiar={limpiar}
@@ -279,12 +292,77 @@ export default function CalendarioPage() {
         />
       )}
 
+      {/* Resumen de bloques fijos de la semana */}
+      <ResumenBloquesFijos />
+
       {/* Ayuda */}
       <p className="text-center text-xs text-muted-foreground">
         💡 Tip: limita cada día a 3-4 bloques asignados. Más de 4h de foco
         profundo no es sostenible (pilar 5).
       </p>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ResumenBloquesFijos — lista compacta de los bloques fijos del sistema.
+// Muestra qué celdas están reservadas esta semana, agrupadas por día,
+// para que el usuario vea de un vistazo qué huecos quedan libres.
+// ---------------------------------------------------------------------------
+function ResumenBloquesFijos() {
+  return (
+    <section className="rounded-xl border border-border bg-card p-4">
+      <header className="mb-3 flex items-center justify-between">
+        <h2 className="text-sm font-semibold tracking-tight">
+          🔒 Bloques fijos de la semana
+        </h2>
+        <span className="text-[11px] text-muted-foreground">
+          {BLOQUES_FIJOS.length} reservas globales
+        </span>
+      </header>
+      <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {DIAS_SEMANA.map((d) => {
+          const fijos = bloquesFijosDe(d.id);
+          if (fijos.length === 0) {
+            return (
+              <li
+                key={d.id}
+                className="rounded-lg border border-dashed border-border bg-muted/20 p-2.5 text-[11px] text-muted-foreground"
+              >
+                <strong className="text-foreground">{d.nombre}</strong>
+                <span className="ml-1.5">— sin reservas</span>
+              </li>
+            );
+          }
+          return (
+            <li
+              key={d.id}
+              className="rounded-lg border border-dashed border-primary/40 bg-primary/5 p-2.5"
+            >
+              <strong className="text-sm">{d.nombre}</strong>
+              <ul className="mt-1.5 space-y-1">
+                {fijos.map((f, idx) => (
+                  <li
+                    key={idx}
+                    className="flex items-start gap-1.5 text-[11px] leading-tight"
+                  >
+                    <span className="shrink-0 leading-none">{f.emoji}</span>
+                    <span className="min-w-0 flex-1">
+                      {f.numeroBloque && (
+                        <span className="rounded bg-background px-1 py-px font-mono text-[10px] text-muted-foreground">
+                          B{f.numeroBloque}
+                        </span>
+                      )}
+                      <span className="ml-1">{f.titulo}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 
@@ -330,12 +408,14 @@ function FilaBloque({
       </div>
       {dias.map((d) => {
         const b = mapaBloques.get(`${d.fecha}-${numBloque}`);
+        const fijo = bloqueFijoDe(d.id as DiaSemana, numBloque);
         return (
           <BloqueCell
             key={d.id}
             fecha={d.fecha}
             numBloque={numBloque}
             bloque={b ?? null}
+            fijo={fijo}
             esHoy={d.esHoy}
             onClick={() => onClick(d.fecha)}
           />
@@ -349,17 +429,50 @@ function BloqueCell({
   fecha,
   numBloque,
   bloque,
+  fijo,
   esHoy,
   onClick,
 }: {
   fecha: string;
   numBloque: 1 | 2 | 3 | 4;
   bloque: CalendarioBloqueConTarea | null;
+  fijo: BloqueFijo | null;
   esHoy: boolean;
   onClick: () => void;
 }) {
   const tarea = bloque?.tarea ?? null;
   const tono = tarea ? (TONO_PRIORIDAD[tarea.prioridad ?? "media"] ?? TONO_PRIORIDAD.media) : "";
+
+  // 1) Bloque fijo del sistema (no editable) → manda sobre la tarea.
+  if (fijo) {
+    return (
+      <button
+        onClick={onClick}
+        className={`group relative min-h-[90px] border-b border-r border-border p-2 text-left transition-colors last:border-r-0 ${
+          esHoy ? "bg-violet-500/5" : ""
+        }`}
+        aria-label={`Bloque ${numBloque} del ${fecha}: fijo · ${fijo.titulo}`}
+        title={`Bloque fijo (no editable): ${fijo.titulo}`}
+      >
+        <div className="flex h-full flex-col gap-1 rounded-md border border-dashed border-primary/40 bg-primary/5 p-2">
+          <div className="flex items-start gap-1">
+            <span className="text-sm leading-none">{fijo.emoji}</span>
+            <div className="line-clamp-2 text-[11px] font-medium leading-tight">
+              {fijo.titulo}
+            </div>
+          </div>
+          {fijo.nota && (
+            <p className="text-[10px] italic text-muted-foreground">{fijo.nota}</p>
+          )}
+          <span className="mt-auto self-start rounded-full border border-primary/30 bg-background px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-primary">
+            🔒 fijo
+          </span>
+        </div>
+      </button>
+    );
+  }
+
+  // 2) Celda normal: tarea asignada o libre.
   return (
     <button
       onClick={onClick}
@@ -395,6 +508,7 @@ function PopoverAsignar({
   fecha,
   numBloque,
   bloqueActual,
+  fijo,
   tareas,
   onAsignar,
   onLimpiar,
@@ -403,6 +517,7 @@ function PopoverAsignar({
   fecha: string;
   numBloque: 1 | 2 | 3 | 4;
   bloqueActual: CalendarioBloqueConTarea | null;
+  fijo: BloqueFijo | null;
   tareas: Tarea[];
   onAsignar: (tareaId: string | null) => void;
   onLimpiar: () => void;
@@ -422,6 +537,71 @@ function PopoverAsignar({
       .filter((t) => t.titulo.toLowerCase().includes(q))
       .slice(0, 20);
   }, [tareas, busqueda]);
+
+  // Si la celda es un bloque fijo, solo mostramos el aviso (no se puede asignar/limpiar).
+  if (fijo) {
+    return (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="popover-titulo"
+        onClick={onCerrar}
+      >
+        <div
+          className="w-full max-w-md rounded-xl border border-border bg-card p-5 shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <header className="mb-3 flex items-start justify-between">
+            <div>
+              <h2
+                id="popover-titulo"
+                className="flex items-center gap-2 text-base font-semibold tracking-tight"
+              >
+                <span>{fijo.emoji}</span>
+                Bloque {numBloque} · {BLOQUE_HORARIO[numBloque]}
+              </h2>
+              <p className="text-xs text-muted-foreground">{fechaFmt}</p>
+            </div>
+            <button
+              onClick={onCerrar}
+              className="rounded-md p-1 hover:bg-accent"
+              aria-label="Cerrar"
+            >
+              <IconX className="h-4 w-4" />
+            </button>
+          </header>
+
+          <div className="rounded-md border border-dashed border-primary/40 bg-primary/5 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-primary">
+              🔒 Bloque fijo
+            </p>
+            <p className="mt-2 text-sm font-medium">{fijo.titulo}</p>
+            {fijo.nota && (
+              <p className="mt-1 text-xs italic text-muted-foreground">{fijo.nota}</p>
+            )}
+            <p className="mt-3 text-xs text-muted-foreground">
+              Este bloque está reservado en el sistema y no se puede sobrescribir
+              desde el calendario semanal. Si necesitas modificarlo, edita{" "}
+              <code className="rounded bg-background px-1.5 py-0.5 text-[11px]">
+                BLOQUES_FIJOS
+              </code>{" "}
+              en <code className="rounded bg-background px-1.5 py-0.5 text-[11px]">src/lib/semana.ts</code>.
+            </p>
+          </div>
+
+          <div className="mt-4 flex justify-end">
+            <button
+              onClick={onCerrar}
+              className="rounded-md border border-border bg-card px-4 py-2 text-sm font-medium hover:bg-accent"
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

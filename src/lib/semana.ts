@@ -7,6 +7,16 @@
 export type DiaSemana = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 export type NumeroBloque = 1 | 2 | 3 | 4;
 
+/** Devuelve la fecha local (YYYY-MM-DD) de un `Date`. Usa los componentes
+ *  locales (no UTC) para evitar el bug típico de zonas horarias no-UTC
+ *  donde `toISOString().slice(0,10)` salta al día anterior. */
+export function localYMD(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 /** Horario de los 4 bloques de trabajo profundo del día. Los bloques 1 y 2
  *  son antes de comer; 3 y 4 después. Total = 4h, que es el techo
  *  sostenible del pilar 5. */
@@ -116,6 +126,11 @@ export function formatISOWeek(anio: number, semana_iso: number): string {
 // Bloques fijos (reglas no negociables de la semana).
 // Definidos en código (no en BD) porque "no cambian nunca". Si en el futuro
 // se quieren editar, se migran a `rituales` o a una tabla propia.
+//
+// `numeroBloque` es opcional: si está definido, ese bloque concreto del día
+// queda "reservado" en /calendario (no se puede asignar tarea encima). Si no,
+// el comportamiento clásico es por día completo (se muestra como tarjeta
+// informativa en /semana pero el resto del día sigue editable).
 // ============================================================================
 
 export interface BloqueFijo {
@@ -123,56 +138,94 @@ export interface BloqueFijo {
   emoji: string;
   titulo: string;
   nota?: string;
-  /** Si true, esa columna queda "reservada" y no admite tareas críticas de la IA. */
+  /** Si true, la columna de ese día en /semana queda cerrada a drops. */
   bloquea: boolean;
+  /** Bloque horario concreto que ocupa (1..4). Si está definido, esa celda
+   *  de /calendario se muestra como "fija" (no editable). */
+  numeroBloque?: NumeroBloque;
 }
 
 export const BLOQUES_FIJOS: readonly BloqueFijo[] = [
-  // Lunes a primera hora: pagos, y yo primero.
+  // ─── Lunes ───
+  // Bloque 1: planificación de pagos (yo primero).
   {
     dia: 1,
+    numeroBloque: 1,
     emoji: "💸",
-    titulo: "Pagos de la semana",
-    nota: "¡yo primero!",
+    titulo: "Planificación de pagos",
+    nota: "yo primero",
     bloquea: false,
   },
-  // Jueves todo el día: Sol de Nit.
+  // ─── Martes ───
+  // Bloque 2: compras para Sol de Nit.
+  {
+    dia: 2,
+    numeroBloque: 2,
+    emoji: "🛒",
+    titulo: "Compras · Sol de Nit",
+    bloquea: true,
+  },
+  // ─── Jueves ───
+  // Bloques 1, 2 y 3: producción. Bloque 4: creatividad.
+  ...(
+    [1, 2, 3] as const
+  ).map((n) => ({
+    dia: 4 as DiaSemana,
+    numeroBloque: n,
+    emoji: "🍕",
+    titulo: "Producción · Sol de Nit",
+    bloquea: true,
+  })),
   {
     dia: 4,
+    numeroBloque: 4,
     emoji: "🎨",
-    titulo: "Producción y creatividad · Sol de Nit",
+    titulo: "Creatividad · Sol de Nit",
     bloquea: true,
   },
-  // Sábado: descanso + inventario/lista de la compra de Sol de Nit por la noche.
-  {
-    dia: 6,
-    emoji: "🌿",
-    titulo: "Descanso",
+  // ─── Viernes ───
+  // Bloques 2 y 3: servicio.
+  ...(
+    [2, 3] as const
+  ).map((n) => ({
+    dia: 5 as DiaSemana,
+    numeroBloque: n,
+    emoji: "🍽️",
+    titulo: "Servicio · Sol de Nit",
     bloquea: true,
-  },
-  {
-    dia: 6,
-    emoji: "📦",
-    titulo: "Inventario y lista de la compra · Sol de Nit",
+  })),
+  // ─── Sábado ───
+  // Bloques 2 y 3: servicio.
+  ...(
+    [2, 3] as const
+  ).map((n) => ({
+    dia: 6 as DiaSemana,
+    numeroBloque: n,
+    emoji: "🍽️",
+    titulo: "Servicio · Sol de Nit",
     bloquea: true,
-  },
-  // Domingo: planificación + María + comida.
+  })),
+  // ─── Domingo ───
+  // Bloque 1: planificación semanal. Bloque 2: reunión con María. Bloque 3: menú próxima semana.
   {
     dia: 7,
+    numeroBloque: 1,
     emoji: "📅",
     titulo: "Planificación semanal",
     bloquea: true,
   },
   {
     dia: 7,
+    numeroBloque: 2,
     emoji: "🤝",
     titulo: "Reunión con María",
     bloquea: true,
   },
   {
     dia: 7,
+    numeroBloque: 3,
     emoji: "🍽️",
-    titulo: "Comida de la semana",
+    titulo: "Planificar menú · próxima semana",
     bloquea: true,
   },
 ] as const;
@@ -182,10 +235,22 @@ export function bloquesFijosDe(dia: DiaSemana): BloqueFijo[] {
   return BLOQUES_FIJOS.filter((b) => b.dia === dia);
 }
 
+/** Busca el bloque fijo de un (día, nº bloque) concreto, o null. */
+export function bloqueFijoDe(
+  dia: DiaSemana,
+  numeroBloque: NumeroBloque,
+): BloqueFijo | null {
+  return (
+    BLOQUES_FIJOS.find(
+      (b) => b.dia === dia && b.numeroBloque === numeroBloque,
+    ) ?? null
+  );
+}
+
 /**
  * Un día está BLOQUEADO si tiene algún bloque fijo con `bloquea: true`.
  * En días bloqueados no se pueden arrastrar tareas ni usar el botón "+ Añadir".
- * (L: no — M: no — X: no — J: sí — V: no — S: sí — D: sí).
+ * (L: no — M: sí — X: no — J: sí — V: sí — S: sí — D: sí).
  */
 export function esDiaBloqueado(dia: DiaSemana): boolean {
   return BLOQUES_FIJOS.some((f) => f.dia === dia && f.bloquea);
