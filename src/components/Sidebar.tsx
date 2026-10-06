@@ -20,6 +20,7 @@ import {
   IconList,
   IconLogout,
   IconMenu,
+  IconRepeat,
   IconSettings,
   IconSparkles,
   IconTarget,
@@ -27,6 +28,7 @@ import {
   IconX,
 } from "@/components/icons";
 import { createClient } from "@/lib/supabase/client";
+import { APP_VERSION, forzarActualizacion } from "@/lib/version";
 
 type IconComponent = (p: SVGProps<SVGSVGElement>) => React.ReactElement;
 type NavItem = { href: string; label: string; Icon: IconComponent };
@@ -152,6 +154,31 @@ function SignOutButton({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
+/** Botón "Actualizar app" + versión del build.
+ *  Sirve para forzar la recarga cuando el móvil se queda con una versión
+ *  vieja cacheada (sin romper la sesión de Supabase). */
+function AppVersionFooter({ onNavigate }: { onNavigate?: () => void }) {
+  return (
+    <div className="mt-1">
+      <button
+        type="button"
+        onClick={async () => {
+          onNavigate?.();
+          await forzarActualizacion();
+        }}
+        className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
+        title="Limpia cachés y recarga la app"
+      >
+        <IconRepeat className="h-3.5 w-3.5" aria-hidden />
+        Actualizar app
+      </button>
+      <p className="px-3 pb-1 text-[10px] text-muted-foreground/60">
+        build {APP_VERSION}
+      </p>
+    </div>
+  );
+}
+
 function NavItems({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
 
@@ -196,6 +223,7 @@ function NavItems({ onNavigate }: { onNavigate?: () => void }) {
           onNavigate={onNavigate}
         />
         <div className="mt-1">
+          <AppVersionFooter onNavigate={onNavigate} />
           <SignOutButton onNavigate={onNavigate} />
         </div>
       </div>

@@ -33,6 +33,35 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return () => sub.subscription.unsubscribe();
   }, []);
 
+  // Registro del Service Worker (network-first para HTML). Evita que el
+  // móvil se quede ejecutando una versión vieja cacheada tras un deploy.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!("serviceWorker" in navigator)) return;
+    const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
+    navigator.serviceWorker
+      .register(`${basePath}/sw.js`, {
+        scope: `${basePath}/`,
+        // No usar la caché HTTP para el propio sw.js: así detectamos
+        // versiones nuevas del SW en cada carga.
+        updateViaCache: "none",
+      })
+      .then((reg) => {
+        // Busca actualizaciones cada vez que se abre la app.
+        reg.update().catch(() => {});
+        // Si hay una versión nueva del SW esperando, actívala ya.
+        reg.addEventListener("updatefound", () => {
+          const nuevo = reg.installing;
+          nuevo?.addEventListener("statechange", () => {
+            if (nuevo.state === "installed" && navigator.serviceWorker.controller) {
+              nuevo.postMessage("SKIP_WAITING");
+            }
+          });
+        });
+      })
+      .catch((e) => console.warn("[sw] registro falló:", e));
+  }, []);
+
   useEffect(() => {
     if (!ready) return;
     if (typeof window !== "undefined" && window.location.search.includes("debug=1")) return;
