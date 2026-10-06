@@ -1040,7 +1040,14 @@ export async function fetchCalendarioSemana(opts: {
 /** Upsert: asigna (o reemplaza) la tarea de un bloque. Si `tareaId` es null,
  *  queda como bloque libre con `nota`. Solo para bloques 1, 2 y 4 (los
  *  tres llevan índice UNIQUE PARCIAL; ver migración 0020). Para el Bloque 3
- *  usa `agregarTareaABloque3` / `quitarTareaDeBloque3`. */
+ *  usa `agregarTareaABloque3` / `quitarTareaDeBloque3`.
+ *
+ *  NOTA: NO usamos `supabase.upsert(..., { onConflict: ... })` porque la
+ *  UNIQUE de bloques 1/2/4 es un ÍNDICE PARCIAL (`WHERE numero_bloque IN
+ *  (1,2,4)`) y Postgres NO soporta `ON CONFLICT` sobre índices parciales
+ *  (error 42P10). Hacemos el upsert a mano: SELECT fila existente → si
+ *  existe, UPDATE; si no, INSERT. Como en bloques 1/2/4 solo puede haber
+ *  1 fila (lo garantiza el índice parcial), no hay race condition real. */
 export async function upsertBloque(opts: {
   fecha: string;
   numeroBloque: 1 | 2 | 3 | 4;
@@ -1055,18 +1062,44 @@ export async function upsertBloque(opts: {
   const supabase = createClient();
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.user) throw new Error("Sin sesión");
-  const { error } = await supabase.from("calendario_bloques").upsert(
-    {
-      owner_id: session.user.id,
-      fecha: opts.fecha,
-      numero_bloque: opts.numeroBloque,
-      tarea_id: opts.tareaId,
-      nota: opts.nota ?? null,
-      orden: 0,
-    },
-    { onConflict: "owner_id,fecha,numero_bloque" },
-  );
-  if (error) throw error;
+
+  const ownerId = session.user.id;
+  const updateValues = {
+    tarea_id: opts.tareaId,
+    nota: opts.nota ?? null,
+  };
+
+  // 1) SELECT fila existente (en bloques 1/2/4 solo puede haber 0 o 1).
+  const { data: existente, error: errSelect } = await supabase
+    .from("calendario_bloques")
+    .select("id")
+    .eq("owner_id", ownerId)
+    .eq("fecha", opts.fecha)
+    .eq("numero_bloque", opts.numeroBloque)
+    .maybeSingle();
+  if (errSelect) throw errSelect;
+
+  if (existente) {
+    // 2a) UPDATE de la fila existente.
+    const { error: errUpdate } = await supabase
+      .from("calendario_bloques")
+      .update(updateValues)
+      .eq("id", existente.id);
+    if (errUpdate) throw errUpdate;
+    return;
+  }
+
+  // 2b) INSERT de fila nueva. Si dos requests entran a la vez, el índice
+  // parcial 1/2/4 garantiza que solo uno gana; el otro recibe 23505
+  // (subidor lo verá como error normal).
+  const { error: errInsert } = await supabase.from("calendario_bloques").insert({
+    owner_id: ownerId,
+    fecha: opts.fecha,
+    numero_bloque: opts.numeroBloque,
+    orden: 0,
+    ...updateValues,
+  });
+  if (errInsert) throw errInsert;
 }
 
 /** Añade una tarea al Bloque 3 (operativas en lote). El `orden` se asigna
