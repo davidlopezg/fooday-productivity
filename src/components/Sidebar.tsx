@@ -71,7 +71,8 @@ const REPORTS_ITEMS: NavItem[] = [
 
 // Otros — config, ayuda y salida
 const OTHER_ITEMS: NavItem[] = [
-  { href: "/docs", label: "Metodología", Icon: IconBook },
+  { href: "/metodologia", label: "Arquitectura (WIGs/GTD)", Icon: IconTarget },
+  { href: "/docs", label: "Los 5 pilares", Icon: IconBook },
   { href: "/configuracion", label: "Configuración", Icon: IconSettings },
 ];
 

@@ -44,6 +44,18 @@ export async function fetchTareas(estado?: string): Promise<Tarea[]> {
   return ordenarSubtareas((data ?? []) as Tarea[]);
 }
 
+/** Trae una tarea concreta con sus subtareas anidadas. */
+export async function fetchTareaById(id: string): Promise<Tarea | null> {
+  const { data, error } = await createClient()
+    .from("tareas")
+    .select("*, subtareas:tareas_subtareas(*)")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  return ordenarSubtareas([data as Tarea])[0];
+}
+
 /** Ordena las subtareas anidadas por `orden` ascendente. */
 function ordenarSubtareas<T extends { subtareas: TareaSubtarea[] | null }>(tareas: T[]): T[] {
   return tareas.map((t) => ({

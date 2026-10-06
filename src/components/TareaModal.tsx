@@ -296,7 +296,7 @@ function SubtareasEditor({
             )}
           </div>
           <p className="mt-0.5 text-[11px] text-muted-foreground">
-            Micro-pasos accionables (≤5 min, primera persona, imperativo).
+            Micro-pasos accionables (verbo + objeto concreto, primera persona, imperativo). Los minutos a la derecha ajustan el timer del Focus.
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
@@ -378,11 +378,18 @@ function SubtareasEditor({
                 type="button"
                 onClick={() => {
                   if (!s.descripcion.trim()) return;
+                  // Si la subtarea tiene un tiempo estimado propio, el timer
+                  // se ajusta a ese tamaño. Si no, se usa el default (25 min).
+                  // `s.id` existe en runtime cuando la subtarea viene de BD
+                  // (TareaSubtarea), aunque el tipo wire (Subtarea) no lo declare.
+                  const subtareaId = (s as { id?: string }).id ?? null;
+                  const minutos = s.tiempo_estimado_min ?? 0;
                   iniciar({
                     tarea_id: tareaId,
                     tarea_titulo: tareaTitulo,
-                    subtarea_id: null, // el editor aún no tiene IDs persistidos
+                    subtarea_id: subtareaId,
                     subtarea_descripcion: s.descripcion.trim(),
+                    duracionSeg: minutos > 0 ? minutos * 60 : undefined,
                   });
                 }}
                 disabled={!s.descripcion.trim()}
@@ -400,17 +407,17 @@ function SubtareasEditor({
               <input
                 type="number"
                 min={1}
-                max={5}
+                max={120}
                 step={1}
                 value={s.tiempo_estimado_min ?? ""}
                 onChange={(e) =>
                   actualizar(idx, {
                     tiempo_estimado_min:
-                      e.target.value === "" ? null : Math.max(1, Math.min(5, Number(e.target.value))),
+                      e.target.value === "" ? null : Math.max(1, Math.min(120, Number(e.target.value))),
                   })
                 }
                 className="w-12 rounded border border-input bg-background px-1 py-0.5 text-center text-xs outline-none focus:ring-1 focus:ring-ring"
-                title="Minutos estimados (1–5)"
+                title="Minutos estimados (1–120, alimenta el timer del Focus)"
                 aria-label="Minutos estimados"
               />
               <span className="text-[10px] text-muted-foreground">min</span>
@@ -505,17 +512,17 @@ function SubtareasEditorLite({
               <input
                 type="number"
                 min={1}
-                max={5}
+                max={120}
                 step={1}
                 value={s.tiempo_estimado_min ?? ""}
                 onChange={(e) =>
                   actualizar(idx, {
                     tiempo_estimado_min:
-                      e.target.value === "" ? null : Math.max(1, Math.min(5, Number(e.target.value))),
+                      e.target.value === "" ? null : Math.max(1, Math.min(120, Number(e.target.value))),
                   })
                 }
                 className="w-12 rounded border border-input bg-background px-1 py-0.5 text-center text-xs outline-none focus:ring-1 focus:ring-ring"
-                title="Minutos estimados (1–5)"
+                title="Minutos estimados (1–120)"
                 aria-label="Minutos estimados"
               />
               <span className="text-[10px] text-muted-foreground">min</span>
@@ -1018,7 +1025,7 @@ export function EditarModal({
             descripcion: s.descripcion.trim(),
             tiempo_estimado_min:
               s.tiempo_estimado_min && s.tiempo_estimado_min > 0
-                ? Math.min(5, Math.round(s.tiempo_estimado_min))
+                ? Math.round(s.tiempo_estimado_min)
                 : null,
             hecho: !!s.hecho,
           }))
@@ -1227,7 +1234,7 @@ export function CrearModal({
             descripcion: s.descripcion.trim(),
             tiempo_estimado_min:
               s.tiempo_estimado_min && s.tiempo_estimado_min > 0
-                ? Math.min(5, Math.round(s.tiempo_estimado_min))
+                ? Math.round(s.tiempo_estimado_min)
                 : null,
             hecho: !!s.hecho,
           }))

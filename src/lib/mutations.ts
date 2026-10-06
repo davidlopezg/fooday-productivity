@@ -184,7 +184,7 @@ export async function crearTareaConIA(
       descripcion: s.descripcion.trim(),
       tiempo_estimado_min:
         s.tiempo_estimado_min && s.tiempo_estimado_min > 0
-          ? Math.min(5, Math.round(s.tiempo_estimado_min))
+          ? Math.round(s.tiempo_estimado_min)
           : null,
       hecho: !!s.hecho,
     }))
@@ -370,7 +370,7 @@ export async function reemplazarSubtareasTarea(
       descripcion: s.descripcion.trim(),
       tiempo_estimado_min:
         s.tiempo_estimado_min && s.tiempo_estimado_min > 0
-          ? Math.min(5, Math.round(s.tiempo_estimado_min))
+          ? Math.round(s.tiempo_estimado_min)
           : null,
       // Preserva el `hecho` que trae el input (lo que el usuario acaba de
       // marcar en el editor). Solo recurrimos al match por descripción con
@@ -394,6 +394,42 @@ export async function reemplazarSubtareasTarea(
     .select("*");
   if (errIns) throw errIns;
   return (insertadas ?? []) as TareaSubtarea[];
+}
+
+/**
+ * Marca como hecha UNA subtarea persistente (de `tareas_subtareas`).
+ * Si tenemos el `id` lo usamos (caso óptimo: 1 UPDATE); si solo tenemos
+ * la descripción, hacemos un UPDATE por (tarea_id, descripcion
+ * normalizada). Se usa desde el PostFocusDialog para que el usuario no
+ * tenga que abrir el modal.
+ *
+ * No confundir con `marcarSubtareaHecha` (sin prefijo) que opera sobre
+ * `plan_diario_subtareas` (las subtareas efímeras del plan del día).
+ */
+export async function marcarTareaSubtareaHecha(
+  tareaId: string,
+  subtareaId: string | null,
+  descripcion: string,
+): Promise<void> {
+  const supabase = createClient();
+  if (subtareaId) {
+    const { error } = await supabase
+      .from("tareas_subtareas")
+      .update({ hecho: true })
+      .eq("id", subtareaId)
+      .eq("tarea_id", tareaId);
+    if (error) throw error;
+    return;
+  }
+  // Fallback: por descripción exacta (case-insensitive, trimmed).
+  const norm = descripcion.trim();
+  if (!norm) throw new Error("Descripción de subtarea vacía");
+  const { error } = await supabase
+    .from("tareas_subtareas")
+    .update({ hecho: true })
+    .eq("tarea_id", tareaId)
+    .ilike("descripcion", norm);
+  if (error) throw error;
 }
 
 export async function guardarConfiguracion(datos: {

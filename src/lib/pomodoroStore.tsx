@@ -164,6 +164,14 @@ type PomodoroContextValue = {
   objetivo: PomodoroObjetivo | null;
   preFlight: PreFlightCheck | null;
   pomodorosHoy: number;
+  /** Cuando un foco de subtarea termina y está esperando decisión del
+   *  usuario (marcar hecha / añadir más / más tiempo). Null = no hay. */
+  postFocusPendiente: {
+    tareaId: string;
+    tareaTitulo: string;
+    subtareaDescripcion: string;
+    subtareaId: string | null;
+  } | null;
 
   /** Inicia un pomodoro de foco para una subtarea concreta. */
   iniciar: (objetivo: PomodoroObjetivo, preFlight?: PreFlightCheck) => void;
@@ -178,6 +186,8 @@ type PomodoroContextValue = {
   setDuracionFocoMin: (min: number) => void;
   /** Inicia un descanso sin objetivo (libre). */
   descansar: (largo?: boolean) => void;
+  /** Resuelve el diálogo post-focus. */
+  resolverPostFocus: (accion: "descansar" | "mas" | "cerrar") => void;
 };
 
 const PomodoroContext = createContext<PomodoroContextValue | null>(null);
@@ -206,13 +216,28 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
   const endedRef = useRef(false);
   // Para no perder la duración personalizada al recargar.
   const duracionFocoRef = useRef<number>(DURACION_FOCO_DEFECTO_SEG);
+  // Duración REAL del pomodoro en curso (puede venir de la subtarea).
+  // Se usa en onFaseTerminada para grabar la sesión con la duración correcta.
+  const duracionActualRef = useRef<number>(DURACION_FOCO_DEFECTO_SEG);
+  // Cuando un foco de subtarea termina, paramos el reloj y mostramos
+  // el PostFocusDialog en vez de saltar a descanso_corto automáticamente.
+  // El usuario decide: marcar hecha, añadir más subtareas o pedir más tiempo.
+  const [postFocusPendiente, setPostFocusPendiente] = useState<{
+    tareaId: string;
+    subtareaDescripcion: string;
+    /** Si el objetivo ya llevaba un id de subtarea persistido, lo guardamos
+     *  para poder hacer UPDATE directo sin tener que re-leer. */
+    subtareaId: string | null;
+    /** Título de la tarea padre, para mostrarlo en el diálogo. */
+    tareaTitulo: string;
+  } | null>(null);
 
   // --------------------------------------------------------------------------
   // onFaseTerminada — declaramos ANTES del effect del tick.
   // --------------------------------------------------------------------------
   const onFaseTerminada = useCallback(() => {
     const eraFocus = fase === "focus";
-    const durSeg = eraFocus ? duracionFocoRef.current : DURACIONES_SEG[fase];
+    const durSeg = eraFocus ? duracionActualRef.current : DURACIONES_SEG[fase];
     const startedAt = new Date(endAt - durSeg * 1000);
 
     if (eraFocus) {
@@ -240,6 +265,25 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     } else {
       sonarFinDescanso();
       notificar("☕ Descanso terminado", "Vuelve al foco cuando puedas.", objetivo);
+    }
+
+    // Si era un foco vinculado a una subtarea real (no "libre" ni sin
+    // descripción), paramos el reloj aquí y dejamos que el PostFocusDialog
+    // pregunte al usuario qué hacer (marcar hecha, añadir más, más tiempo).
+    // El descanso NO arranca hasta que el usuario decida.
+    if (eraFocus && objetivo && objetivo.tarea_id !== "libre" && objetivo.subtarea_descripcion) {
+      setFase("focus");
+      setEndAt(Date.now() + durSeg * 1000); // pausado: endAt en el futuro con el restante
+      setCorriendo(false);
+      endedRef.current = false;
+      setRestante(durSeg);
+      setPostFocusPendiente({
+        tareaId: objetivo.tarea_id,
+        subtareaDescripcion: objetivo.subtarea_descripcion,
+        subtareaId: objetivo.subtarea_id,
+        tareaTitulo: objetivo.tarea_titulo,
+      });
+      return;
     }
 
     // Avanza a la siguiente fase. focus → descanso_corto, descanso → focus.
@@ -349,14 +393,22 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
   const iniciar = useCallback((obj: PomodoroObjetivo, pf?: PreFlightCheck) => {
     void desbloquearAudio();
     void pedirPermisoNotificaciones();
-    const end = Date.now() + duracionFocoRef.current * 1000;
+    // Si la subtarea trae una duración estimada, la usamos; si no, el
+    // default configurado por el usuario (25 min típicamente).
+    const seg = Math.max(
+      60,
+      Math.min(60 * 60, Math.round(obj.duracionSeg ?? duracionFocoRef.current)),
+    );
+    duracionActualRef.current = seg;
+    const end = Date.now() + seg * 1000;
     endedRef.current = false;
     setFase("focus");
     setObjetivo(obj);
     setPreFlight(pf ?? null);
+    setPostFocusPendiente(null);
     setEndAt(end);
     setCorriendo(true);
-    setRestante(Math.ceil(duracionFocoRef.current));
+    setRestante(seg);
   }, []);
 
   const descansar = useCallback((largo = false) => {
@@ -395,6 +447,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     setCorriendo(false);
     setObjetivo(null);
     setPreFlight(null);
+    setPostFocusPendiente(null);
     setRestante(duracionFocoRef.current);
   }, []);
 
@@ -416,6 +469,50 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     [corriendo, fase],
   );
 
+  /**
+   * Resuelve el diálogo post-focus. Tres acciones:
+   *  - 'descansar' : cierra el diálogo y salta a descanso_corto (flujo legacy).
+   *  - 'mas'       : cierra el diálogo y vuelve a poner el timer en marcha
+   *                  con la misma duración que tenía la subtarea.
+   *  - 'cerrar'    : solo cierra el diálogo, deja el foco pausado para que
+   *                  el usuario decida más tarde.
+   *
+   * Las acciones de 'hecha' y 'anadir' se manejan dentro del propio diálogo
+   * (que conoce el id de la subtarea), porque implican escribir en Supabase
+   * y luego llamar aquí con 'descansar' o 'mas' para continuar el flujo.
+   */
+  const resolverPostFocus = useCallback(
+    (accion: "descansar" | "mas" | "cerrar") => {
+      if (!postFocusPendiente) return;
+      setPostFocusPendiente(null);
+      if (accion === "mas") {
+        const seg = duracionActualRef.current;
+        duracionActualRef.current = seg;
+        setFase("focus");
+        setEndAt(Date.now() + seg * 1000);
+        setCorriendo(true);
+        setRestante(seg);
+        return;
+      }
+      if (accion === "descansar") {
+        setFase("descanso_corto");
+        setEndAt(0);
+        setCorriendo(false);
+        endedRef.current = false;
+        setRestante(DURACIONES_SEG.descanso_corto);
+        return;
+      }
+      // 'cerrar': deja el foco pausado en 0. El reloj grande mostrará
+      // "Foco terminado — pulsa Saltar o Abortar para continuar".
+      setFase("focus");
+      setEndAt(0);
+      setCorriendo(false);
+      endedRef.current = false;
+      setRestante(0);
+    },
+    [postFocusPendiente],
+  );
+
   // --------------------------------------------------------------------------
   // Valor del contexto
   // --------------------------------------------------------------------------
@@ -427,6 +524,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
       objetivo,
       preFlight,
       pomodorosHoy,
+      postFocusPendiente,
       iniciar,
       pausar,
       reanudar,
@@ -434,6 +532,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
       saltar,
       setDuracionFocoMin,
       descansar,
+      resolverPostFocus,
     }),
     [
       fase,
@@ -442,6 +541,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
       objetivo,
       preFlight,
       pomodorosHoy,
+      postFocusPendiente,
       iniciar,
       pausar,
       reanudar,
@@ -449,6 +549,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
       saltar,
       setDuracionFocoMin,
       descansar,
+      resolverPostFocus,
     ],
   );
 

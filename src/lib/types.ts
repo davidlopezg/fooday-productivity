@@ -523,6 +523,11 @@ export interface PomodoroObjetivo {
   tarea_titulo: string;
   subtarea_id: string | null;
   subtarea_descripcion: string | null;
+  /** Duración efectiva del pomodoro en segundos. Si no se indica, se usa
+   *  la duración por defecto (25 min o la configurada por el usuario).
+   *  Cuando se inicia desde una subtarea, se usa el `tiempo_estimado_min`
+   *  de esa subtarea para que el timer se ajuste a su tamaño. */
+  duracionSeg?: number;
 }
 
 /** Respuestas del checklist pre-pomodoro. Se pasa al iniciar() y se graba

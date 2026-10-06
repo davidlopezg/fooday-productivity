@@ -7,6 +7,7 @@ import { Sidebar } from "@/components/Sidebar";
 import { ConfigProvider } from "@/lib/configStore";
 import { PomodoroProvider } from "@/lib/pomodoroStore";
 import { PomodoroWidget } from "@/components/PomodoroWidget";
+import { PostFocusDialog } from "@/components/PostFocusDialog";
 import { ThemeProvider } from "@/lib/themeStore";
 
 /**
@@ -86,6 +87,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </main>
         </div>
         <PomodoroWidget />
+        <PostFocusDialog />
       </PomodoroProvider>
     </ConfigProvider>
     </ThemeProvider>

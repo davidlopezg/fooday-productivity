@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { IconArrowLeft, IconCheck } from "@/components/icons";
+import { IconArrowLeft, IconCheck, IconTarget } from "@/components/icons";
 
 // ============================================================================
 // /docs — Los 5 pilares que sustentan fooday·productivity.
@@ -210,6 +210,29 @@ export default function DocsPage() {
           <AplicacionEnApp pilar={p.num} />
         </section>
       ))}
+
+      <section className="rounded-2xl border-2 border-violet-500/30 bg-gradient-to-br from-violet-500/5 to-fuchsia-500/5 p-6 sm:p-8">
+        <header>
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-violet-700 dark:text-violet-300">
+            Complemento · Arquitectura
+          </div>
+          <h2 className="mt-1 text-2xl font-bold tracking-tight">
+            Cómo se implementa este sistema en la app
+          </h2>
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+            Los 5 pilares de arriba son la <strong className="text-foreground">base filosófica</strong> (por qué). Su implementación
+            concreta — WIGs, GTD, Próxima Acción, dos inboxes — vive en una página aparte
+            porque es más densa y operativa:
+          </p>
+        </header>
+        <Link
+          href="/metodologia"
+          className="mt-5 inline-flex items-center gap-2 rounded-lg border border-violet-500/30 bg-background/60 px-4 py-2 text-sm font-medium text-foreground underline-offset-4 hover:underline"
+        >
+          <IconTarget className="h-4 w-4 text-violet-500" />
+          Ir a /metodologia — WIGs, GTD y Próxima Acción
+        </Link>
+      </section>
 
       {/* =====================================================================
           Apéndice · Evidencia científica sobre bloques de enfoque profundo
