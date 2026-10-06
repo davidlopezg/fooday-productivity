@@ -402,6 +402,165 @@ export default function DocsPage() {
         </div>
       </section>
 
+      {/* =====================================================================
+          Apéndice · Implementación práctica del Productivity Stack
+          Cómo encajan las micro-tareas operativas con los bloques de foco.
+         ===================================================================== */}
+      <section className="rounded-2xl border-2 border-sky-500/30 bg-gradient-to-br from-sky-500/5 to-violet-500/5 p-6 sm:p-8">
+        <header>
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-sky-700 dark:text-sky-300">
+            Apéndice · Implementación práctica
+          </div>
+          <h2 className="mt-1 text-2xl font-bold tracking-tight">
+            El Productivity Stack: cómo encajan las micro-tareas con los bloques de foco
+          </h2>
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+            Integrar la alta concentración con las tareas operativas diarias es una de las
+            mayores dudas al implementar este sistema. Las fuentes sobre rendimiento y gestión
+            del tiempo ofrecen soluciones concretas para ambos casos:
+          </p>
+        </header>
+
+        <hr className="my-6 border-border" />
+
+        {/* ── 1. Loteado de micro-tareas ── */}
+        <h3 className="text-base font-semibold">
+          1. ¿Dónde van las 20 micro-tareas de 10 minutos? (Loteado de trabajo superficial)
+        </h3>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          Si dispersas 20 micro-tareas de 10 minutos a lo largo del día intercalándolas con tus
+          bloques de foco, tu cerebro nunca alcanzará la máxima concentración [1, 2]. Cada
+          cambio de tarea genera <strong>"residuo de atención"</strong> (<em>attention residue</em>),
+          haciendo que la mente siga procesando la tarea anterior y perdiendo hasta un{" "}
+          <strong>40% del tiempo en puras pérdidas de tracción mental</strong> [2, 3].
+        </p>
+        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+          La estrategia respaldada por los investigadores para gestionar estas tareas es la
+          siguiente:
+        </p>
+        <ul className="mt-3 space-y-3 text-sm leading-relaxed text-muted-foreground">
+          <li className="flex gap-2">
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-sky-500" />
+            <span>
+              <strong>Agrupamiento en lotes (<em>Batching</em>)</strong>: En lugar de atender las
+              tareas operativas a medida que surgen, agrúpalas todas en un sistema de captura
+              externo (una lista de tareas o base de datos estilo GTD) para liberar tu mente de
+              recordatorios constantes [4, 5].
+            </span>
+          </li>
+          <li className="flex gap-2">
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-sky-500" />
+            <span>
+              <strong>Bloques de trabajo superficial (<em>Task / Shallow Work Blocks</em>)</strong>:
+              Reserva 1 o 2 bloques en tu calendario al día (por ejemplo, de 60 a 90 minutos al
+              final de la mañana o de la tarde) dedicados <strong>exclusivamente a procesar esas
+              micro-tareas en lote</strong> [6, 7]. Durante ese bloque operativo, ejecutas una
+              tarea tras otra de forma continua [7].
+            </span>
+          </li>
+          <li className="flex gap-2">
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-sky-500" />
+            <span>
+              <strong>Presupuesto de trabajo superficial</strong>: La investigación sugiere
+              definir un "presupuesto" diario para lo administrativo (habitualmente entre un{" "}
+              <strong>30% y un 50% de tu jornada</strong>), protegiendo el resto del tiempo para
+              tus 4 bloques de foco profundo [8, 9].
+            </span>
+          </li>
+        </ul>
+
+        {/* ── 2. Tarea incompleta ── */}
+        <h3 className="mt-6 text-base font-semibold">
+          2. ¿Qué hacer si la tarea requiere más tiempo y queda a medias?
+        </h3>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          Dejar una tarea incompleta suele generar ansiedad debido al{" "}
+          <strong>efecto Zeigarnik</strong>, que es la tendencia del cerebro a mantener "bucles
+          abiertos" y seguir pensando en lo que no ha terminado [4, 10]. Sin embargo, la ciencia
+          demuestra que <strong>no necesitas terminar la tarea para liberar tu mente</strong>,
+          solo necesitas gestionarla correctamente [4, 11].
+        </p>
+        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+          Cuando se acaba el tiempo del bloque y la tarea no está terminada, debes aplicar estos
+          tres pasos:
+        </p>
+        <ol className="mt-3 space-y-3 text-sm leading-relaxed text-muted-foreground">
+          <li className="flex gap-3">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-sky-500/20 text-xs font-bold text-sky-700 dark:text-sky-300">
+              1
+            </span>
+            <span>
+              <strong>Anotar la "siguiente acción física"</strong>: Antes de cerrar el bloque,
+              escribe exactamente en qué punto te quedaste y cuál es la siguiente acción concreta
+              que debes realizar para reanudarla [11, 12].
+            </span>
+          </li>
+          <li className="flex gap-3">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-sky-500/20 text-xs font-bold text-sky-700 dark:text-sky-300">
+              2
+            </span>
+            <span>
+              <strong>Asignarle un nuevo bloque en el calendario</strong>: Los estudios de
+              Masicampo y Baumeister demostraron que crear un plan concreto de cuándo se
+              completará un objetivo pendiente elimina el efecto Zeigarnik y libera por completo
+              la carga cognitiva del cerebro [4, 11].
+            </span>
+          </li>
+          <li className="flex gap-3">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-sky-500/20 text-xs font-bold text-sky-700 dark:text-sky-300">
+              3
+            </span>
+            <span>
+              <strong>
+                Usar bloques condicionales de desbordamiento (<em>Overflow Blocks</em>)
+              </strong>
+              : Al planificar tu agenda, es recomendable dejar bloques de amortiguación o
+              desbordamiento al final de la jornada [13]. Si una tarea principal requiere más
+              tiempo del previsto, usas el bloque de desbordamiento para continuarla sin alterar
+              el resto de tus compromisos [13].
+            </span>
+          </li>
+        </ol>
+
+        {/* ── 3. Productivity Stack ── */}
+        <h3 className="mt-6 text-base font-semibold">
+          🧩 La combinación perfecta (El "Productivity Stack")
+        </h3>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          Para que el sistema funcione sin fricción, las fuentes recomiendan conectar tres capas
+          [5]:
+        </p>
+        <ol className="mt-3 space-y-3 text-sm leading-relaxed text-muted-foreground">
+          <li className="flex gap-3">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-sky-500/20 text-xs font-bold text-sky-700 dark:text-sky-300">
+              1
+            </span>
+            <span>
+              <strong>GTD (Base de datos)</strong>: Vacía tu cabeza y registra las 20
+              micro-tareas [4, 5].
+            </span>
+          </li>
+          <li className="flex gap-3">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-sky-500/20 text-xs font-bold text-sky-700 dark:text-sky-300">
+              2
+            </span>
+            <span>
+              <strong>Bloques de tiempo (Calendario)</strong>: Define cuándo harás los 4 bloques
+              de foco y cuándo procesarás las tareas operativas [14].
+            </span>
+          </li>
+          <li className="flex gap-3">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-sky-500/20 text-xs font-bold text-sky-700 dark:text-sky-300">
+              3
+            </span>
+            <span>
+              <strong>Sprints / Pomodoro (Motor de ejecución)</strong>: Dentro de cada bloque,
+              trabaja en sprints sin distracciones para mantener el ritmo sin agotarte [15, 16].
+            </span>
+          </li>
+        </ol>
+      </section>
+
       <footer className="rounded-2xl border border-dashed border-border bg-muted/30 p-6 text-center text-sm text-muted-foreground">
         ¿Falta algo? Cada botón "Por qué existe esto" en las pantallas de la
         app apunta a esta página. La metodología no es dogma: si algo no
