@@ -59,6 +59,20 @@ import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
 
 const BLOQUES: Array<1 | 2 | 3 | 4> = [1, 2, 3, 4];
 
+/** Heurística barata para detectar si un mensaje de error de Supabase viene
+ *  de una columna/relación que no existe — síntoma típico de una migración
+ *  no aplicada en la BD. */
+function migracionFalta(msg: string): boolean {
+  const m = msg.toLowerCase();
+  return (
+    m.includes("orden") ||
+    m.includes("column") ||
+    m.includes("does not exist") ||
+    m.includes("no existe") ||
+    m.includes("relation")
+  );
+}
+
 const TONO_PRIORIDAD: Record<string, string> = {
   critica: "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300",
   urgente: "border-orange-500/40 bg-orange-500/10 text-orange-700 dark:text-orange-300",
@@ -139,19 +153,24 @@ export default function CalendarioPage() {
 
   // Estado del popover "asignar"
   const [popover, setPopover] = useState<
-    | { fecha: string; numeroBloque: 1 | 2 | 3 | 4 }
+    | { fecha: string; numeroBloque: 1 | 2 | 3 | 4; error?: string }
     | null
   >(null);
 
   async function asignar(tareaId: string | null) {
     if (!popover) return;
-    // Para el Bloque 3 el upsert está deshabilitado; usa agregar/quitar.
     if (popover.numeroBloque !== 3 && tareaId !== undefined) {
-      await upsertBloque({
-        fecha: popover.fecha,
-        numeroBloque: popover.numeroBloque,
-        tareaId,
-      });
+      try {
+        await upsertBloque({
+          fecha: popover.fecha,
+          numeroBloque: popover.numeroBloque,
+          tareaId,
+        });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        setPopover({ ...popover, error: msg });
+        return;
+      }
     }
     setPopover(null);
     bloquesQ.reload();
@@ -162,24 +181,42 @@ export default function CalendarioPage() {
   async function agregarAOperativas(tareaId: string) {
     if (!popover) return;
     if (popover.numeroBloque !== 3) return;
-    await agregarTareaABloque3({
-      fecha: popover.fecha,
-      tareaId,
-    });
-    bloquesQ.reload();
+    try {
+      await agregarTareaABloque3({
+        fecha: popover.fecha,
+        tareaId,
+      });
+      // Limpia error si lo había y refresca.
+      setPopover({ ...popover, error: undefined });
+      bloquesQ.reload();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setPopover({ ...popover, error: msg });
+    }
   }
 
   async function quitarDeOperativas(bloqueId: string) {
-    await quitarTareaDeBloque3({ bloqueId });
-    bloquesQ.reload();
+    try {
+      await quitarTareaDeBloque3({ bloqueId });
+      bloquesQ.reload();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (popover) setPopover({ ...popover, error: msg });
+    }
   }
 
   async function limpiar() {
     if (!popover) return;
-    await limpiarBloque({
-      fecha: popover.fecha,
-      numeroBloque: popover.numeroBloque,
-    });
+    try {
+      await limpiarBloque({
+        fecha: popover.fecha,
+        numeroBloque: popover.numeroBloque,
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setPopover({ ...popover, error: msg });
+      return;
+    }
     setPopover(null);
     bloquesQ.reload();
   }
@@ -318,6 +355,7 @@ export default function CalendarioPage() {
           fecha={popover.fecha}
           numBloque={popover.numeroBloque}
           bloquesActuales={mapaBloques.get(`${popover.fecha}-${popover.numeroBloque}`) ?? []}
+          errorMsg={popover.error}
           fijo={bloqueFijoDe(
             (dias.find((d) => d.fecha === popover.fecha)?.id ?? 1) as DiaSemana,
             popover.numeroBloque,
@@ -627,6 +665,7 @@ function PopoverAsignar({
   bloquesActuales,
   fijo,
   tareas,
+  errorMsg,
   onAsignar,
   onLimpiar,
   onCerrar,
@@ -638,6 +677,7 @@ function PopoverAsignar({
   bloquesActuales: CalendarioBloqueConTarea[];
   fijo: BloqueFijo | null;
   tareas: Tarea[];
+  errorMsg?: string;
   onAsignar: (tareaId: string | null) => void;
   onLimpiar: () => void;
   onCerrar: () => void;
@@ -766,6 +806,22 @@ function PopoverAsignar({
               <IconX className="h-4 w-4" />
             </button>
           </header>
+
+          {errorMsg && (
+            <div className="mb-3 rounded-md border border-red-500/30 bg-red-500/10 p-2.5 text-xs text-red-700 dark:text-red-400">
+              <p className="font-semibold">No se pudo guardar:</p>
+              <p className="mt-1 break-words">{errorMsg}</p>
+              {migracionFalta(errorMsg) && (
+                <p className="mt-2">
+                  Parece que falta aplicar la migración{" "}
+                  <code className="rounded bg-background px-1 py-0.5 text-[11px]">
+                    supabase/migrations/0020_calendario_bloque_operativas.sql
+                  </code>{" "}
+                  en el SQL Editor de Supabase.
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Lista actual */}
           {tareasAsignadas.length > 0 && (
@@ -910,6 +966,22 @@ function PopoverAsignar({
             <IconX className="h-4 w-4" />
           </button>
         </header>
+
+        {errorMsg && (
+          <div className="mb-3 rounded-md border border-red-500/30 bg-red-500/10 p-2.5 text-xs text-red-700 dark:text-red-400">
+            <p className="font-semibold">No se pudo guardar:</p>
+            <p className="mt-1 break-words">{errorMsg}</p>
+            {migracionFalta(errorMsg) && (
+              <p className="mt-2">
+                Parece que falta aplicar la migración{" "}
+                <code className="rounded bg-background px-1 py-0.5 text-[11px]">
+                  supabase/migrations/0020_calendario_bloque_operativas.sql
+                </code>{" "}
+                en el SQL Editor de Supabase.
+              </p>
+            )}
+          </div>
+        )}
 
         {bloqueActual?.tarea && (
           <div className="mb-3 rounded-md border border-violet-500/30 bg-violet-500/5 p-2 text-xs">
