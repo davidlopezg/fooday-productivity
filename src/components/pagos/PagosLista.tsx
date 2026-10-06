@@ -10,11 +10,20 @@ import {
 } from "@/lib/pagos/queries";
 import { refreshPagosVencidos } from "@/lib/pagos/mutations";
 import { PagoCard } from "@/components/pagos/PagoCard";
+import { PagoFormModal } from "@/components/pagos/PagoFormModal";
+import { PagoPagarParcialModal } from "@/components/pagos/PagoPagarParcialModal";
 import {
   type EstadoPago,
   type PagoConUrgencia,
 } from "@/lib/pagos/types";
 import { IconPlus } from "@/components/icons";
+
+/** Estado del modal activo. Solo uno a la vez. */
+type ModalState =
+  | { tipo: "crear" }
+  | { tipo: "editar"; pago: PagoConUrgencia }
+  | { tipo: "parcial"; pago: PagoConUrgencia }
+  | null;
 
 const fmtEUR = (n: number) =>
   new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(n);
@@ -46,9 +55,10 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "historico", label: "Histórico" },
 ];
 
-export function PagosLista({ onNuevo }: { onNuevo?: () => void }) {
+export function PagosLista() {
   const [tab, setTab] = useState<Tab>("lunes");
   const [refreshKey, setRefreshKey] = useState(0);
+  const [modal, setModal] = useState<ModalState>(null);
 
   // Datos del tab "lunes": programado para el próximo lunes + urgentes pr. 7d
   const lunesISO = useMemo(() => proximoLunesISO(), []);
@@ -133,16 +143,14 @@ export function PagosLista({ onNuevo }: { onNuevo?: () => void }) {
             </button>
           ))}
         </div>
-        {onNuevo && (
-          <button
-            type="button"
-            onClick={onNuevo}
-            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground shadow-sm hover:opacity-90"
-          >
-            <IconPlus className="h-4 w-4" />
-            Nuevo pago
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => setModal({ tipo: "crear" })}
+          className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground shadow-sm hover:opacity-90"
+        >
+          <IconPlus className="h-4 w-4" />
+          Nuevo pago
+        </button>
       </div>
 
       {error && (
@@ -170,6 +178,8 @@ export function PagosLista({ onNuevo }: { onNuevo?: () => void }) {
           totalLunes={totalLunes}
           totalUrgentes={totalUrgentes}
           onChanged={reload}
+          onEdit={(pago) => setModal({ tipo: "editar", pago })}
+          onPagoParcial={(pago) => setModal({ tipo: "parcial", pago })}
           loading={lunesQ.loading || urgentesQ.loading}
         />
       )}
@@ -179,6 +189,8 @@ export function PagosLista({ onNuevo }: { onNuevo?: () => void }) {
           pagos={pendientesQ.data}
           total={totalPendientes}
           onChanged={reload}
+          onEdit={(pago) => setModal({ tipo: "editar", pago })}
+          onPagoParcial={(pago) => setModal({ tipo: "parcial", pago })}
           loading={pendientesQ.loading}
         />
       )}
@@ -186,12 +198,37 @@ export function PagosLista({ onNuevo }: { onNuevo?: () => void }) {
       {tab === "historico" && (
         <TabHistorico
           pagos={historicoQ.data}
+          onEdit={(pago) => setModal({ tipo: "editar", pago })}
           loading={historicoQ.loading}
         />
       )}
 
       {isLoading && !error && (
         <p className="text-center text-xs text-muted-foreground">Cargando…</p>
+      )}
+
+      {/* Modales (solo uno a la vez) */}
+      {modal?.tipo === "crear" && (
+        <PagoFormModal
+          modo="crear"
+          onClose={() => setModal(null)}
+          onSaved={reload}
+        />
+      )}
+      {modal?.tipo === "editar" && (
+        <PagoFormModal
+          modo="editar"
+          pago={modal.pago}
+          onClose={() => setModal(null)}
+          onSaved={reload}
+        />
+      )}
+      {modal?.tipo === "parcial" && (
+        <PagoPagarParcialModal
+          pago={modal.pago}
+          onClose={() => setModal(null)}
+          onSaved={reload}
+        />
       )}
     </div>
   );
@@ -209,6 +246,8 @@ function TabEsteLunes({
   totalLunes,
   totalUrgentes,
   onChanged,
+  onEdit,
+  onPagoParcial,
   loading,
 }: {
   lunesISO: string;
@@ -218,6 +257,8 @@ function TabEsteLunes({
   totalLunes: number;
   totalUrgentes: number;
   onChanged: () => void;
+  onEdit: (pago: PagoConUrgencia) => void;
+  onPagoParcial: (pago: PagoConUrgencia) => void;
   loading: boolean;
 }) {
   // Urgentes que NO están ya en el lunes (para no duplicar).
@@ -259,7 +300,13 @@ function TabEsteLunes({
         ) : (
           <div className="space-y-2">
             {pagosLunes.map((p) => (
-              <PagoCard key={p.id} pago={p} onChanged={onChanged} />
+              <PagoCard
+                key={p.id}
+                pago={p}
+                onChanged={onChanged}
+                onEdit={onEdit}
+                onPagoParcial={onPagoParcial}
+              />
             ))}
           </div>
         )}
@@ -287,7 +334,13 @@ function TabEsteLunes({
           </p>
           <div className="space-y-2">
             {urgentesFueraDeLunes.map((p) => (
-              <PagoCard key={p.id} pago={p} onChanged={onChanged} />
+              <PagoCard
+                key={p.id}
+                pago={p}
+                onChanged={onChanged}
+                onEdit={onEdit}
+                onPagoParcial={onPagoParcial}
+              />
             ))}
           </div>
         </section>
@@ -304,11 +357,15 @@ function TabPendientes({
   pagos,
   total,
   onChanged,
+  onEdit,
+  onPagoParcial,
   loading,
 }: {
   pagos: PagoConUrgencia[];
   total: number;
   onChanged: () => void;
+  onEdit: (pago: PagoConUrgencia) => void;
+  onPagoParcial: (pago: PagoConUrgencia) => void;
   loading: boolean;
 }) {
   if (!loading && pagos.length === 0) {
@@ -367,7 +424,13 @@ function TabPendientes({
             </h3>
             <div className="space-y-2">
               {lista.map((p) => (
-                <PagoCard key={p.id} pago={p} onChanged={onChanged} />
+                <PagoCard
+                  key={p.id}
+                  pago={p}
+                  onChanged={onChanged}
+                  onEdit={onEdit}
+                  onPagoParcial={onPagoParcial}
+                />
               ))}
             </div>
           </section>
@@ -379,9 +442,11 @@ function TabPendientes({
 
 function TabHistorico({
   pagos,
+  onEdit,
   loading,
 }: {
   pagos: PagoConUrgencia[];
+  onEdit: (pago: PagoConUrgencia) => void;
   loading: boolean;
 }) {
   if (!loading && pagos.length === 0) {
@@ -437,6 +502,7 @@ function TabHistorico({
                   key={p.id}
                   pago={p}
                   onChanged={() => {}}
+                  onEdit={onEdit}
                   sinAcciones
                 />
               ))}

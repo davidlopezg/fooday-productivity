@@ -25,6 +25,7 @@ import {
   IconAlertTriangle,
   IconCheck,
   IconClock,
+  IconPencil,
   IconTrash,
 } from "@/components/icons";
 
@@ -88,6 +89,10 @@ export type PagoCardProps = {
   sinAcciones?: boolean;
   /** Si true, se permite editar/eliminar (modo admin). */
   permitirEdicion?: boolean;
+  /** Abre el modal de edición. Si no se pasa, el botón "Editar" no aparece. */
+  onEdit?: (pago: PagoConUrgencia) => void;
+  /** Abre el modal de pago parcial. Si no se pasa, se usa prompt nativo. */
+  onPagoParcial?: (pago: PagoConUrgencia) => void;
 };
 
 export function PagoCard({
@@ -95,6 +100,8 @@ export function PagoCard({
   onChanged,
   sinAcciones,
   permitirEdicion = true,
+  onEdit,
+  onPagoParcial,
 }: PagoCardProps) {
   const [isPending, startTransition] = useTransition();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -142,6 +149,11 @@ export function PagoCard({
   };
 
   const handlePagarParcial = () => {
+    if (onPagoParcial) {
+      onPagoParcial(pago);
+      return;
+    }
+    // Fallback a prompt nativo si no hay modal configurado
     const input = window.prompt(
       `Importe a pagar (restante: ${fmtEUR(pago.importe_total - pago.importe_pagado)}):`,
       String(pago.importe_total - pago.importe_pagado),
@@ -165,6 +177,10 @@ export function PagoCard({
         setError(errorMessage(e));
       }
     });
+  };
+
+  const handleEdit = () => {
+    onEdit?.(pago);
   };
 
   const handleAnular = () => {
@@ -366,6 +382,19 @@ export function PagoCard({
                           className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-accent"
                         >
                           ⏩ Al lunes siguiente
+                        </button>
+                      )}
+                      {onEdit && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMenuOpen(false);
+                            handleEdit();
+                          }}
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-accent"
+                        >
+                          <IconPencil className="h-3.5 w-3.5" />
+                          Editar
                         </button>
                       )}
                       <button

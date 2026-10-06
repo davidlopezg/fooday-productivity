@@ -156,7 +156,7 @@ function NavItems({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
 
   return (
-    <nav className="flex flex-col gap-5">
+    <nav className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto pr-1 -mr-1 overscroll-contain">
       {/* Bloque 1 — Acción y captura rápida */}
       <NavSection section={{ items: QUICK_ITEMS }} pathname={pathname} onNavigate={onNavigate} />
 
@@ -229,7 +229,7 @@ export function Sidebar() {
             className="absolute inset-0 bg-black/50"
             onClick={() => setOpen(false)}
           />
-          <aside className="safe-t safe-b absolute left-0 top-0 flex h-full w-72 max-w-[85vw] flex-col overflow-y-auto border-r border-border bg-card px-4 pb-4">
+          <aside className="safe-t safe-b absolute left-0 top-0 flex h-full w-72 max-w-[85vw] flex-col overflow-y-auto border-r border-border bg-card px-4 pb-4 overscroll-contain">
             <div className="flex h-14 shrink-0 items-center justify-between">
               <span className="font-semibold tracking-tight">
                 fooday·productivity
@@ -249,7 +249,7 @@ export function Sidebar() {
 
       {/* Sidebar (escritorio) */}
       <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-border bg-card/40 px-3 py-5 md:flex">
-        <div className="mb-8 px-3 font-semibold tracking-tight">
+        <div className="mb-4 shrink-0 px-3 font-semibold tracking-tight">
           fooday<span className="text-muted-foreground">·productivity</span>
         </div>
         <NavItems />
