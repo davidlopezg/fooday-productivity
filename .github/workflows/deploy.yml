@@ -31,6 +31,8 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           # Para GitHub Pages de proyecto: /<nombre-del-repo>
           NEXT_PUBLIC_BASE_PATH: /${{ github.event.repository.name }}
+      - name: Escribir version.json
+        run: echo "{\"version\":\"${{ github.sha }}\",\"t\":$(date +%s)000}" > out/version.json
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -7,6 +7,39 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
+// Versión embebida en build-time (GITHUB_SHA o timestamp).
+// Se usa en el <script> de auto-actualización de abajo para detectar
+// el clásico "estoy viendo código viejo cacheado".
+const APP_VERSION =
+  process.env.NEXT_PUBLIC_APP_VERSION ??
+  (process.env.GITHUB_SHA?.slice(0, 7) ?? "dev");
+
+// Script inline que rompe la caché cuando hay una versión nueva.
+// Ejecuta ANTES de que cargue el JS de la app. Si la versión desplegada
+// (leída de /version.json) no coincide con la de este HTML, recarga
+// forzando bypass de caché HTTP. Una vez registrado el Service Worker,
+// este script es redundante (el SW ya hace network-first), pero es la
+// red de seguridad para el primer deploy / instalaciones nuevas.
+const VERSION_CHECK_SCRIPT = `
+(function(){
+  try {
+    var v = ${JSON.stringify(APP_VERSION)};
+    var bp = ${JSON.stringify(basePath)};
+    var u = (bp || '') + '/version.json?_=' + Date.now();
+    fetch(u, { cache: 'no-store', credentials: 'omit' })
+      .then(function(r){ return r && r.ok ? r.json() : null; })
+      .catch(function(){ return null; })
+      .then(function(d){
+        if (d && d.version && d.version !== v) {
+          var url = new URL(window.location.href);
+          url.searchParams.set('_v', Date.now());
+          window.location.replace(url.toString());
+        }
+      });
+  } catch (e) { /* noop */ }
+})();
+`.trim();
+
 export const metadata: Metadata = {
   title: "fooday·productivity",
   description: "Sistema operativo personal: propósito, metas, tareas y planificación",
@@ -39,6 +72,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es" className={`${inter.variable} h-full`}>
+      <head>
+        {/* Auto-actualización: detecta versión nueva y recarga con cache-bust */}
+        <script dangerouslySetInnerHTML={{ __html: VERSION_CHECK_SCRIPT }} />
+      </head>
       <body className="min-h-screen">
         <AppShell>{children}</AppShell>
       </body>
