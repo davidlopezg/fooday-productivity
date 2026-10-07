@@ -214,6 +214,44 @@ export const TONO_PRIORIDAD_PAGO: Record<PrioridadPago, string> = {
     "bg-muted text-muted-foreground border-border",
 };
 
+// ============================================================================
+// Clasificación binaria de la deuda (semáforo visual)
+// Capa paralela a `EstadoPago` para responder "¿tengo que ocuparme?".
+// · Activa:    saldo pendiente > 0  (la deuda existe y aún no está saldada)
+// · Cancelada: saldo pendiente = 0  (deuda saldada íntegramente)
+// Las obligaciones `anulado` no entran en el semáforo (no son deuda).
+// ============================================================================
+
+export type ClasificacionDeuda = "activa" | "cancelada";
+
+/** Devuelve la clasificación binaria para una obligación.
+ *  `null` cuando está anulada: ahí no pintamos semáforo. */
+export function clasificarDeuda(
+  pago: {
+    estado_efectivo: EstadoPago;
+    importe_total: number;
+    importe_pagado: number;
+  },
+): ClasificacionDeuda | null {
+  if (pago.estado_efectivo === "anulado") return null;
+  const pendiente = pago.importe_total - pago.importe_pagado;
+  // Tolerancia de 1 céntimo por redondeos en BD.
+  return pendiente > 0.005 ? "activa" : "cancelada";
+}
+
+export const CLASIFICACION_DEUDA_LABEL: Record<ClasificacionDeuda, string> = {
+  activa: "Activa",
+  cancelada: "Cancelada",
+};
+
+/** Tonos para el chip semáforo de clasificación de deuda. */
+export const TONO_CLASIFICACION_DEUDA: Record<ClasificacionDeuda, string> = {
+  activa:
+    "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30",
+  cancelada:
+    "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30",
+};
+
 /** Calcula si el score de urgencia (devuelto por la vista SQL) supera
  *  a la prioridad manual. Sirve para mostrar el warning visual. */
 export function urgenciaSuperaPrioridad(

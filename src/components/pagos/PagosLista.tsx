@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/useData";
 import {
@@ -276,6 +277,66 @@ export function PagosLista() {
           </button>
         </div>
       )}
+
+      {/* Cuadro de mando · deuda viva acumulada (semáforo Activa / Cancelada).
+          Reusa `pendientesQ` y `totalPendientes` que ya teníamos: cero
+          query nueva. Suma SOLO obligaciones con saldo pendiente > 0. */}
+      <section
+        aria-label="Cuadro de mando de deuda viva"
+        className="grid grid-cols-1 gap-3 sm:grid-cols-2"
+      >
+        <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-4">
+          <div className="flex items-center gap-2">
+            <span aria-hidden className="h-2 w-2 rounded-full bg-red-500" />
+            <p className="text-xs font-semibold uppercase tracking-wider text-red-700 dark:text-red-300">
+              Deuda viva
+            </p>
+          </div>
+          <p className="mt-1.5 font-mono text-2xl font-bold tabular-nums">
+            {fmtEUR(totalPendientes)}
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {pendientesQ.data.length}{" "}
+            {pendientesQ.data.length === 1
+                ? "obligación activa"
+                : "obligaciones activas"}
+          </p>
+        </div>
+        <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4">
+          <div className="flex items-center gap-2">
+            <span aria-hidden className="h-2 w-2 rounded-full bg-emerald-500" />
+            <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+              Deuda liquidada
+            </p>
+          </div>
+          <p className="mt-1.5 font-mono text-2xl font-bold tabular-nums">
+            {fmtEUR(
+              historicoQ.data
+                .filter((p) => p.estado_efectivo === "pagado")
+                .reduce((acc, p) => acc + p.importe_total, 0),
+            )}
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {historicoQ.data.filter((p) => p.estado_efectivo === "pagado")
+              .length}{" "}
+            obligaciones canceladas
+          </p>
+        </div>
+      </section>
+
+      {/* Nota metodológica (1 línea, no añade fricción por pago).
+          Enlace profundo a la sección de /docs: el cómo-pensar vive allí,
+          no en la pantalla operativa. */}
+      <p className="-mt-1 px-1 text-xs italic text-muted-foreground">
+        💡 Antes de amortizar anticipadamente, ten claro tu{" "}
+        <Link
+          href="/docs#bucle-equilibrio-temporada"
+          className="font-medium text-foreground underline-offset-4 hover:underline"
+        >
+          colchón de temporada baja
+        </Link>
+        .
+      </p>
 
       {tab === "lunes" && (
         <TabEsteLunes

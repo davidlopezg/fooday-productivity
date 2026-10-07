@@ -584,6 +584,161 @@ export default function DocsPage() {
         </ol>
       </section>
 
+      {/* =====================================================================
+          Complemento · Aplicación sectorial
+          Bucle de equilibrio para restaurantes de temporada: cómo proteger
+          liquidez antes de amortizar deuda en negocios con ingresos
+          estacionales. Apunta también desde /pagos.
+         ===================================================================== */}
+      <section
+        id="bucle-equilibrio-temporada"
+        className="scroll-mt-20 rounded-2xl border-2 border-amber-500/30 bg-gradient-to-br from-amber-500/5 to-orange-500/5 p-6 sm:p-8"
+      >
+        <header>
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300">
+            Complemento · Aplicación sectorial
+          </div>
+          <h2 className="mt-1 text-2xl font-bold tracking-tight">
+            Bucle de equilibrio para restaurantes de temporada
+          </h2>
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+            En negocios con ingresos estacionales (hostelería, turismo,etc.) el{" "}
+            <strong className="text-foreground">ahorro acumulado no es
+            excedente libre</strong>: es el combustible que permite sobrevivir
+            la temporada baja. Si lo gastas todo en amortizar de forma agresivo
+            durante los meses flacos, desproteges el flujo de caja y ante el
+            primer imprevisto (avería, subida de suministros, impuesto) te ves
+            obligado a créditos caros o impagos — la espiral de deuda.
+            Esta nota describe cómo reducir deuda de forma{" "}
+            <strong className="text-foreground">estratégica</strong> sin
+            desproteger el restaurante.
+          </p>
+        </header>
+
+        <hr className="my-6 border-border" />
+
+        {/* 1. Bucle de equilibrio */}
+        <h3 className="text-base font-semibold">
+          1. Divide el ahorro en dos bloques (bucle de equilibrio)
+        </h3>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          Antes de destinar un solo euro a amortización anticipada, fija esta
+          regla de dos bloques sobre tu ahorro:
+        </p>
+        <ul className="mt-3 space-y-3 text-sm leading-relaxed text-muted-foreground">
+          <li className="flex gap-2">
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
+            <span>
+              <strong className="font-bold text-amber-700 dark:text-amber-300">
+                Bloque A — Colchón operativo de temporada baja.
+              </strong>{" "}
+              Calcula el déficit neto mensual (gastos fijos − ingresos
+              estimados de temporada baja) y multiplica por el número de
+              meses de temporada baja. <strong>No se toca para pagar
+              deuda</strong>: es el bucle de equilibrio que absorbe los meses
+              en negativo sin generar nuevos impagos.
+            </span>
+          </li>
+          <li className="flex gap-2">
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
+            <span>
+              <strong className="font-bold text-amber-700 dark:text-amber-300">
+                Bloque B — Excedente real.
+              </strong>{" "}
+              Solo el dinero que sobra por encima del colchón operativo se
+              considera disponible para amortización acelerada de deuda.
+            </span>
+          </li>
+        </ul>
+
+        {/* 2. Punto de apalancamiento */}
+        <h3 className="mt-6 text-base font-semibold">
+          2. Identifica el punto de apalancamiento (qué pagar y cuándo)
+        </h3>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          Una vez identificado el excedente real, aplica el apalancamiento de
+          mayor impacto:
+        </p>
+        <ul className="mt-3 space-y-3 text-sm leading-relaxed text-muted-foreground">
+          <li className="flex gap-2">
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
+            <span>
+              <strong className="font-bold text-amber-700 dark:text-amber-300">
+                Timing.
+              </strong>{" "}
+              Protege la liquidez durante los meses en negativo. Las
+              amortizaciones extraordinarias se hacen al final de la
+              temporada alta (máxima certidumbre de caja) o de forma muy
+              gradual en temporada baja, siempre con el colchón intacto.
+            </span>
+          </li>
+          <li className="flex gap-2">
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
+            <span>
+              <strong className="font-bold text-amber-700 dark:text-amber-300">
+                Aparcamiento de deudas caras.
+              </strong>{" "}
+              Destina el excedente prioritariamente a las deudas con la{" "}
+              <strong>TAE más alta</strong> (pólizas de crédito, préstamos
+              personales, microcréditos): son las que tienen efecto
+              multiplicador de coste.
+            </span>
+          </li>
+          <li className="flex gap-2">
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
+            <span>
+              <strong className="font-bold text-amber-700 dark:text-amber-300">
+                Mantener los mínimos.
+              </strong>{" "}
+              En deudas baratas o a largo plazo (hipotecas, líneas con bajo
+              interés), paga solo la cuota mínima obligatoria. No genera
+              penalizaciones ni agota liquidez.
+            </span>
+          </li>
+        </ul>
+
+        {/* 3. Modelo mental */}
+        <h3 className="mt-6 text-base font-semibold">
+          3. Modelo mental (la base del iceberg)
+        </h3>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          Ajusta la creencia profunda sobre qué priorizar en cada fase del
+          año:
+        </p>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <div className="rounded-lg border border-amber-500/30 bg-background/60 p-4">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300">
+              Temporada alta
+            </p>
+            <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+              El objetivo del sistema es{" "}
+              <strong className="text-foreground">acumular liquidez</strong> y
+              amortizar deuda con el excedente. Aquí se gana el año.
+            </p>
+          </div>
+          <div className="rounded-lg border border-sky-500/30 bg-background/60 p-4">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-sky-700 dark:text-sky-300">
+              Temporada baja
+            </p>
+            <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+              La prioridad absoluta es la{" "}
+              <strong className="text-foreground">estabilidad financiera</strong>{" "}
+              y la preservación de la liquidez. No la velocidad de pago de
+              la deuda.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-6 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
+          <p className="text-sm font-medium leading-relaxed text-amber-700 dark:text-amber-300">
+            💡 Si quieres, calculamos juntos la estructura de costes fijos de
+            tu restaurante para determinar exactamente de cuánto debe ser tu
+            colchón de temporada baja antes de destinardinero a amortizar
+            deudas.
+          </p>
+        </div>
+      </section>
+
       <footer className="rounded-2xl border border-dashed border-border bg-muted/30 p-6 text-center text-sm text-muted-foreground">
         ¿Falta algo? Cada botón "Por qué existe esto" en las pantallas de la
         app apunta a esta página. La metodología no es dogma: si algo no

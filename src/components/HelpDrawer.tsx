@@ -14,6 +14,7 @@
 // ============================================================================
 
 import { useState, type ReactNode } from "react";
+import Link from "next/link";
 import { IconHelp, IconX } from "@/components/icons";
 
 export type HelpItem = {
@@ -514,6 +515,26 @@ export const AYUDA_POR_RUTA: Record<
         cuerpo:
           "Si el score 7d está cayendo semana tras semana, no estás en modo sostenible: estás en modo heroicidad, que dura 3-4 semanas antes de quebrar. Mejor bajar el plan que romperte.",
         pilar: 4,
+      },
+    ],
+  },
+  "/pagos": {
+    // Sin `pilares` aquí: el contenido enlazado vive en /docs (modelo
+    // financiero), no encaja con los 5 pilares de productividad personal.
+    pilares: [],
+    items: [
+      {
+        titulo: "Esta pantalla ejecuta, no decide cuánto amortizar",
+        cuerpo:
+          "El cuadro de mando y los chips 'Activa/Cancelada' te dicen cuánto debes y a quién. La regla sobre CUÁNDO amortizar anticipadamente (bucle de equilibrio, TAE alta primero, mínimos en deudas baratas) vive en la metodología, no aquí:",
+        extra: (
+          <Link
+            href="/docs#bucle-equilibrio-temporada"
+            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium hover:bg-accent"
+          >
+            → Bucle de equilibrio para restaurantes de temporada
+          </Link>
+        ),
       },
     ],
   },

@@ -4,13 +4,16 @@ import { useState, useTransition } from "react";
 import {
   CATEGORIA_ICONO,
   CATEGORIA_LABEL,
+  CLASIFICACION_DEUDA_LABEL,
   ESTADO_LABEL,
   METODO_LABEL,
+  TONO_CLASIFICACION_DEUDA,
   TONO_ESTADO_PAGO,
   TONO_PRIORIDAD_PAGO,
   type EstadoPago,
   type PagoConUrgencia,
   type PrioridadPago,
+  clasificarDeuda,
   urgenciaSuperaPrioridad,
 } from "@/lib/pagos/types";
 import {
@@ -117,6 +120,14 @@ export function PagoCard({
     pago.urgencia_calculada,
     pago.prioridad as PrioridadPago,
   );
+
+  // Clasificación binaria para el semáforo deuda (Activa / Cancelada).
+  // `null` para obligaciones anuladas: ahí no se pinta chip.
+  const clasificacion = clasificarDeuda({
+    estado_efectivo: pago.estado_efectivo as EstadoPago,
+    importe_total: pago.importe_total,
+    importe_pagado: pago.importe_pagado,
+  });
 
   const handlePagarEntero = () => {
     const restante = pago.importe_total - pago.importe_pagado;
@@ -254,6 +265,17 @@ export function PagoCard({
             <Badge tone={TONO_ESTADO_PAGO[pago.estado_efectivo as EstadoPago]}>
               {ESTADO_LABEL[pago.estado_efectivo as EstadoPago]}
             </Badge>
+            {clasificacion && (
+              <Badge tone={TONO_CLASIFICACION_DEUDA[clasificacion]}>
+                <span
+                  aria-hidden
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    clasificacion === "activa" ? "bg-red-500" : "bg-emerald-500"
+                  }`}
+                />
+                {CLASIFICACION_DEUDA_LABEL[clasificacion]}
+              </Badge>
+            )}
             {pago.prioridad !== "media" && (
               <Badge tone={TONO_PRIORIDAD_PAGO[pago.prioridad as PrioridadPago]}>
                 {pago.prioridad}
