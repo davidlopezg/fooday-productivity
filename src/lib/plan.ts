@@ -1438,6 +1438,143 @@ export async function generarPlanMetaIA(
   return { trimestres_usados, krs, prompt_usado: prompt };
 }
 
+// ============================================================================
+// aplicarKrsYTareasEnMeta — motor compartido para materializar un
+// `PlanMetaGenerado` en una meta (existente o recién creada).
+//
+// Lo usan dos flujos:
+//   · /metas/nueva  → crea la meta y llama a este helper con su id.
+//   · EditarMetaModal (botón IA en /metas y /metas/detalle) → usa el id
+//     de la meta ya existente; salta los KRs que ya tenga ese trimestre
+//     para no chocar con el UNIQUE (meta_id, periodo_id).
+//
+// IMPORTANTE: este helper NO toca el `estado` de la meta. El caller decide.
+// ============================================================================
+
+export type AplicarKrsResultado = {
+  /** KRs nuevos creados en resultados_periodo. */
+  krsCreados: number;
+  /** Trimestres del plan que se saltaron porque ya existía un KR. */
+  krsExistentes: number;
+  /** Tareas (subtareas cuentan aparte) creadas y asignadas al KR. */
+  tareasCreadas: number;
+  /** Tareas cuya recurrencia NO se pudo asignar tras crearse (no rompe). */
+  tareasSinRecurrencia: number;
+};
+
+export async function aplicarKrsYTareasEnMeta(
+  metaId: string,
+  plan: PlanMetaGenerado,
+  periodosByNumero: Map<1 | 2 | 3 | 4, { id: string }>,
+  cfg: {
+    base_url: string;
+    minimax_api_key: string | null;
+    model: string;
+  },
+  opts: {
+    /** Si true, trimestres que ya tengan KR en esta meta se saltan en
+     *  silencio (no crean KR nuevo pero siguen creando tareas en el
+     *  KR existente). Si false, el UNIQUE violation lanza error. */
+    saltarExistentes?: boolean;
+    /** Callback por KR procesado, útil para mostrar progreso en UI. */
+    onProgress?: (msg: string) => void;
+  } = {},
+): Promise<AplicarKrsResultado> {
+  const { crearResultadoPeriodo, crearTareaConIA, setRecurrencia } = await import(
+    "@/lib/mutations"
+  );
+  const supabase = (await import("@/lib/supabase/client")).createClient();
+
+  // 1) Traemos los KRs ya existentes de esta meta (solo id + periodo_id
+  //    — lo justo para detectar duplicados por trimestre sin cargar más).
+  const { data: krsPrevios } = await supabase
+    .from("resultados_periodo")
+    .select("id,periodo_id")
+    .eq("meta_id", metaId);
+  const krPorPeriodo = new Map<string, string>();
+  for (const r of krsPrevios ?? []) krPorPeriodo.set(r.periodo_id, r.id);
+
+  const saltarExistentes = opts.saltarExistentes ?? true;
+  let krsCreados = 0;
+  let krsExistentes = 0;
+  let tareasCreadas = 0;
+  let tareasSinRecurrencia = 0;
+
+  for (const kr of plan.krs) {
+    const periodo = periodosByNumero.get(kr.trimestre);
+    if (!periodo) continue;
+
+    let resultadoId: string;
+    const krPrevioId = krPorPeriodo.get(periodo.id);
+    if (krPrevioId) {
+      if (!saltarExistentes) {
+        throw new Error(
+          `Ya existe un KR para Q${kr.trimestre} en esta meta. ` +
+            `Quítalo primero o regenera con saltarExistentes=true.`,
+        );
+      }
+      resultadoId = krPrevioId;
+      krsExistentes++;
+      opts.onProgress?.(
+        `Q${kr.trimestre}: KR existente — añadiendo tareas al KR actual.`,
+      );
+    } else {
+      const r = await crearResultadoPeriodo({
+        meta_id: metaId,
+        periodo_id: periodo.id,
+        titulo: kr.titulo,
+        descripcion: kr.descripcion || null,
+        metrica: kr.metrica || null,
+        valor_objetivo: kr.valor_objetivo,
+        unidad: kr.unidad || null,
+        peso: kr.peso,
+        estado: "pendiente",
+      });
+      resultadoId = r.id;
+      krsCreados++;
+      opts.onProgress?.(`Q${kr.trimestre}: KR nuevo creado.`);
+    }
+
+    for (const t of kr.tareas) {
+      const creada = await crearTareaConIA(
+        {
+          titulo: t.titulo,
+          descripcion: t.descripcion || null,
+          prioridad: t.prioridad,
+          estado: "pendiente",
+          criterio_terminacion_manual: t.criterio_terminacion || null,
+          meta_id: metaId,
+          resultado_periodo_id: resultadoId,
+        },
+        {
+          base_url: cfg.base_url,
+          minimax_api_key: cfg.minimax_api_key,
+          model: cfg.model,
+        },
+      );
+      tareasCreadas++;
+      if (t.recurrencia_tipo) {
+        try {
+          await setRecurrencia(creada.id, {
+            tipo: t.recurrencia_tipo,
+            dias_semana:
+              t.recurrencia_tipo === "semanal"
+                ? t.recurrencia_dias_semana
+                : null,
+            dia_mes:
+              t.recurrencia_tipo === "mensual" ? t.recurrencia_dia_mes : null,
+          });
+        } catch (e) {
+          console.warn("[aplicarKrsYTareasEnMeta] setRecurrencia falló:", e);
+          tareasSinRecurrencia++;
+        }
+      }
+    }
+  }
+
+  return { krsCreados, krsExistentes, tareasCreadas, tareasSinRecurrencia };
+}
+
 /** Sanea el array `krs` devuelto por la IA: filtra por trimestre válido,
  *  limpia textos, sanea prioridades y recurrencias. Reutilizado por
  *  `generarPlanMetaIA` y `generarMetaYPlanIA` (mismo formato de respuesta). */

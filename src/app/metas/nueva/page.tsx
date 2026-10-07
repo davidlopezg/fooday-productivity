@@ -5,15 +5,16 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
   crearMeta,
-  crearResultadoPeriodo,
-  crearTareaConIA,
   ensurePeriodosAnio,
-  setRecurrencia,
 } from "@/lib/mutations";
 import { fetchAreas, fetchPeriodos } from "@/lib/queries";
 import { useConfig } from "@/lib/configStore";
 import { useData } from "@/lib/useData";
-import { generarPlanMetaIA, type PlanMetaGenerado } from "@/lib/plan";
+import {
+  aplicarKrsYTareasEnMeta,
+  generarPlanMetaIA,
+  type PlanMetaGenerado,
+} from "@/lib/plan";
 import { PlanMetaGeneradoPreview } from "@/components/PlanMetaGeneradoPreview";
 import type { AmbitoMeta, Area, Periodo } from "@/lib/types";
 import { IconSparkles, IconX } from "@/components/icons";
@@ -146,12 +147,14 @@ export default function NuevaMetaPage() {
     setAplicando(true);
     setErrorAplicar(null);
     try {
-      // Asegurar periodos
+      // Asegurar periodos del año actual
       await ensurePeriodosAnio(anioActual);
       const periodosActuales = (periodos ?? []).filter(
         (p) => p.tipo === "trimestre" && p.anio === anioActual,
       );
-      const periodosByNumero = new Map(periodosActuales.map((p) => [p.numero, p]));
+      const periodosByNumero = new Map(
+        periodosActuales.map((p) => [p.numero as 1 | 2 | 3 | 4, { id: p.id }]),
+      );
 
       // Crear meta con los campos del formulario (no los del plan)
       const meta = await crearMeta({
@@ -168,46 +171,16 @@ export default function NuevaMetaPage() {
           .filter(Boolean),
       });
 
-      for (const kr of planGenerado.krs) {
-        const periodo = periodosByNumero.get(kr.trimestre);
-        if (!periodo) continue;
-        const resultado = await crearResultadoPeriodo({
-          meta_id: meta.id,
-          periodo_id: periodo.id,
-          titulo: kr.titulo,
-          descripcion: kr.descripcion || null,
-          metrica: kr.metrica || null,
-          valor_objetivo: kr.valor_objetivo,
-          unidad: kr.unidad || null,
-          peso: kr.peso,
-          estado: "pendiente",
-        });
-        for (const t of kr.tareas) {
-          const creada = await crearTareaConIA(
-            {
-              titulo: t.titulo,
-              descripcion: t.descripcion || null,
-              prioridad: t.prioridad,
-              estado: "pendiente",
-              criterio_terminacion_manual: t.criterio_terminacion || null,
-              meta_id: meta.id,
-              resultado_periodo_id: resultado.id,
-            },
-            {
-              base_url: cfg.data.base_url,
-              minimax_api_key: cfg.data.minimax_api_key,
-              model: cfg.data.model,
-            },
-          );
-          if (t.recurrencia_tipo) {
-            await setRecurrencia(creada.id, {
-              tipo: t.recurrencia_tipo,
-              dias_semana: t.recurrencia_tipo === "semanal" ? t.recurrencia_dias_semana : null,
-              dia_mes: t.recurrencia_tipo === "mensual" ? t.recurrencia_dia_mes : null,
-            }).catch((e) => console.warn("[NuevaMeta] set recurrencia falló:", e));
-          }
-        }
-      }
+      // Materializar el plan (KRs + tareas) — helper compartido con
+      // EditarMetaModal para que ambos flujos tengan el mismo invariante.
+      await aplicarKrsYTareasEnMeta(
+        meta.id,
+        planGenerado,
+        periodosByNumero,
+        cfg.data,
+        { saltarExistentes: true },
+      );
+
       router.push(`/metas/detalle?id=${meta.id}`);
     } catch (e) {
       setErrorAplicar(

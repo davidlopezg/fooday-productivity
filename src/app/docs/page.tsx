@@ -161,7 +161,7 @@ const FEATURES: Array<{ ruta: string; proposito: string; docs: string }> = [
   { ruta: "/calendario", proposito: "Time-blocking: 4 bloques fijos × 7 días", docs: "Pilar 3 · Rituales §1 (mañana) · HelpDrawer" },
 
   // ── Metas y planificación ──
-  { ruta: "/metas", proposito: "Cards de metas con estado y progreso + botón IA Sugerir WIGs", docs: "Pilar 2 · Ritual mensual · HelpDrawer" },
+  { ruta: "/metas", proposito: "Cards de metas con estado y progreso + botón IA Sugerir WIGs + EditarMetaModal con botón IA Generar plan", docs: "Pilar 2 · Ritual mensual · HelpDrawer" },
   { ruta: "/metas/nueva", proposito: "Crear meta + botón IA Generar plan (KRs+tareas+hábitos)", docs: "Pilar 2 · HelpDrawer" },
   { ruta: "/metas/agente", proposito: "Agente IA: contexto libre → meta + plan trimestral completo", docs: "Pilar 2 · HelpDrawer" },
   { ruta: "/metas/plan", proposito: "Plan trimestral con scorecard de KRs + proyección", docs: "Pilar 2 · Ritual semanal (domingo) · Ritual mensual · HelpDrawer" },
@@ -1447,6 +1447,27 @@ export default function DocsPage() {
         </header>
 
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-10-09
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">Botón IA en EditarMetaModal.</strong>{" "}
+              El botón “✨ Generar plan con IA” que ya existía en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas/nueva</code>{" "}
+              ahora también aparece en el editor rápido de cada meta (el modal
+              que se abre desde el lápiz de <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas</code>{" "}
+              y desde <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas/detalle</code>).
+              Materializa el plan sobre la meta ya existente: crea los KRs que
+              falten en cada trimestre y suma las tareas al KR correspondiente
+              (los trimestres que ya tengan KR se respetan). Por contrato, la
+              meta <strong className="text-foreground">no se marca como
+              completada</strong>. Refactor menor: la lógica de aplicar plan
+              vive ahora en <code className="rounded bg-muted px-1.5 py-0.5 text-xs">aplicarKrsYTareasEnMeta()</code>{" "}
+              en <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/lib/plan.ts</code>{" "}
+              y la comparten ambos flujos.
+            </span>
+          </li>
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
               2026-10-08
