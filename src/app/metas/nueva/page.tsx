@@ -3,11 +3,20 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { crearMeta, ensurePeriodosAnio } from "@/lib/mutations";
-import { fetchAreas } from "@/lib/queries";
+import {
+  crearMeta,
+  crearResultadoPeriodo,
+  crearTareaConIA,
+  ensurePeriodosAnio,
+  setRecurrencia,
+} from "@/lib/mutations";
+import { fetchAreas, fetchPeriodos } from "@/lib/queries";
+import { useConfig } from "@/lib/configStore";
 import { useData } from "@/lib/useData";
-import type { AmbitoMeta, Area } from "@/lib/types";
-import { IconX } from "@/components/icons";
+import { generarPlanMetaIA, type PlanMetaGenerado } from "@/lib/plan";
+import { PlanMetaGeneradoPreview } from "@/components/PlanMetaGeneradoPreview";
+import type { AmbitoMeta, Area, Periodo } from "@/lib/types";
+import { IconSparkles, IconX } from "@/components/icons";
 
 const ESTADOS = [
   "sin_empezar",
@@ -24,7 +33,15 @@ const AMBITOS: Array<{ id: AmbitoMeta; label: string }> = [
 
 export default function NuevaMetaPage() {
   const router = useRouter();
+  const cfg = useConfig();
   const { data: areas } = useData<Area[]>(fetchAreas, []);
+  const { data: periodos } = useData<Periodo[]>(fetchPeriodos, []);
+  const anioActual = new Date().getFullYear();
+
+  const trimestresDisponibles = (periodos ?? [])
+    .filter((p) => p.tipo === "trimestre" && p.anio === anioActual)
+    .sort((a, b) => a.numero - b.numero)
+    .map((p) => ({ numero: p.numero as 1 | 2 | 3 | 4, nombre: p.nombre }));
 
   const [titulo, setTitulo] = useState("");
   const [descripcion, setDescripcion] = useState("");
@@ -37,6 +54,13 @@ export default function NuevaMetaPage() {
   const [autoTrimestres, setAutoTrimestres] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Estado IA
+  const [planGenerado, setPlanGenerado] = useState<PlanMetaGenerado | null>(null);
+  const [generando, setGenerando] = useState(false);
+  const [aplicando, setAplicando] = useState(false);
+  const [errorIa, setErrorIa] = useState<string | null>(null);
+  const [errorAplicar, setErrorAplicar] = useState<string | null>(null);
 
   async function guardar() {
     if (!titulo.trim()) {
@@ -72,6 +96,124 @@ export default function NuevaMetaPage() {
       setError(e instanceof Error ? e.message : "No se pudo crear la meta.");
     } finally {
       setGuardando(false);
+    }
+  }
+
+  async function generarPlan() {
+    if (!titulo.trim()) {
+      setErrorIa("Escribe primero el título de la meta.");
+      return;
+    }
+    if (!cfg.data.minimax_api_key) {
+      setErrorIa("Configura la clave de IA en /configuracion antes de usar esta función.");
+      return;
+    }
+    if (trimestresDisponibles.length === 0) {
+      setErrorIa(
+        "No hay trimestres creados para este año. Pulsa el checkbox 'Auto-generar 4 trimestres' abajo y vuelve a intentarlo.",
+      );
+      return;
+    }
+    setGenerando(true);
+    setErrorIa(null);
+    setPlanGenerado(null);
+    try {
+      const plan = await generarPlanMetaIA(
+        cfg.data.base_url,
+        cfg.data.minimax_api_key,
+        cfg.data.model,
+        {
+          meta_titulo: titulo.trim(),
+          meta_descripcion: descripcion.trim() || null,
+          meta_ambito: (ambito || null) as "personal" | "profesional" | null,
+          meta_plazo: plazo.trim() || null,
+          trimestres_disponibles: trimestresDisponibles,
+          anio: anioActual,
+        },
+      );
+      setPlanGenerado(plan);
+    } catch (e) {
+      setErrorIa(
+        e instanceof Error ? e.message : "La IA no pudo generar el plan.",
+      );
+    } finally {
+      setGenerando(false);
+    }
+  }
+
+  async function aplicarPlan() {
+    if (!planGenerado) return;
+    setAplicando(true);
+    setErrorAplicar(null);
+    try {
+      // Asegurar periodos
+      await ensurePeriodosAnio(anioActual);
+      const periodosActuales = (periodos ?? []).filter(
+        (p) => p.tipo === "trimestre" && p.anio === anioActual,
+      );
+      const periodosByNumero = new Map(periodosActuales.map((p) => [p.numero, p]));
+
+      // Crear meta con los campos del formulario (no los del plan)
+      const meta = await crearMeta({
+        titulo,
+        descripcion: descripcion.trim() || null,
+        estado,
+        prioridad,
+        area_id: areaId || null,
+        plazo: plazo.trim() || null,
+        ambito: ambito || null,
+        tags: tags
+          .split(",")
+          .map((t) => t.trim().replace(/^#/, ""))
+          .filter(Boolean),
+      });
+
+      for (const kr of planGenerado.krs) {
+        const periodo = periodosByNumero.get(kr.trimestre);
+        if (!periodo) continue;
+        const resultado = await crearResultadoPeriodo({
+          meta_id: meta.id,
+          periodo_id: periodo.id,
+          titulo: kr.titulo,
+          descripcion: kr.descripcion || null,
+          metrica: kr.metrica || null,
+          valor_objetivo: kr.valor_objetivo,
+          unidad: kr.unidad || null,
+          peso: kr.peso,
+          estado: "pendiente",
+        });
+        for (const t of kr.tareas) {
+          const creada = await crearTareaConIA(
+            {
+              titulo: t.titulo,
+              descripcion: t.descripcion || null,
+              prioridad: t.prioridad,
+              estado: "pendiente",
+              criterio_terminacion_manual: t.criterio_terminacion || null,
+              meta_id: meta.id,
+              resultado_periodo_id: resultado.id,
+            },
+            {
+              base_url: cfg.data.base_url,
+              minimax_api_key: cfg.data.minimax_api_key,
+              model: cfg.data.model,
+            },
+          );
+          if (t.recurrencia_tipo) {
+            await setRecurrencia(creada.id, {
+              tipo: t.recurrencia_tipo,
+              dias_semana: t.recurrencia_tipo === "semanal" ? t.recurrencia_dias_semana : null,
+              dia_mes: t.recurrencia_tipo === "mensual" ? t.recurrencia_dia_mes : null,
+            }).catch((e) => console.warn("[NuevaMeta] set recurrencia falló:", e));
+          }
+        }
+      }
+      router.push(`/metas/detalle?id=${meta.id}`);
+    } catch (e) {
+      setErrorAplicar(
+        e instanceof Error ? e.message : "No se pudo aplicar el plan.",
+      );
+      setAplicando(false);
     }
   }
 
@@ -218,7 +360,20 @@ export default function NuevaMetaPage() {
         {error && (
           <p className="mt-3 text-xs text-red-600 dark:text-red-400">{error}</p>
         )}
-        <div className="mt-4 flex gap-2">
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            onClick={generarPlan}
+            disabled={generando || aplicando || guardando || !titulo.trim() || !cfg.data.minimax_api_key}
+            className="inline-flex items-center gap-1.5 rounded-md bg-violet-500 px-4 py-2 text-sm font-medium text-white hover:bg-violet-600 disabled:cursor-not-allowed disabled:opacity-50"
+            title={
+              !cfg.data.minimax_api_key
+                ? "Configura la clave de IA en /configuracion"
+                : "Genera KRs y tareas automáticamente"
+            }
+          >
+            <IconSparkles className="h-4 w-4" />
+            {generando ? "Generando plan…" : "✨ Generar plan con IA"}
+          </button>
           <button
             onClick={guardar}
             disabled={guardando}
@@ -233,7 +388,34 @@ export default function NuevaMetaPage() {
             Cancelar
           </Link>
         </div>
+        {errorIa && (
+          <p className="mt-2 text-xs text-red-600 dark:text-red-400">{errorIa}</p>
+        )}
+        {!cfg.data.minimax_api_key && (
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            💡 Para usar el botón IA, configura la clave en{" "}
+            <Link href="/configuracion" className="font-mono text-foreground underline">
+              /configuracion
+            </Link>
+            . Si no quieres IA, pulsa directamente “Crear meta”.
+          </p>
+        )}
       </section>
+
+      {planGenerado && (
+        <PlanMetaGeneradoPreview
+          plan={planGenerado}
+          metaTitulo={titulo}
+          trimestrersDisponibles={trimestresDisponibles}
+          busy={aplicando}
+          error={errorAplicar}
+          onCancel={() => {
+            setPlanGenerado(null);
+            setErrorAplicar(null);
+          }}
+          onConfirm={aplicarPlan}
+        />
+      )}
     </div>
   );
 }

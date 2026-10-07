@@ -1260,3 +1260,519 @@ export async function generarCriterioTerminacionIA(
 
   return { criterio_terminacion: criterio, prompt_usado: prompt };
 }
+
+
+// ============================================================================
+// Generador de plan trimestral completo para una META nueva
+// ----------------------------------------------------------------------------
+// Dada la descripción de una meta (título, descripción, plazo, ámbito),
+// devuelve KRs por trimestre + tareas concretas para cada KR. Pensado para
+// el botón "✨ Generar plan con IA" en /metas/nueva.
+// ============================================================================
+
+export type KrGenerado = {
+  /** Trimestre al que pertenece el KR (1..4). */
+  trimestre: 1 | 2 | 3 | 4;
+  titulo: string;
+  descripcion: string;
+  metrica: string;
+  valor_objetivo: number;
+  unidad: string;
+  peso: number;
+  tareas: TareaGenerada[];
+};
+
+export type TareaGenerada = {
+  titulo: string;
+  descripcion?: string | null;
+  prioridad: "critica" | "alta" | "media" | "baja";
+  /** Si es hábito: "diaria", "semanal" o "mensual". Si es puntual: null. */
+  recurrencia_tipo: "diaria" | "semanal" | "mensual" | null;
+  /** Días de la semana cuando es 'semanal' (0=Dom..6=Sáb). */
+  recurrencia_dias_semana: number[] | null;
+  /** Día del mes (1..28) cuando es 'mensual'. */
+  recurrencia_dia_mes: number | null;
+  /** Frase corta "Esta tarea está HECHA cuando ___". Opcional. */
+  criterio_terminacion: string | null;
+};
+
+export type PlanMetaGenerado = {
+  trimestres_usados: Array<1 | 2 | 3 | 4>;
+  krs: KrGenerado[];
+  prompt_usado: string;
+};
+
+export type GenerarPlanMetaOpts = {
+  meta_titulo: string;
+  meta_descripcion?: string | null;
+  meta_ambito?: "personal" | "profesional" | null;
+  meta_plazo?: string | null;
+  /** Trimestres disponibles (1..4) con nombre legible, p.ej. ["Q1 2026", "Q2 2026", ...] */
+  trimestres_disponibles: Array<{ numero: 1 | 2 | 3 | 4; nombre: string }>;
+  anio: number;
+  /** Cuántos KRs por trimestre (defecto 3). */
+  krs_por_trimestre?: number;
+};
+
+/** Variante del agente: parte de un contexto libre y la IA propone el nombre
+ *  y descripción de la meta además del plan. La diferencia con
+ *  `generarPlanMetaIA` es que aquí NO se asume meta pre-existente. */
+export type GenerarMetaYPlanOpts = {
+  /** Contexto libre en primera persona: lo que David quiere conseguir. */
+  contexto: string;
+  /** Restricciones duras que David mencionó (TDAH, ansiedad, lesiones, etc.). */
+  restricciones?: string[];
+  meta_ambito?: "personal" | "profesional" | null;
+  meta_plazo?: string | null;
+  trimestres_disponibles: Array<{ numero: 1 | 2 | 3 | 4; nombre: string }>;
+  anio: number;
+  krs_por_trimestre?: number;
+};
+
+export type MetaYPlanGenerado = {
+  meta_titulo: string;
+  meta_descripcion: string;
+  meta_ambito: "personal" | "profesional" | null;
+  meta_plazo: string | null;
+  plan: PlanMetaGenerado;
+  prompt_usado: string;
+};
+
+function buildPromptPlanMeta(opts: GenerarPlanMetaOpts): string {
+  const krsXTrim = opts.krs_por_trimestre ?? 3;
+  const desc = opts.meta_descripcion?.trim() || "(sin descripción)";
+  const ambito = opts.meta_ambito || "(sin clasificar)";
+  const plazo = opts.meta_plazo?.trim() || "(sin plazo concreto)";
+  const trimestres = opts.trimestres_disponibles
+    .map((t) => `  - Q${t.numero} (${t.nombre})`)
+    .join("\n");
+
+  return `Eres un coach de OKR para David López. Tu trabajo: dado el contexto de una meta, generar el plan trimestral COMPLETO: KRs por trimestre + tareas concretas para cada KR.
+
+META DE DAVID:
+  Título: ${opts.meta_titulo}
+  Descripción: ${desc}
+  Ámbito: ${ambito}
+  Plazo: ${plazo}
+  Año: ${opts.anio}
+
+TRIMESTRES DISPONIBLES (estos son los compartimentos reales de la BD, NO inventes otros):
+${trimestres}
+
+==========
+REGLAS (lelas 2 veces antes de generar)
+==========
+1. Solo puedes usar los trimestres listados arriba. Cada KR va a UN trimestre con su número correcto.
+2. Genera EXACTAMENTE ${krsXTrim} KRs por trimestre. Más de eso satura; menos de eso es vago.
+3. Cada KR debe tener 2-4 tareas. Una tarea = una acción concreta observable. Si no se puede hacer en 2 minutos sin ambigüedad, no es tarea — es un proyecto.
+5. Mezcla: ~30% de las tareas deben ser HABITOS (recurrencia_tipo no nulo) y ~70% tareas PUNTUALES (recurrencia_tipo null). Los hábitos son cosas que David repite (meditar, caminar, registrar, tomar pastillas, etc.).
+6. Para cada tarea incluye:
+   - titulo: imperativo, ≤80 caracteres. Empieza con verbo.
+   - prioridad: una de "critica" | "alta" | "media" | "baja".
+   - recurrencia_tipo: "diaria" si se hace todos los días, "semanal" si se hace ciertos días, "mensual" si se hace una vez al mes, null si es puntual.
+   - Si es semanal: recurrencia_dias_semana = array de enteros 0..6 (0=Dom, 1=Lun, ..., 6=Sáb). Si no se repite, null.
+   - Si es mensual: recurrencia_dia_mes = entero 1..28. Si no se repite, null.
+   - criterio_terminacion: una frase corta estilo "Esta tarea está HECHA cuando ___". O null.
+7. KR:
+   - titulo: ≤100 chars, específico y medible.
+   - descripcion: 1-2 frases aclarando qué significa el KR.
+   - metrica: nombre corto de la métrica (p.ej. "minutos de movimiento", "despertares por noche").
+   - valor_objetivo: número realista para el trimestre (p.ej. 15, 2, 80).
+   - unidad: unidad de la métrica (p.ej. "min/día", "desp/noche", "% noches").
+   - peso: 1 (por defecto). Puede ser 1.5-2 si el KR es más crítico.
+8. Responde SOLO con JSON válido con esta estructura EXACTA:
+
+{
+  "trimestres_usados": [2, 3, 4],
+  "krs": [
+    {
+      "trimestre": 2,
+      "titulo": "...",
+      "descripcion": "...",
+      "metrica": "...",
+      "valor_objetivo": 15,
+      "unidad": "min/día",
+      "peso": 1,
+      "tareas": [
+        {
+          "titulo": "...",
+          "descripcion": null,
+          "prioridad": "alta",
+          "recurrencia_tipo": "diaria",
+          "recurrencia_dias_semana": null,
+          "recurrencia_dia_mes": null,
+          "criterio_terminacion": "..."
+        }
+      ]
+    }
+  ]
+}
+
+Usa conocimiento común del dominio (salud, finanzas, negocios) si la meta es genérica. Si David mencionó restricciones en la descripción (TDAH, cervicales, ansiedad, etc.), respétalas ABSOLUTAMENTE.
+`;
+}
+
+export async function generarPlanMetaIA(
+  baseUrl: string,
+  apiKey: string,
+  model: string,
+  opts: GenerarPlanMetaOpts,
+): Promise<PlanMetaGenerado> {
+  const prompt = buildPromptPlanMeta(opts);
+  const parsed = await llamarLLM<{
+    trimestres_usados?: unknown;
+    krs?: unknown;
+  }>(
+    baseUrl,
+    apiKey,
+    model,
+    "Respondes SOLO con JSON válido, sin texto adicional.",
+    prompt,
+    true,
+  );
+
+  const krs = saneKrsFromParsed(parsed?.krs, opts.trimestres_disponibles);
+  const trimestres_usados: Array<1 | 2 | 3 | 4> = Array.from(
+    new Set(krs.map((k) => k.trimestre)),
+  ).sort((a, b) => a - b) as Array<1 | 2 | 3 | 4>;
+  return { trimestres_usados, krs, prompt_usado: prompt };
+}
+
+/** Sanea el array `krs` devuelto por la IA: filtra por trimestre válido,
+ *  limpia textos, sanea prioridades y recurrencias. Reutilizado por
+ *  `generarPlanMetaIA` y `generarMetaYPlanIA` (mismo formato de respuesta). */
+function saneKrsFromParsed(
+  raw: unknown,
+  trimestresDisponibles: Array<{ numero: 1 | 2 | 3 | 4; nombre: string }>,
+): KrGenerado[] {
+  const krsRaw = Array.isArray(raw) ? raw : [];
+  const trimestresValidos = new Set<number>(trimestresDisponibles.map((t) => t.numero));
+  const krs: KrGenerado[] = [];
+  for (const k of krsRaw) {
+    const tNum = Number((k as { trimestre?: unknown })?.trimestre);
+    if (!Number.isInteger(tNum) || !trimestresValidos.has(tNum)) continue;
+    const titulo = String((k as { titulo?: unknown })?.titulo ?? "").trim().slice(0, 200);
+    if (!titulo) continue;
+    const descripcion = String((k as { descripcion?: unknown })?.descripcion ?? "").trim().slice(0, 400);
+    const metrica = String((k as { metrica?: unknown })?.metrica ?? "").trim().slice(0, 80);
+    const valor_objetivo = Number((k as { valor_objetivo?: unknown })?.valor_objetivo);
+    const unidad = String((k as { unidad?: unknown })?.unidad ?? "").trim().slice(0, 40);
+    const pesoNum = Number((k as { peso?: unknown })?.peso);
+    const peso = Number.isFinite(pesoNum) && pesoNum > 0 ? pesoNum : 1;
+
+    const tareasRaw = Array.isArray((k as { tareas?: unknown })?.tareas)
+      ? ((k as { tareas: unknown[] }).tareas)
+      : [];
+    const tareas: TareaGenerada[] = [];
+    for (const t of tareasRaw) {
+      const tTitulo = String((t as { titulo?: unknown })?.titulo ?? "").trim().slice(0, 200);
+      if (!tTitulo) continue;
+      const prio = String((t as { prioridad?: unknown })?.prioridad ?? "media").toLowerCase();
+      const prioridadValida = (["critica", "alta", "media", "baja"] as const).includes(
+        prio as "critica" | "alta" | "media" | "baja",
+      )
+        ? (prio as "critica" | "alta" | "media" | "baja")
+        : "media";
+      const recTipoRaw = String((t as { recurrencia_tipo?: unknown })?.recurrencia_tipo ?? "")
+        .toLowerCase()
+        .trim();
+      const recurrencia_tipo =
+        recTipoRaw === "diaria" || recTipoRaw === "semanal" || recTipoRaw === "mensual"
+          ? (recTipoRaw as "diaria" | "semanal" | "mensual")
+          : null;
+      let dias_sem: number[] | null = null;
+      let dia_mes: number | null = null;
+      if (recurrencia_tipo === "semanal") {
+        const ds = (t as { recurrencia_dias_semana?: unknown })?.recurrencia_dias_semana;
+        if (Array.isArray(ds)) {
+          dias_sem = ds.filter((d): d is number => typeof d === "number" && d >= 0 && d <= 6).slice(0, 7);
+          if (dias_sem.length === 0) dias_sem = null;
+        }
+      } else if (recurrencia_tipo === "mensual") {
+        const dm = Number((t as { recurrencia_dia_mes?: unknown })?.recurrencia_dia_mes);
+        if (Number.isInteger(dm) && dm >= 1 && dm <= 28) dia_mes = dm;
+      }
+      const criterio = String((t as { criterio_terminacion?: unknown })?.criterio_terminacion ?? "")
+        .trim()
+        .slice(0, 200);
+      const descT = String((t as { descripcion?: unknown })?.descripcion ?? "").trim().slice(0, 400);
+      tareas.push({
+        titulo: tTitulo,
+        descripcion: descT || null,
+        prioridad: prioridadValida,
+        recurrencia_tipo,
+        recurrencia_dias_semana: dias_sem,
+        recurrencia_dia_mes: dia_mes,
+        criterio_terminacion: criterio || null,
+      });
+      if (tareas.length >= 6) break;
+    }
+    krs.push({
+      trimestre: tNum as 1 | 2 | 3 | 4,
+      titulo,
+      descripcion,
+      metrica,
+      valor_objetivo: Number.isFinite(valor_objetivo) ? valor_objetivo : 1,
+      unidad,
+      peso,
+      tareas,
+    });
+    if (krs.length >= 24) break;
+  }
+  return krs;
+}
+
+
+// ============================================================================
+// Agente: genera META + PLAN completo a partir de un contexto libre.
+// Pensado para /metas/agente — David pega lo que le ronda por la cabeza y la
+// IA le devuelve una meta bien titulada + descripción + KRs + tareas.
+//
+// Esta función es una evolución de `generarPlanMetaIA`: en lugar de recibir
+// meta_titulo + meta_descripcion como input, los devuelve como output.
+// Internamente hace DOS llamadas LLM encadenadas (o una sola con prompt
+// doble — aquí usamos una sola por economía).
+// ============================================================================
+
+function buildPromptAgente(opts: GenerarMetaYPlanOpts): string {
+  const krsXTrim = opts.krs_por_trimestre ?? 3;
+  const restricciones = (opts.restricciones ?? []).join("; ") || "(ninguna explícita)";
+  const trimestres = opts.trimestres_disponibles
+    .map((t) => `  - Q${t.numero} (${t.nombre})`)
+    .join("\n");
+
+  return `Eres un coach de OKR para David López. Tu trabajo: a partir de un contexto libre que David te cuenta en primera persona, proponer UNA meta bien definida + el plan trimestral completo (KRs por trimestre + tareas concretas).
+
+==========
+LO QUE DAVID CUENTA (en sus palabras)
+==========
+${opts.contexto}
+
+==========
+RESTRICCIONES DURAS (respétalas ABSOLUTAMENTE)
+==========
+${restricciones}
+
+==========
+CONTEXTO ADICIONAL
+==========
+Ámbito sugerido: ${opts.meta_ambito || "(personal o profesional — deduce del texto)"}
+Plazo: ${opts.meta_plazo || "(deduce del texto o pon '12 meses' como default)"}
+Año actual: ${opts.anio}
+
+Trimestres disponibles (úsalos, NO inventes otros):
+${trimestres}
+
+==========
+CÓMO DEBES TRABAJAR (lelo 2 veces antes de escribir)
+==========
+1. PRIMERO: identifica QUÉ quiere David. Si el texto menciona varias cosas (ej. "salud, dinero, familia"), propón LA meta más concreta y accionable que cubra el área mencionada. Si hay varias áreas, devuelve solo la primera — David podrá repetir el agente para las demás.
+2. SEGUNDO: redacta un título de meta CORTO (≤80 chars), en imperativo o infinitivo, que David pueda usar tal cual. Ej: "Mejorar el sueño y la energía matutina".
+3. TERCERO: redacta una descripción (≤500 chars) que mencione el "por qué" — qué le importa, qué quiere sentir/medir al final.
+4. CUARTO: elige un ámbito ("personal" o "profesional") coherente con el texto.
+5. QUINTO: genera el plan con EXACTAMENTE ${krsXTrim} KRs por trimestre. Cada KR con 2-4 tareas concretas.
+6. Las tareas: ~30% hábitos (recurrencia_tipo no nulo) y ~70% puntuales (null).
+7. Respeta las restricciones duras: si David dice "no puedo correr por la espalda", las tareas NO incluyen correr.
+8. Idioma: SIEMPRE español de España (tuteo).
+
+Responde SOLO con JSON válido con esta forma EXACTA:
+
+{
+  "meta_titulo": "Título de la meta propuesto",
+  "meta_descripcion": "Descripción de 2-3 frases",
+  "meta_ambito": "personal" | "profesional",
+  "meta_plazo": "plazo libre (ej. '12 meses', 'Q2 2026')",
+  "trimestres_usados": [2, 3, 4],
+  "krs": [
+    {
+      "trimestre": 2,
+      "titulo": "...",
+      "descripcion": "...",
+      "metrica": "...",
+      "valor_objetivo": 15,
+      "unidad": "min/día",
+      "peso": 1,
+      "tareas": [
+        {
+          "titulo": "...",
+          "descripcion": null,
+          "prioridad": "alta",
+          "recurrencia_tipo": "diaria",
+          "recurrencia_dias_semana": null,
+          "recurrencia_dia_mes": null,
+          "criterio_terminacion": "..."
+        }
+      ]
+    }
+  ]
+}
+`;
+}
+
+export async function generarMetaYPlanIA(
+  baseUrl: string,
+  apiKey: string,
+  model: string,
+  opts: GenerarMetaYPlanOpts,
+): Promise<MetaYPlanGenerado> {
+  const prompt = buildPromptAgente(opts);
+  const parsed = await llamarLLM<{
+    meta_titulo?: unknown;
+    meta_descripcion?: unknown;
+    meta_ambito?: unknown;
+    meta_plazo?: unknown;
+    trimestres_usados?: unknown;
+    krs?: unknown;
+  }>(
+    baseUrl,
+    apiKey,
+    model,
+    "Respondes SOLO con JSON válido, sin texto adicional.",
+    prompt,
+    true,
+  );
+
+  const meta_titulo = String(parsed?.meta_titulo ?? "").trim().slice(0, 200);
+  const meta_descripcion = String(parsed?.meta_descripcion ?? "").trim().slice(0, 600);
+  const ambitoRaw = String(parsed?.meta_ambito ?? "").toLowerCase().trim();
+  const meta_ambito: "personal" | "profesional" | null =
+    ambitoRaw === "personal" || ambitoRaw === "profesional" ? (ambitoRaw as "personal" | "profesional") : null;
+  const meta_plazo = String(parsed?.meta_plazo ?? "").trim().slice(0, 80) || null;
+
+  if (!meta_titulo) {
+    throw new Error("La IA no pudo proponer un título para la meta. Prueba a ser más específico en el contexto.");
+  }
+
+  // Saneamos los KRs en UNA llamada (sin pasar otra vez por la IA).
+  const krs = saneKrsFromParsed(parsed?.krs, opts.trimestres_disponibles);
+  const trimestres_usados: Array<1 | 2 | 3 | 4> = Array.from(
+    new Set(krs.map((k) => k.trimestre)),
+  ).sort((a, b) => a - b) as Array<1 | 2 | 3 | 4>;
+
+  return {
+    meta_titulo,
+    meta_descripcion,
+    meta_ambito,
+    meta_plazo,
+    plan: { trimestres_usados, krs, prompt_usado: prompt },
+    prompt_usado: prompt,
+  };
+}
+
+
+// ============================================================================
+// Sugeridor de WIGs (Wildly Important Goals)
+// ----------------------------------------------------------------------------
+// Dada la lista de metas activas del usuario, sugiere 3 WIGs con una razón
+// corta para cada uno. Pensado para el botón "✨ Sugerir 3 WIGs" en /metas.
+// ============================================================================
+
+export type WigSugerido = {
+  meta_id: string;
+  razon: string;
+};
+
+export type SugerirWigsOpts = {
+  metas: Array<{
+    id: string;
+    codigo?: string | null;
+    titulo: string;
+    descripcion?: string | null;
+    ambito?: "personal" | "profesional" | null;
+    estado: string;
+    prioridad?: string | null;
+    plazo?: string | null;
+    tags?: string[];
+    num_krs: number;
+    num_tareas: number;
+    num_tareas_hechas: number;
+  }>;
+  wigs_ya_marcados: string[];
+};
+
+export type SugerirWigsResultado = {
+  sugerencias: WigSugerido[];
+  prompt_usado: string;
+};
+
+function buildPromptSugerirWigs(opts: SugerirWigsOpts): string {
+  const resumenMetas = opts.metas
+    .map((m) => {
+      const w = opts.wigs_ya_marcados.includes(m.id) ? " [YA WIG]" : "";
+      const pct = m.num_tareas > 0 ? Math.round((100 * m.num_tareas_hechas) / m.num_tareas) : 0;
+      return `- ${m.codigo ?? "—"} · ${m.titulo}${w}
+  estado=${m.estado}, prioridad=${m.prioridad ?? "—"}, plazo=${m.plazo ?? "—"}, ambito=${m.ambito ?? "—"}
+  KRs=${m.num_krs}, tareas=${m.num_tareas_hechas}/${m.num_tareas} (${pct}%), tags=[${(m.tags ?? []).join(", ")}]`;
+    })
+    .join("\n");
+
+  return `Eres un coach de productividad para David López (TDAH, trabaja solo, dirige un restaurante + proyectos tech). Tu trabajo: ayudarlo a elegir sus 3 WIGs (Wildly Important Goals) para el trimestre actual.
+
+==========
+QUÉ ES UN WIG
+==========
+Un WIG es la meta a la que David dedica ENERGÍA DESPROPORCIONADA este trimestre. No es "la más importante en abstracto" — es la que, si la empuja con fuerza, hace irrelevantes a las otras o desbloquea las demás.
+
+REGLA: máximo 3. Si hay 5 candidatas, pregunta: ¿cuál, si la logra, hace irrelevantes a las otras 4?
+
+==========
+METAS ACTIVAS DE DAVID
+==========
+${resumenMetas}
+
+==========
+LO QUE DEBES DEVOLVER
+==========
+Una lista de EXACTAMENTE 3 sugerencias (o menos si David tiene menos de 3 metas activas). Para cada una:
+  - meta_id: el id de la meta que sugieres como WIG
+  - razon: UNA frase de máximo 140 caracteres justificando por qué esta meta debería ser WIG AHORA.
+
+CRITERIOS para elegir (en orden de importancia):
+1. URGENCIA: ¿algo se rompe si no avanza esta meta? (deudas, salud crítica, deadlines duros)
+2. LEVERAGE: ¿avanzar esta meta desbloquea otras? (sueño reparador → energía → todo lo demás)
+3. ESTADO: ¿está en rojo y necesita impulso? (estado=bloqueada o sin_empezar con prioridad alta)
+4. ENERGÍA DISPONIBLE: si David está quemado, una meta de bajo esfuerzo que ya tiene momentum puede ser mejor WIG que una ambiciosa que requiera empuje heroico.
+
+Si una meta ya está marcada como WIG, no la vuelvas a sugerir (a no ser que la respuesta sea corta y te sobre espacio).
+
+NO sugieras metas en estado "archivada" o "completada".
+
+Responde SOLO con JSON válido con esta forma EXACTA:
+{
+  "sugerencias": [
+    { "meta_id": "uuid-aqui", "razon": "frase corta justificando" }
+  ]
+}
+`;
+}
+
+export async function sugerirWigsIA(
+  baseUrl: string,
+  apiKey: string,
+  model: string,
+  opts: SugerirWigsOpts,
+): Promise<SugerirWigsResultado> {
+  const prompt = buildPromptSugerirWigs(opts);
+  const parsed = await llamarLLM<{ sugerencias?: unknown }>(
+    baseUrl,
+    apiKey,
+    model,
+    "Respondes SOLO con JSON válido, sin texto adicional.",
+    prompt,
+    true,
+  );
+
+  const metaIdsValidos = new Set(opts.metas.map((m) => m.id));
+  const raw = Array.isArray(parsed?.sugerencias) ? parsed.sugerencias : [];
+  const sugerencias: WigSugerido[] = [];
+  for (const s of raw) {
+    const id = String((s as { meta_id?: unknown })?.meta_id ?? "").trim();
+    if (!id || !metaIdsValidos.has(id)) continue;
+    const razon = String((s as { razon?: unknown })?.razon ?? "").trim().slice(0, 200);
+    if (!razon) continue;
+    sugerencias.push({ meta_id: id, razon });
+    if (sugerencias.length >= 3) break;
+  }
+
+  return { sugerencias, prompt_usado: prompt };
+}

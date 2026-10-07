@@ -161,7 +161,9 @@ const FEATURES: Array<{ ruta: string; proposito: string; docs: string }> = [
   { ruta: "/calendario", proposito: "Time-blocking: 4 bloques fijos × 7 días", docs: "Pilar 3 · Rituales §1 (mañana) · HelpDrawer" },
 
   // ── Metas y planificación ──
-  { ruta: "/metas", proposito: "Cards de metas con estado y progreso", docs: "Pilar 2 · Ritual mensual · HelpDrawer" },
+  { ruta: "/metas", proposito: "Cards de metas con estado y progreso + botón IA Sugerir WIGs", docs: "Pilar 2 · Ritual mensual · HelpDrawer" },
+  { ruta: "/metas/nueva", proposito: "Crear meta + botón IA Generar plan (KRs+tareas+hábitos)", docs: "Pilar 2 · HelpDrawer" },
+  { ruta: "/metas/agente", proposito: "Agente IA: contexto libre → meta + plan trimestral completo", docs: "Pilar 2 · HelpDrawer" },
   { ruta: "/metas/plan", proposito: "Plan trimestral con scorecard de KRs + proyección", docs: "Pilar 2 · Ritual semanal (domingo) · Ritual mensual · HelpDrawer" },
   { ruta: "/plan-diario", proposito: "Estado emocional + plan diario generado por IA", docs: "Rituales §1 (mañana) · HelpDrawer" },
   { ruta: "/plan-diario/detalle", proposito: "Detalle de un plan con notas e informe", docs: "Sub-ruta de /plan-diario" },
@@ -330,9 +332,7 @@ export default function DocsPage() {
             2026-10-07
           </span>
           <span className="text-muted-foreground">
-            — selector de meta/KR añadido a CrearModal y EditarModal.
-            Última actualización: pasada retro + integración de la
-            jerarquía meta→KR→tareas en el flujo de creación de tareas.
+            — selector de meta/KR en CrearModal/EditarModal. Chip visual hábito vs puntual (RecurrenciaChip). Badge "📊 N KRs · M trimestres" en /metas. Tres funciones IA nuevas: botón en /metas/nueva ("Generar plan"), botón en /metas ("Sugerir 3 WIGs"), y nueva ruta /metas/agente (contexto libre → meta + plan completo).
           </span>
         </div>
       </section>
@@ -1450,6 +1450,18 @@ export default function DocsPage() {
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
               2026-10-07
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">Tres funciones IA nuevas + UX hábitos.</strong>{" "}
+              (1) <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas/nueva</code> ahora tiene un botón "✨ Generar plan con IA" que propone KRs por trimestre + tareas (incluyendo recurrencia) usando el contexto del título+descripción. (2) <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas</code>{" "}
+              tiene un botón "✨ Sugerir 3 WIGs" que devuelve texto (no escribe en BD) y un botón "Agente" que lleva a la nueva ruta. (3) Nueva ruta{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas/agente</code>: textarea libre donde David cuenta qué quiere conseguir, la IA devuelve meta+descripción+plan, el usuario revisa y aplica. Nuevo componente <code className="rounded bg-muted px-1.5 py-0.5 text-xs">RecurrenciaChip</code>{" "}
+              que distingue visualmente hábitos de tareas puntuales en TasksTable y /metas/detalle. Cada tarjeta de meta ahora muestra un badge "📊 N KRs · M trimestres".
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2025-10-07
             </span>
             <span className="text-muted-foreground">
               <strong className="text-foreground">Selector de meta y KR en CrearModal/EditarModal.</strong>{" "}

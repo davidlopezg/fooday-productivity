@@ -5,14 +5,18 @@ import { useMemo, useState } from "react";
 import { fetchMetasConProgreso } from "@/lib/queries";
 import { marcarWig } from "@/lib/mutations";
 import { useData } from "@/lib/useData";
+import { useConfig } from "@/lib/configStore";
 import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
 import { EditarMetaModal } from "@/components/EditarMetaModal";
+import { SugerirWigsModal } from "@/components/SugerirWigsModal";
+import { sugerirWigsIA, type SugerirWigsResultado } from "@/lib/plan";
 import type { AmbitoMeta, MetaConPlan } from "@/lib/types";
 import {
   IconColumns,
   IconInbox,
   IconPencil,
   IconPlus,
+  IconSparkles,
   IconTarget,
 } from "@/components/icons";
 
@@ -158,12 +162,19 @@ export default function MetasPage() {
     fetchMetasConProgreso,
     [],
   );
+  const cfg = useConfig();
 
   const [filtro, setFiltro] = useState<Filtro>("todas");
   const [tagsSel, setTagsSel] = useState<Set<string>>(new Set());
   const [guardandoId, setGuardandoId] = useState<string | null>(null);
   const [errorWig, setErrorWig] = useState<string | null>(null);
   const [editando, setEditando] = useState<MetaConPlan | null>(null);
+
+  // Sugerencias IA
+  const [sugerencias, setSugerencias] = useState<SugerirWigsResultado | null>(null);
+  const [sugiriendo, setSugiriendo] = useState(false);
+  const [errorSug, setErrorSug] = useState<string | null>(null);
+  const [applyingSugId, setApplyingSugId] = useState<string | null>(null);
 
   const wigs = useMemo(
     () =>
@@ -221,6 +232,73 @@ export default function MetasPage() {
     }
   }
 
+  async function abrirSugerencias() {
+    if (!cfg.data.minimax_api_key) {
+      setErrorSug("Configura la clave de IA en /configuracion primero.");
+      setSugerencias({ sugerencias: [], prompt_usado: "" });
+      return;
+    }
+    setSugiriendo(true);
+    setErrorSug(null);
+    setSugerencias(null);
+    try {
+      const metasActivas = metas.filter(
+        (m) =>
+          m.meta.estado !== "archivada" &&
+          m.meta.estado !== "completada",
+      );
+      const wigsActuales = wigs.map((w) => w.meta.id);
+      const res = await sugerirWigsIA(
+        cfg.data.base_url,
+        cfg.data.minimax_api_key,
+        cfg.data.model,
+        {
+          metas: metasActivas.map((m) => ({
+            id: m.meta.id,
+            codigo: m.meta.codigo,
+            titulo: m.meta.titulo,
+            descripcion: m.meta.descripcion,
+            ambito: m.meta.ambito,
+            estado: m.meta.estado,
+            prioridad: m.meta.prioridad,
+            plazo: m.meta.plazo,
+            tags: m.meta.tags,
+            num_krs: m.resultados.length,
+            num_tareas: m.total_tareas,
+            num_tareas_hechas: m.tareas_hechas,
+          })),
+          wigs_ya_marcados: wigsActuales,
+        },
+      );
+      setSugerencias(res);
+    } catch (e) {
+      setErrorSug(
+        e instanceof Error ? e.message : "La IA no pudo sugerir WIGs.",
+      );
+    } finally {
+      setSugiriendo(false);
+    }
+  }
+
+  async function aplicarSugerencia(metaId: string): Promise<boolean> {
+    if (wigs.some((w) => w.meta.id === metaId)) return true;
+    setApplyingSugId(metaId);
+    try {
+      const ok = await marcarWig(metaId, true);
+      if (!ok) {
+        setErrorWig("Ya tienes 3 WIG activos. Quita uno antes de añadir otro.");
+        return false;
+      }
+      await reload();
+      return true;
+    } catch (e) {
+      setErrorWig(e instanceof Error ? e.message : "No se pudo aplicar");
+      return false;
+    } finally {
+      setApplyingSugId(null);
+    }
+  }
+
   const conteoPersonal = metas.filter((m) => m.meta.ambito === "personal").length;
   const conteoProfesional = metas.filter(
     (m) => m.meta.ambito === "profesional",
@@ -241,6 +319,23 @@ export default function MetasPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <HelpDrawer title="Metas" items={AYUDA_POR_RUTA["/metas"]?.items ?? []} />
+          <button
+            type="button"
+            onClick={abrirSugerencias}
+            disabled={sugiriendo}
+            className="inline-flex items-center gap-1.5 rounded-md bg-violet-500 px-3 py-2 text-sm font-medium text-white hover:bg-violet-600 disabled:opacity-50"
+            title="La IA analiza tus metas y sugiere 3 WIGs con razones"
+          >
+            <IconSparkles className="h-4 w-4" />
+            {sugiriendo ? "Pensando…" : "Sugerir 3 WIGs"}
+          </button>
+          <Link
+            href="/metas/agente"
+            className="inline-flex items-center gap-1.5 rounded-md border border-violet-500/40 bg-card px-3 py-2 text-sm font-medium text-violet-700 hover:bg-violet-500/10 dark:text-violet-300"
+          >
+            <IconSparkles className="h-4 w-4" />
+            Agente
+          </Link>
           <Link
             href="/tareas/inbox"
             className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-2 text-sm font-medium hover:bg-accent"
@@ -494,6 +589,22 @@ export default function MetasPage() {
           meta={editando.meta}
           onClose={() => setEditando(null)}
           onChanged={reload}
+        />
+      )}
+
+      {sugerencias && (
+        <SugerirWigsModal
+          resultado={sugerencias}
+          metas={metas}
+          busy={sugiriendo}
+          error={errorSug}
+          wigsActuales={wigs.map((w) => w.meta.id)}
+          onCancel={() => {
+            setSugerencias(null);
+            setErrorSug(null);
+          }}
+          onAplicarWig={aplicarSugerencia}
+          applyingId={applyingSugId}
         />
       )}
     </div>
