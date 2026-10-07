@@ -3,13 +3,22 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
+  fetchMetasConProgreso,
   fetchPomodoroSesiones,
   fetchProyectosConConteo,
   fetchTareasCompletadas,
 } from "@/lib/queries";
 import { useData } from "@/lib/useData";
 import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
-import type { PomodoroSesion, Proyecto, Tarea } from "@/lib/types";
+import { IconCheck, IconTarget } from "@/components/icons";
+import type {
+  Meta,
+  MetaConPlan,
+  PomodoroSesion,
+  Proyecto,
+  ResultadoConTareas,
+  Tarea,
+} from "@/lib/types";
 
 const DIAS_OPCIONES = [7, 30, 90, 365];
 
@@ -38,6 +47,10 @@ export default function InformesPage() {
   );
   const { data: proyectos, loading: l3 } = useData(
     fetchProyectosConConteo,
+    [],
+  );
+  const { data: metas, loading: l4 } = useData<MetaConPlan[]>(
+    fetchMetasConProgreso,
     [],
   );
 
@@ -103,11 +116,78 @@ export default function InformesPage() {
       .sort((a, b) => b.n - a.n);
   }, [hechasEnRango, proyectos]);
 
-  const loading = l1 || l2 || l3;
+  const loading = l1 || l2 || l3 || l4;
 
   // Para el heatmap simple: max tareas/día en la serie
   const maxTareasDia = Math.max(1, ...serie.map((d) => d.tareas));
   const maxFocoDia = Math.max(1, ...serie.map((d) => d.foco_min));
+
+  // ── Metas completadas (filtradas a la ventana usando updated_at como
+  // proxy de la fecha en que se cerró la meta: el trigger set_updated_at
+  // se dispara al cambiar `estado` a 'completada'). ──
+  const metasCompletadas = useMemo<MetaConPlan[]>(() => {
+    return metas
+      .filter((m) => m.meta.estado === "completada")
+      .filter((m) => (m.meta.updated_at ?? "") >= desde)
+      .sort((a, b) =>
+        (b.meta.updated_at ?? "").localeCompare(a.meta.updated_at ?? ""),
+      );
+  }, [metas, desde]);
+
+  // ── KRs (resultados_periodo) completados: aplanamos todas las metas y
+  // nos quedamos con los que están en estado 'completado'. ──
+  const krsCompletados = useMemo<
+    Array<{
+      meta: Meta;
+      kr: ResultadoConTareas;
+      metaCodigo: string | null;
+      metaTitulo: string;
+      updatedAt: string;
+    }>
+  >(() => {
+    const out: Array<{
+      meta: Meta;
+      kr: ResultadoConTareas;
+      metaCodigo: string | null;
+      metaTitulo: string;
+      updatedAt: string;
+    }> = [];
+    for (const mp of metas) {
+      for (const r of mp.resultados) {
+        if (r.estado !== "completado") continue;
+        out.push({
+          meta: mp.meta,
+          kr: r,
+          metaCodigo: mp.meta.codigo,
+          metaTitulo: mp.meta.titulo,
+          updatedAt: r.updated_at ?? "",
+        });
+      }
+    }
+    return out
+      .filter((k) => k.updatedAt >= desde)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  }, [metas, desde]);
+
+  // ── Metas con plan vs sin plan: una meta "forma parte de un OKR
+  // completo" cuando tiene al menos un resultado_periodo (KR). Las que no
+  // tienen KRs son declaraciones aspiracionales sin estructura medible. ──
+  const metasConPlan = useMemo(
+    () => metas.filter((m) => m.resultados.length > 0),
+    [metas],
+  );
+  const metasSinPlan = useMemo(
+    () =>
+      metas
+        .filter((m) => m.resultados.length === 0)
+        .sort((a, b) =>
+          (a.meta.codigo ?? "zzz").localeCompare(b.meta.codigo ?? "zzz"),
+        ),
+    [metas],
+  );
+  const totalMetasNoArchivadas = metas.filter(
+    (m) => m.meta.estado !== "archivada",
+  ).length;
 
   return (
     <div className="space-y-6">
@@ -139,7 +219,7 @@ export default function InformesPage() {
       </header>
 
       {/* KPIs */}
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <Kpi
           label="Tareas hechas"
           value={loading ? "—" : totalTareas.toString()}
@@ -159,6 +239,18 @@ export default function InformesPage() {
           label="Racha"
           value={loading ? "—" : `${racha}d`}
           sub="días seguidos con tarea"
+        />
+        <Kpi
+          label="Metas cerradas"
+          value={loading ? "—" : metasCompletadas.length.toString()}
+          sub={`últimos ${dias} días`}
+          accent="violet"
+        />
+        <Kpi
+          label="OKRs (KRs) cerrados"
+          value={loading ? "—" : krsCompletados.length.toString()}
+          sub={`últimos ${dias} días`}
+          accent="violet"
         />
       </section>
 
@@ -266,17 +358,300 @@ export default function InformesPage() {
           </ul>
         )}
       </section>
+
+      {/* Metas completadas */}
+      <section className="rounded-xl border border-violet-500/30 bg-gradient-to-br from-violet-500/5 to-fuchsia-500/5 p-5">
+        <header className="mb-3 flex items-end justify-between gap-2">
+          <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-violet-700 dark:text-violet-300">
+            <IconTarget className="h-4 w-4" />
+            Metas completadas
+          </h2>
+          <span className="text-[11px] tabular-nums text-muted-foreground">
+            últimos {dias} días · {metasCompletadas.length}
+          </span>
+        </header>
+        {metasCompletadas.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Ninguna meta cerrada en este rango. Las metas pasan a{" "}
+            <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+              estado = completada
+            </code>{" "}
+            desde el editor de cada meta (
+            <Link href="/metas" className="underline underline-offset-4">
+              /metas
+            </Link>
+            ).
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {metasCompletadas.map((mp) => {
+              const m = mp.meta;
+              const fecha = m.updated_at?.slice(0, 10) ?? "";
+              const ambitoTxt =
+                m.ambito === "personal"
+                  ? "👤"
+                  : m.ambito === "profesional"
+                    ? "💼"
+                    : "·";
+              return (
+                <li
+                  key={m.id}
+                  className="flex items-center gap-3 rounded-lg border border-violet-500/20 bg-background/70 p-3 text-sm"
+                >
+                  <IconCheck className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  <span className="font-mono text-xs text-muted-foreground">
+                    {m.codigo ?? "—"}
+                  </span>
+                  <Link
+                    href={`/metas/detalle?id=${m.id}`}
+                    className="min-w-0 flex-1 truncate font-medium hover:underline"
+                  >
+                    {m.titulo}
+                  </Link>
+                  <span className="hidden text-[11px] text-muted-foreground sm:inline">
+                    {ambitoTxt} {m.plazo ? `· ${m.plazo}` : ""}
+                  </span>
+                  {mp.total_tareas > 0 && (
+                    <span className="hidden tabular-nums text-[11px] text-muted-foreground sm:inline">
+                      · {mp.tareas_hechas}/{mp.total_tareas} tareas
+                    </span>
+                  )}
+                  <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                    {fecha}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
+      {/* OKRs (KRs) completados */}
+      <section className="rounded-xl border border-violet-500/30 bg-gradient-to-br from-violet-500/5 to-fuchsia-500/5 p-5">
+        <header className="mb-3 flex items-end justify-between gap-2">
+          <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-violet-700 dark:text-violet-300">
+            <IconCheck className="h-4 w-4" />
+            OKRs (KRs) completados
+          </h2>
+          <span className="text-[11px] tabular-nums text-muted-foreground">
+            últimos {dias} días · {krsCompletados.length}
+          </span>
+        </header>
+        {krsCompletados.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Ningún resultado clave cerrado en este rango. Los KRs se
+            completan al editar el resultado desde{" "}
+            <Link href="/metas/plan" className="underline underline-offset-4">
+              /metas/plan
+            </Link>{" "}
+            o{" "}
+            <Link href="/metas/detalle" className="underline underline-offset-4">
+              /metas/detalle
+            </Link>
+            .
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {krsCompletados.map(({ metaCodigo, metaTitulo, kr, updatedAt, meta }) => {
+              const fecha = updatedAt.slice(0, 10);
+              const tieneMetrica =
+                kr.metrica && kr.valor_objetivo != null;
+              const ambitoTxt =
+                meta.ambito === "personal"
+                  ? "👤"
+                  : meta.ambito === "profesional"
+                    ? "💼"
+                    : "·";
+              return (
+                <li
+                  key={kr.id}
+                  className="flex items-center gap-3 rounded-lg border border-violet-500/20 bg-background/70 p-3 text-sm"
+                >
+                  <IconCheck className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  <span className="font-mono text-xs text-muted-foreground">
+                    {metaCodigo ?? "—"}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">{kr.titulo}</p>
+                    <p className="truncate text-[11px] text-muted-foreground">
+                      {ambitoTxt} meta: {metaTitulo}
+                      {tieneMetrica &&
+                        ` · objetivo ${kr.valor_objetivo} ${kr.metrica}`}
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                    {fecha}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
+      {/* Plan trimestral: ¿cuántas metas tienen KRs? */}
+      <section className="rounded-xl border border-border bg-card p-5">
+        <header className="mb-4 flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              Plan trimestral: ¿cuántas metas tienen KRs?
+            </h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Una meta “con plan” tiene al menos un Key Result (
+              <code className="rounded bg-muted px-1 py-0.5 text-[11px]">
+                resultados_periodo
+              </code>
+              ). Las “sin plan” son declaraciones aspiracionales sin
+              sub-metas: en OKR no se miden, solo se desean.
+            </p>
+          </div>
+          <span className="text-[11px] tabular-nums text-muted-foreground">
+            {totalMetasNoArchivadas === 0
+              ? "0 metas activas"
+              : `${metasConPlan.length} con plan · ${metasSinPlan.length} sin plan (de ${totalMetasNoArchivadas} activas)`}
+          </span>
+        </header>
+
+        {metas.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Sin metas todavía.{" "}
+            <Link href="/metas" className="underline underline-offset-4">
+              Crea la primera en /metas
+            </Link>
+            .
+          </p>
+        ) : (
+          <>
+            {/* Barras comparativas */}
+            <div className="space-y-3">
+              <ComparacionFila
+                color="emerald"
+                etiqueta="Con plan (KRs definidos)"
+                n={metasConPlan.length}
+                total={metas.length}
+                ayuda="OKR completo: la meta tiene resultados_periodo asociados."
+              />
+              <ComparacionFila
+                color="amber"
+                etiqueta="Sin plan (aspiraciones)"
+                n={metasSinPlan.length}
+                total={metas.length}
+                ayuda="No tienen KRs. Siguiente paso: materializar el plan (botón ✨ Generar plan con IA en /metas o al crear la meta)."
+              />
+            </div>
+
+            {/* Listado de metas sin plan: llamada a la acción */}
+            {metasSinPlan.length > 0 && (
+              <details className="mt-5 group">
+                <summary className="cursor-pointer select-none text-xs font-medium text-muted-foreground hover:text-foreground">
+                  Ver {metasSinPlan.length} meta{metasSinPlan.length === 1 ? "" : "s"} sin plan
+                  <span className="ml-1 text-[10px] opacity-60 group-open:hidden">
+                    (click para desplegar)
+                  </span>
+                </summary>
+                <ul className="mt-3 space-y-1.5">
+                  {metasSinPlan.map((mp) => {
+                    const m = mp.meta;
+                    const ambitoTxt =
+                      m.ambito === "personal"
+                        ? "👤"
+                        : m.ambito === "profesional"
+                          ? "💼"
+                          : "·";
+                    return (
+                      <li
+                        key={m.id}
+                        className="flex items-center gap-3 rounded-md border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-sm"
+                      >
+                        <span className="font-mono text-xs text-muted-foreground">
+                          {m.codigo ?? "—"}
+                        </span>
+                        <Link
+                          href={`/metas/detalle?id=${m.id}`}
+                          className="min-w-0 flex-1 truncate font-medium hover:underline"
+                        >
+                          {m.titulo}
+                        </Link>
+                        <span className="hidden text-[11px] text-muted-foreground sm:inline">
+                          {ambitoTxt} {m.estado.replace("_", " ")}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </details>
+            )}
+          </>
+        )}
+      </section>
     </div>
   );
 }
 
-function Kpi({ label, value, sub }: { label: string; value: string; sub: string }) {
+/** Fila de comparación: etiqueta + barra horizontal + n y %. */
+function ComparacionFila({
+  etiqueta,
+  n,
+  total,
+  color,
+  ayuda,
+}: {
+  etiqueta: string;
+  n: number;
+  total: number;
+  color: "emerald" | "amber";
+  ayuda: string;
+}) {
+  const pct = total === 0 ? 0 : Math.round((n / total) * 100);
+  const barClass =
+    color === "emerald" ? "bg-emerald-500/70" : "bg-amber-500/70";
   return (
-    <div className="rounded-xl border border-border bg-card p-4">
+    <div title={ayuda}>
+      <div className="mb-1 flex items-center justify-between text-xs">
+        <span className="font-medium text-foreground">{etiqueta}</span>
+        <span className="tabular-nums text-muted-foreground">
+          {n} ({pct}%)
+        </span>
+      </div>
+      <div className="h-2.5 overflow-hidden rounded-full bg-muted">
+        <div
+          className={`h-full rounded-full transition-all ${barClass}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function Kpi({
+  label,
+  value,
+  sub,
+  accent,
+}: {
+  label: string;
+  value: string;
+  sub: string;
+  accent?: "violet";
+}) {
+  return (
+    <div
+      className={`rounded-xl border bg-card p-4 ${
+        accent === "violet"
+          ? "border-violet-500/30 bg-gradient-to-br from-violet-500/5 to-fuchsia-500/5"
+          : "border-border"
+      }`}
+    >
       <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </div>
-      <div className="mt-1 text-2xl font-bold tracking-tight">{value}</div>
+      <div
+        className={`mt-1 text-2xl font-bold tracking-tight ${
+          accent === "violet" ? "text-violet-700 dark:text-violet-300" : ""
+        }`}
+      >
+        {value}
+      </div>
       <div className="mt-0.5 text-[11px] text-muted-foreground">{sub}</div>
     </div>
   );

@@ -502,7 +502,7 @@ export const AYUDA_POR_RUTA: Record<
     ],
   },
   "/informes": {
-    pilares: [1, 4, 5],
+    pilares: [1, 2, 4, 5],
     items: [
       {
         titulo: "Mide lo que importa: foco profundo y hábitos",
@@ -515,6 +515,12 @@ export const AYUDA_POR_RUTA: Record<
         cuerpo:
           "Si el score 7d está cayendo semana tras semana, no estás en modo sostenible: estás en modo heroicidad, que dura 3-4 semanas antes de quebrar. Mejor bajar el plan que romperte.",
         pilar: 4,
+      },
+      {
+        titulo: "Metas y OKRs cerrados: la auditoría mensual",
+        cuerpo:
+          "“Con plan vs sin plan” mide madurez OKR: una meta sin Key Results no se mide, solo se desea. Si el grueso de tus metas está en “sin plan”, el cuello de botella no es de ejecución, es de diseño — vuelve a /metas y materializa los KRs (botón ✨ Generar plan con IA) antes de pedirte más foco.",
+        pilar: 2,
       },
     ],
   },

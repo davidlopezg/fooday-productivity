@@ -91,6 +91,12 @@ export interface Meta {
   es_wig: boolean;
   /** Posición en el panel WIG (1-3). Único por owner cuando es_wig=true. */
   wig_orden: number | null;
+  /** Trigger `set_updated_at` (migration 0001). No está en el CREATE TABLE
+   *  pero `fetchMetasConProgreso` hace `select("*")` y la columna existe,
+   *  así que la exponemos como opcional para ordenar/filtrar por fecha de
+   *  cambio de estado (p.ej. `estado = 'completada'`). */
+  updated_at?: string;
+  created_at?: string;
 }
 
 // ============================================================================
@@ -134,6 +140,10 @@ export interface ResultadoPeriodo {
   estado: EstadoResultado;
   peso: number;
   orden: number;
+  /** Trigger `set_updated_at` (migration 0015). Igual que en `Meta`, la
+   *  exponemos opcional para poder filtrar KRs por fecha de completado. */
+  updated_at?: string;
+  created_at?: string;
 }
 
 /** Vista agregada: un resultado con su periodo y sus tareas anidadas.

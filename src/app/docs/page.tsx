@@ -172,7 +172,7 @@ const FEATURES: Array<{ ruta: string; proposito: string; docs: string }> = [
   { ruta: "/pipeline", proposito: "Kanban por prioridad + motor IA de priorización", docs: "Ritual semanal (miércoles) · HelpDrawer" },
 
   // ── Revisión y análisis ──
-  { ruta: "/informes", proposito: "KPIs + heatmap de foco + proyectos con conteo", docs: "Ritual semanal (viernes) · Ritual mensual · HelpDrawer" },
+  { ruta: "/informes", proposito: "KPIs + heatmap de foco + proyectos con conteo + metas y OKRs cerrados + comparación con plan vs sin plan", docs: "Ritual semanal (viernes) · Ritual mensual · HelpDrawer" },
   { ruta: "/dashboard-emocional", proposito: "4 dimensiones: despertar / mente / cuerpo / rueda", docs: "Pilar 4 · HelpDrawer" },
 
   // ── Identidad y horizonte ──
@@ -1316,9 +1316,12 @@ export default function DocsPage() {
                 /informes
               </Link>
               : <strong className="text-foreground">tendencia 30 días</strong>.
-              Heatmap de foco, score de hábitos, días en rojo emocionales.
-              Si una racha roja emocional supera los 5 días, abrir una
-              acción correctiva ya (no esperar al mes siguiente).
+              Heatmap de foco, score de hábitos, días en rojo emocionales,
+              metas y KRs cerrados en la ventana, y la brecha “metas con
+              plan vs sin plan” (las aspiracionales sin KRs son el típico
+              cuello de botella del mes). Si una racha roja emocional
+              supera los 5 días, abrir una acción correctiva ya (no
+              esperar al mes siguiente).
             </span>
           </li>
           <li className="flex gap-2">
@@ -1447,6 +1450,38 @@ export default function DocsPage() {
         </header>
 
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-10-10
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">/informes: metas y OKRs cerrados + comparación con plan vs sin plan.</strong>{" "}
+              Tres bloques nuevos al final de{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/informes</code>:
+              (1) dos KPIs en violeta — “Metas cerradas” y “OKRs (KRs)
+              cerrados” — que respetan el selector de ventana (7/30/90/365);
+              (2) dos secciones con listas de metas y KRs cuyo{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">estado = &apos;completada&apos;/&apos;completado&apos;</code>{" "}
+              y cuyo <code className="rounded bg-muted px-1.5 py-0.5 text-xs">updated_at</code>{" "}
+              cae en la ventana (el trigger{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">set_updated_at</code>{" "}
+              se dispara al cerrar); (3) “Plan trimestral: ¿cuántas metas
+              tienen KRs?” — barras comparativas con % de metas con al
+              menos un <code className="rounded bg-muted px-1.5 py-0.5 text-xs">resultados_periodo</code>{" "}
+              vs metas aspiracionales sin KRs, y desplegable con el
+              listado de las que faltan para animar a materializar el plan
+              (botón ✨ Generar plan con IA en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas</code>).
+              Actualizado el índice de features (FEATURES) y este changelog.
+              Añadidos los campos opcionales{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">updated_at?</code>
+              /<code className="rounded bg-muted px-1.5 py-0.5 text-xs">created_at?</code>{" "}
+              en <code className="rounded bg-muted px-1.5 py-0.5 text-xs">Meta</code>{" "}
+              y <code className="rounded bg-muted px-1.5 py-0.5 text-xs">ResultadoPeriodo</code>{" "}
+              (las queries ya hacían <code className="rounded bg-muted px-1.5 py-0.5 text-xs">select(&quot;*&quot;)</code>
+              , solo faltaba tiparlos).
+            </span>
+          </li>
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
               2026-10-09
