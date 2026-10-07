@@ -1,14 +1,50 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { fetchAdjuntosCount, fetchTareas } from "@/lib/queries";
+import { marcarTareaWig } from "@/lib/mutations";
 import { useData } from "@/lib/useData";
 import { TasksTable } from "@/components/TasksTable";
+import { PanelWigTareas } from "@/components/PanelWigTareas";
 import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
 import type { Tarea } from "@/lib/types";
 
 export default function TareasPage() {
   const { data: tareas, loading, error, reload } = useData<Tarea[]>(fetchTareas, []);
+
+  // Estado del panel WIG — separado del de TasksTable a propósito:
+  // ambos llaman a la misma RPC, y `reload()` tras cada toggle sincroniza
+  // los dos. Así no toco la API interna de TasksTable.
+  const [guardandoWigId, setGuardandoWigId] = useState<string | null>(null);
+  const [errorWig, setErrorWig] = useState<string | null>(null);
+
+  // Tareas marcadas como WIG (4DX), ordenadas por wig_orden (1, 2, 3).
+  const wigTareas = useMemo(
+    () =>
+      tareas
+        .filter((t) => t.es_wig)
+        .sort((a, b) => (a.wig_orden ?? 9) - (b.wig_orden ?? 9)),
+    [tareas],
+  );
+
+  async function quitarWig(id: string) {
+    setErrorWig(null);
+    setGuardandoWigId(id);
+    try {
+      const ok = await marcarTareaWig(id, false);
+      if (!ok) {
+        // No debería pasar al quitar (no aplica el límite de 3), pero por
+        // si acaso: si la RPC devuelve false, mostramos genérico.
+        setErrorWig("No se pudo quitar el WIG de la tarea.");
+      } else {
+        await reload();
+      }
+    } catch (e) {
+      setErrorWig(e instanceof Error ? e.message : "No se pudo actualizar");
+    } finally {
+      setGuardandoWigId(null);
+    }
+  }
 
   // Carga un mapa de adjuntos (id -> count) para mostrar "📎 N" en la tabla.
   const ids = useMemo(() => tareas.map((t) => t.id), [tareas]);
@@ -46,6 +82,21 @@ export default function TareasPage() {
           <HelpDrawer title="Tareas" items={AYUDA_POR_RUTA["/tareas"]?.items ?? []} />
         </div>
       </header>
+
+      {/* Panel WIG — siempre arriba, antes de la tabla. Mismo patrón que
+          el PanelWig de /metas: lista las 1-3 tareas foco del ciclo. */}
+      <PanelWigTareas
+        wigs={wigTareas}
+        onQuitar={quitarWig}
+        guardandoId={guardandoWigId}
+      />
+
+      {errorWig && (
+        <p className="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">
+          {errorWig}
+        </p>
+      )}
+
       {adjError && (
         <p className="rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-600 dark:text-amber-400">
           No se pudieron cargar los adjuntos: {adjError}

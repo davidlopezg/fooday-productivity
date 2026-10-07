@@ -5,10 +5,11 @@
 
 ---
 
-## ✅ Ya corregido (22 issues)
+## ✅ Ya corregido (23 issues)
 
 | # | Problema | Archivo | Fix |
 |---|----------|---------|-----|
+| 0.X | 9 hábitos nunca se persistían (claves sin prefijo `habito_` en el spread del submit) | `components/EstatusForm.tsx:105` | Prefijar `habito_${k}` al construir el payload en `onSubmit` |
 | 0.1 | `useData` sin `.catch()` | `useData.ts` | Añadido `.catch()` + campo `error` |
 | 0.2 | `guardar()` sin try/catch (CrearModal) | `TasksTable.tsx` | try/catch + error en footer |
 | 0.3 | `guardar()` sin try/catch (EditarModal) | `TasksTable.tsx` | Idem |
@@ -62,7 +63,7 @@
 ## Resumen
 
 ```
-Corregidos:  22/28  (79%)
-Pendientes:   6/28  (21%) — todos de prioridad baja/media
+Corregidos:  23/29  (79%)
+Pendientes:   6/29  (21%) — todos de prioridad baja/media
 Fase 4:       6     — debt técnico, no urgente
 ```

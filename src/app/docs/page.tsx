@@ -152,7 +152,7 @@ const FEATURES: Array<{ ruta: string; proposito: string; docs: string }> = [
   { ruta: "/estatus/ver", proposito: "Ver una entrada en detalle (racha + micro-acción)", docs: "Sub-ruta de /estatus" },
 
   // ── Tareas y GTD ──
-  { ruta: "/tareas", proposito: "Tareas pendientes: marcar hechas, adjuntos, asignar a meta/KR", docs: "Pilar 2 · HelpDrawer" },
+  { ruta: "/tareas", proposito: "Tareas pendientes: marcar hechas, adjuntos, asignar a meta/KR + panel WIGs (foco del ciclo)", docs: "Pilar 2 · WIGs §3 (cap de ejecución) · HelpDrawer" },
   { ruta: "/tareas/inbox", proposito: "Triaje residual: tareas sin meta o sin KR (después de asignar al crear)", docs: "HelpDrawer" },
   { ruta: "/tareas/completadas", proposito: "Histórico de tareas hechas (7/30/90/365/todo)", docs: "HelpDrawer" },
 
@@ -1447,6 +1447,29 @@ export default function DocsPage() {
         </header>
 
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-10-08
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">Panel WIGs en /tareas.</strong>{" "}
+              Nuevo componente{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">PanelWigTareas</code>{" "}
+              que muestra, encima de la tabla de tareas, las 1–3 tareas marcadas
+              como Enormemente Importantes (cap independiente del panel de
+              metas). Mismo patrón que{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">PanelWig</code>{" "}
+              en <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas</code>:
+              contador N/3, lista con título/ámbito/prioridad y botón Quitar.
+              El backend (RPC{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">toggle_tarea_wig</code>{" "}
+              + columnas <code className="rounded bg-muted px-1.5 py-0.5 text-xs">es_wig</code>/
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">wig_orden</code>) ya
+              existía; solo faltaba el panel en esta pantalla. Actualizado
+              índice de features, FEATURES de /docs y metodología §3
+              (“Dónde se ven y cómo se marcan en la app”).
+            </span>
+          </li>
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
               2026-10-07

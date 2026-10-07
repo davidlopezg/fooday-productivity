@@ -100,6 +100,11 @@ const WIG_PUNTOS: Punto[] = [
     cuerpo:
       "La mayoría de herramientas mezclan 'meta' y 'tarea' en una sola lista. Esta app separa dos planos: (a) WIGs de METAS (qué resultados quieres, máx 3) y (b) WIGs de TAREAS (qué 3 tareas concretas los sostienen). Son dos caps independientes de 3 — uno sin el otro no funciona.",
   },
+  {
+    titulo: "Dónde se ven y cómo se marcan en la app",
+    cuerpo:
+      "Cada capa tiene su panel violeta/fucsia con contador N/3: el de METAS vive arriba de /metas (con botón “Sugerir 3 WIGs” por IA); el de TAREAS vive arriba de /tareas y también en / (sección “Tareas Enormemente Importantes”, debajo del panel de metas). En ambos casos, el botón 🎯 dentro de cada tarjeta/fila asciende a WIG y la RPC toggle_*_wig rechaza el 4º para mantener el cap.",
+  },
 ];
 
 // ============================================================================

@@ -103,11 +103,18 @@ export function EstatusForm({
     setError(null);
     let alive = true;
     try {
-      // Mezcla los 9 hábitos desde el estado `habitos` con el resto
+      // Los 9 hábitos viven en `habitos` con claves cortas (qigong, caminar,
+      // ducha, …) pero las columnas de Supabase son `habito_qigong`,
+      // `habito_caminar`, `habito_ducha`, … Hay que prefijar al mezclar
+      // con el resto del payload, si no Postgres los ignora silenciosamente
+      // y siempre quedan en NULL.
+      const habitosPrefijados = Object.fromEntries(
+        Object.entries(habitos).map(([k, v]) => [`habito_${k}`, v]),
+      );
       const payload: EstatusInput = {
         ...datos,
         fecha,
-        ...habitos, // 9 campos habito_*
+        ...habitosPrefijados, // 9 campos habito_*
         comidas,
       };
       await upsertEstatus(fecha, payload);
