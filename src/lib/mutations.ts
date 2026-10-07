@@ -63,6 +63,13 @@ export interface TareaCampos {
   fecha_fin?: string | null;
   ambito?: "personal" | "profesional" | null;
   tags?: string[];
+  /** Migration 0015: FK a la meta. Null = bandeja sin asignar.
+   *  Si se pasa junto con `resultado_periodo_id`, este se IGNORA: el
+   *  meta_id se deriva del resultado para evitar inconsistencias. */
+  meta_id?: string | null;
+  /** Migration 0015: FK al KR concreto. Null = sin KR (puede tener meta
+   *  o no). Si se pasa, se sincroniza también `meta_id` con el del KR. */
+  resultado_periodo_id?: string | null;
 }
 
 export async function actualizarTarea(datos: TareaCampos) {
@@ -71,6 +78,20 @@ export async function actualizarTarea(datos: TareaCampos) {
   if (campos.estado !== undefined) {
     update.completada_at = campos.estado === "hecha" ? new Date().toISOString() : null;
   }
+
+  // Si nos pasan KR pero NO meta_id, derivamos meta_id del KR (mismo
+  // invariante que `asignarTareaResultado` y que `crearTarea`). Evita
+  // inconsistencias donde resultado_periodo.meta_id != tareas.meta_id.
+  if (campos.resultado_periodo_id && !campos.meta_id) {
+    const { data: rp, error: eRp } = await createClient()
+      .from("resultados_periodo")
+      .select("meta_id")
+      .eq("id", campos.resultado_periodo_id)
+      .maybeSingle();
+    if (eRp) throw new Error(`No se pudo resolver el KR: ${eRp.message}`);
+    update.meta_id = (rp as { meta_id: string } | null)?.meta_id ?? null;
+  }
+
   const { error } = await createClient().from("tareas").update(update).eq("id", id);
   // Sin esto, un UPDATE fallido (RLS, red, columna inexistente) pasaba por
   // bueno y la UI mentia: el dato no se guardaba y nadie se enteraba.
@@ -101,8 +122,27 @@ export async function crearTarea(datos: {
   ambito?: "personal" | "profesional" | null;
   tags?: string[];
   subtareas?: Subtarea[] | null;
+  /** Si se pasa un KR, se asigna también el meta_id derivado.
+   *  Si se pasa meta_id sin KR, la tarea queda con meta pero sin KR
+   *  (cae en el bucket "con meta sin trimestre" de /tareas/inbox). */
+  resultado_periodo_id?: string | null;
+  meta_id?: string | null;
 }): Promise<TareaCreada> {
   const supabase = createClient();
+
+  // Si nos dan KR pero no meta_id, derivamos el meta_id del KR
+  // (mismo invariante que `asignarTareaResultado`). Si nos dan meta_id
+  // sin KR, lo respetamos (la tarea queda "con meta sin trimestre").
+  let metaIdFinal = datos.meta_id ?? null;
+  if (datos.resultado_periodo_id && !metaIdFinal) {
+    const { data: rp, error: eRp } = await supabase
+      .from("resultados_periodo")
+      .select("meta_id")
+      .eq("id", datos.resultado_periodo_id)
+      .maybeSingle();
+    if (eRp) throw new Error(`No se pudo resolver el KR: ${eRp.message}`);
+    metaIdFinal = (rp as { meta_id: string } | null)?.meta_id ?? null;
+  }
 
   const { data, error } = await supabase
     .from("tareas")
@@ -123,6 +163,8 @@ export async function crearTarea(datos: {
       fecha_fin: datos.fecha_fin ?? null,
       ambito: datos.ambito ?? null,
       tags: datos.tags ?? [],
+      meta_id: metaIdFinal,
+      resultado_periodo_id: datos.resultado_periodo_id ?? null,
       origen: "manual",
     })
     .select("id,titulo")
@@ -170,6 +212,9 @@ export async function crearTareaConIA(
     criterio_terminacion_manual?: string | null;
     /** Si el usuario metió subtareas a mano, NO se sobreescribe con IA. */
     subtareas_manuales?: Subtarea[] | null;
+    /** Jerarquía meta→KR: si se pasan, se asignan en la creación. */
+    resultado_periodo_id?: string | null;
+    meta_id?: string | null;
   },
   cfg: {
     base_url: string;
@@ -207,6 +252,8 @@ export async function crearTareaConIA(
     tags: datos.tags ?? [],
     criterio_terminacion: criterioManual,
     subtareas: subtareasLimpias,
+    meta_id: datos.meta_id ?? null,
+    resultado_periodo_id: datos.resultado_periodo_id ?? null,
   });
 
   // 2) Decide si hay que invocar a la IA para los huecos.

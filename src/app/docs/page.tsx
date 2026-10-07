@@ -137,6 +137,58 @@ const PILARES: Pilar[] = [
   },
 ];
 
+// ----------------------------------------------------------------------------
+// Índice de features documentadas (para la sección "Meta · Índice" de abajo).
+// Mantener en sincronía con /src/app/ — cualquier ruta nueva debe aparecer
+// aquí con su propósito y la sección de la doc que la explica.
+// ----------------------------------------------------------------------------
+const FEATURES: Array<{ ruta: string; proposito: string; docs: string }> = [
+  // ── Núcleo diario ──
+  { ruta: "/", proposito: "Hoy: semáforo del día + plan diario + contadores", docs: "Rituales §1 (mañana 1ª hora) · HelpDrawer" },
+  { ruta: "/captura", proposito: "Inbox rápido para vaciar la cabeza (efecto Zeigarnik)", docs: "Pilar 4 · Rituales §1 · HelpDrawer" },
+  { ruta: "/estatus", proposito: "9 hábitos + auditoría 20/80 + cierre cognitivo", docs: "Pilar 4 · Rituales §1 (final del día) · HelpDrawer" },
+  { ruta: "/estatus/nuevo", proposito: "Crear nueva entrada de Estatus (1 por día)", docs: "Sub-ruta de /estatus" },
+  { ruta: "/estatus/editar", proposito: "Editar entrada existente (1 por día)", docs: "Sub-ruta de /estatus" },
+  { ruta: "/estatus/ver", proposito: "Ver una entrada en detalle (racha + micro-acción)", docs: "Sub-ruta de /estatus" },
+
+  // ── Tareas y GTD ──
+  { ruta: "/tareas", proposito: "Tareas pendientes: marcar hechas, adjuntos, asignar a meta/KR", docs: "Pilar 2 · HelpDrawer" },
+  { ruta: "/tareas/inbox", proposito: "Triaje residual: tareas sin meta o sin KR (después de asignar al crear)", docs: "HelpDrawer" },
+  { ruta: "/tareas/completadas", proposito: "Histórico de tareas hechas (7/30/90/365/todo)", docs: "HelpDrawer" },
+
+  // ── Trabajo profundo ──
+  { ruta: "/focus", proposito: "Pomodoro + pre-flight check + post-focus", docs: "Pilar 1 · Productivity Stack · Rituales §1 · HelpDrawer" },
+  { ruta: "/calendario", proposito: "Time-blocking: 4 bloques fijos × 7 días", docs: "Pilar 3 · Rituales §1 (mañana) · HelpDrawer" },
+
+  // ── Metas y planificación ──
+  { ruta: "/metas", proposito: "Cards de metas con estado y progreso", docs: "Pilar 2 · Ritual mensual · HelpDrawer" },
+  { ruta: "/metas/plan", proposito: "Plan trimestral con scorecard de KRs + proyección", docs: "Pilar 2 · Ritual semanal (domingo) · Ritual mensual · HelpDrawer" },
+  { ruta: "/plan-diario", proposito: "Estado emocional + plan diario generado por IA", docs: "Rituales §1 (mañana) · HelpDrawer" },
+  { ruta: "/plan-diario/detalle", proposito: "Detalle de un plan con notas e informe", docs: "Sub-ruta de /plan-diario" },
+  { ruta: "/plan-diario/historico", proposito: "Histórico de planes (7/30/90/365/todo)", docs: "Sub-ruta de /plan-diario" },
+  { ruta: "/semana", proposito: "Pipeline semanal con drag & drop + IA 3 críticas/día", docs: "Ritual semanal (domingo noche) · HelpDrawer" },
+  { ruta: "/pipeline", proposito: "Kanban por prioridad + motor IA de priorización", docs: "Ritual semanal (miércoles) · HelpDrawer" },
+
+  // ── Revisión y análisis ──
+  { ruta: "/informes", proposito: "KPIs + heatmap de foco + proyectos con conteo", docs: "Ritual semanal (viernes) · Ritual mensual · HelpDrawer" },
+  { ruta: "/dashboard-emocional", proposito: "4 dimensiones: despertar / mente / cuerpo / rueda", docs: "Pilar 4 · HelpDrawer" },
+
+  // ── Identidad y horizonte ──
+  { ruta: "/norte", proposito: "Propósito, valores y visión (la brújula)", docs: "Pilar 2 · Ritual diario (despertar) · Ritual mensual · HelpDrawer" },
+
+  // ── Sistema ──
+  { ruta: "/pagos", proposito: "Pagos pendientes: ejecutar tesorería lunes 1ª hora", docs: "Apéndice §Bucle de equilibrio · Ritual semanal (lunes estricto) · HelpDrawer" },
+  { ruta: "/proyectos", proposito: "Gestión de proyectos con conteo de tareas", docs: "HelpDrawer" },
+  { ruta: "/configuracion", proposito: "Configuración: API key IA, base URL, modelo, tema", docs: "HelpDrawer" },
+
+  // ── Documentación ──
+  { ruta: "/docs", proposito: "Esta página: pilares + rituales + apéndices + índice", docs: "(auto-referencial)" },
+  { ruta: "/metodologia", proposito: "WIGs, GTD, Próxima Acción, dos inboxes", docs: "(complemento directo de /docs)" },
+
+  // ── Auth ──
+  { ruta: "/login", proposito: "Login con Supabase (email + password)", docs: "(no requiere metodología)" },
+];
+
 export default function DocsPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-10">
@@ -167,6 +219,208 @@ export default function DocsPage() {
           Cada botón "Por qué existe esto" en las pantallas apunta aquí.
         </p>
       </header>
+
+      {/* =====================================================================
+          Meta · Cómo se mantiene este documento actualizado
+          Regla de sincronización docs ↔ app + última actualización.
+         ===================================================================== */}
+      <section
+        id="meta-mantenimiento"
+        className="scroll-mt-20 rounded-2xl border-2 border-indigo-500/30 bg-gradient-to-br from-indigo-500/5 to-blue-500/5 p-6 sm:p-8"
+      >
+        <header>
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
+            Meta · Mantenimiento
+          </div>
+          <h2 className="mt-1 text-2xl font-bold tracking-tight">
+            📌 Cómo se mantiene este documento actualizado
+          </h2>
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+            Esta página se actualiza{" "}
+            <strong className="text-foreground">en la misma sesión</strong>{" "}
+            en que se añade o modifica cualquier feature de la app. Si la doc
+            no se actualiza, el trabajo no está terminado. Convención
+            sincronizada con{" "}
+            <code className="rounded bg-muted px-1.5 py-0.5 text-xs">AGENTS.md</code>.
+          </p>
+        </header>
+
+        <ol className="mt-5 space-y-2 text-sm leading-relaxed">
+          <li className="flex gap-3 rounded-lg border border-indigo-500/20 bg-background/40 p-3">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-500/20 text-xs font-bold text-indigo-700 dark:text-indigo-300">
+              1
+            </span>
+            <div>
+              <strong className="text-foreground">Pantalla nueva</strong>{" "}
+              <span className="text-muted-foreground">
+                → añadir fila al índice de abajo y revisar si aplica a un
+                ritual (diario / semanal / mensual).
+              </span>
+            </div>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-indigo-500/20 bg-background/40 p-3">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-500/20 text-xs font-bold text-indigo-700 dark:text-indigo-300">
+              2
+            </span>
+            <div>
+              <strong className="text-foreground">Hábito nuevo</strong>{" "}
+              <span className="text-muted-foreground">
+                → actualizar{" "}
+                <Link
+                  href="/metodologia"
+                  className="font-mono text-indigo-700 dark:text-indigo-300 underline-offset-4 hover:underline"
+                >
+                  /metodologia
+                </Link>{" "}
+                y Pilar 4 de{" "}
+                <Link
+                  href="/docs"
+                  className="font-mono text-indigo-700 dark:text-indigo-300 underline-offset-4 hover:underline"
+                >
+                  /docs
+                </Link>
+                .
+              </span>
+            </div>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-indigo-500/20 bg-background/40 p-3">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-500/20 text-xs font-bold text-indigo-700 dark:text-indigo-300">
+              3
+            </span>
+            <div>
+              <strong className="text-foreground">Regla de metodología</strong>{" "}
+              <span className="text-muted-foreground">
+                → actualizar el pilar correspondiente. Si contradice
+                evidencia, revisar también el apéndice "Evidencia
+                científica".
+              </span>
+            </div>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-indigo-500/20 bg-background/40 p-3">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-500/20 text-xs font-bold text-indigo-700 dark:text-indigo-300">
+              4
+            </span>
+            <div>
+              <strong className="text-foreground">Cambio de nombre o comportamiento</strong>{" "}
+              <span className="text-muted-foreground">
+                → actualizar índice, rituales y HelpDrawer de la página
+                afectada.
+              </span>
+            </div>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-indigo-500/20 bg-background/40 p-3">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-500/20 text-xs font-bold text-indigo-700 dark:text-indigo-300">
+              5
+            </span>
+            <div>
+              <strong className="text-foreground">Cualquier cambio</strong>{" "}
+              <span className="text-muted-foreground">
+                → añadir entrada al "Registro de cambios" (abajo del todo)
+                con fecha.
+              </span>
+            </div>
+          </li>
+        </ol>
+
+        <div className="mt-5 flex flex-wrap items-center gap-2 rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-4 py-3 text-sm">
+          <span className="font-semibold text-indigo-700 dark:text-indigo-300">
+            Última actualización:
+          </span>
+          <span className="font-mono text-indigo-700 dark:text-indigo-300">
+            2026-10-07
+          </span>
+          <span className="text-muted-foreground">
+            — selector de meta/KR añadido a CrearModal y EditarModal.
+            Última actualización: pasada retro + integración de la
+            jerarquía meta→KR→tareas en el flujo de creación de tareas.
+          </span>
+        </div>
+      </section>
+
+      {/* =====================================================================
+          Meta · Índice de features documentadas
+          Mapa: ruta → propósito → dónde se documenta.
+         ===================================================================== */}
+      <section
+        id="meta-indice"
+        className="scroll-mt-20 rounded-2xl border-2 border-slate-500/30 bg-gradient-to-br from-slate-500/5 to-zinc-500/5 p-6 sm:p-8"
+      >
+        <header>
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+            Meta · Índice
+          </div>
+          <h2 className="mt-1 text-2xl font-bold tracking-tight">
+            🗂️ Índice de features documentadas
+          </h2>
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+            Mapa completo de las 27 rutas de la app. Cada fila dice qué hace
+            la pantalla y en qué sección de esta página (o de{" "}
+            <Link
+              href="/metodologia"
+              className="font-mono text-slate-700 dark:text-slate-300 underline-offset-4 hover:underline"
+            >
+              /metodologia
+            </Link>
+            ) se explica el método que la sustenta. Si una fila solo dice
+            "HelpDrawer", significa que no tiene sección dedicada en{" "}
+            <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/docs</code>{" "}
+            y se explica en el cajón de ayuda de la propia pantalla.
+          </p>
+        </header>
+
+        <div className="mt-5 overflow-x-auto rounded-lg border border-slate-500/20">
+          <table className="w-full min-w-[640px] text-sm">
+            <thead className="bg-slate-500/10">
+              <tr>
+                <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                  Ruta
+                </th>
+                <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                  Propósito
+                </th>
+                <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                  Documentado en
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border bg-background/40">
+              {FEATURES.map((f) => (
+                <tr key={f.ruta}>
+                  <td className="px-3 py-2 font-mono font-medium">
+                    {f.ruta === "/docs" || f.ruta === "/login" ? (
+                      <span className="text-slate-700 dark:text-slate-300">
+                        {f.ruta}
+                      </span>
+                    ) : (
+                      <Link
+                        href={f.ruta}
+                        className="text-slate-700 dark:text-slate-300 underline-offset-4 hover:underline"
+                      >
+                        {f.ruta}
+                      </Link>
+                    )}
+                  </td>
+                  <td className="px-3 py-2 text-muted-foreground">
+                    {f.proposito}
+                  </td>
+                  <td className="px-3 py-2 text-xs text-muted-foreground">
+                    {f.docs}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <p className="mt-4 text-xs text-muted-foreground">
+          <strong className="text-foreground">Leyenda:</strong>{" "}
+          <span className="font-mono">Pilar X</span> = sección de los 5 pilares ·{" "}
+          <span className="font-mono">Ritual X</span> = bloque "Rituales de uso" ·{" "}
+          <span className="font-mono">Apéndice §…</span> = apéndice específico ·{" "}
+          <span className="font-mono">HelpDrawer</span> = solo cajón de ayuda
+          in-app.
+        </p>
+      </section>
 
       {PILARES.map((p) => (
         <section
@@ -1166,6 +1420,96 @@ export default function DocsPage() {
             home (/) que muestre "Hoy toca: X" según el día de la semana.
           </p>
         </div>
+      </section>
+
+      {/* =====================================================================
+          Meta · Registro de cambios de esta página
+          Historial manual, en orden inverso. No se borran entradas.
+         ===================================================================== */}
+      <section
+        id="meta-changelog"
+        className="scroll-mt-20 rounded-2xl border-2 border-teal-500/30 bg-gradient-to-br from-teal-500/5 to-cyan-500/5 p-6 sm:p-8"
+      >
+        <header>
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-teal-700 dark:text-teal-300">
+            Meta · Registro de cambios
+          </div>
+          <h2 className="mt-1 text-2xl font-bold tracking-tight">
+            📜 Registro de cambios de esta página
+          </h2>
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+            Historial manual en orden inverso (lo más reciente arriba). Cada
+            vez que se añade o modifica una sección, se anota aquí con la
+            fecha. Para no perder el aprendizaje,{" "}
+            <strong className="text-foreground">no se borran entradas</strong>:
+            si una sección se renombra o se mueve, se anota la operación.
+          </p>
+        </header>
+
+        <ul className="mt-5 space-y-3 text-sm leading-relaxed">
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-10-07
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">Selector de meta y KR en CrearModal/EditarModal.</strong>{" "}
+              Las tareas ahora se asignan a su meta y KR (resultado del trimestre)
+              directamente al crear/editar, sin tener que pasar por{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/tareas/inbox</code>.
+              La derivación meta_id desde KR está centralizada en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">crearTarea</code> y{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">actualizarTarea</code>{" "}
+              (mismo invariante que el chokepoint{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">asignarTareaResultado</code>).
+              El inbox queda como triaje residual. Corregida también la fila
+              Lag/Lead en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metodologia</code>{" "}
+              (antes mencionaba <code className="rounded bg-muted px-1.5 py-0.5 text-xs">okrs</code>/
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">key_results</code>, ahora
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">metas</code>+
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">periodos</code>+
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">resultados_periodo</code>).
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2025-10-07
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">Sistema de sincronización docs ↔ app.</strong>{" "}
+              Añadidos 3 bloques meta: "Cómo se mantiene este documento
+              actualizado" (regla de sincronización), "Índice de features
+              documentadas" (mapa de las 27 rutas) y este "Registro de
+              cambios". Regla equivalente añadida a{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">AGENTS.md</code>.
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2025-10-07
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">Pasada retro del índice.</strong>{" "}
+              Las 27 rutas existentes quedan indexadas con su propósito y la
+              sección de la doc donde se explican. Pantallas sin sección
+              dedicada (proyectos, configuración, login, sub-rutas) marcadas
+              como "HelpDrawer" o "sub-ruta".
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2025-10-07
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">Añadido bloque "Rituales de uso".</strong>{" "}
+              Nuevo bloque con ritual diario (5 micro-acciones), ritual
+              semanal (1 acción por día, lunes{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/pagos</code>{" "}
+              marcado como estricto), ritual mensual (revisión profunda de
+              OKR) y 3 hábitos innegociables.
+            </span>
+          </li>
+        </ul>
       </section>
 
       <footer className="rounded-2xl border border-dashed border-border bg-muted/30 p-6 text-center text-sm text-muted-foreground">

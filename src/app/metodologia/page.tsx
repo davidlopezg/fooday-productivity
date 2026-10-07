@@ -76,7 +76,7 @@ const LAG_VS_LEAD: { dimension: string; lag: string; lead: string }[] = [
   },
   {
     dimension: "En la app",
-    lag: "Tabla `metas` + `okrs` + `key_results` (ver /metas/plan).",
+    lag: "Tabla `metas` + `periodos` + `resultados_periodo` (los KRs viven aquí, ver /metas/plan).",
     lead: "Columna `es_wig` en `metas` (panel violeta) y en `tareas` (panel fucsia).",
   },
 ];

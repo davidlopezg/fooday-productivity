@@ -32,13 +32,13 @@ import {
   subirAdjuntos,
   type Recurrencia,
 } from "@/lib/mutations";
-import { fetchAdjuntosTarea, fetchProyectos } from "@/lib/queries";
+import { fetchAdjuntosTarea, fetchMetasConProgreso, fetchProyectos } from "@/lib/queries";
 import { useConfig } from "@/lib/configStore";
 import { usePomodoro } from "@/lib/pomodoroStore";
 import { generarCriterioTerminacionIA } from "@/lib/plan";
 import { useData } from "@/lib/useData";
 import { ComentariosTarea } from "@/components/ComentariosTarea";
-import type { Proyecto, RecurrenciaTipo, Subtarea, Tarea, TareaAdjunto } from "@/lib/types";
+import type { MetaConPlan, Proyecto, RecurrenciaTipo, Subtarea, Tarea, TareaAdjunto } from "@/lib/types";
 import { IconRepeat } from "@/components/icons";
 import { errorMessage } from "@/lib/errors";
 
@@ -233,6 +233,102 @@ function ProyectoRecurrenciaEditor({
           Al marcarla como hecha, se creará automáticamente una nueva copia.
         </p>
       )}
+    </section>
+  );
+}
+
+// ============================================================================
+// Editor de Meta y KR — migration 0015
+// Selecciona a qué meta y, opcionalmente, a qué resultado_periodo (KR)
+// pertenece esta tarea. Si no se elige nada, la tarea va al inbox.
+// Cuando se elige un KR, el meta_id se deriva automáticamente del KR.
+// ============================================================================
+function MetaKrEditor({
+  metaId,
+  resultadoId,
+  onMetaChange,
+  onResultadoChange,
+}: {
+  metaId: string | null;
+  resultadoId: string | null;
+  onMetaChange: (v: string | null) => void;
+  onResultadoChange: (v: string | null) => void;
+}) {
+  const { data: metas } = useData<MetaConPlan[]>(() => fetchMetasConProgreso(), []);
+  const field =
+    "h-9 w-full rounded-md border border-input bg-background px-2 text-sm outline-none focus:ring-2 focus:ring-ring";
+
+  // Solo metas activas (no archivadas) y con título.
+  const metasActivas = (metas ?? []).filter(
+    (m) => m.meta.estado !== "archivada" && (m.meta.titulo ?? "").trim().length > 0,
+  );
+
+  // KRs de la meta seleccionada, ordenados por (año desc, nº periodo desc).
+  const krDeMeta = metaId
+    ? (metasActivas.find((m) => m.meta.id === metaId)?.resultados ?? []).slice().sort(
+        (a, b) =>
+          b.periodo.anio - a.periodo.anio ||
+          b.periodo.numero - a.periodo.numero ||
+          (a.orden ?? 0) - (b.orden ?? 0),
+      )
+    : [];
+
+  return (
+    <section className="rounded-lg border border-border bg-muted/30 p-3">
+      <div className="mb-2 flex items-center gap-2">
+        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Meta y resultado clave
+        </span>
+      </div>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <label className="block">
+          <span className="mb-1 block text-[11px] text-muted-foreground">Meta</span>
+          <select
+            className={field}
+            value={metaId ?? ""}
+            onChange={(e) => {
+              const v = e.target.value || null;
+              onMetaChange(v);
+              // Al cambiar de meta, reseteamos el KR (pertenecía a la meta anterior).
+              onResultadoChange(null);
+            }}
+          >
+            <option value="">— Sin meta (queda en /tareas/inbox) —</option>
+            {metasActivas.map((m) => (
+              <option key={m.meta.id} value={m.meta.id}>
+                {(m.meta.codigo ? `${m.meta.codigo} · ` : "") + m.meta.titulo}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-[11px] text-muted-foreground">
+            KR (resultado del trimestre)
+          </span>
+          <select
+            className={field}
+            value={resultadoId ?? ""}
+            disabled={!metaId}
+            onChange={(e) => onResultadoChange(e.target.value || null)}
+          >
+            <option value="">
+              {metaId
+                ? "— Sin KR (con meta, sin trimestre) —"
+                : "— Elige primero una meta —"}
+            </option>
+            {krDeMeta.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.periodo.nombre} · {r.titulo}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <p className="mt-1.5 text-[11px] text-muted-foreground">
+        Cada tarea debe estar dentro de una meta → KR → tareas para que
+        cuente hacia el scorecard de /metas/plan. Si la dejas sin asignar,
+        la tarea va a /tareas/inbox (triaje).
+      </p>
     </section>
   );
 }
@@ -952,6 +1048,10 @@ export function EditarModal({
   const [ambito, setAmbito] = useState<"personal" | "profesional" | null>(
     tarea.ambito ?? null,
   );
+  const [metaId, setMetaId] = useState<string | null>(tarea.meta_id ?? null);
+  const [resultadoId, setResultadoId] = useState<string | null>(
+    tarea.resultado_periodo_id ?? null,
+  );
   const [tagsInput, setTagsInput] = useState<string>(
     (tarea.tags ?? []).join(", "),
   );
@@ -1016,6 +1116,8 @@ export function EditarModal({
           proyecto_id: proyectoId,
           ambito: ambito,
           tags: tagsLimpios,
+          meta_id: metaId,
+          resultado_periodo_id: resultadoId,
         });
         // Recurrencia: si cambia, se actualiza. Si antes era distinta
         // (incluida null), se sobreescribe con el setRecurrencia.
@@ -1064,6 +1166,13 @@ export function EditarModal({
             <span className="mb-1 block text-xs text-muted-foreground">Descripción</span>
             <textarea rows={3} className={field} value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} />
           </label>
+
+          <MetaKrEditor
+            metaId={metaId}
+            resultadoId={resultadoId}
+            onMetaChange={setMetaId}
+            onResultadoChange={setResultadoId}
+          />
 
           <CriterioTerminacionEditor
             value={form.criterio_terminacion}
@@ -1207,6 +1316,8 @@ export function CrearModal({
   });
   const [proyectoId, setProyectoId] = useState<string | null>(null);
   const [recurrencia, setRecurrenciaState] = useState<Recurrencia>({ tipo: null });
+  const [metaId, setMetaId] = useState<string | null>(null);
+  const [resultadoId, setResultadoId] = useState<string | null>(null);
   const [ambito, setAmbito] = useState<"personal" | "profesional" | null>(null);
   const [tagsInput, setTagsInput] = useState<string>("");
   const [subtareas, setSubtareas] = useState<Subtarea[]>([]);
@@ -1261,6 +1372,8 @@ export function CrearModal({
             criterio_terminacion_manual: form.criterio_terminacion.trim() || null,
             subtareas_manuales:
               subtareasLimpias.length > 0 ? subtareasLimpias : null,
+            meta_id: metaId,
+            resultado_periodo_id: resultadoId,
           },
           {
             base_url: cfg.base_url,
@@ -1347,6 +1460,13 @@ export function CrearModal({
               onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
             />
           </label>
+
+          <MetaKrEditor
+            metaId={metaId}
+            resultadoId={resultadoId}
+            onMetaChange={setMetaId}
+            onResultadoChange={setResultadoId}
+          />
 
           <CriterioTerminacionEditor
             value={form.criterio_terminacion}
