@@ -739,6 +739,435 @@ export default function DocsPage() {
         </div>
       </section>
 
+      {/* =====================================================================
+          Complemento · Rituales de uso (chuleta diaria / semanal / mensual)
+          Cuándo abrir cada pantalla y qué hábitos mantener para que el
+          sistema no se rompa por desuso.
+         ===================================================================== */}
+      <section
+        id="rituales-uso"
+        className="scroll-mt-20 rounded-2xl border-2 border-rose-500/30 bg-gradient-to-br from-rose-500/5 to-pink-500/5 p-6 sm:p-8"
+      >
+        <header>
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-rose-700 dark:text-rose-300">
+            Complemento · Rituales de uso
+          </div>
+          <h2 className="mt-1 text-2xl font-bold tracking-tight">
+            Cuándo usar cada pantalla (y qué hábitos no se rompen)
+          </h2>
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+            Esta app tiene más de 15 pantallas. Sin un orden, se te olvidan
+            o las usas mal. Aquí está la chuleta:{" "}
+            <strong className="text-foreground">qué abrir, cuándo y por qué</strong>.
+            Si saltas un ritual, el sistema pierde valor acumulado: la
+            información se desactualiza, el semáforo miente y el Estatus
+            Diario deja de detectar patrones.
+          </p>
+        </header>
+
+        <hr className="my-6 border-border" />
+
+        {/* ── 1. Ritual diario ── */}
+        <h3 className="text-base font-semibold">
+          ☀️ 1. Ritual diario (todos los días, ~5 aperturas)
+        </h3>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          Aperturas obligatorias del día. Si te saltas una, anótalo en el
+          Estatus y compénsalo mañana — no improvises una rutina nueva.
+        </p>
+
+        <div className="mt-4 overflow-x-auto rounded-lg border border-rose-500/20">
+          <table className="w-full min-w-[480px] text-sm">
+            <thead className="bg-rose-500/10">
+              <tr>
+                <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-rose-700 dark:text-rose-300">
+                  Cuándo
+                </th>
+                <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-rose-700 dark:text-rose-300">
+                  Pantalla
+                </th>
+                <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-rose-700 dark:text-rose-300">
+                  Qué hacer
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border bg-background/40">
+              <tr>
+                <td className="px-3 py-2 font-medium">Al despertar</td>
+                <td className="px-3 py-2">
+                  <Link
+                    href="/norte"
+                    className="font-mono text-rose-700 dark:text-rose-300 underline-offset-4 hover:underline"
+                  >
+                    /norte
+                  </Link>
+                </td>
+                <td className="px-3 py-2 text-muted-foreground">
+                  Recordar propósito/valores (10s). Ancla emocional del día.
+                </td>
+              </tr>
+              <tr>
+                <td className="px-3 py-2 font-medium">Mañana, 1ª hora</td>
+                <td className="px-3 py-2">
+                  <Link
+                    href="/plan-diario"
+                    className="font-mono text-rose-700 dark:text-rose-300 underline-offset-4 hover:underline"
+                  >
+                    /plan-diario
+                  </Link>
+                  {" + "}
+                  <Link
+                    href="/calendario"
+                    className="font-mono text-rose-700 dark:text-rose-300 underline-offset-4 hover:underline"
+                  >
+                    /calendario
+                  </Link>
+                </td>
+                <td className="px-3 py-2 text-muted-foreground">
+                  Definir las 3 cosas del día + pintar 4 bloques. Es lo
+                  primero que se hace, antes de emails.
+                </td>
+              </tr>
+              <tr>
+                <td className="px-3 py-2 font-medium">
+                  Cuando algo se te cruce por la cabeza
+                </td>
+                <td className="px-3 py-2">
+                  <Link
+                    href="/captura"
+                    className="font-mono text-rose-700 dark:text-rose-300 underline-offset-4 hover:underline"
+                  >
+                    /captura
+                  </Link>
+                </td>
+                <td className="px-3 py-2 text-muted-foreground">
+                  Vaciar cabeza en &lt;30s. No pienses, captura. Luego lo
+                  trias.
+                </td>
+              </tr>
+              <tr>
+                <td className="px-3 py-2 font-medium">Bloques de trabajo</td>
+                <td className="px-3 py-2">
+                  <Link
+                    href="/focus"
+                    className="font-mono text-rose-700 dark:text-rose-300 underline-offset-4 hover:underline"
+                  >
+                    /focus
+                  </Link>
+                </td>
+                <td className="px-3 py-2 text-muted-foreground">
+                  Pomodoro con pre-flight (silenciar, cerrar email, criterio
+                  de éxito). Máx 4/día.
+                </td>
+              </tr>
+              <tr>
+                <td className="px-3 py-2 font-medium">Final del día</td>
+                <td className="px-3 py-2">
+                  <Link
+                    href="/estatus"
+                    className="font-mono text-rose-700 dark:text-rose-300 underline-offset-4 hover:underline"
+                  >
+                    /estatus
+                  </Link>
+                </td>
+                <td className="px-3 py-2 text-muted-foreground">
+                  Marcar los 9 hábitos + cierre cognitivo 5 preguntas. Esto
+                  es sagrado: si no se hace, el sistema pierde valor al día
+                  siguiente.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <hr className="my-6 border-border" />
+
+        {/* ── 2. Ritual semanal ── */}
+        <h3 className="text-base font-semibold">
+          📅 2. Ritual semanal (1 acción por día, ~15-30 min total)
+        </h3>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          Una sola cosa importante por día. No acumules todo en el domingo:
+          satura.
+        </p>
+
+        <div className="mt-4 overflow-x-auto rounded-lg border border-rose-500/20">
+          <table className="w-full min-w-[480px] text-sm">
+            <thead className="bg-rose-500/10">
+              <tr>
+                <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-rose-700 dark:text-rose-300">
+                  Día
+                </th>
+                <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-rose-700 dark:text-rose-300">
+                  Pantalla
+                </th>
+                <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-rose-700 dark:text-rose-300">
+                  Acción
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border bg-background/40">
+              <tr>
+                <td className="px-3 py-2 font-medium">Domingo noche</td>
+                <td className="px-3 py-2">
+                  <Link
+                    href="/semana"
+                    className="font-mono text-rose-700 dark:text-rose-300 underline-offset-4 hover:underline"
+                  >
+                    /semana
+                  </Link>
+                  {" + "}
+                  <Link
+                    href="/plan-diario"
+                    className="font-mono text-rose-700 dark:text-rose-300 underline-offset-4 hover:underline"
+                  >
+                    /plan-diario
+                  </Link>
+                </td>
+                <td className="px-3 py-2 text-muted-foreground">
+                  Planificar la semana entrante: arrastrar y soltar tareas,
+                  registrar estado emocional. Es la base de todo lo demás.
+                </td>
+              </tr>
+              <tr>
+                <td className="px-3 py-2 font-medium">
+                  <span className="block">Lunes, 1ª hora</span>
+                  <span className="mt-1 inline-block rounded-full bg-rose-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-rose-700 dark:text-rose-300">
+                    Estricto
+                  </span>
+                </td>
+                <td className="px-3 py-2">
+                  <Link
+                    href="/pagos"
+                    className="font-mono text-rose-700 dark:text-rose-300 underline-offset-4 hover:underline"
+                  >
+                    /pagos
+                  </Link>
+                </td>
+                <td className="px-3 py-2 text-muted-foreground">
+                  <strong className="text-foreground">Estricto.</strong>{" "}
+                  Revisar y ejecutar pagos pendientes. Es lo primero del
+                  lunes, antes de cualquier otra cosa. Si el lunes es
+                  festivo, se hace el martes a 1ª hora (no más tarde). Si
+                  tampoco se puede, se salta esa semana, pero se vuelve al
+                  lunes siguiente sin falta.
+                </td>
+              </tr>
+              <tr>
+                <td className="px-3 py-2 font-medium">Miércoles</td>
+                <td className="px-3 py-2">
+                  <Link
+                    href="/pipeline"
+                    className="font-mono text-rose-700 dark:text-rose-300 underline-offset-4 hover:underline"
+                  >
+                    /pipeline
+                  </Link>
+                </td>
+                <td className="px-3 py-2 text-muted-foreground">
+                  Revisar Kanban: mover tarjetas, repriorizar, lanzar motor
+                  IA si hay atasco. Punto medio de semana para corregir
+                  rumbo.
+                </td>
+              </tr>
+              <tr>
+                <td className="px-3 py-2 font-medium">Viernes tarde</td>
+                <td className="px-3 py-2">
+                  <Link
+                    href="/informes"
+                    className="font-mono text-rose-700 dark:text-rose-300 underline-offset-4 hover:underline"
+                  >
+                    /informes
+                  </Link>
+                </td>
+                <td className="px-3 py-2 text-muted-foreground">
+                  Mirar heatmap de foco + scorecard de hábitos. Cierre
+                  semanal objetivo: cuántas horas reales de foco vs. las
+                  4/día prometidas.
+                </td>
+              </tr>
+              <tr>
+                <td className="px-3 py-2 font-medium">Domingo (parte final)</td>
+                <td className="px-3 py-2">
+                  <Link
+                    href="/metas/plan"
+                    className="font-mono text-rose-700 dark:text-rose-300 underline-offset-4 hover:underline"
+                  >
+                    /metas/plan
+                  </Link>
+                </td>
+                <td className="px-3 py-2 text-muted-foreground">
+                  Revisar la proyección lineal de KRs: ¿voy en línea, por
+                  encima o por debajo del ritmo esperado? Ajustar si toca.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <hr className="my-6 border-border" />
+
+        {/* ── 3. Ritual mensual ── */}
+        <h3 className="text-base font-semibold">
+          🗓️ 3. Ritual mensual (1 vez al mes, ~60-90 min)
+        </h3>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          Reservar un bloque protegido el primer domingo del mes nuevo. No
+          más de 90 min. Si se pasa, el ritual está mal dimensionado.
+        </p>
+        <ul className="mt-3 space-y-3 text-sm leading-relaxed text-muted-foreground">
+          <li className="flex gap-2">
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500" />
+            <span>
+              <Link
+                href="/metas"
+                className="font-mono text-rose-700 dark:text-rose-300 underline-offset-4 hover:underline"
+              >
+                /metas
+              </Link>
+              {" + "}
+              <Link
+                href="/metas/plan"
+                className="font-mono text-rose-700 dark:text-rose-300 underline-offset-4 hover:underline"
+              >
+                /metas/plan
+              </Link>
+              : <strong className="text-foreground">revisión profunda de OKR</strong>.
+              ¿Qué KRs avancé? ¿Cuáles están persistentemente en rojo?
+              ¿Aparecen metas nuevas? ¿Qué metas mueren (ya no aportan al
+              norte)?
+            </span>
+          </li>
+          <li className="flex gap-2">
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500" />
+            <span>
+              <Link
+                href="/norte"
+                className="font-mono text-rose-700 dark:text-rose-300 underline-offset-4 hover:underline"
+              >
+                /norte
+              </Link>
+              : <strong className="text-foreground">vigencia del norte</strong>.
+              ¿Mi propósito/valores siguen siendo los mismos? (Esto se hace
+              de forma más profunda cada trimestre; una mirada mensual
+              basta).
+            </span>
+          </li>
+          <li className="flex gap-2">
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500" />
+            <span>
+              <Link
+                href="/informes"
+                className="font-mono text-rose-700 dark:text-rose-300 underline-offset-4 hover:underline"
+              >
+                /informes
+              </Link>
+              : <strong className="text-foreground">tendencia 30 días</strong>.
+              Heatmap de foco, score de hábitos, días en rojo emocionales.
+              Si una racha roja emocional supera los 5 días, abrir una
+              acción correctiva ya (no esperar al mes siguiente).
+            </span>
+          </li>
+          <li className="flex gap-2">
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500" />
+            <span>
+              <strong className="text-foreground">
+                Decidir 1-3 experimentos para el mes (no más).
+              </strong>{" "}
+              Cosas concretas que vas a probar los próximos 30 días. Se
+              registran en{" "}
+              <Link
+                href="/tareas"
+                className="font-mono text-rose-700 dark:text-rose-300 underline-offset-4 hover:underline"
+              >
+                /tareas
+              </Link>{" "}
+              con un tag o ámbito "experimento_mes" para poder evaluarlos
+              en el siguiente ritual.
+            </span>
+          </li>
+        </ul>
+
+        <hr className="my-6 border-border" />
+
+        {/* ── 4. Hábitos recurrentes ── */}
+        <h3 className="text-base font-semibold">
+          🔁 4. Hábitos recurrentes (las 3 reglas que no se rompen)
+        </h3>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          Si solo pudieras mantener 3 hábitos del sistema, que sean estos.
+          Lo demás se puede recuperar; si rompes uno de estos, el sistema
+          pierde coherencia.
+        </p>
+
+        <ol className="mt-3 space-y-3 text-sm">
+          <li className="flex gap-3 rounded-lg border border-rose-500/20 bg-background/40 p-4">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-rose-500/20 text-sm font-bold text-rose-700 dark:text-rose-300">
+              1
+            </span>
+            <div className="leading-relaxed">
+              <strong className="text-foreground">
+                Nunca dejes una idea en la cabeza.
+              </strong>{" "}
+              <span className="text-muted-foreground">
+                Si piensas algo —una tarea, una preocupación, una idea—,
+                va a{" "}
+              </span>
+              <Link
+                href="/captura"
+                className="font-mono text-rose-700 dark:text-rose-300 underline-offset-4 hover:underline"
+              >
+                /captura
+              </Link>
+              <span className="text-muted-foreground">
+                {" "}
+                en el momento. Sin excepción. Luego la trias cuando toca.
+              </span>
+            </div>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-rose-500/20 bg-background/40 p-4">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-rose-500/20 text-sm font-bold text-rose-700 dark:text-rose-300">
+              2
+            </span>
+            <div className="leading-relaxed">
+              <strong className="text-foreground">
+                Nunca empieces un bloque sin /focus + pre-flight.
+              </strong>{" "}
+              <span className="text-muted-foreground">
+                Silenciar notificaciones, cerrar email, definir criterio de
+                éxito del bloque. Es la única forma de que los 4 bloques
+                diarios sean bloques de verdad y no tiempo perdido con
+                sensación de "trabajar".
+              </span>
+            </div>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-rose-500/20 bg-background/40 p-4">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-rose-500/20 text-sm font-bold text-rose-700 dark:text-rose-300">
+              3
+            </span>
+            <div className="leading-relaxed">
+              <strong className="text-foreground">
+                Nunca cierres el día sin /estatus.
+              </strong>{" "}
+              <span className="text-muted-foreground">
+                Marcar los 9 hábitos + cierre cognitivo de 5 preguntas. Si
+                saltas esto 2 días seguidos, el sistema pierde valor: el
+                score de hábitos se rompe, el cierre cognitivo se acumula
+                sin procesar y el dashboard emocional deja de detectar
+                patrones a tiempo.
+              </span>
+            </div>
+          </li>
+        </ol>
+
+        <div className="mt-6 rounded-lg border border-rose-500/30 bg-rose-500/10 p-4">
+          <p className="text-sm font-medium leading-relaxed text-rose-700 dark:text-rose-300">
+            💡 ¿Quieres que te recuerde el ritual diario automáticamente al
+            abrir la app cada mañana? Puedo añadir un mini-banner en la
+            home (/) que muestre "Hoy toca: X" según el día de la semana.
+          </p>
+        </div>
+      </section>
+
       <footer className="rounded-2xl border border-dashed border-border bg-muted/30 p-6 text-center text-sm text-muted-foreground">
         ¿Falta algo? Cada botón "Por qué existe esto" en las pantallas de la
         app apunta a esta página. La metodología no es dogma: si algo no
