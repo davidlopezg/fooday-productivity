@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Cómo funcionan las metas, los OKR y los WIG — Guía sencilla</title>
+<style>
+  @page {
+    size: A4;
+    margin: 18mm 16mm 18mm 16mm;
+    @bottom-center {
+      content: "Guía: Metas, OKR y WIG · fooday·productivity · página " counter(page) " de " counter(pages);
+      font-family: 'Helvetica', sans-serif;
+      font-size: 9pt;
+      color: #888;
+    }
+  }
+  body {
+    font-family: 'Helvetica', 'Arial', sans-serif;
+    font-size: 11.5pt;
+    line-height: 1.55;
+    color: #2a2a2a;
+  }
+  h1 {
+    font-size: 26pt;
+    color: #6c2bd9;
+    margin: 0 0 4mm 0;
+    text-align: center;
+  }
+  h1 .subtitulo {
+    display: block;
+    font-size: 13pt;
+    color: #555;
+    font-weight: normal;
+    margin-top: 3mm;
+  }
+  h2 {
+    font-size: 18pt;
+    color: #6c2bd9;
+    border-bottom: 2px solid #6c2bd9;
+    padding-bottom: 2mm;
+    margin-top: 12mm;
+    page-break-after: avoid;
+  }
+  h3 {
+    font-size: 14pt;
+    color: #2d1b69;
+    margin-top: 7mm;
+    page-break-after: avoid;
+  }
+  .portada {
+    text-align: center;
+    padding: 25mm 5mm;
+    page-break-after: always;
+  }
+  .portada .icono {
+    font-size: 72pt;
+    line-height: 1;
+  }
+  .portada p {
+    margin: 4mm auto;
+    max-width: 120mm;
+  }
+  .caja {
+    background: #f4eefe;
+    border-left: 5px solid #6c2bd9;
+    padding: 4mm 6mm;
+    margin: 4mm 0;
+    border-radius: 0 3mm 3mm 0;
+    page-break-inside: avoid;
+  }
+  .caja.verde {
+    background: #e8f5e9;
+    border-left-color: #2e7d32;
+  }
+  .caja.azul {
+    background: #e3f2fd;
+    border-left-color: #1565c0;
+  }
+  .caja.naranja {
+    background: #fff3e0;
+    border-left-color: #ef6c00;
+  }
+  .caja.rosa {
+    background: #fce4ec;
+    border-left-color: #c2185b;
+  }
+  .analogia {
+    font-style: italic;
+    color: #555;
+    margin: 3mm 6mm;
+    padding-left: 4mm;
+    border-left: 3px solid #ddd;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 4mm 0;
+    page-break-inside: avoid;
+  }
+  th {
+    background: #6c2bd9;
+    color: white;
+    padding: 2mm 3mm;
+    text-align: left;
+    font-weight: bold;
+  }
+  td {
+    border-bottom: 1px solid #ddd;
+    padding: 2mm 3mm;
+    vertical-align: top;
+  }
+  tr:nth-child(even) td {
+    background: #faf7ff;
+  }
+  .arbol {
+    font-family: 'Courier New', monospace;
+    font-size: 10.5pt;
+    background: #fafafa;
+    padding: 5mm 7mm;
+    border-radius: 2mm;
+    border: 1px solid #ddd;
+    white-space: pre;
+    line-height: 1.4;
+    page-break-inside: avoid;
+  }
+  ul, ol {
+    margin: 2mm 0 3mm 6mm;
+  }
+  li {
+    margin-bottom: 1.5mm;
+  }
+  .destacado {
+    background: #fff59d;
+    padding: 1mm 2mm;
+    border-radius: 1mm;
+  }
+  .emoji-grande {
+    font-size: 16pt;
+  }
+  .footer-info {
+    margin-top: 12mm;
+    padding-top: 4mm;
+    border-top: 1px solid #ddd;
+    font-size: 10pt;
+    color: #888;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<!-- ================================================================ -->
+<!-- PORTADA -->
+<!-- ================================================================ -->
+<section class="portada">
+  <div class="icono">🎯</div>
+  <h1>
+    Metas, OKR y WIG<br>
+    <span class="subtitulo">Una guía sencilla (explicada como para un niño)</span>
+  </h1>
+  <p style="font-size: 13pt; color: #555;">
+    Para entender cómo se organiza tu cerebro<br>
+    (y el de tu app <strong>fooday·productivity</strong>)
+  </p>
+  <p style="margin-top: 18mm; font-size: 10pt; color: #888;">
+    David López · 2026-10-07
+  </p>
+</section>
+
+<!-- ================================================================ -->
+<!-- 1. LA HISTORIA DE LOS JUGUETES (analogía central) -->
+<!-- ================================================================ -->
+<h2>1. La historia de los juguetes</h2>
+
+<p>Imagina que tu cuarto es el lugar donde vive todo lo que quieres conseguir en tu vida. En tu cuarto hay:</p>
+
+<div class="arbol">
+📦 El cuarto (tu vida)
+   ├── 🧸 Juguetes sueltos por el suelo (tareas que haces cada día)
+   ├── 🗂️ Cajas donde guardas juguetes parecidos (metas)
+   ├── 🎯 Juguetes favoritos (las metas donde pones MÁS energía)
+   └── 📋 Listas pegadas en la pared (planes trimestrales)
+</div>
+
+<p>El truco para no vivir entre el desorden es <strong>organizarlo todo en cajas</strong>. Cada caja tiene su nombre y dentro guarda solo lo que tiene sentido junto. Eso es lo que hace esta app: te ayuda a poner cada cosa en su caja.</p>
+
+<!-- ================================================================ -->
+<!-- 2. ¿QUÉ ES UNA META? -->
+<!-- ================================================================ -->
+<h2>2. ¿Qué es una meta?</h2>
+
+<p>Una <strong>meta</strong> es una caja grande. Dentro caben muchas cosas, pero todas tienen que ver con un mismo tema.</p>
+
+<div class="caja">
+  <strong>Ejemplo:</strong> la caja se llama "Mejorar mi salud".<br>
+  Dentro van a parar todo lo relacionado con dormir mejor, hacer ejercicio, comer bien, ir al médico, etc.
+</div>
+
+<p>Una meta tiene tres cositas:</p>
+<ul>
+  <li><strong>Título:</strong> el nombre de la caja. Corto y claro. Ej: "Mejorar mi salud".</li>
+  <li><strong>Descripción:</strong> una nota pegada por fuera de la caja. Por qué te importa. Ej: "Quiero tener más energía y dormir mejor".</li>
+  <li><strong>Plazo:</strong> cuándo quieres haber avanzado. Ej: "12 meses".</li>
+</ul>
+
+<!-- ================================================================ -->
+<!-- 3. ¿QUÉ ES UN TRIMESTRE? -->
+<!-- ================================================================ -->
+<h2>3. ¿Qué es un trimestre?</h2>
+
+<p>Un año tiene 365 días. ¡Son MUCHOS! Si solo tienes la caja "Mejorar mi salud", no sabes por dónde empezar hoy.</p>
+
+<p>Por eso el año se divide en <strong>4 trimestres</strong>, como si la caja tuviera 4 compartimentos:</p>
+
+<table>
+  <tr><th>Trimestre</th><th>Meses</th><th>Piensa en él como…</th></tr>
+  <tr><td>Q1</td><td>Enero · Febrero · Marzo</td><td>El primer empujón del año.</td></tr>
+  <tr><td>Q2</td><td>Abril · Mayo · Junio</td><td>Cuando consolidas lo que empezaste.</td></tr>
+  <tr><td>Q3</td><td>Julio · Agosto · Septiembre</td><td>El verano. Sigues construyendo.</td></tr>
+  <tr><td>Q4</td><td>Octubre · Noviembre · Diciembre</td><td>La recta final. Ves los resultados.</td></tr>
+</table>
+
+<div class="caja azul">
+  <strong>Analogía del puzzle:</strong><br>
+  Una meta es el puzzle completo (1000 piezas). Cada trimestre es una sección del puzzle (4 secciones). Si solo trabajas en una sección cada 3 meses, en diciembre tendrás el puzzle entero.
+</div>
+
+<!-- ================================================================ -->
+<!-- 4. ¿QUÉ ES UN KR? (Key Result / Resultado Clave) -->
+<!-- ================================================================ -->
+<h2>4. ¿Qué es un KR (Key Result / Resultado Clave)?</h2>
+
+<p>Un KR es una <strong>pieza del puzzle</strong>. Es una cosa concreta y medible que quieres haber logrado al final del trimestre.</p>
+
+<p>Para que un KR sea bueno, tiene que cumplir <strong>3 reglas</strong>:</p>
+
+<ol>
+  <li><strong>Específico:</strong> se entiende sin ambigüedad. ❌ "Estar en forma" / ✅ "Caminar 30 min al día".</li>
+  <li><strong>Medible:</strong> puedes decir "lo he conseguido" o "no lo he conseguido". Necesita un número.</li>
+  <li><strong>Con fecha:</strong> sabes cuándo se cumple. "Antes de que acabe junio".</li>
+</ol>
+
+<div class="caja verde">
+  <strong>Ejemplo malo:</strong> "Quiero dormir mejor".<br>
+  <em>¿Cuánto es "mejor"? ¿Cuándo lo sabré?</em><br><br>
+  <strong>Ejemplo bueno:</strong> "Dormir 7 horas seguidas, 5 noches a la semana, antes de fin de Q2".<br>
+  <em>¡Claro! Puedo contarlo, sé cuándo se cumple.</em>
+</div>
+
+<p>Cada meta grande tiene entre <strong>2 y 4 KRs por trimestre</strong>. Más de eso es demasiado, menos es poco concreto.</p>
+
+<!-- ================================================================ -->
+<!-- 5. ¿QUÉ ES UNA TAREA? -->
+<!-- ================================================================ -->
+<h2>5. ¿Qué es una tarea?</h2>
+
+<p>Una tarea es una <strong>acción concreta que haces una vez</strong>: llamar al médico, comprar melatonina, dar un paseo de 15 minutos, escribir una nota.</p>
+
+<p>Las tareas son las piezas más pequeñas. Las haces <strong>hoy, mañana o esta semana</strong>. Cuando las haces todas, el KR avanza. Cuando el KR avanza, la meta avanza.</p>
+
+<!-- ================================================================ -->
+<!-- 6. HÁBITOS VS TAREAS PUNTUALES -->
+<!-- ================================================================ -->
+<h2>6. Hay dos tipos de tarea: los <strong>hábitos</strong> y las <strong>puntuales</strong></h2>
+
+<p>Se parecen pero NO son lo mismo. La app los distingue con un dibujito:</p>
+
+<table>
+  <tr>
+    <th style="width: 30%;">Tipo</th>
+    <th style="width: 20%;">Cómo se ve</th>
+    <th style="width: 50%;">Qué significa</th>
+  </tr>
+  <tr>
+    <td><strong>Hábito diario</strong></td>
+    <td>🔁 Diaria</td>
+    <td>La haces TODOS los días. Cuando la marcas como hecha, se crea una nueva automáticamente para mañana.</td>
+  </tr>
+  <tr>
+    <td><strong>Hábito semanal</strong></td>
+    <td>🗓️ L-V (o los días que elijas)</td>
+    <td>La haces solo ciertos días de la semana (p.ej. solo de lunes a viernes). Se crea una nueva cuando termina la semana.</td>
+  </tr>
+  <tr>
+    <td><strong>Hábito mensual</strong></td>
+    <td>📅 Día 1 (o el día que elijas)</td>
+    <td>La haces una vez al mes (p.ej. el día 1 de cada mes).</td>
+  </tr>
+  <tr>
+    <td><strong>Tarea puntual</strong></td>
+    <td>— (sin chip)</td>
+    <td>La haces UNA sola vez. Cuando la marcas como hecha, desaparece. No vuelve.</td>
+  </tr>
+</table>
+
+<div class="caja naranja">
+  <strong>Cómo saber cuál usar:</strong><br>
+  · Si la tarea se repite cada día/semana/mes → es un <strong>hábito</strong> (usa el chip 🔁/🗓️/📅).<br>
+  · Si solo la vas a hacer una vez en tu vida → es <strong>puntual</strong> (sin chip).<br><br>
+  <em>Pista útil:</em> si al terminarla piensas "ya no la quiero hacer más", es puntual. Si piensas "tengo que acordarme de hacerla otra vez", es un hábito.
+</div>
+
+<!-- ================================================================ -->
+<!-- 7. ¿QUÉ ES UN OKR? -->
+<!-- ================================================================ -->
+<h2>7. ¿Qué es un OKR?</h2>
+
+<p>OKR son las siglas de <strong>Objectives and Key Results</strong> (Objetivos y Resultados Clave). Es el nombre del <em>método</em> que une todo lo anterior:</p>
+
+<div class="arbol">
+📦 OKR = 1 OBJETIVO (la meta) + VARIOS KEY RESULTS (los KRs del trimestre)
+</div>
+
+<p>En tu app, cada meta con sus KRs y sus tareas forma <strong>un OKR completo</strong>. Puedes tener varios OKRs a la vez (uno por cada meta importante que tengas).</p>
+
+<div class="caja">
+  <strong>Entonces, ¿"metas" y "OKRs" son lo mismo?</strong><br>
+  Sí y no. "Meta" es la palabra de toda la vida. "OKR" es la palabra técnica del método. En esta app usamos ambas como sinónimos para referirnos a lo mismo: una caja grande con KRs y tareas dentro.
+</div>
+
+<!-- ================================================================ -->
+<!-- 8. ¿QUÉ ES UN WIG? -->
+<!-- ================================================================ -->
+<h2>8. ¿Qué es un WIG?</h2>
+
+<p>WIG son las siglas de <strong>Wildly Important Goal</strong> ("Meta Enormemente Importante"). Viene del libro <em>The 4 Disciplines of Execution</em>.</p>
+
+<p>Imagina que tienes 10 cajas en tu cuarto (10 metas). Pero tu energía y tu tiempo son limitados. <strong>No puedes avanzar las 10 a la vez.</strong></p>
+
+<p>Un WIG es la caja a la que le dedicas <strong>energía desproporcionada</strong>. La que decides empujar con más fuerza este trimestre, aunque las demás sigan ahí.</p>
+
+<div class="caja rosa">
+  <strong>La regla de oro:</strong> máximo <strong>3 WIGs</strong> a la vez.<br>
+  · Si tienes 5 candidatos, pregunta: ¿cuál, si la logras, hace irrelevantes a las otras 4? Esa es tu WIG.<br>
+  · La app te deja elegir solo 3. Si intentas marcar la 4ª, te lo bloquea. Esto es A PROPÓSITO.
+</div>
+
+<div class="caja verde">
+  <strong>Diferencia clave OKR vs WIG:</strong><br>
+  · <strong>OKR</strong> = cualquier meta con sus KRs. Puedes tener 10 OKRs.<br>
+  · <strong>WIG</strong> = las 1-3 metas donde pones el foco. Subconjunto de los OKRs.
+</div>
+
+<!-- ================================================================ -->
+<!-- 9. CÓMO SE CONECTA TODO -->
+<!-- ================================================================ -->
+<h2>9. Cómo se conecta todo (el mapa completo)</h2>
+
+<p>Pongamos un ejemplo real con la meta "Mejorar mi salud" (código M8101) en tu app:</p>
+
+<div class="arbol">🎯 META: Mejorar mi salud personal
+
+   📅 TRIMESTRE: Q2 2026 (abril-junio)
+
+      🟢 KR 1: Movimiento diario 10-15 min
+         📋 Tarea puntual: "Caminar 2 min post-desayuno"
+         📋 Tarea puntual: "Qi Gong 2 min mañana"
+         🔁 Hábito diario: "Tomar pastillas"
+
+      🟢 KR 2: Despertares < 2 por noche
+         📋 Tarea puntual: "Establecer rutina pre-cama fija"
+         🔁 Hábito diario: "Registrar nº despertares"
+
+      🟢 KR 3: Estado ánimo al despertar = Neutro
+         📋 Tarea puntual: "Pedir hora médico"
+         🔁 Hábito diario: "1 palabra ánimo al despertar"
+
+   📅 TRIMESTRE: Q3 2026 (julio-septiembre)
+      🟢 KR 4: Estrés percibido -20%
+      🟢 KR 5: 3 sesiones de relajación/semana
+      🟢 KR 6: Sueño reparador 80%
+
+   📅 TRIMESTRE: Q4 2026 (octubre-diciembre)
+      🟢 KR 7: IMC 18.5-24.9
+      🟢 KR 8: Energía 8/10
+      🟢 KR 9: Satisfacción bienestar 8/10
+</div>
+
+<p>Si haces las tareas → los KRs avanzan → la meta avanza → al final del año, tu salud ha mejorado de verdad.</p>
+
+<!-- ================================================================ -->
+<!-- 10. CÓMO SE VE EN LA APP -->
+<!-- ================================================================ -->
+<h2>10. Cómo se ve esto en la app</h2>
+
+<table>
+  <tr><th>Pantalla</th><th>Qué ves ahí</th></tr>
+  <tr>
+    <td><strong>/metas</strong></td>
+    <td>Todas tus metas como tarjetas. Cada tarjeta muestra: 📊 N KRs · M trimestres. Si es WIG, tiene un borde violeta y un chip "🎯 WIG #1" (o #2 o #3).</td>
+  </tr>
+  <tr>
+    <td><strong>/metas/plan</strong></td>
+    <td>Una cuadrícula Q1-Q4. Cada celda tiene los KRs de cada meta con un scorecard (🟢 en línea / 🟡 por debajo / 🔴 muy por debajo).</td>
+  </tr>
+  <tr>
+    <td><strong>/metas/detalle</strong></td>
+    <td>Una meta concreta. Ves sus KRs por trimestre, y dentro de cada KR sus tareas con su estado (pendiente / hecha) y si son hábitos (🔁/🗓️/📅).</td>
+  </tr>
+  <tr>
+    <td><strong>/tareas</strong></td>
+    <td>Todas las tareas en una tabla. Las puntuales salen "tal cual". Las recurrentes (hábitos) llevan un chip de color: verde (diaria), ámbar (semanal), gris (mensual).</td>
+  </tr>
+  <tr>
+    <td><strong>/tareas/inbox</strong></td>
+    <td>Tareas "huérfanas": las que no tienen meta o no tienen KR. Aquí decides a qué meta/KR pertenecen. La app intenta que esta carpeta esté casi vacía.</td>
+  </tr>
+</table>
+
+<!-- ================================================================ -->
+<!-- 11. RESUMEN EN UNA PAGINA -->
+<!-- ================================================================ -->
+<h2>11. Resumen en 30 segundos</h2>
+
+<div class="caja">
+  <strong>🎯 META</strong> = la caja grande con un tema.<br>
+  <strong>📅 TRIMESTRE</strong> = uno de los 4 compartimentos de la caja (Q1, Q2, Q3, Q4).<br>
+  <strong>🟢 KR</strong> = una pieza medible del puzzle. Tienes 2-4 por trimestre.<br>
+  <strong>📋 TAREA</strong> = una acción concreta que haces hoy/esta semana.<br>
+  <strong>📊 OKR</strong> = el nombre del método (meta + KRs + tareas). Sinónimo de "meta con plan".<br>
+  <strong>🎯 WIG</strong> = la meta a la que le pones energía desproporcionada. Máximo 3 a la vez.<br>
+  <strong>🔁 Hábito</strong> = tarea que se repite (diaria / semanal / mensual). Lleva chip.<br>
+  <strong>📋 Puntual</strong> = tarea de una sola vez. Sin chip.
+</div>
+
+<p>Si solo te quedas con una frase, quédate con esta:</p>
+
+<div class="caja verde" style="text-align: center; font-size: 13pt;">
+  <strong>"Caja grande (META) → puzzle de 4 piezas (TRIMESTRES) → cada pieza tiene 2-4 colores (KRs) → cada color se pinta con tareas (HÁBITOS o PUNTUALES). Elige 1-3 cajas para pintar con más fuerza (WIGs)."</strong>
+</div>
+
+<!-- ================================================================ -->
+<!-- 12. PREGUNTAS FRECUENTES -->
+<!-- ================================================================ -->
+<h2>12. Preguntas frecuentes</h2>
+
+<h3>¿Por qué máximo 3 WIGs y no 10?</h3>
+<p>Porque tu energía de foco es limitada (~4 horas de trabajo profundo al día). Repartirla entre 10 metas equivale a no avanzar ninguna. La concentración es lo que genera resultados reales.</p>
+
+<h3>¿Qué pasa si tengo una meta urgente que NO es WIG?</h3>
+<p>La atiendes, pero no la conviertas en WIG. Las metas urgentes se trabajan con energía reactiva (cuando toca). Las WIGs se trabajan con energía proactiva (las agendas). Mezclar las dos rompe el sistema.</p>
+
+<h3>¿Qué pasa si rompo la racha de un hábito?</h3>
+<p>Nada. La tarea se queda sin marcar y mañana hay otra instancia esperando. Los hábitos no se "rompen" en tu app: simplemente se acumulan las instancias no hechas. Decide tú si borrar las viejas o seguir.</p>
+
+<h3>¿Necesito tener KR en cada trimestre?</h3>
+<p>No. Puedes tener una meta sin KRs (está "en barbecho"). Pero entonces no podrás medir si avanzas. Lo ideal es tener al menos 1 KR en el trimestre actual.</p>
+
+<h3>¿Una tarea puede pertenecer a varios KRs?</h3>
+<p>No. Cada tarea va a UN KR concreto. Si necesitas contar la misma tarea para 2 KRs distintos, divídela en 2 tareas. Esto es por diseño: te obliga a ser específico.</p>
+
+<h3>¿Y si cambio de meta a mitad de trimestre?</h3>
+<p>Puedes. La app no te lo prohíbe. Pero recuerda la regla: cambiar de WIG cada 2 semanas significa que no tienes WIG.</p>
+
+<div class="footer-info">
+  Documento generado el 2026-10-07 desde fooday·productivity.<br>
+  Basado en los libros <em>The 4 Disciplines of Execution</em> (4DX), <em>Getting Things Done</em> (GTD) y la propia metodología documentada en /docs y /metodologia de la app.
+</div>
+
+</body>
+</html>
