@@ -35,6 +35,7 @@ import {
   IconTrash,
 } from "@/components/icons";
 import { EditarMetaModal } from "@/components/EditarMetaModal";
+import { RecurrenciaTag } from "@/components/RecurrenciaChip";
 
 const ESTADO_META: Record<string, string> = {
   sin_empezar: "bg-muted text-muted-foreground border-border",
@@ -456,6 +457,11 @@ function TareaRow({
       </button>
       <span className={`min-w-0 flex-1 ${hecha ? "text-muted-foreground line-through" : ""}`}>
         {tarea.titulo}
+        {tarea.recurrencia_tipo && (
+          <span className="ml-2 inline-flex align-middle">
+            <RecurrenciaTag tarea={tarea} />
+          </span>
+        )}
       </span>
       {tarea.prioridad && (
         <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground">

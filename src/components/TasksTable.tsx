@@ -26,6 +26,7 @@ import {
   IconX,
 } from "@/components/icons";
 import { CrearModal, EditarModal } from "./TareaModal";
+import { RecurrenciaChip } from "./RecurrenciaChip";
 import { errorMessage } from "@/lib/errors";
 
 const CAPAS = ["CAPA 1", "CAPA 2", "CAPA 3"];
@@ -594,9 +595,7 @@ export function TasksTable({
                           </span>
                         )}
                         {t.recurrencia_tipo && (
-                          <span className="rounded-full border border-border bg-background px-1.5 py-0.5 text-[10px]">
-                            🔁 {t.recurrencia_tipo}
-                          </span>
+                          <RecurrenciaChip tarea={t} />
                         )}
                         {(() => {
                           const n = adjuntosCount?.get(t.id) ?? 0;

@@ -85,12 +85,13 @@ function PanelWig({
         <div>
           <h2 className="flex items-center gap-2 text-lg font-bold tracking-tight">
             <IconTarget className="h-5 w-5 text-violet-500" />
-            Enormemente Importantes (WIG)
+            WIGs — OKR foco (máx 3)
           </h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Máximo 3 metas a la vez. La simplicidad en el número de objetivos
-            concentra la energía con la intensidad suficiente para generar
-            resultados reales.
+            Las 3 metas a las que dedicas energía desproporcionada este ciclo.
+            El resto de metas siguen activas pero sin foco — “OKR” describe la
+            fila completa (meta + KRs + tareas); “WIG” es el subconjunto
+            donde concentras la energía.
           </p>
         </div>
         <span className="rounded-full bg-violet-500/20 px-3 py-1 text-xs font-semibold tabular-nums text-violet-700 dark:text-violet-300">
@@ -231,7 +232,11 @@ export default function MetasPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Metas / OKR</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {loading ? "…" : metas.length} metas registradas.
+            {loading ? "…" : metas.length} metas ·{" "}
+            {wigs.length} marcada{wigs.length === 1 ? "" : "s"} como WIG (foco).{" "}
+            <span className="text-[11px] text-muted-foreground/80">
+              “OKR” = la fila completa (meta + KRs + tareas). “WIG” = la meta a la que le dedicas energía desproporcionada.
+            </span>
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -406,8 +411,23 @@ export default function MetasPage() {
                   </p>
                 )}
 
-                {/* Badges: ámbito + tags */}
+                {/* Mini-badge: KRs y trimestres que tiene esta meta */}
                 <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-[11px] font-medium text-violet-700 dark:text-violet-300"
+                    title={`${mp.resultados.length} resultados (KRs) repartidos en ${new Set(mp.resultados.map((r) => r.periodo.id)).size} trimestre(s)`}
+                  >
+                    📊 {mp.resultados.length} KR{mp.resultados.length === 1 ? "" : "s"} · {new Set(mp.resultados.map((r) => r.periodo.id)).size} trimestre{new Set(mp.resultados.map((r) => r.periodo.id)).size === 1 ? "" : "s"}
+                  </span>
+                  {m.es_wig && (
+                    <span className="inline-flex items-center gap-0.5 rounded-full bg-violet-500/20 px-2 py-0.5 text-[11px] font-semibold text-violet-700 dark:text-violet-300">
+                      🎯 WIG #{m.wig_orden ?? "?"}
+                    </span>
+                  )}
+                </div>
+
+                {/* Badges: ámbito + tags */}
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
                   {m.ambito && (
                     <span
                       className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${
