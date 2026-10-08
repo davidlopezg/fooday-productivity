@@ -71,6 +71,11 @@ const PILARES: Pilar[] = [
         cuerpo:
           "La meta debe ser lo suficientemente alta para motivar al cerebro a superar el sesgo del presente, pero no tan extrema que se vuelva un castigo insostenible que lleve a abandonar la autorregulación. Ajusta cada trimestre.",
       },
+      {
+        titulo: "Alcance temporal: campo plazo",
+        cuerpo:
+          "Una meta sin plazo se diluye. La app usa el campo libre plazo para decidir EN QUÉ trimestres la IA debe generar los KRs (los hitos medibles que la cumplen). Acepta Q3 2026, Q1-Q3, Q1, Q3, fin de 2026, trimestre 3… Si lo dejas vacío, se cubren los 4 trimestres por defecto. Un KR es un resultado medible (no una acción): 'medir sueño 6h/noche' lo es; 'apagar el móvil a las 23h' es la tarea dentro de él.",
+      },
     ],
   },
   {
@@ -162,7 +167,7 @@ const FEATURES: Array<{ ruta: string; proposito: string; docs: string }> = [
 
   // ── Metas y planificación ──
   { ruta: "/metas", proposito: "Cards de metas con estado y progreso + botón IA Sugerir WIGs + EditarMetaModal con botón IA Generar plan", docs: "Pilar 2 · Ritual mensual · HelpDrawer" },
-  { ruta: "/metas/nueva", proposito: "Crear meta + botón IA Generar plan (KRs+tareas+hábitos)", docs: "Pilar 2 · HelpDrawer" },
+  { ruta: "/metas/nueva", proposito: "Crear meta + botón IA Generar plan (KRs+tareas+hábitos) que respeta el campo plazo", docs: "Pilar 2 · HelpDrawer" },
   { ruta: "/metas/agente", proposito: "Agente IA: contexto libre → meta + plan trimestral completo", docs: "Pilar 2 · HelpDrawer" },
   { ruta: "/metas/plan", proposito: "Plan trimestral con scorecard de KRs + proyección", docs: "Pilar 2 · Ritual semanal (domingo) · Ritual mensual · HelpDrawer" },
   { ruta: "/plan-diario", proposito: "Estado emocional + plan diario generado por IA", docs: "Rituales §1 (mañana) · HelpDrawer" },
@@ -1452,6 +1457,38 @@ export default function DocsPage() {
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-10-11
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">Botón IA “Generar plan” respeta el campo plazo.</strong>{" "}
+              El botón “✨ Generar plan con IA” en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas/nueva</code>{" "}
+              y en el editor rápido de meta (lápiz desde{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas</code>{" "}
+              y <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas/detalle</code>)
+              ahora interpreta el campo libre{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">plazo</code>{" "}
+              y SOLO genera KRs en los trimestres que implica. Formatos aceptados:
+              {" "}<code className="rounded bg-muted px-1.5 py-0.5 text-xs">Q3</code>,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">Q3 2026</code>,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">2026-Q3</code>,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">Q1-Q3</code>,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">Q1, Q3</code>,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">fin de 2026</code>,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">trimestre 3</code>…
+              Si está vacío, fallback a los 4 trimestres. La lógica vive en la nueva función exportada{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">parsearTrimestresDePlazo()</code>{" "}
+              en <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/lib/plan.ts</code>{" "}
+              y se aplica también al{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas/agente</code>{" "}
+              (la IA propone el <code className="rounded bg-muted px-1.5 py-0.5 text-xs">meta_plazo</code> y los KRs del plan se filtran a ese plazo). Se ha añadido un hint visual en el input de plazo con los formatos soportados. Pilar 2 (“Metas específicas”) ahora incluye un punto nuevo sobre “Alcance temporal: campo plazo”, su “Cómo se aplica en la app” menciona el filtrado por plazo, y el índice FEATURES actualiza la fila de{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas/nueva</code>.
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metodologia</code>{" "}
+              §3 menciona también la regla plazo → trimestres en su aplicación de WIGs.
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
               2026-10-10
             </span>
             <span className="text-muted-foreground">
@@ -1624,6 +1661,7 @@ function AplicacionEnApp({ pilar }: { pilar: 1 | 2 | 3 | 4 | 5 }) {
       "Scorecard de KRs con proyección lineal (/metas/plan)",
       "Semáforo verde/amarillo/rojo en planes diarios",
       "Estados de meta (sin_empezar → en_progreso → completada) con feedback visible",
+      "Botón IA “Generar plan con IA” en /metas/nueva y EditarMetaModal: filtra KRs por el campo plazo (Q3, Q1-Q3, fin de 2026…) y dentro de cada KR anota las tareas y hábitos necesarios para cumplirlo",
     ],
     3: [
       "Time-blocking con 4 bloques fijos por día (/calendario)",

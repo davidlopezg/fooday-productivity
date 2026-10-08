@@ -26,6 +26,7 @@ import { useData } from "@/lib/useData";
 import {
   aplicarKrsYTareasEnMeta,
   generarPlanMetaIA,
+  parsearTrimestresDePlazo,
   type PlanMetaGenerado,
 } from "@/lib/plan";
 import { PlanMetaGeneradoPreview } from "@/components/PlanMetaGeneradoPreview";
@@ -114,6 +115,9 @@ export function EditarMetaModal({
     setErrorIa(null);
     setPlanGenerado(null);
     try {
+      // Trimestres objetivo derivados del campo libre "plazo".
+      // Si el usuario no escribió nada, el parser devuelve los 4 trimestres.
+      const trimestresObjetivo = parsearTrimestresDePlazo(plazo.trim());
       const plan = await generarPlanMetaIA(
         cfg.data.base_url,
         cfg.data.minimax_api_key,
@@ -124,6 +128,7 @@ export function EditarMetaModal({
           meta_ambito: (ambito || null) as "personal" | "profesional" | null,
           meta_plazo: plazo.trim() || null,
           trimestres_disponibles: trimestresDisponibles,
+          trimestres_objetivo: trimestresObjetivo,
           anio: anioActual,
         },
       );
@@ -303,13 +308,25 @@ export function EditarMetaModal({
                 </select>
               </label>
               <label className="block">
-                <span className="mb-1 block text-xs text-muted-foreground">Plazo</span>
+                <span className="mb-1 block text-xs text-muted-foreground">
+                  Plazo{" "}
+                  <span className="font-normal">
+                    (define en qué trimestres se generan KRs)
+                  </span>
+                </span>
                 <input
                   className={field}
                   value={plazo}
                   onChange={(e) => setPlazo(e.target.value)}
-                  placeholder="p.ej. 2026-Q3"
+                  placeholder="p.ej. Q3 2026, Q1-Q3, fin de 2026, trimestre 3…"
                 />
+                <span className="mt-1 block text-[10px] text-muted-foreground">
+                  Formatos: <code className="font-mono">Q3</code>,{" "}
+                  <code className="font-mono">Q3 2026</code>,{" "}
+                  <code className="font-mono">Q1-Q3</code>,{" "}
+                  <code className="font-mono">fin de 2026</code>… Si lo dejas
+                  vacío, se generan los 4 trimestres.
+                </span>
               </label>
               <label className="block">
                 <span className="mb-1 block text-xs text-muted-foreground">Ámbito</span>

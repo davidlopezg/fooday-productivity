@@ -76,7 +76,7 @@ const LAG_VS_LEAD: { dimension: string; lag: string; lead: string }[] = [
   },
   {
     dimension: "En la app",
-    lag: "Tabla `metas` + `periodos` + `resultados_periodo` (los KRs viven aquí, ver /metas/plan).",
+    lag: "Tabla `metas` + `periodos` + `resultados_periodo` (los KRs viven aquí, ver /metas/plan). El campo `plazo` de la meta define en cuáles trimestres la IA y el agente deben generar KRs.",
     lead: "Columna `es_wig` en `metas` (panel violeta) y en `tareas` (panel fucsia).",
   },
 ];
@@ -395,6 +395,13 @@ export default function MetodologiaPage() {
                     Hoy
                   </Link>
                   .
+                </span>
+              </li>
+              <li className="flex gap-2">
+                <span className="text-fuchsia-500">·</span>
+                <span>
+                  <strong className="text-foreground">Alcance temporal de una meta (campo <code className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono">plazo</code>).</strong>{" "}
+                  Define en qué trimestres la IA y el agente generan KRs. Formatos: <code className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono">Q3 2026</code>, <code className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono">Q1-Q3</code>, <code className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono">Q1, Q3</code>, <code className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono">fin de 2026</code>, <code className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono">trimestre 3</code>… Si lo dejas vacío, se cubren los 4 trimestres. La función <code className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono">parsearTrimestresDePlazo()</code> en <code className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono">/lib/plan.ts</code> hace el mapeo texto → trimestres.
                 </span>
               </li>
             </ul>

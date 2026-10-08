@@ -1335,6 +1335,12 @@ export type GenerarPlanMetaOpts = {
   meta_plazo?: string | null;
   /** Trimestres disponibles (1..4) con nombre legible, p.ej. ["Q1 2026", "Q2 2026", ...] */
   trimestres_disponibles: Array<{ numero: 1 | 2 | 3 | 4; nombre: string }>;
+  /** Trimestres objetivo derivados del campo `plazo`. Si se omite, se
+   *  usan TODOS los disponibles. Si se pasa, la IA generará KRs SOLO en
+   *  estos trimestres (los demás no se mencionan ni aparecen en el plan).
+   *  El caller (página /metas/nueva o EditarMetaModal) lo calcula con
+   *  `parsearTrimestresDePlazo()`. */
+  trimestres_objetivo?: Array<1 | 2 | 3 | 4>;
   anio: number;
   /** Cuántos KRs por trimestre (defecto 3). */
   krs_por_trimestre?: number;
@@ -1355,6 +1361,129 @@ export type GenerarMetaYPlanOpts = {
   krs_por_trimestre?: number;
 };
 
+// ============================================================================
+// parsearTrimestresDePlazo
+// ----------------------------------------------------------------------------
+// Interpreta el campo libre `plazo` ("Q3 2026", "Q1-Q3", "fin de 2026",
+// "trimestre 3", "12 meses", etc.) y devuelve el conjunto de trimestres
+// (1..4) a los que aplica.
+//
+// Formatos soportados:
+//   · "Q3", "Q3 2026", "2026-Q3", "T3"           → [3]
+//   · "trimestre 3"                              → [3]
+//   · "Q1-Q3", "Q1 a Q3", "Q1 al Q3", "Q1→Q3"    → [1, 2, 3]
+//   · "Q1+Q3", "Q1, Q3", "Q1 y Q3"               → [1, 3]
+//   · "primer trimestre", "principio de 2026"    → [1]
+//   · "último trimestre", "fin de 2026"          → [4]
+//   · "medio de 2026"                            → [2, 3]
+//   · "12 meses", "2026", texto libre sin Q/T   → [1, 2, 3, 4] (fallback)
+//
+// Si la entrada es null/undefined/espacios, devuelve los 4 trimestres
+// (compatibilidad con el comportamiento previo: si no hay plazo, se
+// cubren los 4 trimestres por defecto).
+// ============================================================================
+export function parsearTrimestresDePlazo(
+  plazo: string | null | undefined,
+): Array<1 | 2 | 3 | 4> {
+  if (!plazo || !plazo.trim()) return [1, 2, 3, 4];
+  // Quitamos diacríticos para que el flag `i` no se confunda con "ú" vs "u".
+  // "último" → "ultimo", "año" → "ano".
+  const t = sinAcentos(plazo.trim());
+
+  // Frases hechas (heurísticas). Orden importa: las más específicas primero.
+  // Importante: NO incluir "1 trimestre" como frase hecha — eso es solo
+  // una mención de Q1 (lo captura el recolector general más abajo).
+  if (/\b(primer|primero|primera)\s+trimestre\b/.test(t)) return [1];
+  if (/\b(ultimo|ultima)\s+trimestre\b/.test(t)) return [4];
+  if (/\b(segundo|segunda)\s+trimestre\b/.test(t)) return [2];
+  if (/\b(tercer|tercera)\s+trimestre\b/.test(t)) return [3];
+  // Ordinales explícitos: "1º trimestre", "1er trimestre", "4º trimestre".
+  // Solo se matchean si el dígito lleva un marcador ordinal detrás.
+  const ordinalMatch = t.match(/(\d+)\s*[º°o]\s*trimestre/);
+  if (ordinalMatch) {
+    const n = Number(ordinalMatch[1]);
+    if (n >= 1 && n <= 4) return [n] as Array<1 | 2 | 3 | 4>;
+  }
+  if (/\b(principio|inicio|arranque)\s+de\s+(ano|2\d{3})/.test(t)) return [1];
+  if (/\bfin\s+de\s+(ano|2\d{3})/.test(t)) return [4];
+  if (/\bmedio\s+(de|del)\s+(ano|2\d{3})/.test(t)) return [2, 3];
+
+  // Recolectar menciones individuales: Q1..Q4, T1..T4, "trimestre N"
+  const individuos = new Set<number>();
+  let mm: RegExpExecArray | null;
+  const reQt = /[qt]([1-4])/gi;
+  while ((mm = reQt.exec(t)) !== null) {
+    const n = Number(mm[1]);
+    if (n >= 1 && n <= 4) individuos.add(n);
+  }
+  const reTrim = /trimestre\s*([1-4])/gi;
+  while ((mm = reTrim.exec(t)) !== null) {
+    const n = Number(mm[1]);
+    if (n >= 1 && n <= 4) individuos.add(n);
+  }
+
+  if (individuos.size === 0) return [1, 2, 3, 4];
+
+  // Detectar rangos explícitos: "Q1-Q3", "Q1 a Q3", "Q1 al Q3", "Q1→Q3".
+  // Para trimestre: "trimestre 1 al 4", etc.
+  const rangos: Array<[number, number]> = [];
+  const reRangoQt =
+    /[qt]([1-4])\s*(?:-|a\s+|al\s+|→\s*)[qt]?([1-4])/gi;
+  while ((mm = reRangoQt.exec(t)) !== null) {
+    const a = Number(mm[1]);
+    const b = Number(mm[2]);
+    if (a >= 1 && a <= 4 && b >= 1 && b <= 4) rangos.push([a, b]);
+  }
+  const reRangoTrim =
+    /trimestre\s*([1-4])\s*(?:-|a\s+|al\s+)(?:trimestre\s*)?([1-4])/gi;
+  while ((mm = reRangoTrim.exec(t)) !== null) {
+    const a = Number(mm[1]);
+    const b = Number(mm[2]);
+    if (a >= 1 && a <= 4 && b >= 1 && b <= 4) rangos.push([a, b]);
+  }
+  // Heurística final: si hay 2+ individuos y NO hay separador explícito
+  // (+, ,, " y ", " e ") entre los dígitos, interpretamos como rango
+  // continuo. Ej: "trimestre 1 trimestre 4", "Q3 Q4 2026".
+  const tieneSeparador = /[,+]/.test(t) || /\s+[ye]\s+/.test(t);
+  if (rangos.length === 0 && individuos.size >= 2 && !tieneSeparador) {
+    const sorted = Array.from(individuos).sort((a, b) => a - b);
+    rangos.push([sorted[0], sorted[sorted.length - 1]]);
+  }
+
+  // Combinar: expandimos rangos a {min..max} y añadimos individuos que
+  // no caen dentro de ningún rango.
+  const resultado = new Set<number>();
+  for (const [a, b] of rangos) {
+    const min = Math.min(a, b);
+    const max = Math.max(a, b);
+    for (let i = min; i <= max; i++) resultado.add(i);
+  }
+  for (const x of individuos) {
+    let enRango = false;
+    for (const [a, b] of rangos) {
+      const min = Math.min(a, b);
+      const max = Math.max(a, b);
+      if (x >= min && x <= max) {
+        enRango = true;
+        break;
+      }
+    }
+    if (!enRango) resultado.add(x);
+  }
+
+  if (resultado.size === 0) return [1, 2, 3, 4];
+  return Array.from(resultado).sort((a, b) => a - b) as Array<
+    1 | 2 | 3 | 4
+  >;
+}
+
+/** Quita diacríticos para que el flag `i` no se confunda entre
+ *  "último" / "ultimo" o "año" / "ano". Se aplica sobre la copia
+ *  local, no toca el input original. */
+function sinAcentos(s: string): string {
+  return s.normalize("NFD").replace(/\p{Diacritic}/gu, "");
+}
+
 export type MetaYPlanGenerado = {
   meta_titulo: string;
   meta_descripcion: string;
@@ -1369,11 +1498,29 @@ function buildPromptPlanMeta(opts: GenerarPlanMetaOpts): string {
   const desc = opts.meta_descripcion?.trim() || "(sin descripción)";
   const ambito = opts.meta_ambito || "(sin clasificar)";
   const plazo = opts.meta_plazo?.trim() || "(sin plazo concreto)";
-  const trimestres = opts.trimestres_disponibles
-    .map((t) => `  - Q${t.numero} (${t.nombre})`)
-    .join("\n");
 
-  return `Eres un coach de OKR para David López. Tu trabajo: dado el contexto de una meta, generar el plan trimestral COMPLETO: KRs por trimestre + tareas concretas para cada KR.
+  // Regla de plazo: si el caller pasó `trimestres_objetivo`, FILTRAMOS los
+  // trimestres disponibles a ese subconjunto. La IA sólo verá y deberá
+  // rellenar estos. Si el caller no pasó nada (plazo vacío/no interpretable),
+  // se mantienen los 4 trimestres como antes.
+  let trimestresVisibles = opts.trimestres_disponibles;
+  if (opts.trimestres_objetivo && opts.trimestres_objetivo.length > 0) {
+    const nums = new Set<number>(opts.trimestres_objetivo);
+    trimestresVisibles = opts.trimestres_disponibles.filter((t) =>
+      nums.has(t.numero),
+    );
+  }
+  const trimestresStr =
+    trimestresVisibles.length > 0
+      ? trimestresVisibles
+          .map((t) => `  - Q${t.numero} (${t.nombre})`)
+          .join("\n")
+      : "  (ninguno — revisa el formato del campo 'plazo')";
+
+  const hayFiltro =
+    !!opts.trimestres_objetivo && opts.trimestres_objetivo.length > 0;
+
+  return `Eres un coach de OKR para David López. Tu trabajo: dado el contexto de una meta, generar el plan trimestral COMPLETO: KRs por trimestre + tareas/hábitos dentro de cada KR.
 
 META DE DAVID:
   Título: ${opts.meta_titulo}
@@ -1382,16 +1529,21 @@ META DE DAVID:
   Plazo: ${plazo}
   Año: ${opts.anio}
 
-TRIMESTRES DISPONIBLES (estos son los compartimentos reales de la BD, NO inventes otros):
-${trimestres}
+TRIMESTRES OBJETIVO${
+    hayFiltro
+      ? " (los únicos donde esta meta aplica — derivan del campo 'plazo' arriba; NO generes nada fuera de esta lista)"
+      : " (todos los del año actual)"
+  }:
+${trimestresStr}
 
 ==========
 REGLAS (lelas 2 veces antes de generar)
 ==========
-1. Solo puedes usar los trimestres listados arriba. Cada KR va a UN trimestre con su número correcto.
-2. Genera EXACTAMENTE ${krsXTrim} KRs por trimestre. Más de eso satura; menos de eso es vago.
-3. Cada KR debe tener 2-4 tareas. Una tarea = una acción concreta observable. Si no se puede hacer en 2 minutos sin ambigüedad, no es tarea — es un proyecto.
-5. Mezcla: ~30% de las tareas deben ser HABITOS (recurrencia_tipo no nulo) y ~70% tareas PUNTUALES (recurrencia_tipo null). Los hábitos son cosas que David repite (meditar, caminar, registrar, tomar pastillas, etc.).
+0. ${hayFiltro ? "REGLA DE PLAZO (CRÍTICA): SOLO puedes crear KRs dentro de los trimestres listados arriba. Si el plazo es 'Q3 2026', NO generes KRs en Q1/Q2/Q4. Los demás trimestres quedan vacíos." : "Por defecto se generan los 4 trimestres del año. Si esto no encaja con la meta (ej: meta de un solo trimestre), el caller habrá recortado la lista de arriba."}
+1. Cada KR = un HITO MEDIBLE que, si se cumple, demuestra que la meta avanza / se alcanza. Redacta los KRs como "lo que tiene que ocurrir para considerar esta meta lograda".
+2. Genera EXACTAMENTE ${krsXTrim} KRs por trimestre listado. Más satura, menos es vago.
+3. DENTRO de cada KR, añade 2-4 tareas concretas. Una tarea = una acción que se hace en ≤2 minutos de leerla sin ambigüedad. Si no se puede, es un proyecto, no una tarea.
+5. Mezcla ~30% HABITOS (recurrencia_tipo no nulo) y ~70% tareas PUNTUALES (null). Los hábitos son cosas que David repite (meditar, caminar, registrar, tomar pastillas, etc.).
 6. Para cada tarea incluye:
    - titulo: imperativo, ≤80 caracteres. Empieza con verbo.
    - prioridad: una de "critica" | "alta" | "media" | "baja".
@@ -1733,10 +1885,11 @@ CÓMO DEBES TRABAJAR (lelo 2 veces antes de escribir)
 2. SEGUNDO: redacta un título de meta CORTO (≤80 chars), en imperativo o infinitivo, que David pueda usar tal cual. Ej: "Mejorar el sueño y la energía matutina".
 3. TERCERO: redacta una descripción (≤500 chars) que mencione el "por qué" — qué le importa, qué quiere sentir/medir al final.
 4. CUARTO: elige un ámbito ("personal" o "profesional") coherente con el texto.
-5. QUINTO: genera el plan con EXACTAMENTE ${krsXTrim} KRs por trimestre. Cada KR con 2-4 tareas concretas.
-6. Las tareas: ~30% hábitos (recurrencia_tipo no nulo) y ~70% puntuales (null).
-7. Respeta las restricciones duras: si David dice "no puedo correr por la espalda", las tareas NO incluyen correr.
-8. Idioma: SIEMPRE español de España (tuteo).
+5. QUINTO: deduce un PLAZO concreto (ej. "Q3 2026", "Q1-Q3 2026", "fin de 2026") y devuélvelo en \`meta_plazo\`. La app FILTRA automáticamente los KRs para que sólo vivan en esos trimestres.
+6. SEXTO: genera el plan con EXACTAMENTE ${krsXTrim} KRs SOLO en los trimestres que implica tu \`meta_plazo\`. NO rellenes los demás trimestres aunque estén en la lista de disponibles. Cada KR con 2-4 tareas concretas.
+7. Las tareas: ~30% hábitos (recurrencia_tipo no nulo) y ~70% puntuales (null).
+8. Respeta las restricciones duras: si David dice "no puedo correr por la espalda", las tareas NO incluyen correr.
+9. Idioma: SIEMPRE español de España (tuteo).
 
 Responde SOLO con JSON válido con esta forma EXACTA:
 
@@ -1808,8 +1961,17 @@ export async function generarMetaYPlanIA(
 
   // Saneamos los KRs en UNA llamada (sin pasar otra vez por la IA).
   const krs = saneKrsFromParsed(parsed?.krs, opts.trimestres_disponibles);
+
+  // Regla de plazo: la IA propone meta_plazo en su respuesta. Aplicamos
+  // el mismo parser que en /metas/nueva para FILTRAR los KRs a los
+  // trimestres que el propio agente declara como objetivo. Si el agente
+  // no puso plazo, mantenemos los 4 trimestres.
+  const trimestresObjetivo = parsearTrimestresDePlazo(meta_plazo);
+  const setNumeros = new Set<number>(trimestresObjetivo);
+  const krsFiltrados = krs.filter((k) => setNumeros.has(k.trimestre));
+
   const trimestres_usados: Array<1 | 2 | 3 | 4> = Array.from(
-    new Set(krs.map((k) => k.trimestre)),
+    new Set(krsFiltrados.map((k) => k.trimestre)),
   ).sort((a, b) => a - b) as Array<1 | 2 | 3 | 4>;
 
   return {
@@ -1817,7 +1979,7 @@ export async function generarMetaYPlanIA(
     meta_descripcion,
     meta_ambito,
     meta_plazo,
-    plan: { trimestres_usados, krs, prompt_usado: prompt },
+    plan: { trimestres_usados, krs: krsFiltrados, prompt_usado: prompt },
     prompt_usado: prompt,
   };
 }
