@@ -259,9 +259,20 @@ async function llamarLLM<T>(
     body.response_format = { type: "json_object" };
   }
 
-  // Timeout de 45s para no colgarse si la API no responde
+  // Timeout de 45s para no colgarse si la API no responde.
+  // Le pasamos un Error como `reason` para que el AbortError resultante
+  // lleve un mensaje útil en lugar del genérico
+  // "signal is aborted without reason" que mostraba la UI tal cual.
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 45_000);
+  const timeoutId = setTimeout(
+    () =>
+      controller.abort(
+        new Error(
+          "La IA no respondió a tiempo (más de 45s). Vuelve a intentarlo.",
+        ),
+      ),
+    45_000,
+  );
   try {
     const res = await fetch(endpoint(baseUrl), {
       method: "POST",
@@ -289,6 +300,22 @@ async function llamarLLM<T>(
       const json = extractFirstJSON(content);
       return JSON.parse(saneadorComun(json));
     }
+  } catch (e) {
+    // AbortError puede venir de dos sitios:
+    //   1) Nuestro timeout de 45s: el `abort(reason)` de arriba le inyecta
+    //      un Error con mensaje útil → lo re-lanzamos tal cual.
+    //   2) Abort externo (componente desmontado, navegación, regenerar
+    //      rápido, signal del caller): `reason` es undefined → mostramos
+    //      mensaje amable en lugar del críptico "signal is aborted
+    //      without reason".
+    if (e instanceof Error && e.name === "AbortError") {
+      const reason = (e as Error & { cause?: unknown }).cause;
+      if (reason instanceof Error && reason.message) throw reason;
+      throw new Error(
+        "La petición a la IA fue cancelada (navegación o regeneración). Reintenta.",
+      );
+    }
+    throw e;
   } finally {
     clearTimeout(timeoutId);
   }
