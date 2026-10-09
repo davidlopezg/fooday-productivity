@@ -43,6 +43,7 @@ const QUICK_ITEMS: NavItem[] = [
 // Bloque 2 — Dirección y Planificación Estratégica
 const STRATEGY_ITEMS: NavItem[] = [
   { href: "/norte", label: "Norte", Icon: IconCompass },
+  { href: "/agente", label: "Agente", Icon: IconSparkles },
   { href: "/metas", label: "Metas", Icon: IconTarget },
   { href: "/metas/plan", label: "Plan trimestral", Icon: IconCalendar },
   { href: "/proyectos", label: "Proyectos", Icon: IconFolder },

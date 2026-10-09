@@ -2,14 +2,14 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { fetchProyectosConConteo, fetchTareas } from "@/lib/queries";
+import { fetchAreas, fetchProyectosConConteo, fetchTareas } from "@/lib/queries";
 import {
   archivarProyecto,
   crearProyecto,
   eliminarProyecto,
 } from "@/lib/mutations";
 import { useData } from "@/lib/useData";
-import type { Proyecto, Tarea } from "@/lib/types";
+import type { Area, Proyecto, Tarea } from "@/lib/types";
 import { IconArchive, IconTrash, IconX } from "@/components/icons";
 
 type ProyectoConConteo = Proyecto & {
@@ -27,10 +27,12 @@ export default function ProyectosPage() {
   // adicional a /tareas y agrupamos en cliente. Mantenemos la página
   // liviana sin tocar la RPC de proyectos).
   const { data: tareas } = useData<Tarea[]>(() => fetchTareas(), []);
+  const { data: areas } = useData<Area[]>(fetchAreas, []);
 
   const [mostrarForm, setMostrarForm] = useState(false);
   const [nombre, setNombre] = useState("");
   const [color, setColor] = useState("#64748b");
+  const [areaId, setAreaId] = useState<string>("");
   const [desc, setDesc] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [errForm, setErrForm] = useState<string | null>(null);
@@ -43,10 +45,11 @@ export default function ProyectosPage() {
     setGuardando(true);
     setErrForm(null);
     try {
-      await crearProyecto({ nombre, color, descripcion: desc || null });
+      await crearProyecto({ nombre, color, descripcion: desc || null, area_id: areaId || null });
       setNombre("");
       setDesc("");
       setColor("#64748b");
+      setAreaId("");
       setMostrarForm(false);
       await reload();
     } catch (e) {
@@ -121,6 +124,21 @@ export default function ProyectosPage() {
                 onChange={(e) => setColor(e.target.value)}
                 className="h-10 w-full rounded-md border border-input bg-background px-1 outline-none focus:ring-2 focus:ring-ring"
               />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium">Área</label>
+              <select
+                value={areaId}
+                onChange={(e) => setAreaId(e.target.value)}
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="">— Sin área —</option>
+                {areas.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.nombre}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
           <div className="mt-3 space-y-1">

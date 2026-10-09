@@ -1223,6 +1223,7 @@ export async function crearProyecto(datos: {
   nombre: string;
   color?: string;
   descripcion?: string | null;
+  area_id?: string | null;
 }): Promise<Proyecto> {
   const supabase = createClient();
   const { data, error } = await supabase
@@ -1231,8 +1232,9 @@ export async function crearProyecto(datos: {
       nombre: datos.nombre.trim(),
       color: datos.color ?? "#64748b",
       descripcion: datos.descripcion?.trim() ?? null,
+      area_id: datos.area_id ?? null,
     })
-    .select("id,nombre,color,descripcion,orden,archivado")
+    .select("id,nombre,color,descripcion,orden,archivado,area_id")
     .single();
   if (error || !data) throw new Error(`No se pudo crear el proyecto: ${error?.message}`);
   return data as Proyecto;
@@ -1549,6 +1551,10 @@ export async function crearMeta(datos: {
   plazo?: string | null;
   ambito?: Meta["ambito"];
   tags?: string[];
+  proyecto_id?: string | null;
+  fecha_objetivo?: string | null;
+  contexto?: string | null;
+  situacion_actual?: string | null;
 }): Promise<Meta> {
   const { data, error } = await createClient()
     .from("metas")
@@ -1562,6 +1568,10 @@ export async function crearMeta(datos: {
       plazo: datos.plazo?.trim() || null,
       ambito: datos.ambito ?? null,
       tags: datos.tags ?? [],
+      proyecto_id: datos.proyecto_id ?? null,
+      fecha_objetivo: datos.fecha_objetivo ?? null,
+      contexto: datos.contexto?.trim() || null,
+      situacion_actual: datos.situacion_actual?.trim() || null,
     })
     .select("*")
     .single();
@@ -1571,7 +1581,10 @@ export async function crearMeta(datos: {
 
 export async function actualizarMeta(
   id: string,
-  campos: Partial<Pick<Meta, "titulo" | "descripcion" | "estado" | "prioridad" | "area_id" | "plazo" | "ambito" | "tags">>,
+  campos: Partial<Pick<Meta,
+    "titulo" | "descripcion" | "estado" | "prioridad" | "area_id" | "plazo" | "ambito" | "tags"
+    | "proyecto_id" | "fecha_objetivo" | "contexto" | "situacion_actual"
+  >>,
 ): Promise<void> {
   const { error } = await createClient()
     .from("metas")

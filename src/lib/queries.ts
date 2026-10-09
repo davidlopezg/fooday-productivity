@@ -573,7 +573,7 @@ export async function fetchSubtareasHechas(
 export async function fetchProyectos(opts?: { includeArchivados?: boolean }): Promise<Proyecto[]> {
   let q = createClient()
     .from("proyectos")
-    .select("id,nombre,color,descripcion,orden,archivado")
+    .select("id,nombre,color,descripcion,orden,archivado,area_id")
     .order("orden")
     .order("nombre");
   if (!opts?.includeArchivados) q = q.eq("archivado", false);
@@ -586,7 +586,7 @@ export async function fetchProyectos(opts?: { includeArchivados?: boolean }): Pr
 export async function fetchProyectosConConteo(): Promise<Array<Proyecto & { total_tareas: number; tareas_hechas: number }>> {
   const supabase = createClient();
   const [proyectosRes, tareasRes] = await Promise.all([
-    supabase.from("proyectos").select("id,nombre,color,descripcion,orden,archivado").order("orden"),
+    supabase.from("proyectos").select("id,nombre,color,descripcion,orden,archivado,area_id").order("orden"),
     supabase.from("tareas").select("proyecto_id,estado").not("proyecto_id", "is", null),
   ]);
   if (proyectosRes.error) throw proyectosRes.error;

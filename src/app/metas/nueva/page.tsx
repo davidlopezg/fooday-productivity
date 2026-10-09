@@ -7,7 +7,7 @@ import {
   crearMeta,
   ensurePeriodosAnio,
 } from "@/lib/mutations";
-import { fetchAreas, fetchPeriodos } from "@/lib/queries";
+import { fetchAreas, fetchPeriodos, fetchProyectos } from "@/lib/queries";
 import { useConfig } from "@/lib/configStore";
 import { useData } from "@/lib/useData";
 import {
@@ -17,7 +17,7 @@ import {
   type PlanMetaGenerado,
 } from "@/lib/plan";
 import { PlanMetaGeneradoPreview } from "@/components/PlanMetaGeneradoPreview";
-import type { AmbitoMeta, Area, Periodo } from "@/lib/types";
+import type { AmbitoMeta, Area, Periodo, Proyecto } from "@/lib/types";
 import { IconSparkles, IconX } from "@/components/icons";
 
 const ESTADOS = [
@@ -38,6 +38,7 @@ export default function NuevaMetaPage() {
   const cfg = useConfig();
   const { data: areas } = useData<Area[]>(fetchAreas, []);
   const { data: periodos } = useData<Periodo[]>(fetchPeriodos, []);
+  const { data: proyectos } = useData<Proyecto[]>(() => fetchProyectos(), []);
   const anioActual = new Date().getFullYear();
 
   const trimestresDisponibles = (periodos ?? [])
@@ -53,6 +54,11 @@ export default function NuevaMetaPage() {
   const [areaId, setAreaId] = useState<string>("");
   const [ambito, setAmbito] = useState<AmbitoMeta | "">("");
   const [tags, setTags] = useState("");
+  // Migration 0024: proyecto + fecha objetivo + contexto + situación actual.
+  const [proyectoId, setProyectoId] = useState<string>("");
+  const [fechaObjetivo, setFechaObjetivo] = useState<string>("");
+  const [contexto, setContexto] = useState("");
+  const [situacionActual, setSituacionActual] = useState("");
   const [autoTrimestres, setAutoTrimestres] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -84,6 +90,10 @@ export default function NuevaMetaPage() {
           .split(",")
           .map((t) => t.trim().replace(/^#/, ""))
           .filter(Boolean),
+        proyecto_id: proyectoId || null,
+        fecha_objetivo: fechaObjetivo || null,
+        contexto: contexto.trim() || null,
+        situacion_actual: situacionActual.trim() || null,
       });
       if (autoTrimestres) {
         // Mejor esfuerzo: si falla, no bloquea la creación de la meta.
@@ -174,6 +184,10 @@ export default function NuevaMetaPage() {
           .split(",")
           .map((t) => t.trim().replace(/^#/, ""))
           .filter(Boolean),
+        proyecto_id: proyectoId || null,
+        fecha_objetivo: fechaObjetivo || null,
+        contexto: contexto.trim() || null,
+        situacion_actual: situacionActual.trim() || null,
       });
 
       // Materializar el plan (KRs + tareas) — helper compartido con
@@ -332,6 +346,79 @@ export default function NuevaMetaPage() {
             />
           </label>
         </div>
+
+        {/* === Migration 0024: proyecto + fecha objetivo + contexto. === */}
+        <details className="mt-4 rounded-md border border-border bg-muted/20 px-3 py-2">
+          <summary className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground">
+            Clasificación y contexto (ayuda al agente)
+          </summary>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium">
+                Proyecto
+                <span className="ml-1 font-normal text-muted-foreground">
+                  (si pertenece a uno)
+                </span>
+              </span>
+              <select
+                className={field}
+                value={proyectoId}
+                onChange={(e) => setProyectoId(e.target.value)}
+              >
+                <option value="">— Sin proyecto —</option>
+                {proyectos.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nombre}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium">
+                Fecha objetivo
+                <span className="ml-1 font-normal text-muted-foreground">
+                  (la propondrá el agente)
+                </span>
+              </span>
+              <input
+                type="date"
+                className={field}
+                value={fechaObjetivo}
+                onChange={(e) => setFechaObjetivo(e.target.value)}
+              />
+            </label>
+            <label className="block sm:col-span-2">
+              <span className="mb-1 block text-xs font-medium">
+                Contexto
+                <span className="ml-1 font-normal text-muted-foreground">
+                  (lo que rodea esta meta)
+                </span>
+              </span>
+              <textarea
+                rows={2}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+                value={contexto}
+                onChange={(e) => setContexto(e.target.value)}
+                placeholder="p.ej. Lanzamiento v1 antes del verano. Equipo de 2, presupuesto limitado."
+              />
+            </label>
+            <label className="block sm:col-span-2">
+              <span className="mb-1 block text-xs font-medium">
+                Situación actual
+                <span className="ml-1 font-normal text-muted-foreground">
+                  (dónde estoy hoy con esta meta)
+                </span>
+              </span>
+              <textarea
+                rows={2}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+                value={situacionActual}
+                onChange={(e) => setSituacionActual(e.target.value)}
+                placeholder="p.ej. MVP técnico listo, falta onboarding y pasarela de pago."
+              />
+            </label>
+          </div>
+        </details>
 
         <label className="mt-4 flex items-start gap-2 text-sm">
           <input

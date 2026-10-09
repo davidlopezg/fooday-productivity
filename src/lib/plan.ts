@@ -2133,3 +2133,242 @@ export async function sugerirWigsIA(
 
   return { sugerencias, prompt_usado: prompt };
 }
+
+// ============================================================================
+// Clasificador + generador de PROYECTO a partir de un contexto libre.
+// ----------------------------------------------------------------------------
+// El usuario pega en lenguaje natural lo que tiene en la cabeza. La IA
+// decide si es un PROYECTO (agrupa varias metas) o una META aislada, y
+// propone el nombre + descripción + área + 2-4 metas hijas con su KR
+// inicial cada una y la fecha objetivo que sugiere.
+//
+// Pensado para /agente — el flujo unificado que sustituye a /metas/agente.
+// El humano revisa, ajusta y aplica. El estado de la meta NO se modifica.
+// ============================================================================
+
+export type Clasificacion = "proyecto" | "meta" | "captura";
+
+export type MetaHijaGenerada = {
+  meta_titulo: string;
+  meta_descripcion: string;
+  meta_ambito: "personal" | "profesional" | null;
+  meta_plazo: string | null;
+  fecha_objetivo: string | null;       // YYYY-MM-DD
+  contexto: string | null;
+  kr_inicial: {
+    trimestre: 1 | 2 | 3 | 4;
+    titulo: string;
+    metrica: string | null;
+    valor_objetivo: number | null;
+    unidad: string | null;
+  } | null;
+};
+
+export type ResultadoClasificador = {
+  clasificacion: Clasificacion;
+  razon_clasificacion: string;
+  /** Área sugerida por nombre (la resuelve el cliente contra fetchAreas). */
+  area_nombre: string | null;
+  /** Si clasificacion === "proyecto" */
+  proyecto?: {
+    nombre: string;
+    descripcion: string;
+    color: string;
+  };
+  /** Metas hijas (1 si era meta aislada, 2-4 si era proyecto). */
+  metas: MetaHijaGenerada[];
+  prompt_usado: string;
+};
+
+export type ClasificarOpts = {
+  contexto: string;
+  restricciones?: string[];
+  areasExistentes?: string[]; // nombres de áreas ya creadas (para sugerir la correcta)
+};
+
+function buildPromptClasificador(opts: ClasificarOpts): string {
+  const restricciones = (opts.restricciones ?? []).join("; ") || "(ninguna explícita)";
+  const areas = (opts.areasExistentes ?? []).join(", ") || "(ninguna creada todavía)";
+  return `Eres un coach de productividad para David López. Tu trabajo: leer un texto libre en primera persona y decidir si lo que David cuenta es:
+
+  (a) PROYECTO  → una iniciativa que agrupa 2-4 metas relacionadas dentro de un área.
+                   Ej: "Quiero lanzar la v1 de Sol de Nit" → proyecto con metas de producto, marketing, contratación.
+  (b) META      → un resultado concreto con plazo, sin necesidad de descomponerlo.
+                   Ej: "Quiero dormir mejor y levantarme con energía" → una sola meta, no varias.
+  (c) CAPTURA   → una idea suelta, un vago deseo, un disparate. NO es accionable.
+                   Ej: "Algún día quiero viajar a Japón" → captura.
+
+Después de clasificar, devuelves la propuesta estructurada.
+
+==========
+LO QUE DAVID CUENTA (en sus palabras)
+==========
+${opts.contexto}
+
+==========
+RESTRICCIONES DURAS (respétalas ABSOLUTAMENTE)
+==========
+${restricciones}
+
+==========
+ÁREAS QUE DAVID YA TIENE CREADAS
+==========
+${areas}
+(usa el nombre EXACTO de una de estas si encaja; si no, propón un nombre corto nuevo)
+
+==========
+CÓMO DEBES TRABAJAR (lelo 2 veces antes de escribir)
+==========
+1. Clasifica PRIMERO entre las 3 opciones. Justifica en UNA frase corta.
+2. Si es PROYECTO: propón nombre del proyecto + 2-4 metas hijas. Cada meta hija con su KR inicial (un único KR medible, no varios) y su fecha objetivo estimada.
+3. Si es META: devuelve UNA sola meta con su KR inicial y su fecha objetivo.
+4. Si es CAPTURA: no propongas nada (metas = []).
+5. Para fecha_objetivo: razona en función del plazo implícito. Si David dice "antes de septiembre 2026" y estamos en Q1 2026, pon "2026-09-30" o "2026-08-31". Si dice "en 6 meses", calcula desde hoy.
+6. Las metas hijas deben ser ACCIÓN CONCRETA, no etiquetas. "Marketing" NO es meta; "Publicar en 3 medios especializados antes del lanzamiento" SÍ.
+7. Idioma: SIEMPRE español de España (tuteo).
+
+Responde SOLO con JSON válido con esta forma EXACTA:
+
+{
+  "clasificacion": "proyecto" | "meta" | "captura",
+  "razon_clasificacion": "Una frase de menos de 200 chars justificando",
+  "area_nombre": "Nombre del área sugerida (o null si captura)",
+  "proyecto": {  // solo si clasificacion === "proyecto"
+    "nombre": "≤80 chars, imperativo o infinitivo",
+    "descripcion": "≤400 chars, el por qué",
+    "color": "#hex color (uno de la paleta: #64748b #6366f1 #8b5cf6 #ec4899 #f59e0b #10b981 #ef4444)"
+  },
+  "metas": [
+    {
+      "meta_titulo": "≤80 chars",
+      "meta_descripcion": "≤400 chars",
+      "meta_ambito": "personal" | "profesional",
+      "meta_plazo": "Q3 2026 / fin de 2026 / etc. (texto libre)",
+      "fecha_objetivo": "YYYY-MM-DD",
+      "contexto": "≤400 chars (qué rodea a esta meta)",
+      "kr_inicial": {
+        "trimestre": 1,
+        "titulo": "KR medible, ≤100 chars",
+        "metrica": "nombre corto de la métrica o null",
+        "valor_objetivo": 0,
+        "unidad": "unidad o null"
+      }
+    }
+  ]
+}
+`;
+}
+
+export async function clasificarYGenerarIA(
+  baseUrl: string,
+  apiKey: string,
+  model: string,
+  opts: ClasificarOpts,
+): Promise<ResultadoClasificador> {
+  const prompt = buildPromptClasificador(opts);
+  const parsed = await llamarLLM<{
+    clasificacion?: unknown;
+    razon_clasificacion?: unknown;
+    area_nombre?: unknown;
+    proyecto?: { nombre?: unknown; descripcion?: unknown; color?: unknown };
+    metas?: Array<{
+      meta_titulo?: unknown;
+      meta_descripcion?: unknown;
+      meta_ambito?: unknown;
+      meta_plazo?: unknown;
+      fecha_objetivo?: unknown;
+      contexto?: unknown;
+      kr_inicial?: {
+        trimestre?: unknown;
+        titulo?: unknown;
+        metrica?: unknown;
+        valor_objetivo?: unknown;
+        unidad?: unknown;
+      };
+    }>;
+  }>(
+    baseUrl,
+    apiKey,
+    model,
+    "Respondes SOLO con JSON válido, sin texto adicional.",
+    prompt,
+    true,
+  );
+
+  const clasRaw = String(parsed?.clasificacion ?? "").toLowerCase().trim();
+  const clasificacion: Clasificacion =
+    clasRaw === "proyecto" || clasRaw === "meta" || clasRaw === "captura"
+      ? (clasRaw as Clasificacion)
+      : "captura";
+
+  const razon_clasificacion = String(parsed?.razon_clasificacion ?? "").trim().slice(0, 240);
+  const area_nombre = String(parsed?.area_nombre ?? "").trim().slice(0, 80) || null;
+
+  let proyecto: ResultadoClasificador["proyecto"];
+  if (clasificacion === "proyecto" && parsed?.proyecto) {
+    const p = parsed.proyecto;
+    proyecto = {
+      nombre: String(p.nombre ?? "").trim().slice(0, 120) || "(sin nombre)",
+      descripcion: String(p.descripcion ?? "").trim().slice(0, 600),
+      color: String(p.color ?? "#6366f1").trim() || "#6366f1",
+    };
+  }
+
+  const metas: MetaHijaGenerada[] = (Array.isArray(parsed?.metas) ? parsed.metas : [])
+    .map((m) => {
+      const meta_titulo = String(m?.meta_titulo ?? "").trim().slice(0, 200);
+      if (!meta_titulo) return null;
+      const ambRaw = String(m?.meta_ambito ?? "").toLowerCase().trim();
+      const meta_ambito: "personal" | "profesional" | null =
+        ambRaw === "personal" || ambRaw === "profesional"
+          ? (ambRaw as "personal" | "profesional")
+          : null;
+      const kr = m?.kr_inicial;
+      const trimestreRaw = Number(kr?.trimestre ?? 1);
+      const trimestre = (
+        trimestreRaw >= 1 && trimestreRaw <= 4 ? Math.floor(trimestreRaw) : 1
+      ) as 1 | 2 | 3 | 4;
+      return {
+        meta_titulo,
+        meta_descripcion: String(m?.meta_descripcion ?? "").trim().slice(0, 600),
+        meta_ambito,
+        meta_plazo: String(m?.meta_plazo ?? "").trim().slice(0, 80) || null,
+        fecha_objetivo: String(m?.fecha_objetivo ?? "").trim().match(/^\d{4}-\d{2}-\d{2}$/)
+          ? String(m?.fecha_objetivo).trim()
+          : null,
+        contexto: String(m?.contexto ?? "").trim().slice(0, 600) || null,
+        kr_inicial: kr
+          ? {
+              trimestre,
+              titulo: String(kr.titulo ?? "").trim().slice(0, 200) || "(KR sin título)",
+              metrica: String(kr.metrica ?? "").trim().slice(0, 80) || null,
+              valor_objetivo:
+                typeof kr.valor_objetivo === "number" ? kr.valor_objetivo : null,
+              unidad: String(kr.unidad ?? "").trim().slice(0, 30) || null,
+            }
+          : null,
+      } as MetaHijaGenerada;
+    })
+    .filter((m): m is MetaHijaGenerada => m !== null);
+
+  // Invariantes: si es proyecto, al menos 2 metas; si es meta, 1; si es captura, 0.
+  if (clasificacion === "proyecto" && metas.length < 2) {
+    throw new Error(
+      "La IA clasificó esto como proyecto pero devolvió menos de 2 metas. Reformula el contexto con más detalle.",
+    );
+  }
+  if (clasificacion === "meta" && metas.length === 0) {
+    throw new Error(
+      "La IA clasificó esto como meta pero no devolvió ninguna. Reformula el contexto.",
+    );
+  }
+
+  return {
+    clasificacion,
+    razon_clasificacion,
+    area_nombre,
+    proyecto,
+    metas,
+    prompt_usado: prompt,
+  };
+}

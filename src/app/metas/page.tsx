@@ -330,11 +330,19 @@ export default function MetasPage() {
             {sugiriendo ? "Pensando…" : "Sugerir 3 WIGs"}
           </button>
           <Link
-            href="/metas/agente"
+            href="/agente"
             className="inline-flex items-center gap-1.5 rounded-md border border-violet-500/40 bg-card px-3 py-2 text-sm font-medium text-violet-700 hover:bg-violet-500/10 dark:text-violet-300"
           >
             <IconSparkles className="h-4 w-4" />
             Agente
+          </Link>
+          <Link
+            href="/metas/auditoria"
+            className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/40 bg-card px-3 py-2 text-sm font-medium text-amber-700 hover:bg-amber-500/10 dark:text-amber-300"
+            title="Ver qué metas les falta contexto, proyecto, fecha objetivo…"
+          >
+            <IconSparkles className="h-4 w-4" />
+            Auditoría
           </Link>
           <Link
             href="/tareas/inbox"

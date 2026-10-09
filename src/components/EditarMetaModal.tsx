@@ -20,7 +20,7 @@
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { actualizarMeta, ensurePeriodosAnio } from "@/lib/mutations";
-import { fetchAreas, fetchPeriodos } from "@/lib/queries";
+import { fetchAreas, fetchPeriodos, fetchProyectos } from "@/lib/queries";
 import { useConfig } from "@/lib/configStore";
 import { useData } from "@/lib/useData";
 import {
@@ -36,6 +36,7 @@ import type {
   Meta,
   Periodo,
   Prioridad,
+  Proyecto,
 } from "@/lib/types";
 import { IconPencil, IconSparkles, IconX } from "@/components/icons";
 
@@ -67,6 +68,7 @@ export function EditarMetaModal({
   const cfg = useConfig();
   const { data: areas } = useData<Area[]>(fetchAreas, []);
   const { data: periodos } = useData<Periodo[]>(fetchPeriodos, []);
+  const { data: proyectos } = useData<Proyecto[]>(() => fetchProyectos(), []);
   const anioActual = new Date().getFullYear();
 
   const [titulo, setTitulo] = useState(meta.titulo);
@@ -79,6 +81,11 @@ export function EditarMetaModal({
   const [plazo, setPlazo] = useState(meta.plazo ?? "");
   const [ambito, setAmbito] = useState<AmbitoMeta | "">(meta.ambito ?? "");
   const [tagsInput, setTagsInput] = useState<string>((meta.tags ?? []).join(", "));
+  // Migration 0024: proyecto + fecha objetivo + contexto + situación actual.
+  const [proyectoId, setProyectoId] = useState<string>(meta.proyecto_id ?? "");
+  const [fechaObjetivo, setFechaObjetivo] = useState<string>(meta.fecha_objetivo ?? "");
+  const [contexto, setContexto] = useState<string>(meta.contexto ?? "");
+  const [situacionActual, setSituacionActual] = useState<string>(meta.situacion_actual ?? "");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -202,6 +209,10 @@ export function EditarMetaModal({
           plazo: plazo.trim() || null,
           ambito: ambito || null,
           tags: tagsLimpios,
+          proyecto_id: proyectoId || null,
+          fecha_objetivo: fechaObjetivo || null,
+          contexto: contexto.trim() || null,
+          situacion_actual: situacionActual.trim() || null,
         });
         onChanged();
         onClose();
@@ -354,6 +365,75 @@ export function EditarMetaModal({
                 />
               </label>
             </div>
+
+            {/* === Migration 0024: proyecto + fecha objetivo + contexto. === */}
+            <details className="rounded-md border border-border bg-muted/20 px-3 py-2">
+              <summary className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground">
+                Clasificación y contexto (ayuda al agente)
+              </summary>
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <label className="block">
+                  <span className="mb-1 block text-xs text-muted-foreground">
+                    Proyecto
+                    <span className="ml-1 font-normal">(si pertenece a uno)</span>
+                  </span>
+                  <select
+                    className={field}
+                    value={proyectoId}
+                    onChange={(e) => setProyectoId(e.target.value)}
+                  >
+                    <option value="">— Sin proyecto —</option>
+                    {(proyectos ?? []).map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-xs text-muted-foreground">
+                    Fecha objetivo
+                    <span className="ml-1 font-normal">(sugerida por el agente)</span>
+                  </span>
+                  <input
+                    type="date"
+                    className={field}
+                    value={fechaObjetivo}
+                    onChange={(e) => setFechaObjetivo(e.target.value)}
+                  />
+                </label>
+                <label className="block sm:col-span-2">
+                  <span className="mb-1 block text-xs text-muted-foreground">
+                    Contexto
+                    <span className="ml-1 font-normal">
+                      (lo que rodea esta meta; el agente lo lee para proponer KRs)
+                    </span>
+                  </span>
+                  <textarea
+                    rows={2}
+                    className={fieldTextarea}
+                    value={contexto}
+                    onChange={(e) => setContexto(e.target.value)}
+                    placeholder="Ej: Lanzamiento v1 de Sol de Nit antes del verano. Equipo de 2, presupuesto limitado."
+                  />
+                </label>
+                <label className="block sm:col-span-2">
+                  <span className="mb-1 block text-xs text-muted-foreground">
+                    Situación actual
+                    <span className="ml-1 font-normal">
+                      (dónde estoy hoy con esta meta)
+                    </span>
+                  </span>
+                  <textarea
+                    rows={2}
+                    className={fieldTextarea}
+                    value={situacionActual}
+                    onChange={(e) => setSituacionActual(e.target.value)}
+                    placeholder="Ej: MVP técnico listo, falta onboarding y pasarela de pago."
+                  />
+                </label>
+              </div>
+            </details>
 
             {/* === Botón IA: enriquece la meta con un plan nuevo sin recrearla.
                 El estado de la meta NO se modifica — explícitamente lo

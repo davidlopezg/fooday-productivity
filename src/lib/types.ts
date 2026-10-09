@@ -36,6 +36,8 @@ export interface Proyecto {
   descripcion: string | null;
   orden: number;
   archivado: boolean;
+  /** Migration 0024: área a la que pertenece el proyecto. Null = huérfano. */
+  area_id?: string | null;
 }
 
 export type RecurrenciaTipo = "diaria" | "semanal" | "mensual" | null;
@@ -97,6 +99,15 @@ export interface Meta {
    *  cambio de estado (p.ej. `estado = 'completada'`). */
   updated_at?: string;
   created_at?: string;
+  /** Migration 0024: proyecto al que pertenece la meta. Null = meta suelta. */
+  proyecto_id?: string | null;
+  /** Migration 0024: fecha objetivo real (la que el agente sugiere).
+   *  Distinta de `plazo` (text libre) — esta es operativa. */
+  fecha_objetivo?: string | null;
+  /** Migration 0024: contexto libre para el agente (lo que rodea la meta). */
+  contexto?: string | null;
+  /** Migration 0024: situación actual (dónde estoy hoy con esta meta). */
+  situacion_actual?: string | null;
 }
 
 // ============================================================================

@@ -168,7 +168,9 @@ const FEATURES: Array<{ ruta: string; proposito: string; docs: string }> = [
   // ── Metas y planificación ──
   { ruta: "/metas", proposito: "Cards de metas con estado y progreso + botón IA Sugerir WIGs + EditarMetaModal con botón IA Generar plan", docs: "Pilar 2 · Ritual mensual · HelpDrawer" },
   { ruta: "/metas/nueva", proposito: "Crear meta + botón IA Generar plan (KRs+tareas+hábitos) que respeta el campo plazo", docs: "Pilar 2 · HelpDrawer" },
-  { ruta: "/metas/agente", proposito: "Agente IA: contexto libre → meta + plan trimestral completo", docs: "Pilar 2 · HelpDrawer" },
+  { ruta: "/metas/agente", proposito: "Agente IA: contexto libre → meta + plan trimestral completo (atajo directo a meta; la entrada unificada es /agente)", docs: "Pilar 2 · HelpDrawer" },
+  { ruta: "/agente", proposito: "Agente unificado: clasifica la idea (proyecto/meta/captura) y propone estructura. migration 0024", docs: "Pilar 2 · HelpDrawer" },
+  { ruta: "/metas/auditoria", proposito: "Auditoría de metas: qué les falta (área, proyecto, fecha objetivo, contexto, KRs). migration 0024", docs: "Pilar 2 · HelpDrawer" },
   { ruta: "/metas/plan", proposito: "Plan trimestral con scorecard de KRs + proyección", docs: "Pilar 2 · Ritual semanal (domingo) · Ritual mensual · HelpDrawer" },
   { ruta: "/plan-diario", proposito: "Estado emocional + plan diario generado por IA", docs: "Rituales §1 (mañana) · HelpDrawer" },
   { ruta: "/plan-diario/detalle", proposito: "Detalle de un plan con notas e informe", docs: "Sub-ruta de /plan-diario" },
@@ -1455,6 +1457,47 @@ export default function DocsPage() {
         </header>
 
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-10-13
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">Agente unificado en /agente + auditoría de metas en /metas/auditoria + migration 0024.</strong>{" "}
+              Cuatro cambios: (1) la entrada oficial del agente pasa a{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/agente</code>{" "}
+              (atajo: <code className="rounded bg-muted px-1.5 py-0.5 text-xs">Sidebar</code>{" "}
+              → bloque 2 y botón en <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas</code>).
+              La IA CLASIFICA primero la idea en
+              {" "}<strong className="text-foreground">proyecto</strong> /{" "}
+              <strong className="text-foreground">meta</strong> /{" "}
+              <strong className="text-foreground">captura</strong>{" "}
+              y propone la estructura adecuada (proyecto + N metas hijas
+              con su KR inicial y fecha objetivo, o meta sola, o
+              “déjalo en el inbox”). El humano revisa y aplica. /metas/agente
+              sigue existiendo como atajo para “crear meta directamente”; (2)
+              nueva página{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas/auditoria</code>{" "}
+              con tabla semáforo por meta (área, proyecto, fecha objetivo,
+              contexto, situación actual, KRs) ordenada por “más huecos primero”.
+              Click en cualquier ❌ abre el editor rápido; (3) migration{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">0024_metas_proyecto_contexto.sql</code>{" "}
+              añade <code className="rounded bg-muted px-1.5 py-0.5 text-xs">metas.proyecto_id</code>,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">metas.fecha_objetivo</code>,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">metas.contexto</code>,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">metas.situacion_actual</code>{" "}
+              y <code className="rounded bg-muted px-1.5 py-0.5 text-xs">proyectos.area_id</code>;
+              (4) el editor de meta y el alta de proyecto exponen los
+              nuevos campos (los 4 de meta van en un bloque plegable
+              “Clasificación y contexto” para no saturar).{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">FEATURES</code>{" "}
+              actualizado con 2 filas (<code className="rounded bg-muted px-1.5 py-0.5 text-xs">/agente</code> y{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas/auditoria</code>) y{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas/agente</code>{" "}
+              reetiquetado como atajo. <code className="rounded bg-muted px-1.5 py-0.5 text-xs">AGENTS.md</code>{" "}
+              no se toca (regla de sincronización: la regla “docs ↔ app
+              sincronizadas” ya cubre este caso).
+            </span>
+          </li>
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
               2026-10-12

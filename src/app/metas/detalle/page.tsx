@@ -14,14 +14,18 @@ import {
   reabrirTarea,
 } from "@/lib/mutations";
 import {
+  fetchAreas,
   fetchMetaConPlan,
   fetchPeriodos,
+  fetchProyectos,
   fetchTareasSinMeta,
 } from "@/lib/queries";
 import { useData } from "@/lib/useData";
 import type {
+  Area,
   MetaConPlan,
   Periodo,
+  Proyecto,
   ResultadoConTareas,
   Tarea,
   TareaSinMeta,
@@ -77,6 +81,9 @@ export default function MetaDetallePage() {
   );
   const periodosQ = useData<Periodo[]>(fetchPeriodos, [], []);
   const inboxQ = useData<TareaSinMeta[]>(fetchTareasSinMeta, [], []);
+  // Migration 0024: para resolver los nombres de proyecto y área.
+  const areasQ = useData<Area[]>(fetchAreas, [], []);
+  const proyectosQ = useData<Proyecto[]>(() => fetchProyectos(), [], []);
   const [anioActual] = useState(new Date().getFullYear());
 
   const plan = planQ.data;
@@ -164,6 +171,42 @@ export default function MetaDetallePage() {
                       plazo: {plan.meta.plazo}
                     </span>
                   )}
+                  {/* Migration 0024: proyecto + fecha objetivo al lado de los otros chips. */}
+                  {plan.meta.proyecto_id && (() => {
+                    const p = (proyectosQ.data ?? []).find(
+                      (x) => x.id === plan.meta.proyecto_id,
+                    );
+                    return p ? (
+                      <span
+                        className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-2.5 py-0.5"
+                        title="Proyecto al que pertenece la meta"
+                      >
+                        <span
+                          className="h-2 w-2 rounded-sm"
+                          style={{ backgroundColor: p.color ?? "#64748b" }}
+                        />
+                        proyecto: {p.nombre}
+                      </span>
+                    ) : null;
+                  })()}
+                  {plan.meta.fecha_objetivo && (
+                    <span
+                      className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-emerald-700 dark:text-emerald-400"
+                      title="Fecha objetivo sugerida por el agente"
+                    >
+                      🎯 objetivo: {plan.meta.fecha_objetivo}
+                    </span>
+                  )}
+                  {plan.meta.area_id && (() => {
+                    const a = (areasQ.data ?? []).find(
+                      (x) => x.id === plan.meta.area_id,
+                    );
+                    return a ? (
+                      <span className="rounded-full border border-border bg-muted px-2.5 py-0.5">
+                        área: {a.nombre}
+                      </span>
+                    ) : null;
+                  })()}
                 </div>
               </div>
               <div className="text-right">
@@ -195,6 +238,44 @@ export default function MetaDetallePage() {
               <MiniBar value={plan.progreso} />
             </div>
           </header>
+
+          {/* Migration 0024: contexto + situación actual (input del agente).
+              Solo se muestra si hay algo que contar. Si está vacío, la
+              auditoría (/metas/auditoria) lo señala con ❌ — no saturamos
+              la vista detalle con campos vacíos. */}
+          {(plan.meta.contexto || plan.meta.situacion_actual) && (
+            <section className="rounded-xl border border-border bg-muted/20 p-4">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                Contexto y situación
+              </h2>
+              <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                {plan.meta.contexto && (
+                  <div>
+                    <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Contexto
+                    </div>
+                    <p className="mt-1 whitespace-pre-wrap text-sm">
+                      {plan.meta.contexto}
+                    </p>
+                  </div>
+                )}
+                {plan.meta.situacion_actual && (
+                  <div>
+                    <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Situación actual
+                    </div>
+                    <p className="mt-1 whitespace-pre-wrap text-sm">
+                      {plan.meta.situacion_actual}
+                    </p>
+                  </div>
+                )}
+              </div>
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                💡 Esta información es la que el agente usa para proponer
+                KRs y tareas coherentes. Si está desactualizada, edítala.
+              </p>
+            </section>
+          )}
 
           {/* Trimestres / resultados / tareas */}
           <section className="space-y-3">

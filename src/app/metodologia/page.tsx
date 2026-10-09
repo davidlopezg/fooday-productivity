@@ -201,6 +201,13 @@ const ANTIPATRONES: { titulo: string; por_que: string; que_hacer: string }[] = [
       "Regla: si lleva <15s en tu cabeza, ni lo captures. Si es un texto libre sin estructura → /captura. Si ya es una tarea con meta, prioridad y deadline → /tareas/inbox hasta que la asignes.",
   },
   {
+    titulo: "No saber si lo tuyo es proyecto o meta",
+    por_que:
+      "Confusión clásica. Un proyecto agrupa 2-4 metas dentro de un área; una meta es un resultado medible con plazo. Sin esta distinción, las metas se quedan sueltas, los proyectos sin metas hijas, y la jerarquía no cuenta la historia.",
+    que_hacer:
+      "El agente de /agente decide por ti: pega el contexto y la IA CLASIFICA entre proyecto (te propone 2-4 metas hijas con KR inicial y fecha objetivo cada una), meta (una sola) o captura (no accionable, va al inbox). Si prefieres decidir tú: «¿puedo partir esto en 2-4 resultados con plazo? → proyecto. ¿es un único resultado medible? → meta. ¿no tiene forma? → captura».",
+  },
+  {
     titulo: "Saltarse la captura y 'tenerlo en la cabeza'",
     por_que:
       "El efecto Zeigarnik se reactiva cada vez que el sistema pierde confianza. Si dudas de que la app guarda todo, el cortex prefrontal vuelve a cargar con la lista.",

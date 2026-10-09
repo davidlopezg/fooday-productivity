@@ -8,14 +8,21 @@ Todas las tablas tienen **RLS** y columna `owner_id` (`default auth.uid()`).
 ```
 Áreas
  └── Propósitos
- └── Metas ──┬── OKRs ── Key Results
-             └── Hitos
-Tareas ── (area_id, meta_id)
+ └── Proyectos (area_id) ─── Metas (proyecto_id) ──┬── OKRs ── Key Results
+                                                     └── Hitos
+Tareas ── (area_id, meta_id, proyecto_id)
 Rituales (reglas fijas de la semana)
 Planes semanales
 Planes diarios ── Plan diario tareas ── Tareas
 Capturas (inbox / vaciar-cabeza)
 ```
+
+> Migration `0024_metas_proyecto_contexto.sql` añade `metas.proyecto_id`,
+> `metas.fecha_objetivo`, `metas.contexto`, `metas.situacion_actual` y
+> `proyectos.area_id`. Cierra el hueco que provocaba la confusión
+> "¿esto es meta o proyecto?": ahora la jerarquía es completa y el
+> agente en `/agente` clasifica el contexto libre en proyecto / meta /
+> captura antes de proponer estructura.
 
 ## Tablas
 
