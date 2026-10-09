@@ -511,6 +511,12 @@ export const AYUDA_POR_RUTA: Record<
         pilar: 1,
       },
       {
+        titulo: "Subtareas también cuentan como progreso",
+        cuerpo:
+          "El heatmap y la racha suman tareas + subtareas (una subtarea pesa ⅓ de tarea). Si un día solo cierras micro-pasos de una tarea grande, el día no se queda en blanco en el calendario. Las KPs y el gráfico “Tareas y subtareas por día/semana” lo dejan explícito: barra verde = tareas, barra violeta = subtareas.",
+        pilar: 1,
+      },
+      {
         titulo: "El score de hábitos es tu suelo diario",
         cuerpo:
           "Si el score 7d está cayendo semana tras semana, no estás en modo sostenible: estás en modo heroicidad, que dura 3-4 semanas antes de quebrar. Mejor bajar el plan que romperte.",

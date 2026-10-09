@@ -6,6 +6,7 @@ import {
   fetchMetasConProgreso,
   fetchPomodoroSesiones,
   fetchProyectosConConteo,
+  fetchSubtareasHechas,
   fetchTareasCompletadas,
 } from "@/lib/queries";
 import { useData } from "@/lib/useData";
@@ -24,9 +25,19 @@ const DIAS_OPCIONES = [7, 30, 90, 365];
 
 type TareaConArea = Tarea & { area: { id: string; nombre: string; color: string | null } | null };
 
+type SubtareaHecha = {
+  id: string;
+  tarea_id: string;
+  descripcion: string;
+  hecho: boolean;
+  updated_at: string;
+  tarea: Array<{ id: string; proyecto_id: string | null }> | null;
+};
+
 type Dia = {
   fecha: string; // YYYY-MM-DD
   tareas: number;
+  subtareas: number;
   foco_min: number;
 };
 
@@ -44,6 +55,7 @@ export default function InformesPage() {
   const { data: pomos, loading: l2 } = useData<PomodoroSesion[]>(
     () => fetchPomodoroSesiones(dias),
     [],
+    [dias],
   );
   const { data: proyectos, loading: l3 } = useData(
     fetchProyectosConConteo,
@@ -52,6 +64,11 @@ export default function InformesPage() {
   const { data: metas, loading: l4 } = useData<MetaConPlan[]>(
     fetchMetasConProgreso,
     [],
+  );
+  const { data: subtareas, loading: l5 } = useData<SubtareaHecha[]>(
+    () => fetchSubtareasHechas(dias),
+    [],
+    [dias],
   );
 
   // Filtra tareas hechas a la ventana de tiempo
@@ -65,19 +82,29 @@ export default function InformesPage() {
     [hechas, desde],
   );
 
-  // Serie diaria (tareas hechas + minutos de foco)
+  // Serie diaria (tareas hechas + subtareas hechas + minutos de foco)
   const serie = useMemo<Dia[]>(() => {
     const mapa = new Map<string, Dia>();
     const hoy = new Date();
     for (let i = dias - 1; i >= 0; i--) {
       const d = new Date(hoy);
       d.setDate(d.getDate() - i);
-      mapa.set(fmt(d.toISOString()), { fecha: fmt(d.toISOString()), tareas: 0, foco_min: 0 });
+      mapa.set(fmt(d.toISOString()), {
+        fecha: fmt(d.toISOString()),
+        tareas: 0,
+        subtareas: 0,
+        foco_min: 0,
+      });
     }
     for (const t of hechasEnRango) {
       const k = fmt(t.completada_at ?? "");
       const row = mapa.get(k);
       if (row) row.tareas++;
+    }
+    for (const s of subtareas) {
+      const k = fmt(s.updated_at);
+      const row = mapa.get(k);
+      if (row) row.subtareas++;
     }
     for (const p of pomos) {
       const k = fmt(p.ended_at);
@@ -85,17 +112,19 @@ export default function InformesPage() {
       if (row) row.foco_min += Math.round(p.duracion_seg / 60);
     }
     return Array.from(mapa.values());
-  }, [hechasEnRango, pomos, dias]);
+  }, [hechasEnRango, subtareas, pomos, dias]);
 
   const totalTareas = hechasEnRango.length;
+  const totalSubtareas = subtareas.length;
   const totalFoco = pomos.reduce((acc, p) => acc + p.duracion_seg, 0);
   const totalFocoMin = Math.round(totalFoco / 60);
 
-  // Racha de días consecutivos con al menos 1 tarea hecha
+  // Racha de días consecutivos con al menos 1 tarea O subtarea hecha
+  // (si no, los días donde solo se cierran subtareas rompen la racha)
   const racha = useMemo(() => {
     let r = 0;
     for (let i = serie.length - 1; i >= 0; i--) {
-      if (serie[i].tareas > 0) r++;
+      if (serie[i].tareas + serie[i].subtareas > 0) r++;
       else break;
     }
     return r;
@@ -116,7 +145,7 @@ export default function InformesPage() {
       .sort((a, b) => b.n - a.n);
   }, [hechasEnRango, proyectos]);
 
-  const loading = l1 || l2 || l3 || l4;
+  const loading = l1 || l2 || l3 || l4 || l5;
 
   // Para el heatmap simple: max tareas/día en la serie
   const maxTareasDia = Math.max(1, ...serie.map((d) => d.tareas));
@@ -189,6 +218,74 @@ export default function InformesPage() {
     (m) => m.meta.estado !== "archivada",
   ).length;
 
+  // ── Buckets para el chart "Tareas y subtareas por día/semana".
+  // Para 7/30/90 días: granularidad diaria (1 columna por día).
+  // Para 365 días: granularidad semanal (1 columna por semana, sumando
+  // tareas y subtareas hechas en lunes-domingo). ──
+  const buckets = useMemo<
+    Array<{ etiqueta: string; tareas: number; subtareas: number }>
+  >(() => {
+    const fmtCorto = (iso: string) => {
+      // "2026-01-15" -> "15 ene" (es-ES corto, sin locale switch para
+      // evitar inconsistencias SSR/CSR)
+      const [, m, d] = iso.split("-");
+      const meses = [
+        "ene", "feb", "mar", "abr", "may", "jun",
+        "jul", "ago", "sep", "oct", "nov", "dic",
+      ];
+      return `${Number(d)} ${meses[Number(m) - 1] ?? m}`;
+    };
+    const inicioDeSemana = (iso: string) => {
+      // Devuelve el lunes de la semana de `iso` (YYYY-MM-DD).
+      const d = new Date(iso + "T00:00:00");
+      const dow = d.getDay(); // 0=domingo, 1=lunes, ...
+      const delta = dow === 0 ? -6 : 1 - dow;
+      d.setDate(d.getDate() + delta);
+      return d.toISOString().slice(0, 10);
+    };
+
+    if (dias >= 365) {
+      // ── Semanal ──
+      const map = new Map<
+        string,
+        { etiqueta: string; tareas: number; subtareas: number }
+      >();
+      for (const t of hechasEnRango) {
+        const fecha = fmt(t.completada_at ?? "");
+        const lunes = inicioDeSemana(fecha);
+        const row = map.get(lunes) ?? {
+          etiqueta: `${fmtCorto(lunes)}`,
+          tareas: 0,
+          subtareas: 0,
+        };
+        row.tareas++;
+        map.set(lunes, row);
+      }
+      for (const s of subtareas) {
+        const fecha = fmt(s.updated_at);
+        const lunes = inicioDeSemana(fecha);
+        const row = map.get(lunes) ?? {
+          etiqueta: `${fmtCorto(lunes)}`,
+          tareas: 0,
+          subtareas: 0,
+        };
+        row.subtareas++;
+        map.set(lunes, row);
+      }
+      return Array.from(map.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([, v]) => v);
+    }
+
+    // ── Diario (re-uso `serie` que ya tiene el bucket por día) ──
+    return serie.map((d) => ({
+      etiqueta: fmtCorto(d.fecha),
+      tareas: d.tareas,
+      subtareas: d.subtareas,
+    }));
+  }, [dias, hechasEnRango, subtareas, serie]);
+  const maxBucket = Math.max(1, ...buckets.map((b) => b.tareas + b.subtareas));
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
@@ -219,11 +316,17 @@ export default function InformesPage() {
       </header>
 
       {/* KPIs */}
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
         <Kpi
           label="Tareas hechas"
           value={loading ? "—" : totalTareas.toString()}
           sub={`últimos ${dias} días`}
+        />
+        <Kpi
+          label="Subtareas hechas"
+          value={loading ? "—" : totalSubtareas.toString()}
+          sub={`últimos ${dias} días`}
+          accent="violet"
         />
         <Kpi
           label="Minutos de foco"
@@ -238,7 +341,7 @@ export default function InformesPage() {
         <Kpi
           label="Racha"
           value={loading ? "—" : `${racha}d`}
-          sub="días seguidos con tarea"
+          sub="días con tarea o subtarea"
         />
         <Kpi
           label="Metas cerradas"
@@ -254,10 +357,10 @@ export default function InformesPage() {
         />
       </section>
 
-      {/* Heatmap de tareas */}
+      {/* Heatmap de tareas (incluye subtareas) */}
       <section className="rounded-xl border border-border bg-card p-5">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Tareas por día
+          Actividad por día (tareas + subtareas)
         </h2>
         {serie.length === 0 ? (
           <p className="text-sm text-muted-foreground">Sin datos.</p>
@@ -270,16 +373,20 @@ export default function InformesPage() {
               }}
             >
               {serie.map((d) => {
-                const pct = d.tareas / maxTareasDia;
-                const intensity = d.tareas === 0 ? 0 : 0.2 + pct * 0.8;
+                // Intensidad combina tareas y subtareas: una subtarea
+                // cuenta como 1/3 de tarea (heurística: la subtarea
+                // representa micro-progreso, no cierre de tarea).
+                const score = d.tareas + d.subtareas / 3;
+                const pct = score / maxTareasDia;
+                const intensity = score === 0 ? 0 : 0.2 + pct * 0.8;
                 return (
                   <div
                     key={d.fecha}
-                    title={`${d.fecha}: ${d.tareas} tareas, ${d.foco_min} min foco`}
+                    title={`${d.fecha}: ${d.tareas} tareas, ${d.subtareas} subtareas, ${d.foco_min} min foco`}
                     className="aspect-square rounded-sm"
                     style={{
                       backgroundColor:
-                        d.tareas === 0
+                        score === 0
                           ? "hsl(var(--muted))"
                           : `rgba(16, 185, 129, ${intensity})`,
                     }}
@@ -290,7 +397,58 @@ export default function InformesPage() {
           </div>
         )}
         <p className="mt-2 text-xs text-muted-foreground">
-          Verde = tareas hechas. La altura de la racha ya está arriba.
+          Verde = tareas + subtareas (subtarea ≈ ⅓ de tarea). La racha de
+          días ya está arriba y también cuenta subtareas.
+        </p>
+      </section>
+
+      {/* Tareas y subtareas por día (o semana si 1 año) */}
+      <section className="rounded-xl border border-border bg-card p-5">
+        <header className="mb-3 flex flex-wrap items-end justify-between gap-2">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            Tareas y subtareas por {dias >= 365 ? "semana" : "día"}
+          </h2>
+          <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="inline-block h-2.5 w-2.5 rounded-sm bg-emerald-500" />
+              Tareas
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="inline-block h-2.5 w-2.5 rounded-sm bg-violet-500" />
+              Subtareas
+            </span>
+          </div>
+        </header>
+        {buckets.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Sin datos.</p>
+        ) : (
+          <div className="flex h-40 items-end gap-1">
+            {buckets.map((b) => {
+              const pctT = b.tareas / maxBucket;
+              const pctS = b.subtareas / maxBucket;
+              return (
+                <div
+                  key={b.etiqueta}
+                  className="group flex flex-1 flex-col items-stretch justify-end gap-px"
+                  title={`${b.etiqueta}: ${b.tareas} tareas, ${b.subtareas} subtareas`}
+                >
+                  <div
+                    className="w-full rounded-t bg-emerald-500/70 transition-colors group-hover:bg-emerald-500"
+                    style={{ height: `${Math.max(0, pctT * 100)}%`, minHeight: b.tareas > 0 ? "2px" : "0" }}
+                  />
+                  <div
+                    className="w-full rounded-t bg-violet-500/70 transition-colors group-hover:bg-violet-500"
+                    style={{ height: `${Math.max(0, pctS * 100)}%`, minHeight: b.subtareas > 0 ? "2px" : "0" }}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        )}
+        <p className="mt-2 text-xs text-muted-foreground">
+          {dias >= 365
+            ? "Para 1 año las barras se agrupan por semana (lunes a domingo)."
+            : "Cada columna es un día. Pasa el ratón para ver el desglose."}
         </p>
       </section>
 

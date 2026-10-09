@@ -531,6 +531,42 @@ export async function fetchPomodoroHoy(): Promise<PomodoroSesion[]> {
   return (data ?? []) as PomodoroSesion[];
 }
 
+/** Subtareas marcadas como hechas en los últimos `dias` días.
+ *  Usa `updated_at` como proxy de cuándo se cerró (mismo patrón que
+ *  `metas`/`resultados_periodo` en /informes: el trigger `set_updated_at`
+ *  se dispara al cambiar `hecho` a true). Incluye la tarea padre para
+ *  poder agrupar por proyecto en /informes.
+ */
+export async function fetchSubtareasHechas(
+  dias = 30,
+): Promise<
+  Array<{
+    id: string;
+    tarea_id: string;
+    descripcion: string;
+    hecho: boolean;
+    updated_at: string;
+    tarea: Array<{ id: string; proyecto_id: string | null }> | null;
+  }>
+> {
+  const desde = new Date(Date.now() - dias * 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await createClient()
+    .from("tareas_subtareas")
+    .select("id,tarea_id,descripcion,hecho,updated_at,tarea:tareas(id,proyecto_id)")
+    .eq("hecho", true)
+    .gte("updated_at", desde)
+    .order("updated_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as unknown as Array<{
+    id: string;
+    tarea_id: string;
+    descripcion: string;
+    hecho: boolean;
+    updated_at: string;
+    tarea: Array<{ id: string; proyecto_id: string | null }> | null;
+  }>;
+}
+
 // ============================================================================
 // Proyectos — migration 0012
 // ============================================================================

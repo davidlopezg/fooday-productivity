@@ -177,7 +177,7 @@ const FEATURES: Array<{ ruta: string; proposito: string; docs: string }> = [
   { ruta: "/pipeline", proposito: "Kanban por prioridad + motor IA de priorización", docs: "Ritual semanal (miércoles) · HelpDrawer" },
 
   // ── Revisión y análisis ──
-  { ruta: "/informes", proposito: "KPIs + heatmap de foco + proyectos con conteo + metas y OKRs cerrados + comparación con plan vs sin plan", docs: "Ritual semanal (viernes) · Ritual mensual · HelpDrawer" },
+  { ruta: "/informes", proposito: "KPIs (incluye subtareas) + heatmap de actividad + chart de tareas y subtareas por día/semana + proyectos con conteo + metas y OKRs cerrados + comparación con plan vs sin plan", docs: "Ritual semanal (viernes) · Ritual mensual · HelpDrawer" },
   { ruta: "/dashboard-emocional", proposito: "4 dimensiones: despertar / mente / cuerpo / rueda", docs: "Pilar 4 · HelpDrawer" },
 
   // ── Identidad y horizonte ──
@@ -1455,6 +1455,26 @@ export default function DocsPage() {
         </header>
 
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-10-12
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">/informes: subtareas cuentan + chart tareas/subtareas por día/semana.</strong>{" "}
+              Tres cambios en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/informes</code>
+              : (1) nueva query{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">fetchSubtareasHechas(dias)</code>{" "}
+              en <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/lib/queries.ts</code>{" "}
+              que trae las subtareas con <code className="rounded bg-muted px-1.5 py-0.5 text-xs">hecho = true</code>{" "}
+              y <code className="rounded bg-muted px-1.5 py-0.5 text-xs">updated_at</code>{" "}
+              en la ventana (trigger <code className="rounded bg-muted px-1.5 py-0.5 text-xs">set_updated_at</code>{" "}
+              como proxy, mismo patrón que metas/KRs); (2) nueva KPI “Subtareas hechas” en violeta, heatmap “Actividad por día” que suma tareas + subtareas/3 (una subtarea pesa ⅓ de tarea) y racha que ya no se rompe cuando solo se cierran subtareas — los días con micro-progreso dejan de verse vacíos; (3) nuevo chart “Tareas y subtareas por día/semana” con barras apiladas (verde = tareas, violeta = subtareas), granularidad diaria para 7/30/90 días y semanal (lunes a domingo) para 1 año. El grid de KPIs pasa a{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">xl:grid-cols-7</code>{" "}
+              para acomodar la nueva tarjeta. <code className="rounded bg-muted px-1.5 py-0.5 text-xs">HelpDrawer</code>{" "}
+              añade un ítem “Subtareas también cuentan como progreso” en la ruta. Actualizado el índice de features (FEATURES) y este changelog.
+            </span>
+          </li>
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
               2026-10-11

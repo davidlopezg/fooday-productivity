@@ -2025,7 +2025,13 @@ function buildPromptSugerirWigs(opts: SugerirWigsOpts): string {
     .map((m) => {
       const w = opts.wigs_ya_marcados.includes(m.id) ? " [YA WIG]" : "";
       const pct = m.num_tareas > 0 ? Math.round((100 * m.num_tareas_hechas) / m.num_tareas) : 0;
-      return `- ${m.codigo ?? "—"} · ${m.titulo}${w}
+      // IMPORTANTE: listamos el `codigo` como identificador que la IA
+      // puede copiar (es corto y legible). NO exponemos el UUID: la IA
+      // no puede reproducirlo y siempre acabaría inventándolo, dejando
+      // 0 sugerencias. La app resuelve `meta_codigo` → `meta_id` al
+      // recibir la respuesta.
+      const idLabel = m.codigo ? `[codigo=${m.codigo}]` : `[id=${m.id}]`;
+      return `- ${idLabel} · ${m.titulo}${w}
   estado=${m.estado}, prioridad=${m.prioridad ?? "—"}, plazo=${m.plazo ?? "—"}, ambito=${m.ambito ?? "—"}
   KRs=${m.num_krs}, tareas=${m.num_tareas_hechas}/${m.num_tareas} (${pct}%), tags=[${(m.tags ?? []).join(", ")}]`;
     })
@@ -2049,7 +2055,7 @@ ${resumenMetas}
 LO QUE DEBES DEVOLVER
 ==========
 Una lista de EXACTAMENTE 3 sugerencias (o menos si David tiene menos de 3 metas activas). Para cada una:
-  - meta_id: el id de la meta que sugieres como WIG
+  - meta_codigo: el IDENTIFICADOR EXACTO de la meta tal y como aparece entre corchetes arriba (p.ej. "M-12", "M-7"). COPIALO TAL CUAL, sin inventar.
   - razon: UNA frase de máximo 140 caracteres justificando por qué esta meta debería ser WIG AHORA.
 
 CRITERIOS para elegir (en orden de importancia):
@@ -2065,7 +2071,7 @@ NO sugieras metas en estado "archivada" o "completada".
 Responde SOLO con JSON válido con esta forma EXACTA:
 {
   "sugerencias": [
-    { "meta_id": "uuid-aqui", "razon": "frase corta justificando" }
+    { "meta_codigo": "M-1", "razon": "frase corta justificando" }
   ]
 }
 `;
@@ -2087,16 +2093,42 @@ export async function sugerirWigsIA(
     true,
   );
 
-  const metaIdsValidos = new Set(opts.metas.map((m) => m.id));
+  // La IA devuelve `meta_codigo` (corto, fácil de copiar). Resolvemos al
+  // id real en JS. Si la meta no tiene codigo (m.codigo === null),
+  // caemos al id como último recurso.
+  const porCodigo = new Map<string, string>(); // codigo → id
+  const porId = new Set<string>();              // ids válidos
+  for (const m of opts.metas) {
+    porId.add(m.id);
+    if (m.codigo) porCodigo.set(m.codigo.trim(), m.id);
+  }
   const raw = Array.isArray(parsed?.sugerencias) ? parsed.sugerencias : [];
   const sugerencias: WigSugerido[] = [];
+  const rechazadas: string[] = [];
   for (const s of raw) {
-    const id = String((s as { meta_id?: unknown })?.meta_id ?? "").trim();
-    if (!id || !metaIdsValidos.has(id)) continue;
+    // Aceptamos `meta_codigo` (preferido) o `meta_id` (compat hacia atrás).
+    const codigo = String(
+      (s as { meta_codigo?: unknown })?.meta_codigo ??
+        (s as { meta_id?: unknown })?.meta_id ??
+        "",
+    ).trim();
+    if (!codigo) continue;
+    let id: string | null = porCodigo.get(codigo) ?? null;
+    if (!id && porId.has(codigo)) id = codigo;
+    if (!id) {
+      rechazadas.push(codigo);
+      continue;
+    }
     const razon = String((s as { razon?: unknown })?.razon ?? "").trim().slice(0, 200);
     if (!razon) continue;
     sugerencias.push({ meta_id: id, razon });
     if (sugerencias.length >= 3) break;
+  }
+
+  // Si la IA devolvió 3 sugerencias pero ninguna matchea (lo más habitual
+  // cuando se rompe esto), avisamos en consola para depurar.
+  if (sugerencias.length === 0 && raw.length > 0 && typeof window !== "undefined") {
+    console.warn("[sugerirWigs] La IA devolvió sugerencias pero ninguna matchea con los codigos de meta. codigos_devueltos=", rechazadas);
   }
 
   return { sugerencias, prompt_usado: prompt };

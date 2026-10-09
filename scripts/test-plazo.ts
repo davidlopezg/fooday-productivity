@@ -125,3 +125,4 @@ for (const [input, expected] of casos) {
 }
 console.log(`\n${ok}/${ok + fail} OK, ${fail} fallos`);
 if (fail > 0) process.exit(1);
+export {};
