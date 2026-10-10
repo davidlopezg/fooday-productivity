@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
+import { localYMD } from "@/lib/semana";
 import type {
   Area,
   CalendarioBloque,
@@ -26,7 +27,10 @@ import type {
   TareaSinMeta,
 } from "@/lib/types";
 
-const HOY = () => new Date().toISOString().slice(0, 10);
+// localYMD, no toISOString(): las fechas de esta capa son "día civil" del
+// usuario, no instantes UTC. Con toISOString() el rango se desplazaba un día
+// hacia atrás entre las 00:00 y las 02:00 en zonas UTC+.
+const HOY = () => localYMD(new Date());
 
 export async function fetchAreas(): Promise<Area[]> {
   const { data } = await createClient().from("areas").select("id,nombre,color,orden").order("orden");
@@ -396,7 +400,7 @@ export async function fetchEmocionalStats(dias: number) {
   const supabase = createClient();
   const desde = new Date();
   desde.setDate(desde.getDate() - dias);
-  const desdeStr = desde.toISOString().slice(0, 10);
+  const desdeStr = localYMD(desde);
   const { data } = await supabase
     .from("planes_diarios")
     .select("fecha,semaforo,despertar,mente,cuerpo,rueda,reflexion")
@@ -519,7 +523,7 @@ export async function fetchPomodoroSesiones(
 
 /** Sesiones del día en curso, para mostrar el histórico en /focus. */
 export async function fetchPomodoroHoy(): Promise<PomodoroSesion[]> {
-  const h = new Date().toISOString().slice(0, 10);
+  const h = localYMD(new Date());
   const { data, error } = await createClient()
     .from("pomodoro_sesiones")
     .select("*")

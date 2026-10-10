@@ -1397,29 +1397,38 @@ export function parsearTrimestresDePlazo(
   if (/\b(ultimo|ultima)\s+trimestre\b/.test(t)) return [4];
   if (/\b(segundo|segunda)\s+trimestre\b/.test(t)) return [2];
   if (/\b(tercer|tercera)\s+trimestre\b/.test(t)) return [3];
-  // Ordinales explícitos: "1º trimestre", "1er trimestre", "4º trimestre".
-  // Solo se matchean si el dígito lleva un marcador ordinal detrás.
-  const ordinalMatch = t.match(/(\d+)\s*[º°o]\s*trimestre/);
-  if (ordinalMatch) {
-    const n = Number(ordinalMatch[1]);
-    if (n >= 1 && n <= 4) return [n] as Array<1 | 2 | 3 | 4>;
-  }
   if (/\b(principio|inicio|arranque)\s+de\s+(ano|2\d{3})/.test(t)) return [1];
   if (/\bfin\s+de\s+(ano|2\d{3})/.test(t)) return [4];
   if (/\bmedio\s+(de|del)\s+(ano|2\d{3})/.test(t)) return [2, 3];
-
-  // Recolectar menciones individuales: Q1..Q4, T1..T4, "trimestre N"
+  // Ordinales explícitos: "1º trimestre", "1o trimestre", "2º y 3º trimestre".
+  // Se ACUMULAN todos en vez de devolver en el primero: antes el early-return
+  // cogía solo "3º trimestre" y "2º y 3º trimestre" devolvía [3], perdiendo el
+  // Q2 entero de los KRs que genera /metas/nueva.
   const individuos = new Set<number>();
   let mm: RegExpExecArray | null;
+  if (/trimestre/.test(t)) {
+    const reOrd = /(\d+)\s*[º°o](?=\s|$)/g;
+    while ((mm = reOrd.exec(t)) !== null) {
+      const n = Number(mm[1]);
+      if (n >= 1 && n <= 4) individuos.add(n);
+    }
+  }
+
+  // Recolectar menciones individuales: Q1..Q4, T1..T4, "trimestre N".
   const reQt = /[qt]([1-4])/gi;
   while ((mm = reQt.exec(t)) !== null) {
     const n = Number(mm[1]);
     if (n >= 1 && n <= 4) individuos.add(n);
   }
-  const reTrim = /trimestre\s*([1-4])/gi;
+  // "trimestre 3", "trimestres 2 y 3", "trimestre 2 al 4": el plural y las
+  // listas importan — "trimestres 2 y 3" antes no casaba con `trimestre\s*`
+  // (la "s" de golpeaba el regex) y caía al fallback de los 4 trimestres.
+  const reTrim = /trimestres?\s*([1-4](?:\s*(?:,|y|e|a|al|-)\s*[1-4])*)/gi;
   while ((mm = reTrim.exec(t)) !== null) {
-    const n = Number(mm[1]);
-    if (n >= 1 && n <= 4) individuos.add(n);
+    for (const dig of mm[1].match(/[1-4]/g) ?? []) {
+      const n = Number(dig);
+      if (n >= 1 && n <= 4) individuos.add(n);
+    }
   }
 
   if (individuos.size === 0) return [1, 2, 3, 4];

@@ -3,6 +3,7 @@
 // ============================================================================
 
 import { createClient } from "@/lib/supabase/client";
+import { localYMD } from "@/lib/semana";
 import type {
   CategoriaPago,
   EstadoPago,
@@ -38,7 +39,9 @@ export async function registrarPago(opts: {
     p_pago_id: opts.pagoId,
     p_importe: opts.importe,
     p_metodo: opts.metodo,
-    p_fecha: opts.fecha ?? new Date().toISOString().slice(0, 10),
+    // localYMD, no toISOString(): la fecha que se guarda debe ser la local,
+    // si no se registran pagos "del día anterior" de madrugada en UTC+.
+    p_fecha: opts.fecha ?? localYMD(new Date()),
   });
   if (error) throw new Error(`No se pudo registrar el pago: ${error.message}`);
   return data as string;

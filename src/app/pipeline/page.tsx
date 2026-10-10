@@ -17,6 +17,7 @@ import {
 import { fetchMetas, fetchTareas } from "@/lib/queries";
 import { actualizarTarea } from "@/lib/mutations";
 import { useData } from "@/lib/useData";
+import { localYMD } from "@/lib/semana";
 import type { EstadoTarea, Meta, Prioridad, Tarea } from "@/lib/types";
 import { useConfig } from "@/lib/configStore";
 import { IconBolt, IconSparkles } from "@/components/icons";
@@ -235,7 +236,7 @@ export default function PipelinePage() {
         return null;
       }
       const ahora = new Date();
-      const fecha = ahora.toISOString().slice(0, 10);
+      const fecha = localYMD(ahora);
       const horaLocal = ahora.toTimeString().slice(0, 5);
       const diaSemana = ahora.toLocaleDateString("es-ES", {
         weekday: "long",

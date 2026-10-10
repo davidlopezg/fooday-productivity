@@ -29,6 +29,7 @@ import {
   useState,
 } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { localYMD } from "@/lib/semana";
 import {
   DURACIONES_SEG,
   ETIQUETAS_FASE,
@@ -57,7 +58,10 @@ const LS_KEY = "fooday.pomodoro.v1";
 const DURACION_FOCO_DEFECTO_SEG = 25 * 60;
 
 function hoy(): string {
-  return new Date().toISOString().slice(0, 10);
+  // localYMD, no toISOString(): en UTC+ (España) el toISOString() de un Date
+  // entre las 00:00 y las 02:00 devuelve el día ANTERIOR, así que el contador
+  // diario y el filtro `started_at` se saltaban al día equivocado.
+  return localYMD(new Date());
 }
 
 function readLS(): EstadoGuardado | null {
@@ -145,7 +149,21 @@ function estadoInicial(): {
       restante: DURACIONES_SEG[next],
     };
   }
-  // En pausa: restaurar el restante congelado.
+  // En pausa: restaurar el restante congelado. Si `endAt` es 0 la fase
+  // quedó CERRADA (abortar, o "cerrar" del post-focus) y no hay nada que
+  // recuperar: devolvemos la duración por defecto en vez de 00:00, que era
+  // lo que dejaba el reloj muerto tras recargar.
+  if (saved.endAt <= 0) {
+    return {
+      ...saved,
+      pomodorosHoy,
+      fechaContador,
+      restante:
+        saved.fase === "focus"
+          ? DURACION_FOCO_DEFECTO_SEG
+          : DURACIONES_SEG[saved.fase],
+    };
+  }
   return {
     ...saved,
     pomodorosHoy,
@@ -432,13 +450,28 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
 
   const reanudar = useCallback(() => {
     if (corriendo) return;
+    // `endAt === 0` ⇒ la fase está CERRADA (abortar, o "cerrar" del
+    // post-focus). NO se puede tratar como "el cronómetro ha terminado":
+    // onFaseTerminada() graba la sesión en Supabase, así que pulsar
+    // "Reanudar" después de cerrar el post-focus duplicaba el pomodoro
+    // (y disparaba el sonido/notificación de "foco terminado").
+    if (endAt <= 0) {
+      const seg =
+        fase === "focus" ? duracionActualRef.current : DURACIONES_SEG[fase];
+      endedRef.current = false;
+      setFase(fase);
+      setEndAt(Date.now() + seg * 1000);
+      setRestante(seg);
+      setCorriendo(true);
+      return;
+    }
     if (endAt <= Date.now()) {
       endedRef.current = true;
       onFaseTerminada();
       return;
     }
     setCorriendo(true);
-  }, [corriendo, endAt, onFaseTerminada]);
+  }, [corriendo, endAt, fase, onFaseTerminada]);
 
   const abortar = useCallback(() => {
     endedRef.current = false;

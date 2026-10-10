@@ -11,6 +11,7 @@ import {
 } from "@/lib/queries";
 import { useData } from "@/lib/useData";
 import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
+import { localYMD } from "@/lib/semana";
 import { IconCheck, IconTarget } from "@/components/icons";
 import type {
   Meta,
@@ -236,12 +237,15 @@ export default function InformesPage() {
       return `${Number(d)} ${meses[Number(m) - 1] ?? m}`;
     };
     const inicioDeSemana = (iso: string) => {
-      // Devuelve el lunes de la semana de `iso` (YYYY-MM-DD).
+      // Devuelve el lunes de la semana de `iso` (YYYY-MM-DD) en zona LOCAL.
+      // localYMD, no toISOString(): en UTC+ el toISOString() de un Date a las
+      // 00:00 cae al domingo anterior, así que el heatmap semanal se
+      // etiquetaba con el día equivocado.
       const d = new Date(iso + "T00:00:00");
       const dow = d.getDay(); // 0=domingo, 1=lunes, ...
       const delta = dow === 0 ? -6 : 1 - dow;
       d.setDate(d.getDate() + delta);
-      return d.toISOString().slice(0, 10);
+      return localYMD(d);
     };
 
     if (dias >= 365) {

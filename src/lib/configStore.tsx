@@ -127,8 +127,12 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
       .then((d) => {
         if (!alive) return;
         setLastError(null);
-        // Si Supabase tiene datos, hacen override a localStorage.
-        if (d.minimax_api_key || d !== DEFAULT) {
+        // Si Supabase tiene datos, mandan sobre localStorage — PERO sin vaciar la
+        // API key. `save()` sincroniza en modo best-effort: si ese upsert
+        // falló (sin sesión, RLS, red) el remoto sigue con la key a null, y
+        // el `|| d !== DEFAULT` anterior (siempre true por identidad de
+        // referencia) borraba la key que el usuario acababa de escribir.
+        if (d.minimax_api_key || !readLS().minimax_api_key) {
           setData(d);
           writeLS(d);
         }

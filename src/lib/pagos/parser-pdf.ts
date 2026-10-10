@@ -48,16 +48,26 @@ async function extraerTextoPDF(file: File): Promise<string> {
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
-    // Cada item de `content.items` tiene `str` (texto) y opcionalmente
-    // información de posición. Concatenamos con espacio para evitar
-    // pegar palabras.
-    const texto = content.items
-      .map((it: unknown) => {
-        const item = it as { str?: string; hasEOL?: boolean };
-        return (item.str ?? "") + (item.hasEOL ? "\n" : " ");
-      })
-      .join("");
-    paginas.push(texto);
+    // pdf.js marca salto de línea con `hasEOL`, pero MUCHOS PDFs (sobre todo
+    // los generados por las-suite-of-facturas) no lo marcan nunca: todo
+    // salía en una única línea y el fallback "primera línea no vacía" (que
+    // usa para deducir el proveedor) devolvía los primeros 80 chars del
+    // documento entero. Por eso comparamos además la coordenada Y de cada
+    // item: si salta de línea, cortamos con "\n" nosotros.
+    let yPrevia: number | null = null;
+    const partes: string[] = [];
+    for (const it of content.items as Array<{
+      str?: string;
+      hasEOL?: boolean;
+      transform?: number[];
+    }>) {
+      const y = typeof it.transform?.[5] === "number" ? it.transform[5] : null;
+      const saltoDeLinea = y !== null && yPrevia !== null && Math.abs(y - yPrevia) > 1;
+      partes.push(saltoDeLinea || it.hasEOL ? "\n" : " ");
+      partes.push(it.str ?? "");
+      if (y !== null) yPrevia = y;
+    }
+    paginas.push(partes.join(""));
   }
   return paginas.join("\n\n");
 }
@@ -154,7 +164,11 @@ function buscarImportes(texto: string): number[] {
 }
 
 /** Busca un campo por etiqueta en el texto. Devuelve el valor tras los
- *  dos puntos (o en la misma línea), o null. */
+ *  dos puntos (o en la misma línea), o null.
+ *
+ *  Los `\b` a ambos lados de la etiqueta son OBLIGATORIOS: sin ellos, la
+ *  etiqueta "De" (usada como fallback del proveedor) casaba dentro de
+ *  "Desde: mi banco" y devolvía "sde: mi banco" como nombre de proveedor. */
 function buscarCampo(
   texto: string,
   etiquetas: string[],
@@ -162,7 +176,7 @@ function buscarCampo(
   for (const et of etiquetas) {
     // Patrón: "etiqueta: valor" o "etiqueta valor" (en la misma línea o la siguiente)
     const re = new RegExp(
-      `${escapeRegex(et)}\\s*[:\\-]?\\s*([^\\n\\r]{3,80})`,
+      `\\b${escapeRegex(et)}\\b\\s*[:\\-]?\\s*([^\\n\\r]{3,80})`,
       "i",
     );
     const m = texto.match(re);

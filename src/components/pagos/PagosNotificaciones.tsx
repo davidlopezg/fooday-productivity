@@ -6,6 +6,7 @@ import {
   fetchPagosPorFechaProgramada,
 } from "@/lib/pagos/queries";
 import type { PagoConUrgencia } from "@/lib/pagos/types";
+import { localYMD } from "@/lib/semana";
 
 /** Componente "invisible": se monta en la home y, si es domingo por la
  *  noche, dispara una notificación local PWA recordando los pagos del lunes.
@@ -28,7 +29,7 @@ export function PagosNotificaciones() {
     const diff = (8 - dow) % 7; // 0 si ya es lunes
     const lunes = new Date(hoy);
     lunes.setDate(hoy.getDate() + diff);
-    setLunesISO(lunes.toISOString().slice(0, 10));
+    setLunesISO(localYMD(lunes));
   }, []);
 
   // Carga los pagos del próximo lunes
@@ -56,7 +57,7 @@ export function PagosNotificaciones() {
     // Anti-spam: máximo 1 vez por día
     const lastKey = "pagos_notif_last";
     const last = localStorage.getItem(lastKey);
-    const hoyISO = ahora.toISOString().slice(0, 10);
+    const hoyISO = localYMD(ahora);
     if (last === hoyISO) return;
 
     void notificar(pagosQ.data, lunesISO).then((ok) => {

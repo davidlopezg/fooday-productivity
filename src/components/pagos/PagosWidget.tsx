@@ -7,6 +7,7 @@ import {
   fetchPagosUrgentes,
 } from "@/lib/pagos/queries";
 import type { PagoConUrgencia } from "@/lib/pagos/types";
+import { localYMD } from "@/lib/semana";
 import { IconWallet } from "@/components/icons";
 
 const fmtEUR = (n: number) =>
@@ -35,7 +36,11 @@ function esLunes(): boolean {
  */
 export function PagosWidget() {
   const lunes = proximoLunes();
-  const lunesISO = lunes.toISOString().slice(0, 10);
+  // localYMD, NO lunes.toISOString().slice(0,10): `proximoLunes()` deja el
+  // Date a las 00:00 LOCAL, y en zonas UTC+ (España) el toISOString() de eso
+  // cae al DOMINGO en UTC. El widget consultaba el domingo y en los lunes
+  // en España no encontraba ningún pago.
+  const lunesISO = localYMD(lunes);
   const hoy = esLunes();
 
   const lunesQ = useData(

@@ -5,6 +5,7 @@
 // ============================================================================
 
 import { createClient } from "@/lib/supabase/client";
+import { localYMD } from "@/lib/semana";
 import type {
   Pago,
   PagoConUrgencia,
@@ -93,7 +94,7 @@ export async function fetchPagosUrgentes(
   opts?: { incluirDomiciliados?: boolean },
 ): Promise<PagoConUrgencia[]> {
   const supabase = db();
-  const limite = new Date(Date.now() + dias * 86400000).toISOString().slice(0, 10);
+  const limite = localYMD(new Date(Date.now() + dias * 86400000));
   let q = supabase
     .from("v_pagos")
     .select("*")

@@ -13,6 +13,7 @@ import {
   type PagoMovimiento,
 } from "@/lib/pagos/types";
 import { errorMessage } from "@/lib/errors";
+import { localYMD } from "@/lib/semana";
 
 const fmtEUR = (n: number) =>
   new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(n);
@@ -33,7 +34,7 @@ export function PagoPagarParcialModal({
   const restante = pago.importe_total - pago.importe_pagado;
   const [importe, setImporte] = useState(String(restante));
   const [metodo, setMetodo] = useState<MetodoPago>(pago.metodo_pago);
-  const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
+  const [fecha, setFecha] = useState(localYMD(new Date()));
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 

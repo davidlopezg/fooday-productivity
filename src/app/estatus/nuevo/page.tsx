@@ -5,9 +5,12 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { fetchEstatusPorFecha } from "@/lib/queries";
 import { EstatusForm } from "@/components/EstatusForm";
+import { localYMD } from "@/lib/semana";
 import type { EstatusConComidas } from "@/lib/types";
 
-const HOY = () => new Date().toISOString().slice(0, 10);
+// localYMD, no toISOString(): en UTC+ el toISOString() de madrugada devuelve
+// el día anterior y el estatus se guardaría con la fecha equivocada.
+const HOY = () => localYMD(new Date());
 
 export default function EstatusNuevoPage() {
   const router = useRouter();

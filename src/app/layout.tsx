@@ -49,6 +49,23 @@ const VERSION_CHECK_SCRIPT = `
 })();
 `.trim();
 
+// Script inline que aplica el tema ANTES de pintar. Sin esto, el
+// ThemeProvider lee localStorage en un useEffect y arrives tarde: el usuario
+// en dark ve un flash blanco en cada carga. Mismo patrón que el script de
+// versionado: bloquea el primer paint y no necesita esperar al bundle.
+const THEME_SCRIPT = `
+(function(){
+  try {
+    var t = localStorage.getItem('fooday.theme') || 'system';
+    var dark = t === 'dark' || (t === 'system' &&
+      !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches));
+    var root = document.documentElement;
+    root.classList.toggle('dark', dark);
+    root.dataset.theme = dark ? 'dark' : 'light';
+  } catch (e) { /* noop */ }
+})();
+`.trim();
+
 export const metadata: Metadata = {
   title: "fooday·productivity",
   description: "Sistema operativo personal: propósito, metas, tareas y planificación",
@@ -82,6 +99,8 @@ export default function RootLayout({
   return (
     <html lang="es" className={`${inter.variable} h-full`}>
       <head>
+        {/* Tema antes del primer paint (evita el flash blanco en dark) */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
         {/* Auto-actualización: detecta versión nueva y recarga con cache-bust */}
         <script dangerouslySetInnerHTML={{ __html: VERSION_CHECK_SCRIPT }} />
       </head>

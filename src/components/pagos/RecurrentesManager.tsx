@@ -21,6 +21,7 @@ import {
   type RecurrentePago,
 } from "@/lib/pagos/types";
 import { errorMessage } from "@/lib/errors";
+import { localYMD } from "@/lib/semana";
 import { IconPlus, IconRepeat, IconTrash } from "@/components/icons";
 
 const fmtEUR = (n: number) =>
@@ -296,7 +297,7 @@ function FormRegla({
     regla?.metodo_pago ?? "transferencia",
   );
   const [fechaInicio, setFechaInicio] = useState(
-    regla?.fecha_inicio ?? new Date().toISOString().slice(0, 10),
+    regla?.fecha_inicio ?? localYMD(new Date()),
   );
   const [fechaFin, setFechaFin] = useState(regla?.fecha_fin ?? "");
   const [activo, setActivo] = useState(regla?.activo ?? true);

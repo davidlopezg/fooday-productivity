@@ -19,7 +19,7 @@ import { useData } from "@/lib/useData";
 import { useConfig } from "@/lib/configStore";
 import { generarPlanSimple } from "@/lib/planSimple";
 import type { EstadoEmocional } from "@/lib/plan";
-import { getCurrentISOWeek, BLOQUE_HORARIO } from "@/lib/semana";
+import { getCurrentISOWeek, BLOQUE_HORARIO, localYMD } from "@/lib/semana";
 import type {
   PlanDiario,
   PlanGeneradoSimple,
@@ -31,7 +31,10 @@ import type {
 // Constantes UI
 // ----------------------------------------------------------------------------
 
-const HOY = () => new Date().toISOString().slice(0, 10);
+// localYMD, no toISOString(): el plan se persiste con esta fecha y, en UTC+
+  // (España), el toISOString() entre las 00:00 y las 02:00 devuelve el día
+  // anterior → el plan de hoy se guardaba como el de ayer.
+const HOY = () => localYMD(new Date());
 
 // Las opciones coinciden EXACTAMENTE con los MAPAS del Dashboard emocional,
 // para que los valores se puedan graficar en el dashboard sin mapeos extra.

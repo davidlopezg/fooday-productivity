@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Fragment, useMemo, useState } from "react";
 import { fetchPlanes } from "@/lib/queries";
 import { useData } from "@/lib/useData";
+import { localYMD } from "@/lib/semana";
 import type { PlanDiario } from "@/lib/types";
 
 type PlanConConteo = PlanDiario & {
@@ -35,7 +36,7 @@ export default function PlanDiarioHistoricoPage() {
     if (rango === "todo") return undefined;
     const d = new Date();
     d.setDate(d.getDate() - parseInt(rango, 10));
-    return { desde: d.toISOString().slice(0, 10), limit: 500 };
+    return { desde: localYMD(d), limit: 500 };
   }, [rango]);
 
   const planesQ = useData<PlanConConteo[]>(() => fetchPlanes(filtros), []);

@@ -336,7 +336,7 @@ export default function DocsPage() {
             Última actualización:
           </span>
           <span className="font-mono text-indigo-700 dark:text-indigo-300">
-            2026-10-07
+            2026-10-11
           </span>
           <span className="text-muted-foreground">
             — selector de meta/KR en CrearModal/EditarModal. Chip visual hábito vs puntual (RecurrenciaChip). Badge "📊 N KRs · M trimestres" en /metas. Tres funciones IA nuevas: botón en /metas/nueva ("Generar plan"), botón en /metas ("Sugerir 3 WIGs"), y nueva ruta /metas/agente (contexto libre → meta + plan completo).
@@ -1548,6 +1548,85 @@ export default function DocsPage() {
               <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas/nueva</code>.
               <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metodologia</code>{" "}
               §3 menciona también la regla plazo → trimestres en su aplicación de WIGs.
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-rose-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-rose-700 dark:text-rose-300 sm:text-sm">
+              2026-10-11
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">Bugfix por toda la app (8 bugs).</strong>{" "}
+              Sin cambios de UX: todo arregla comportamiento incorrecto.
+              (1) El widget de la home <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/pagos</code> consultaba
+              el DOMINGO en vez del lunes en husos UTC+ (España) porque{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">setHours(0,0,0,0) + toISOString().slice(0,10)</code>{" "}
+              cruza a UTC; ahora se usa <code className="rounded bg-muted px-1.5 py-0.5 text-xs">localYMD()</code> de{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/lib/semana.ts</code>. Mismo bug en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">PagosLista</code>,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">PagoFormModal</code>,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">PagosNotificaciones</code>,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">inicioDeSemana()</code> de{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/informes</code>, el filtro{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">hoy()</code> de{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/pomodoroStore</code>, el{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">default fecha</code> de{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">registrarPago</code>, los{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">HOY</code> de{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/estatus</code>,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/estatus/nuevo</code>,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/plan-diario</code>,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/plan-diario/historico</code>,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/pipeline</code>, las queries de{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/lib/queries.ts</code> y{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/lib/pagos/queries.ts</code> y la recurrencia{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">siguienteFechaRecurrencia()</code> en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/lib/mutations.ts</code>. (2) El pomodoro
+              <strong> duplicaba sesiones</strong>: cerrar el{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">PostFocusDialog</code> dejaba{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">endAt=0</code> y al pulsar Reanudar se
+              llamaba a <code className="rounded bg-muted px-1.5 py-0.5 text-xs">onFaseTerminada()</code> (que graba
+              sesión); ahora reanuda con la duración de la fase. (3){" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">elegirMicroAccion</code> criterio 1 era
+              código muerto (<code className="rounded bg-muted px-1.5 py-0.5 text-xs">racha === 0</code> justo
+              cuando <code className="rounded bg-muted px-1.5 py-0.5 text-xs">rota</code> es true); añadido{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">rachaPrevia</code> a{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">RachaHabito</code> y el criterio 1 ya
+              dispara de verdad. (4){" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">parsearTrimestresDePlazo()</code> perdía
+              trimestres en plural/listas:{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">"2º y 3º trimestre" → [3]</code> (Q2
+              silenciado) y{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">"trimestres 2 y 3" → [1,2,3,4]</code>; ahora
+              acumula ordinales y soporta plural/listas. (5) Parser de PDF: la etiqueta{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">"De"</code> casaba dentro de "Desde:" y
+              metía <code className="rounded bg-muted px-1.5 py-0.5 text-xs">"sde: mi banco"</code> como proveedor
+              (añadido <code className="rounded bg-muted px-1.5 py-0.5 text-xs">\b…\b</code>); además{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">extraerTextoPDF</code> ya detecta saltos de
+              línea por coordenada Y cuando los PDFs no marcan{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">hasEOL</code>. (6) ~11 mutaciones de{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/lib/mutations.ts</code> ignoraban el{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">error</code> de Supabase y mentían a la UI
+              (RLS/red): <code className="rounded bg-muted px-1.5 py-0.5 text-xs">marcarHecha</code>,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">reabrirTarea</code>,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">archivar/desarchivar/eliminarTarea</code>,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">crearCaptura</code>,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">marcarSubtareaHecha</code>,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">marcarTareaPlanHecha</code>,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">guardarNotasPlan</code>,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">actualizar/eliminarBorrador</code> — ahora
+              todas lanzan error. (7) <code className="rounded bg-muted px-1.5 py-0.5 text-xs">configStore</code>{" "}
+              podía borrar la API key local si el upsert best-effort de{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">save()</code> fallaba: el remoto con{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">key: null</code> pisaba local; ahora solo
+              sobrescribe si el remoto trae key o no tenemos local. (8) Menores: flash de tema en dark (ahora hay
+              un script inline en <code className="rounded bg-muted px-1.5 py-0.5 text-xs">layout.tsx</code> que
+              aplica la clase <code className="rounded bg-muted px-1.5 py-0.5 text-xs">.dark</code> antes del primer
+              paint) y <code className="rounded bg-muted px-1.5 py-0.5 text-xs">useData</code> ya marca{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">loading: true</code> al recargar por cambio
+              de deps (antes pintaba datos viejos como frescos).{" "}
+              <em className="text-muted-foreground">No se han añadido/modificado pantallas, hábitos, rituales
+              ni reglas de metodología, así que el índice FEATURES y los rituales no cambian. Esta entrada es
+              la única actualización obligatoria del AGENTS.md.</em>
             </span>
           </li>
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">

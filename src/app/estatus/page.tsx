@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { fetchEstatusList } from "@/lib/queries";
 import { useData } from "@/lib/useData";
 import { calcularScoreHabitos } from "@/lib/estatus";
+import { localYMD } from "@/lib/semana";
 import { ScoreHabitos } from "@/components/ScoreHabitos";
 import { IconClipboardCheck, IconPlus } from "@/components/icons";
 import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
@@ -24,7 +25,7 @@ export default function EstatusListadoPage() {
   const desde = useMemo(() => {
     const d = new Date();
     d.setDate(d.getDate() - dias);
-    return d.toISOString().slice(0, 10);
+    return localYMD(d);
   }, [dias]);
   const filtradas = useMemo(
     () => entradas.filter((e) => e.fecha >= desde),

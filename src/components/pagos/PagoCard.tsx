@@ -24,6 +24,7 @@ import {
   reprogramarSiguienteLunes,
 } from "@/lib/pagos/mutations";
 import { errorMessage } from "@/lib/errors";
+import { localYMD } from "@/lib/semana";
 import {
   IconAlertTriangle,
   IconCheck,
@@ -49,7 +50,7 @@ const fmtFechaLarga = (iso: string) => {
   });
 };
 
-const fmtHoy = () => new Date().toISOString().slice(0, 10);
+const fmtHoy = () => localYMD(new Date());
 
 function Badge({
   tone,

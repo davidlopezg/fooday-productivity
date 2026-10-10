@@ -129,6 +129,10 @@ export interface RachaHabito {
   id: HabitoId;
   meta: HabitoMeta;
   racha: number;          // 0 si hoy no fue 'hecho' (o si racha rota)
+  /** Racha que terminaba AYER (conteo hacia atrás desde ayer). Es la que
+   *  permite detectar "se está rompiendo hoy": `racha` vale 0 justamente
+   *  cuando `rota` es true, así que no sirve para el criterio 1. */
+  rachaPrevia: number;
   rachaTopHistorica: number; // la racha más larga del histórico (para contexto)
   rota: boolean;          // true si ayer 'hecho' y hoy != 'hecho'
 }
@@ -154,6 +158,13 @@ export function calcularRachas(
       if (estadoHabito(serie[i], meta.id) === "hecho") racha++;
       else break;
     }
+    // Racha que llegaba hasta AYER (arranca en el penúltimo registro).
+    // Necesaria porque `racha` es 0 siempre que `rota` es true.
+    let rachaPrevia = 0;
+    for (let i = serie.length - 2; i >= 0; i--) {
+      if (estadoHabito(serie[i], meta.id) === "hecho") rachaPrevia++;
+      else break;
+    }
     // racha top histórica (recorre todo)
     let rachaTop = 0;
     let actual = 0;
@@ -170,7 +181,14 @@ export function calcularRachas(
     const ayerIdx = serie.length - 2;
     const ayerEstado = ayerIdx >= 0 ? estadoHabito(serie[ayerIdx], meta.id) : null;
     const rota = hoyEstado !== "hecho" && ayerEstado === "hecho";
-    return { id: meta.id, meta, racha, rachaTopHistorica: rachaTop, rota };
+    return {
+      id: meta.id,
+      meta,
+      racha,
+      rachaPrevia,
+      rachaTopHistorica: rachaTop,
+      rota,
+    };
   });
 }
 
@@ -255,13 +273,16 @@ export function elegirMicroAccion(
   patron: PatronSemanal,
   score: number,
 ): MicroAccion {
-  // Criterio 1: racha a punto de romperse (ayer ✓ y hoy ✗, racha previa ≥ 2)
-  const rotaConRacha = rachas.find((r) => r.rota && r.racha >= 2);
+  // Criterio 1: racha a punto de romperse (ayer ✓ y hoy ✗, racha previa ≥ 2).
+  // OJO: se mira `rachaPrevia`, NO `racha`. `racha` cuenta desde hoy, así que
+  // vale 0 justo cuando la racha está rota → el criterio nunca se disparaba.
+  const rotaConRacha = rachas.find((r) => r.rota && r.rachaPrevia >= 2);
   if (rotaConRacha) {
+    const d = rotaConRacha.rachaPrevia;
     return {
-      accion: `Mañana haz ${rotaConRacha.meta.nombre} para reconstruir la racha (${rotaConRacha.racha} días).`,
+      accion: `Mañana haz ${rotaConRacha.meta.nombre} para reconstruir la racha (${d} días).`,
       criterio: 1,
-      justificacion: `Rota la racha de ${rotaConRacha.racha} días en ${rotaConRacha.meta.nombre}.`,
+      justificacion: `Rota la racha de ${d} días en ${rotaConRacha.meta.nombre}.`,
     };
   }
 

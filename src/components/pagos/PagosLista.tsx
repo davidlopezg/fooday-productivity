@@ -11,6 +11,7 @@ import {
   fetchPagosUrgentes,
 } from "@/lib/pagos/queries";
 import { refreshPagosVencidos } from "@/lib/pagos/mutations";
+import { localYMD } from "@/lib/semana";
 import { PagoCard } from "@/components/pagos/PagoCard";
 import { PagoFormModal } from "@/components/pagos/PagoFormModal";
 import { PagoPagarParcialModal } from "@/components/pagos/PagoPagarParcialModal";
@@ -56,14 +57,15 @@ const fmtFechaLarga = (iso: string) => {
   });
 };
 
-/** Devuelve el próximo lunes (o el de hoy si ya es lunes). */
+/** Devuelve el próximo lunes (o el de hoy si ya es lunes) como YYYY-MM-DD
+ *  LOCAL. No usar toISOString(): en UTC+ devolvería el día anterior. */
 function proximoLunesISO(): string {
   const hoy = new Date();
   const dow = hoy.getDay() === 0 ? 7 : hoy.getDay(); // ISO: 1=lun, 7=dom
   const diff = (8 - dow) % 7; // 0 si ya es lunes
   const lunes = new Date(hoy);
   lunes.setDate(hoy.getDate() + diff);
-  return lunes.toISOString().slice(0, 10);
+  return localYMD(lunes);
 }
 
 type Tab = "lunes" | "pendientes" | "historico";

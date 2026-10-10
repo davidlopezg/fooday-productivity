@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
+import { localYMD } from "@/lib/semana";
 import type {
   ComidaInput,
   EstatusConComidas,
@@ -17,10 +18,13 @@ import type {
 import { desgranarTareaIA, generarCriterioTerminacionIA } from "@/lib/plan";
 
 export async function marcarHecha(id: string) {
-  await createClient()
+  const { error } = await createClient()
     .from("tareas")
     .update({ estado: "hecha", completada_at: new Date().toISOString() })
     .eq("id", id);
+  // Sin esto, un UPDATE fallido (RLS, red, columna inexistente) pasaba por
+  // bueno y la UI mentia: el usuario veía la tarea tachada sin estar guardada.
+  if (error) throw new Error(`No se pudo marcar la tarea como hecha: ${error.message}`);
   // ponytail: la recurrencia es un side-effect de "hecha". Si la IA está
   // apagada o la RPC falla, NO se rompe el marcar-hecha principal: el error
   // se loguea y el usuario lo verá en el log de consola.
@@ -30,22 +34,32 @@ export async function marcarHecha(id: string) {
 }
 
 export async function reabrirTarea(id: string) {
-  await createClient()
+  const { error } = await createClient()
     .from("tareas")
     .update({ estado: "pendiente", completada_at: null })
     .eq("id", id);
+  if (error) throw new Error(`No se pudo reabrir la tarea: ${error.message}`);
 }
 
 export async function archivarTarea(id: string) {
-  await createClient().from("tareas").update({ estado: "archivada" }).eq("id", id);
+  const { error } = await createClient()
+    .from("tareas")
+    .update({ estado: "archivada" })
+    .eq("id", id);
+  if (error) throw new Error(`No se pudo archivar la tarea: ${error.message}`);
 }
 
 export async function desarchivarTarea(id: string) {
-  await createClient().from("tareas").update({ estado: "pendiente" }).eq("id", id);
+  const { error } = await createClient()
+    .from("tareas")
+    .update({ estado: "pendiente" })
+    .eq("id", id);
+  if (error) throw new Error(`No se pudo desarchivar la tarea: ${error.message}`);
 }
 
 export async function eliminarTarea(id: string) {
-  await createClient().from("tareas").delete().eq("id", id);
+  const { error } = await createClient().from("tareas").delete().eq("id", id);
+  if (error) throw new Error(`No se pudo eliminar la tarea: ${error.message}`);
 }
 
 export interface TareaCampos {
@@ -328,11 +342,12 @@ export async function crearCaptura(
 ) {
   const t = texto.trim();
   if (!t) return;
-  await createClient().from("capturas").insert({
+  const { error } = await createClient().from("capturas").insert({
     texto: t,
     estado: "pendiente",
     rama: rama ?? null,
   });
+  if (error) throw new Error(`No se pudo guardar la captura: ${error.message}`);
 }
 
 /** Marca una captura como procesada y anota a dónde fue (p.ej. "pago:<id>"). */
@@ -704,15 +719,27 @@ export async function guardarPlanDiario(payload: {
 }
 
 export async function marcarSubtareaHecha(id: string, hecho: boolean) {
-  await createClient().from("plan_diario_subtareas").update({ hecho }).eq("id", id);
+  const { error } = await createClient()
+    .from("plan_diario_subtareas")
+    .update({ hecho })
+    .eq("id", id);
+  if (error) throw new Error(`No se pudo actualizar la subtarea: ${error.message}`);
 }
 
 export async function marcarTareaPlanHecha(id: string, hecho: boolean) {
-  await createClient().from("plan_diario_tareas").update({ hecho }).eq("id", id);
+  const { error } = await createClient()
+    .from("plan_diario_tareas")
+    .update({ hecho })
+    .eq("id", id);
+  if (error) throw new Error(`No se pudo actualizar la tarea del plan: ${error.message}`);
 }
 
 export async function guardarNotasPlan(id: string, notas: string) {
-  await createClient().from("planes_diarios").update({ notas }).eq("id", id);
+  const { error } = await createClient()
+    .from("planes_diarios")
+    .update({ notas })
+    .eq("id", id);
+  if (error) throw new Error(`No se pudieron guardar las notas: ${error.message}`);
 }
 
 export async function guardarBorrador(payload: {
@@ -736,11 +763,19 @@ export async function guardarBorrador(payload: {
 }
 
 export async function actualizarBorrador(id: string, contenido: string) {
-  await createClient().from("plan_diario_borradores").update({ contenido }).eq("id", id);
+  const { error } = await createClient()
+    .from("plan_diario_borradores")
+    .update({ contenido })
+    .eq("id", id);
+  if (error) throw new Error(`No se pudo actualizar el borrador: ${error.message}`);
 }
 
 export async function eliminarBorrador(id: string) {
-  await createClient().from("plan_diario_borradores").delete().eq("id", id);
+  const { error } = await createClient()
+    .from("plan_diario_borradores")
+    .delete()
+    .eq("id", id);
+  if (error) throw new Error(`No se pudo eliminar el borrador: ${error.message}`);
 }
 
 // ============================================================================
@@ -1312,7 +1347,10 @@ function siguienteFechaRecurrencia(
   hoy: Date,
   rec: Recurrencia,
 ): string | null {
-  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  // localYMD, no toISOString(): `hoy` es un Date en hora LOCAL. Con
+  // toISOString() la siguiente instancia de una tarea recurrente se
+  // guardaba con el día anterior en zonas UTC+.
+  const iso = (d: Date) => localYMD(d);
   if (rec.tipo === "diaria") {
     const next = new Date(hoy);
     next.setDate(next.getDate() + 1);

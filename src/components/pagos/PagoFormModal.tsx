@@ -20,6 +20,7 @@ import {
 } from "@/lib/pagos/types";
 import { crearPago, editarPago, programarPago } from "@/lib/pagos/mutations";
 import { errorMessage } from "@/lib/errors";
+import { localYMD } from "@/lib/semana";
 
 const fmtFechaInput = (iso: string | null | undefined): string => iso ?? "";
 
@@ -51,8 +52,10 @@ export function PagoFormModal({
     pago ? String(pago.importe_total) : "",
   );
   const [fechaVencimiento, setFechaVencimiento] = useState(
+    // localYMD, no toISOString(): en UTC+ el toISOString() de "hoy + 14 días"
+    // puede caer en el día anterior (bug de zona horaria).
     fmtFechaInput(pago?.fecha_vencimiento) ||
-      new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10),
+      localYMD(new Date(Date.now() + 14 * 86400000)),
   );
   const [fechaEmision, setFechaEmision] = useState(
     fmtFechaInput(pago?.fecha_emision_factura),
@@ -145,7 +148,7 @@ export function PagoFormModal({
     const diff = (8 - dow) % 7; // 0 si ya es lunes
     const lunes = new Date(hoy);
     lunes.setDate(hoy.getDate() + diff);
-    setFechaProgramada(lunes.toISOString().slice(0, 10));
+    setFechaProgramada(localYMD(lunes));
   };
 
   const isPagado = pago?.estado_efectivo === "pagado";
