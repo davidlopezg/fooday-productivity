@@ -483,8 +483,25 @@ function sanearJSONComun(s: string): string {
 
 function extractFirstJSON(content: string): string {
   let s = content.trim();
+
+  // 1) Quitar fences ```json ... ``` o ``` ... ``` al inicio/final.
   const fence = s.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/);
   if (fence) s = fence[1].trim();
+
+  // 2) Quitar bloques de razonamiento del modelo (<think> ... </think>).
+  //    MiniMax-M3 y otros modelos con "chain of thought" pueden anteponer
+  //    bloques con texto en lenguaje natural antes del JSON. Esos bloques
+  //    contienen llaves que confundirían al extractor ingenuo.
+  s = s.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+  // Variantes: <|reasoning|>...<|/reasoning|>, <reasoning>...</reasoning>.
+  s = s.replace(/<\|?\s*reasoning\s*\|?>[\s\S]*?<\|?\s*\/?\s*reasoning\s*\|?>/gi, "").trim();
+  s = s.replace(/<\s*reasoning\s*>[\s\S]*?<\s*\/\s*reasoning\s*>/gi, "").trim();
+
+  // 3) Si después de limpiar fences y razonamiento siguen quedando fences
+  //    ```json ... ``` (porque la IA los metió alrededor del JSON), los
+  //    respetamos una segunda vez.
+  const fence2 = s.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/);
+  if (fence2) s = fence2[1].trim();
 
   const start = s.indexOf("{");
   if (start < 0) throw new Error("No se encontró '{' en la respuesta.");
