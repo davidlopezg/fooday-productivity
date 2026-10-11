@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   crearMeta,
   ensurePeriodosAnio,
@@ -16,7 +16,9 @@ import { useData } from "@/lib/useData";
 import {
   aplicarKrsYTareasEnMeta,
   generarMetaYPlanIA,
+  parsearMesesDeRango,
   type MetaYPlanGenerado,
+  type UnidadDisponible,
 } from "@/lib/plan";
 import { PlanMetaGeneradoPreview } from "@/components/PlanMetaGeneradoPreview";
 import {
@@ -26,29 +28,84 @@ import {
 } from "@/components/icons";
 import type { Periodo } from "@/lib/types";
 
+/** YYYY-MM-DD de hoy en hora local del navegador. */
+function hoyYMD(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${dd}`;
+}
+
 export default function AgenteMetasPage() {
   const router = useRouter();
   const cfg = useConfig();
   const periodosQ = useData<Periodo[]>(fetchPeriodos, []);
   const periodos = periodosQ.data ?? [];
   const anioActual = new Date().getFullYear();
+  const hoyStr = hoyYMD();
 
   const trimestresDisponibles = periodos
     .filter((p) => p.tipo === "trimestre" && p.anio === anioActual)
     .sort((a, b) => a.numero - b.numero)
-    .map((p) => ({ numero: p.numero as 1 | 2 | 3 | 4, nombre: p.nombre }));
+    .map((p) => ({
+      unidad: "trimestre" as const,
+      numero: p.numero as 1 | 2 | 3 | 4,
+      nombre: p.nombre,
+      fecha_inicio: p.fecha_inicio,
+      fecha_fin: p.fecha_fin,
+    }));
 
   const [contexto, setContexto] = useState("");
   const [restricciones, setRestricciones] = useState(
     "TDAH; cervicales (no correr, no impacto); ansiedad",
   );
+  // Migration 0025: fechas reales opcionales. Vacías = la IA deduce (modo
+  // agente puro). Rellenadas = la IA debe respetar el rango.
+  const [fechaInicioMeta, setFechaInicioMeta] = useState<string>("");
+  const [fechaObjetivo, setFechaObjetivo] = useState<string>("");
+  const [fechaFinBloqueada, setFechaFinBloqueada] = useState<boolean>(false);
   const [sugerencia, setSugerencia] = useState<MetaYPlanGenerado | null>(null);
   const [generando, setGenerando] = useState(false);
   const [aplicando, setAplicando] = useState(false);
   const [errorGen, setErrorGen] = useState<string | null>(null);
   const [errorApp, setErrorApp] = useState<string | null>(null);
 
+  // —— Derivados de fechas (solo si hay fechas rellenas; si no, vacío) ——
+  const rango = useMemo(
+    () =>
+      parsearMesesDeRango({
+        fecha_inicio: fechaInicioMeta || hoyStr,
+        fecha_objetivo: fechaObjetivo || null,
+        anio: anioActual,
+        hoy: hoyStr,
+      }),
+    [fechaInicioMeta, fechaObjetivo, anioActual, hoyStr],
+  );
+
+  const unidadesObjetivo: UnidadDisponible[] = useMemo(
+    () =>
+      rango.meses.map<UnidadDisponible>((m) => ({
+        unidad: "mes",
+        numero: m.numero,
+        nombre: m.nombre,
+        fecha_inicio: m.fecha_inicio,
+        fecha_fin: m.fecha_fin,
+      })),
+    [rango],
+  );
+
+  // Error derivado (sin setState en useMemo).
+  const fechaError =
+    fechaInicioMeta && fechaObjetivo && fechaInicioMeta > fechaObjetivo
+      ? "La fecha de inicio no puede ser posterior a la fecha límite."
+      : null;
+
   const apiKeyOk = !!cfg.data.minimax_api_key;
+  const hayFechas = !!fechaInicioMeta || !!fechaObjetivo;
+
+  const field =
+    "h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring";
 
   async function generar() {
     if (!contexto.trim()) {
@@ -67,19 +124,40 @@ export default function AgenteMetasPage() {
       );
       return;
     }
+    if (fechaError) {
+      setErrorGen(fechaError);
+      return;
+    }
     setGenerando(true);
     setErrorGen(null);
     setSugerencia(null);
     try {
-      const res = await generarMetaYPlanIA(cfg.data.base_url, cfg.data.minimax_api_key!, cfg.data.model, {
-        contexto: contexto.trim(),
-        restricciones: restricciones
-          .split(/[;\n]+/)
-          .map((s) => s.trim())
-          .filter(Boolean),
-        trimestres_disponibles: trimestresDisponibles,
-        anio: anioActual,
-      });
+      const res = await generarMetaYPlanIA(
+        cfg.data.base_url,
+        cfg.data.minimax_api_key!,
+        cfg.data.model,
+        {
+          contexto: contexto.trim(),
+          restricciones: restricciones
+            .split(/[;\n]+/)
+            .map((s) => s.trim())
+            .filter(Boolean),
+          // Compat: trimestres como fallback si no hay fechas.
+          trimestres_disponibles: trimestresDisponibles,
+          // Migration 0025: si hay fechas,优先 pasan meses sueltos.
+          unidades_disponibles: hayFechas ? unidadesObjetivo : undefined,
+          unidades_objetivo: hayFechas
+            ? unidadesObjetivo.map((u) => ({
+                unidad: u.unidad,
+                numero: u.numero,
+              }))
+            : undefined,
+          fecha_inicio_meta: fechaInicioMeta || null,
+          fecha_objetivo: fechaObjetivo || null,
+          fecha_fin_bloqueada: fechaFinBloqueada && !!fechaObjetivo,
+          anio: anioActual,
+        },
+      );
       setSugerencia(res);
     } catch (e) {
       setErrorGen(e instanceof Error ? e.message : "La IA no pudo generar la sugerencia.");
@@ -125,7 +203,7 @@ export default function AgenteMetasPage() {
         });
       }
 
-      // 2. Crear meta.
+      // 2. Crear meta (migration 0025: pasamos fechas si las rellenó).
       const meta = await crearMeta({
         titulo: sugerencia.meta_titulo,
         descripcion: sugerencia.meta_descripcion || null,
@@ -133,6 +211,10 @@ export default function AgenteMetasPage() {
         plazo: sugerencia.meta_plazo,
         estado: "sin_empezar",
         prioridad: "alta",
+        fecha_inicio_meta: fechaInicioMeta || null,
+        fecha_objetivo: fechaObjetivo || null,
+        fecha_fin_bloqueada:
+          !!fechaFinBloqueada && !!fechaObjetivo ? true : false,
       });
 
       // 3. Materializar el plan con el helper compartido (migration 0025).
@@ -160,6 +242,16 @@ export default function AgenteMetasPage() {
     setErrorGen(null);
   }
 
+  // Etiqueta humana del rango (para el chip).
+  const mesesLabel = useMemo(() => {
+    if (!hayFechas) return null;
+    if (rango.meses.length === 0) return "sin rango";
+    if (rango.meses.length === 1) return `1 mes (${rango.meses[0].nombre})`;
+    const primero = rango.meses[0].nombre;
+    const ultimo = rango.meses[rango.meses.length - 1].nombre;
+    return `${rango.meses.length} meses · ${primero} → ${ultimo}`;
+  }, [hayFechas, rango]);
+
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <Link
@@ -179,8 +271,8 @@ export default function AgenteMetasPage() {
             </h1>
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
               Cuéntame qué quieres conseguir en tus propias palabras. Te propongo una meta
-              bien definida, sus KRs por trimestre y las tareas (incluyendo hábitos) para
-              ejecutarla. Revisas, ajustas y aplicas.
+              bien definida, sus KRs (por meses o trimestres, según lo que indiques) y las
+              tareas (incluyendo hábitos) para ejecutarla. Revisas, ajustas y aplicas.
             </p>
           </div>
         </div>
@@ -225,10 +317,93 @@ export default function AgenteMetasPage() {
           </span>
         </label>
 
+        {/* === Migration 0025: rango opcional. Vacío = agente puro, la IA
+              deduce del texto. Rellenado = la IA reparte los KRs dentro del
+              rango como meses sueltos (no fuerza 4 trimestres). === */}
+        <details className="mt-4 rounded-md border border-border bg-muted/20 px-3 py-2">
+          <summary className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground">
+            Rango de la meta (opcional — déjalo vacío si prefieres que la IA lo deduzca)
+          </summary>
+          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium">
+                Fecha de inicio
+                <span className="ml-1 font-normal text-muted-foreground">
+                  (opcional)
+                </span>
+              </span>
+              <input
+                type="date"
+                className={field}
+                value={fechaInicioMeta}
+                onChange={(e) => setFechaInicioMeta(e.target.value)}
+                disabled={generando || aplicando}
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium">
+                Fecha límite
+                <span className="ml-1 font-normal text-muted-foreground">
+                  (opcional)
+                </span>
+              </span>
+              <input
+                type="date"
+                className={field}
+                value={fechaObjetivo}
+                onChange={(e) => setFechaObjetivo(e.target.value)}
+                min={fechaInicioMeta || undefined}
+                disabled={generando || aplicando}
+              />
+            </label>
+            <label className="flex items-end pb-1">
+              <span className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={fechaFinBloqueada}
+                  onChange={(e) => setFechaFinBloqueada(e.target.checked)}
+                  disabled={!fechaObjetivo || generando || aplicando}
+                  className="mt-0.5 h-4 w-4 rounded border-input disabled:opacity-50"
+                />
+                <span>
+                  <span className="font-medium">
+                    🔒 Fecha crítica — no se mueve
+                  </span>
+                  <span className="block text-[11px] text-muted-foreground">
+                    La IA no podrá meter nada después.
+                  </span>
+                </span>
+              </span>
+            </label>
+          </div>
+          {fechaError && (
+            <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+              {fechaError}
+            </p>
+          )}
+          {hayFechas && mesesLabel && (
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
+              <span className="rounded-md bg-background px-2 py-0.5 font-mono text-muted-foreground">
+                Rango detectado: {mesesLabel}
+              </span>
+              {rango.fin_abierto && (
+                <span className="rounded-md bg-amber-500/10 px-2 py-0.5 text-amber-700 dark:text-amber-300">
+                  ⚠️ Sin deadline — la IA propondrá uno orientativo
+                </span>
+              )}
+              {fechaFinBloqueada && fechaObjetivo && (
+                <span className="rounded-md bg-red-500/10 px-2 py-0.5 text-red-700 dark:text-red-300">
+                  🔒 HARD CONSTRAINT
+                </span>
+              )}
+            </div>
+          )}
+        </details>
+
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <button
             onClick={generar}
-            disabled={generando || aplicando || !contexto.trim() || !apiKeyOk}
+            disabled={generando || aplicando || !contexto.trim() || !apiKeyOk || !!fechaError}
             className="inline-flex items-center gap-1.5 rounded-md bg-violet-500 px-4 py-2 text-sm font-medium text-white hover:bg-violet-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <IconSparkles className="h-4 w-4" />
@@ -248,6 +423,10 @@ export default function AgenteMetasPage() {
         <h2 className="font-semibold">Cómo funciona</h2>
         <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-muted-foreground">
           <li>Escribes en lenguaje natural lo que quieres conseguir.</li>
+          <li>
+            (Opcional) Indicas el rango real con dos fechas + si la fecha
+            límite es dura.
+          </li>
           <li>La IA (modelo MiniMax-M3) analiza y propone una meta + KRs + tareas.</li>
           <li>Te muestra una previsualización. Puedes cancelar y reformular, o aplicar.</li>
           <li>Al aplicar, se crea la meta + KRs + tareas con un solo clic. Te lleva al detalle.</li>
@@ -271,6 +450,7 @@ export default function AgenteMetasPage() {
           plan={sugerencia.plan}
           metaTitulo={sugerencia.meta_titulo}
           trimestrersDisponibles={trimestresDisponibles}
+          unidadesDisponibles={unidadesObjetivo}
           busy={aplicando}
           error={errorApp}
           onCancel={cancelar}
