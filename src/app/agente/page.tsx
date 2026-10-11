@@ -259,75 +259,125 @@ export default function AgentePage() {
       const usarFechasDavid = !!fechaInicioMeta || !!fechaObjetivo;
       const idsCreadas: string[] = [];
       const krsFallaron: string[] = [];
+      const metasFallaron: Array<{
+        titulo: string;
+        error: string;
+      }> = [];
+
+      // —— Logging brutal del estado ANTES del loop, para poder
+      // diagnosticar exactamente qué llega del parser y qué falla. ——
+      if (typeof window !== "undefined") {
+        try {
+          sessionStorage.setItem(
+            "agente_debug_aplicar",
+            JSON.stringify({
+              t: Date.now(),
+              clasificacion: resultado.clasificacion,
+              metas_recibidas: resultado.metas.length,
+              titulos_recibidos: resultado.metas.map((m) => m.meta_titulo),
+              titulos_con_kr: resultado.metas
+                .filter((m) => m.kr_inicial)
+                .map((m) => ({
+                  titulo: m.meta_titulo,
+                  unidad_tiempo: m.unidad_tiempo,
+                  mes: m.mes,
+                  trimestre: m.kr_inicial?.trimestre,
+                })),
+              periodos_disponibles: Array.from(periodosByNumero.keys()),
+              proyecto_id: proyectoId,
+              area_id: areaId,
+            }),
+          );
+        } catch {
+          // sessionStorage puede fallar en modo privado.
+        }
+      }
 
       for (const m of resultado.metas) {
-        const meta = await crearMeta({
-          titulo: m.meta_titulo,
-          descripcion: m.meta_descripcion || null,
-          estado: "sin_empezar",
-          prioridad: "alta",
-          area_id: areaId,
-          proyecto_id: proyectoId,
-          plazo: m.meta_plazo || null,
-          ambito: m.meta_ambito,
-          fecha_objetivo:
-            (usarFechasDavid ? fechaObjetivo : null) ?? m.fecha_objetivo,
-          contexto: m.contexto,
-          fecha_inicio_meta: usarFechasDavid ? fechaInicioMeta || null : null,
-          fecha_fin_bloqueada:
-            usarFechasDavid && !!fechaObjetivo ? fechaFinBloqueada : false,
-        });
-        idsCreadas.push(meta.id);
+        try {
+          const meta = await crearMeta({
+            titulo: m.meta_titulo,
+            descripcion: m.meta_descripcion || null,
+            estado: "sin_empezar",
+            prioridad: "alta",
+            area_id: areaId,
+            proyecto_id: proyectoId,
+            plazo: m.meta_plazo || null,
+            ambito: m.meta_ambito,
+            fecha_objetivo:
+              (usarFechasDavid ? fechaObjetivo : null) ?? m.fecha_objetivo,
+            contexto: m.contexto,
+            fecha_inicio_meta: usarFechasDavid ? fechaInicioMeta || null : null,
+            fecha_fin_bloqueada:
+              usarFechasDavid && !!fechaObjetivo ? fechaFinBloqueada : false,
+          });
+          idsCreadas.push(meta.id);
 
-        if (m.kr_inicial) {
-          // Resolver el periodo_id a partir de unidad_tiempo/mes o
-          // trimestre (compat). Ambas vías convergen en un periodoId.
-          let periodoId: string | null = null;
+          if (m.kr_inicial) {
+            let periodoId: string | null = null;
+            if (m.unidad_tiempo === "mes" && typeof m.mes === "number") {
+              const num = m.mes;
+              const trim = (num <= 3 ? 1 : num <= 6 ? 2 : num <= 9 ? 3 : 4) as
+                | 1
+                | 2
+                | 3
+                | 4;
+              periodoId = periodosByNumero.get(trim)?.id ?? null;
+            } else {
+              periodoId =
+                periodosByNumero.get(m.kr_inicial.trimestre as 1 | 2 | 3 | 4)?.id ??
+                null;
+            }
 
-          // Si la IA devolvió `mes` (migration 0025), creamos el periodo
-          // mensual on-the-fly si no existía.
-          if (m.unidad_tiempo === "mes" && typeof m.mes === "number") {
-            const num = m.mes;
-            // Mapeamos mes→trimestre natural.
-            const trim = (num <= 3 ? 1 : num <= 6 ? 2 : num <= 9 ? 3 : 4) as
-              | 1
-              | 2
-              | 3
-              | 4;
-            periodoId = periodosByNumero.get(trim)?.id ?? null;
-          } else {
-            periodoId =
-              periodosByNumero.get(m.kr_inicial.trimestre as 1 | 2 | 3 | 4)?.id ??
-              null;
-          }
-
-          if (periodoId) {
-            try {
-              await crearResultadoPeriodo({
-                meta_id: meta.id,
-                periodo_id: periodoId,
-                titulo: m.kr_inicial.titulo,
-                descripcion: null,
-                metrica: m.kr_inicial.metrica,
-                valor_objetivo: m.kr_inicial.valor_objetivo,
-                unidad: m.kr_inicial.unidad,
-                peso: 1,
-                estado: "pendiente",
-              });
-            } catch (e) {
-              console.warn("[Agente] crear KR inicial falló:", e);
+            if (periodoId) {
+              try {
+                await crearResultadoPeriodo({
+                  meta_id: meta.id,
+                  periodo_id: periodoId,
+                  titulo: m.kr_inicial.titulo,
+                  descripcion: null,
+                  metrica: m.kr_inicial.metrica,
+                  valor_objetivo: m.kr_inicial.valor_objetivo,
+                  unidad: m.kr_inicial.unidad,
+                  peso: 1,
+                  estado: "pendiente",
+                });
+              } catch (e) {
+                console.warn("[Agente] crear KR inicial falló:", e);
+                krsFallaron.push(m.meta_titulo);
+              }
+            } else {
+              console.warn(
+                "[Agente] KR sin periodo resoluble:",
+                m.kr_inicial,
+              );
               krsFallaron.push(m.meta_titulo);
             }
-          } else {
-            // La IA devolvió un trimestre que no existe en BD. No
-            // fallamos: la meta queda creada y se le asignará un KR a
-            // posteriori cuando David arregle el periodo.
-            console.warn(
-              "[Agente] KR sin periodo resoluble:",
-              m.kr_inicial,
-            );
-            krsFallaron.push(m.meta_titulo);
           }
+        } catch (e) {
+          // —— Catch individual por meta ——
+          // Antes un throw aquí abortaba el resto del loop. Ahora
+          // capturamos por meta y seguimos con las demás.
+          const errorStr = e instanceof Error ? e.message : String(e);
+          console.error("[Agente] crearMeta falló:", m.meta_titulo, errorStr);
+          metasFallaron.push({ titulo: m.meta_titulo, error: errorStr });
+        }
+      }
+
+      // —— Logging del resultado final del loop ——
+      if (typeof window !== "undefined") {
+        try {
+          sessionStorage.setItem(
+            "agente_debug_aplicar_resultado",
+            JSON.stringify({
+              t: Date.now(),
+              ids_creadas: idsCreadas,
+              krs_fallaron: krsFallaron,
+              metas_fallaron: metasFallaron,
+            }),
+          );
+        } catch {
+          // igual que antes
         }
       }
 
