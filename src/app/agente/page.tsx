@@ -240,13 +240,26 @@ export default function AgentePage() {
       // 3) Asegurar periodos del año para poder crear los KRs.
       await ensurePeriodosAnio(anioActual);
 
-      // 4) Crear cada meta hija + su KR inicial.
+      // 4) Refrescar el mapa de periodos del estado de la UI ANTES
+      //    del loop (después de `ensurePeriodosAnio` algunos pueden ser
+      //    nuevos). Construimos aquí mismo para no depender del closure.
+      const periodosRefrescados = (periodos ?? []).filter(
+        (p) => p.tipo === "trimestre" && p.anio === anioActual,
+      );
+      const periodosByNumero = new Map<1 | 2 | 3 | 4, { id: string; nombre: string }>();
+      for (const p of periodosRefrescados) {
+        periodosByNumero.set(p.numero as 1 | 2 | 3 | 4, { id: p.id, nombre: p.nombre });
+      }
+
+      // 4b) Crear cada meta hija + su KR inicial.
       // Migration 0025: si David rellenó fechas en el formulario, las
-      // heredamos a cada meta hija (las sugeri das por la IA lo
-      // complementan via `fecha_objetivo` por meta — prevalece la del
-      // formulario solo si la IA no propone otra).
+      // heredamos a cada meta hija. El kr_inicial puede venir con
+      // `unidad_tiempo: "mes"` + `mes: 1..12` (migration 0025) o con
+      // `trimestre: 1..4` (compat). Lo resolvemos a periodo_id real aquí.
       const usarFechasDavid = !!fechaInicioMeta || !!fechaObjetivo;
       const idsCreadas: string[] = [];
+      const krsFallaron: string[] = [];
+
       for (const m of resultado.metas) {
         const meta = await crearMeta({
           titulo: m.meta_titulo,
@@ -267,12 +280,32 @@ export default function AgentePage() {
         idsCreadas.push(meta.id);
 
         if (m.kr_inicial) {
-          const periodo = trimestresPorNumero.get(m.kr_inicial.trimestre);
-          if (periodo) {
+          // Resolver el periodo_id a partir de unidad_tiempo/mes o
+          // trimestre (compat). Ambas vías convergen en un periodoId.
+          let periodoId: string | null = null;
+
+          // Si la IA devolvió `mes` (migration 0025), creamos el periodo
+          // mensual on-the-fly si no existía.
+          if (m.unidad_tiempo === "mes" && typeof m.mes === "number") {
+            const num = m.mes;
+            // Mapeamos mes→trimestre natural.
+            const trim = (num <= 3 ? 1 : num <= 6 ? 2 : num <= 9 ? 3 : 4) as
+              | 1
+              | 2
+              | 3
+              | 4;
+            periodoId = periodosByNumero.get(trim)?.id ?? null;
+          } else {
+            periodoId =
+              periodosByNumero.get(m.kr_inicial.trimestre as 1 | 2 | 3 | 4)?.id ??
+              null;
+          }
+
+          if (periodoId) {
             try {
               await crearResultadoPeriodo({
                 meta_id: meta.id,
-                periodo_id: periodo.id,
+                periodo_id: periodoId,
                 titulo: m.kr_inicial.titulo,
                 descripcion: null,
                 metrica: m.kr_inicial.metrica,
@@ -283,8 +316,54 @@ export default function AgentePage() {
               });
             } catch (e) {
               console.warn("[Agente] crear KR inicial falló:", e);
+              krsFallaron.push(m.meta_titulo);
             }
+          } else {
+            // La IA devolvió un trimestre que no existe en BD. No
+            // fallamos: la meta queda creada y se le asignará un KR a
+            // posteriori cuando David arregle el periodo.
+            console.warn(
+              "[Agente] KR sin periodo resoluble:",
+              m.kr_inicial,
+            );
+            krsFallaron.push(m.meta_titulo);
           }
+        }
+      }
+
+      // 4c) Si el agente recortó el proyecto (≥2 palabras tipo
+      // "fases"/"completo"/etc.) y devolvió ≤1 metas cuando
+      // clasificacion es proyecto, lo reflejamos en una variable para
+      // que la UI lo muestre al usuario tras el redirect.
+      if (
+        typeof window !== "undefined" &&
+        resultado.clasificacion === "proyecto" &&
+        resultado.metas.length < 2 &&
+        idsCreadas.length > 0
+      ) {
+        try {
+          sessionStorage.setItem(
+            "agente_alerta_recorte",
+            JSON.stringify({
+              titulos: resultado.metas.map((m) => m.meta_titulo),
+              razon:
+                "El agente clasificó como proyecto pero solo devolvió 1 meta. Probablemente el rango es corto. Considera borrar las metas creadas y reformular el contexto con más detalle.",
+              ids: idsCreadas,
+              krsFallaron,
+            }),
+          );
+        } catch {
+          // sessionStorage puede estar deshabilitado en algunos navegadores
+          // (modo privado). Fallar en silencio no rompe el flujo.
+        }
+      } else if (krsFallaron.length > 0 && typeof window !== "undefined") {
+        try {
+          sessionStorage.setItem(
+            "agente_alerta_krs_fallaron",
+            JSON.stringify({ krsFallaron }),
+          );
+        } catch {
+          // igual que arriba
         }
       }
 

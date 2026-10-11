@@ -2604,7 +2604,23 @@ ${hardBlock ? "⚠️ HARD CONSTRAINT: la fecha límite es DURA. NINGUNA meta/kr
 
 UNIDADES HABILITADAS (usa SOLO estas): meses [${mesesHabilitados.join(", ")}].
 Para cada meta hija, en lugar de trimestre: 1..4, devuelve unidad_tiempo: "mes" y mes: N (1..12) indicando en qué mes concreto cae.
-IMPORTANTE: aunque el rango sea corto, NO recortes el alcance del proyecto. Si una iniciativa tipo proyecto pide 4 fases (dossier, alternativas, propuesta, simulacro) y el rango solo tiene 3 meses, esas 4 metas deben caer en esos 3 meses, 2 metas en el primer mes, 1+1, o similares. Comprime fases, no recortes. Si después de comprimir siguen siendo demasiadas para el rango, indícalo en fuera_de_rango y propón solo las más críticas (las que NO aplicables se enumeran en la sección apropiada del JSON, no en metas).
+
+⚠️ REGLA CRÍTICA — NUNCA RECORTES ALCANCE A 1 META ⚠️
+Aunque el rango sea corto (3 meses), NO recortes a 1 sola meta. Una iniciativa tipo proyecto suele tener 3-4 fases lógicas independientes:
+- Fase 1: PREPARACIÓN (mes 1)
+- Fase 2: INVESTIGACIÓN/ALTERNATIVAS (mes 1-2)
+- Fase 3: CONSTRUCCIÓN/REDACCIÓN (mes 2)
+- Fase 4: ENSAYO/SIMULACRO (mes 3)
+Esas 4 fases son METAS HIJAS DISTINTAS. Deben caer en los 3 meses del rango comprimiéndose (2 en mes 1, 1 en mes 2, 1 en mes 3), no en 1 sola. Si después de comprimir siguen siendo demasiadas, propón las más críticas y enumera el resto en la sección "fuera_de_rango" del JSON (NO en "metas").
+Ejemplo CORRECTO para "renegociar alquiler" con rango Oct-Dic:
+  metas: [
+    { titulo: "Preparar dossier financiero", kr_inicial: { unidad_tiempo: "mes", mes: 10 } },
+    { titulo: "Mapear 3 alternativas", kr_inicial: { unidad_tiempo: "mes", mes: 10 } },
+    { titulo: "Redactar propuesta de valor", kr_inicial: { unidad_tiempo: "mes", mes: 11 } },
+    { titulo: "Simulacro de reunión", kr_inicial: { unidad_tiempo: "mes", mes: 12 } }
+  ]
+Ejemplo INCORRECTO (recorte de alcance):
+  metas: [{ titulo: "Preparar dossier financiero", kr_inicial: { unidad_tiempo: "mes", mes: 12 } }]
 `
     : fechaInicio || fechaObjetivo
       ? `
