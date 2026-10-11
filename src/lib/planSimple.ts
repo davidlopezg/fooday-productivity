@@ -23,6 +23,7 @@ import type {
   Tarea,
 } from "@/lib/types";
 import type { EstadoEmocional } from "@/lib/plan";
+import { calcularTimeoutIA, mensajeTimeoutIA } from "@/lib/ai-timeout";
 
 export type GenerarPlanSimpleOpts = {
   /** Estado emocional estructurado (los 5 selects que coinciden con Dashboard emocional). */
@@ -259,19 +260,16 @@ async function llamarLLM<T>(
     body.response_format = { type: "json_object" };
   }
 
-  // Timeout de 45s para no colgarse si la API no responde.
-  // Le pasamos un Error como `reason` para que el AbortError resultante
-  // lleve un mensaje útil en lugar del genérico
-  // "signal is aborted without reason" que mostraba la UI tal cual.
+  // Timeout adaptativo (migration 0025). Cálculo centralizado en
+  // /lib/ai-timeout.ts. Aquí el prompt es solo user (no hay system
+  // separado).
+  const promptLen = userPrompt?.length ?? 0;
+  const timeoutMs = calcularTimeoutIA(promptLen);
+
   const controller = new AbortController();
   const timeoutId = setTimeout(
-    () =>
-      controller.abort(
-        new Error(
-          "La IA no respondió a tiempo (más de 45s). Vuelve a intentarlo.",
-        ),
-      ),
-    45_000,
+    () => controller.abort(new Error(mensajeTimeoutIA(promptLen))),
+    timeoutMs,
   );
   try {
     const res = await fetch(endpoint(baseUrl), {

@@ -12,6 +12,7 @@
 // ============================================================================
 
 import type { Meta, Tarea } from "@/lib/types";
+import { calcularTimeoutIA, mensajeTimeoutIA } from "@/lib/ai-timeout";
 
 export type LlamadaIA = {
   baseUrl: string;
@@ -360,15 +361,15 @@ async function llamarLLM<T>(
     body.response_format = { type: "json_object" };
   }
 
+  // Timeout adaptativo (migration 0025). Cálculo centralizado en
+  // /lib/ai-timeout.ts. Mismo patrón que /lib/plan.ts y /lib/planSimple.ts.
+  const promptLen = userPrompt?.length ?? 0;
+  const timeoutMs = calcularTimeoutIA(promptLen);
+
   const controller = new AbortController();
   const timeoutId = setTimeout(
-    () =>
-      controller.abort(
-        new Error(
-          "La IA no respondió a tiempo (más de 45s). Vuelve a intentarlo.",
-        ),
-      ),
-    45_000,
+    () => controller.abort(new Error(mensajeTimeoutIA(promptLen))),
+    timeoutMs,
   );
   try {
     const res = await fetch(endpoint(baseUrl), {

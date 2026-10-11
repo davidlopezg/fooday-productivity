@@ -13,6 +13,7 @@
 // ============================================================================
 
 import type { InformePlan, PlanDiario, Tarea, Subtarea } from "@/lib/types";
+import { calcularTimeoutIA, mensajeTimeoutIA } from "@/lib/ai-timeout";
 
 export type EstadoEmocional = {
   despertar: string;
@@ -368,19 +369,22 @@ async function llamarLLM<T>(
   userPrompt: string,
   parseJSON: boolean,
 ): Promise<T> {
-  // Timeout de 45s para no colgarse si la API no responde.
+  // Timeout adaptativo (migration 0025). Cálculo centralizado en
+  // /lib/ai-timeout.ts para no duplicarlo en los 3 callers LLM.
+  // Razón del cambio: el prompt del planificador creció al soportar
+  // meses + hard constraint + fechas reales, y se acercaba al límite
+  // de 45s en cold start / redes lentas.
   // Le pasamos un Error como `reason` para que el AbortError resultante
   // lleve un mensaje útil en lugar del genérico
   // "signal is aborted without reason" que mostraba la UI tal cual.
+  const promptLen = (systemPrompt?.length ?? 0) + (userPrompt?.length ?? 0);
+  const timeoutMs = calcularTimeoutIA(promptLen);
+
   const controller = new AbortController();
   const timeoutId = setTimeout(
     () =>
-      controller.abort(
-        new Error(
-          "La IA no respondió a tiempo (más de 45s). Vuelve a intentarlo.",
-        ),
-      ),
-    45_000,
+      controller.abort(new Error(mensajeTimeoutIA(promptLen))),
+    timeoutMs,
   );
   try {
     const res = await fetch(endpoint(baseUrl), {
