@@ -17,7 +17,7 @@
 // meta con plan", pero el camino "oficial" para entradas nuevas es este.
 // ============================================================================
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -31,6 +31,7 @@ import { useConfig } from "@/lib/configStore";
 import { useData } from "@/lib/useData";
 import {
   clasificarYGenerarIA,
+  parsearMesesDeRango,
   type MetaHijaGenerada,
   type ResultadoClasificador,
 } from "@/lib/plan";
@@ -42,6 +43,15 @@ import {
   IconX,
 } from "@/components/icons";
 
+/** YYYY-MM-DD de hoy en hora local del navegador. */
+function hoyYMD(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${dd}`;
+}
+
 export default function AgentePage() {
   const router = useRouter();
   const cfg = useConfig();
@@ -49,11 +59,17 @@ export default function AgentePage() {
   const { data: periodos } = useData<Periodo[]>(fetchPeriodos, []);
 
   const anioActual = new Date().getFullYear();
+  const hoyStr = hoyYMD();
 
   const [contexto, setContexto] = useState("");
   const [restricciones, setRestricciones] = useState(
     "TDAH; cervicales (no correr, no impacto); ansiedad",
   );
+  // Migration 0025: rango opcional. Si lo rellenas, se pasa a la IA +
+  // se persiste en cada meta creada.
+  const [fechaInicioMeta, setFechaInicioMeta] = useState<string>("");
+  const [fechaObjetivo, setFechaObjetivo] = useState<string>("");
+  const [fechaFinBloqueada, setFechaFinBloqueada] = useState<boolean>(false);
   const [generando, setGenerando] = useState(false);
   const [aplicando, setAplicando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -70,6 +86,34 @@ export default function AgentePage() {
     }
     return m;
   })();
+
+  // —— Derivados de fechas (migration 0025) ——
+  const rango = useMemo(
+    () =>
+      parsearMesesDeRango({
+        fecha_inicio: fechaInicioMeta || hoyStr,
+        fecha_objetivo: fechaObjetivo || null,
+        anio: anioActual,
+        hoy: hoyStr,
+      }),
+    [fechaInicioMeta, fechaObjetivo, anioActual, hoyStr],
+  );
+
+  const fechaError =
+    fechaInicioMeta && fechaObjetivo && fechaInicioMeta > fechaObjetivo
+      ? "La fecha de inicio no puede ser posterior a la fecha límite."
+      : null;
+
+  const hayFechas = !!fechaInicioMeta || !!fechaObjetivo;
+
+  const mesesLabel = useMemo(() => {
+    if (!hayFechas) return null;
+    if (rango.meses.length === 0) return "sin rango";
+    if (rango.meses.length === 1) return `1 mes (${rango.meses[0].nombre})`;
+    const primero = rango.meses[0].nombre;
+    const ultimo = rango.meses[rango.meses.length - 1].nombre;
+    return `${rango.meses.length} meses · ${primero} → ${ultimo}`;
+  }, [hayFechas, rango]);
 
   async function generar() {
     if (!contexto.trim()) {
@@ -144,11 +188,20 @@ export default function AgentePage() {
         });
         proyectoId = p.id;
       }
+      // Las fechas de David (si las rellenó) se aplican en bloque a las
+      // metas hijas más abajo. No se guardan en el proyecto porque la
+      // tabla `proyectos` no las tiene — es la propia decisión de cada
+      // meta la que cuenta.
 
       // 3) Asegurar periodos del año para poder crear los KRs.
       await ensurePeriodosAnio(anioActual);
 
       // 4) Crear cada meta hija + su KR inicial.
+      // Migration 0025: si David rellenó fechas en el formulario, las
+      // heredamos a cada meta hija (las sugeri das por la IA lo
+      // complementan via `fecha_objetivo` por meta — prevalece la del
+      // formulario solo si la IA no propone otra).
+      const usarFechasDavid = !!fechaInicioMeta || !!fechaObjetivo;
       const idsCreadas: string[] = [];
       for (const m of resultado.metas) {
         const meta = await crearMeta({
@@ -160,8 +213,12 @@ export default function AgentePage() {
           proyecto_id: proyectoId,
           plazo: m.meta_plazo || null,
           ambito: m.meta_ambito,
-          fecha_objetivo: m.fecha_objetivo,
+          fecha_objetivo:
+            (usarFechasDavid ? fechaObjetivo : null) ?? m.fecha_objetivo,
           contexto: m.contexto,
+          fecha_inicio_meta: usarFechasDavid ? fechaInicioMeta || null : null,
+          fecha_fin_bloqueada:
+            usarFechasDavid && !!fechaObjetivo ? fechaFinBloqueada : false,
         });
         idsCreadas.push(meta.id);
 
@@ -273,10 +330,87 @@ export default function AgentePage() {
           </span>
         </label>
 
+        {/* === Migration 0025: rango opcional. Vacío = agente puro,
+              la IA deduce del texto. Rellenado = se propaga a las metas
+              hijas y se pasa a la IA como hint de plazo. === */}
+        <details className="mt-4 rounded-md border border-border bg-muted/20 px-3 py-2">
+          <summary className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground">
+            Rango de la meta (opcional — déjalo vacío si prefieres que la IA lo deduzca)
+          </summary>
+          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium">
+                Fecha de inicio
+                <span className="ml-1 font-normal text-muted-foreground">(opcional)</span>
+              </span>
+              <input
+                type="date"
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+                value={fechaInicioMeta}
+                onChange={(e) => setFechaInicioMeta(e.target.value)}
+                disabled={generando || aplicando}
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium">
+                Fecha límite
+                <span className="ml-1 font-normal text-muted-foreground">(opcional)</span>
+              </span>
+              <input
+                type="date"
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+                value={fechaObjetivo}
+                onChange={(e) => setFechaObjetivo(e.target.value)}
+                min={fechaInicioMeta || undefined}
+                disabled={generando || aplicando}
+              />
+            </label>
+            <label className="flex items-end pb-1">
+              <span className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={fechaFinBloqueada}
+                  onChange={(e) => setFechaFinBloqueada(e.target.checked)}
+                  disabled={!fechaObjetivo || generando || aplicando}
+                  className="mt-0.5 h-4 w-4 rounded border-input disabled:opacity-50"
+                />
+                <span>
+                  <span className="font-medium">🔒 Fecha crítica — no se mueve</span>
+                  <span className="block text-[11px] text-muted-foreground">
+                    La IA no podrá meter nada después.
+                  </span>
+                </span>
+              </span>
+            </label>
+          </div>
+          {fechaError && (
+            <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+              {fechaError}
+            </p>
+          )}
+          {hayFechas && mesesLabel && (
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
+              <span className="rounded-md bg-background px-2 py-0.5 font-mono text-muted-foreground">
+                Rango detectado: {mesesLabel}
+              </span>
+              {rango.fin_abierto && (
+                <span className="rounded-md bg-amber-500/10 px-2 py-0.5 text-amber-700 dark:text-amber-300">
+                  ⚠️ Sin deadline — la IA propondrá uno orientativo
+                </span>
+              )}
+              {fechaFinBloqueada && fechaObjetivo && (
+                <span className="rounded-md bg-red-500/10 px-2 py-0.5 text-red-700 dark:text-red-300">
+                  🔒 HARD CONSTRAINT
+                </span>
+              )}
+            </div>
+          )}
+        </details>
+
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <button
             onClick={generar}
-            disabled={generando || aplicando || !contexto.trim() || !apiKeyOk}
+            disabled={generando || aplicando || !contexto.trim() || !apiKeyOk || !!fechaError}
             className="inline-flex items-center gap-1.5 rounded-md bg-violet-500 px-4 py-2 text-sm font-medium text-white hover:bg-violet-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <IconSparkles className="h-4 w-4" />
