@@ -5,10 +5,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
   crearMeta,
-  crearResultadoPeriodo,
-  crearTareaConIA,
   ensurePeriodosAnio,
-  setRecurrencia,
+  ensurePeriodosMeses,
 } from "@/lib/mutations";
 import {
   fetchPeriodos,
@@ -16,6 +14,7 @@ import {
 import { useConfig } from "@/lib/configStore";
 import { useData } from "@/lib/useData";
 import {
+  aplicarKrsYTareasEnMeta,
   generarMetaYPlanIA,
   type MetaYPlanGenerado,
 } from "@/lib/plan";
@@ -94,12 +93,37 @@ export default function AgenteMetasPage() {
     setAplicando(true);
     setErrorApp(null);
     try {
-      // 1. Asegurar periodos del año.
+      // 1. Asegurar periodos (trimestres del año + meses del plan si los trae).
       await ensurePeriodosAnio(anioActual);
-      const periodosActualizados = periodos.filter(
-        (p) => p.tipo === "trimestre" && p.anio === anioActual,
+      const mesesEnPlan = Array.from(
+        new Set(
+          sugerencia.plan.krs
+            .filter((k) => k.unidad_tiempo === "mes" && typeof k.mes === "number")
+            .map((k) => k.mes as number),
+        ),
       );
-      const periodosByNumero = new Map(periodosActualizados.map((p) => [p.numero, p]));
+      if (mesesEnPlan.length > 0) {
+        try {
+          await ensurePeriodosMeses(
+            anioActual,
+            Math.min(...mesesEnPlan),
+            Math.max(...mesesEnPlan),
+          );
+        } catch (e) {
+          console.warn("[Agente] ensurePeriodosMeses falló:", e);
+        }
+      }
+      const periodosActualizados = periodos.filter((p) => p.anio === anioActual);
+      const periodosByUnidad = new Map<
+        string,
+        { id: string; tipo: "trimestre" | "mes" }
+      >();
+      for (const p of periodosActualizados) {
+        periodosByUnidad.set(`${p.tipo}:${p.numero}`, {
+          id: p.id,
+          tipo: p.tipo as "trimestre" | "mes",
+        });
+      }
 
       // 2. Crear meta.
       const meta = await crearMeta({
@@ -111,50 +135,14 @@ export default function AgenteMetasPage() {
         prioridad: "alta",
       });
 
-      // 3. Crear KRs y tareas.
-      for (const kr of sugerencia.plan.krs) {
-        const periodo = periodosByNumero.get(kr.trimestre);
-        if (!periodo) continue;
-        const resultado = await crearResultadoPeriodo({
-          meta_id: meta.id,
-          periodo_id: periodo.id,
-          titulo: kr.titulo,
-          descripcion: kr.descripcion || null,
-          metrica: kr.metrica || null,
-          valor_objetivo: kr.valor_objetivo,
-          unidad: kr.unidad || null,
-          peso: kr.peso,
-          estado: "pendiente",
-        });
-
-        for (const t of kr.tareas) {
-          const creada = await crearTareaConIA(
-            {
-              titulo: t.titulo,
-              descripcion: t.descripcion || null,
-              prioridad: t.prioridad,
-              estado: "pendiente",
-              criterio_terminacion_manual: t.criterio_terminacion || null,
-              meta_id: meta.id,
-              resultado_periodo_id: resultado.id,
-            },
-            {
-              base_url: cfg.data.base_url,
-              minimax_api_key: cfg.data.minimax_api_key,
-              model: cfg.data.model,
-            },
-          );
-
-          // Set recurrencia si aplica.
-          if (t.recurrencia_tipo) {
-            await setRecurrencia(creada.id, {
-              tipo: t.recurrencia_tipo,
-              dias_semana: t.recurrencia_tipo === "semanal" ? t.recurrencia_dias_semana : null,
-              dia_mes: t.recurrencia_tipo === "mensual" ? t.recurrencia_dia_mes : null,
-            }).catch((e) => console.warn("[Agente] set recurrencia falló:", e));
-          }
-        }
-      }
+      // 3. Materializar el plan con el helper compartido (migration 0025).
+      await aplicarKrsYTareasEnMeta(
+        meta.id,
+        sugerencia.plan,
+        periodosByUnidad,
+        cfg.data,
+        { saltarExistentes: true },
+      );
 
       router.push(`/metas/detalle?id=${meta.id}`);
     } catch (e) {

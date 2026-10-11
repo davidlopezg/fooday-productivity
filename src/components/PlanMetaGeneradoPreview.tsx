@@ -10,12 +10,13 @@
 
 import { useMemo } from "react";
 import { IconSparkles, IconX } from "@/components/icons";
-import type { PlanMetaGenerado } from "@/lib/plan";
+import type { PlanMetaGenerado, UnidadDisponible } from "@/lib/plan";
 
 export function PlanMetaGeneradoPreview({
   plan,
   metaTitulo,
   trimestrersDisponibles,
+  unidadesDisponibles,
   busy,
   error,
   onCancel,
@@ -23,7 +24,10 @@ export function PlanMetaGeneradoPreview({
 }: {
   plan: PlanMetaGenerado | null;
   metaTitulo: string;
-  trimestrersDisponibles: Array<{ numero: 1 | 2 | 3 | 4; nombre: string }>;
+  /** @deprecated desde migration 0025 — usar `unidadesDisponibles`. */
+  trimestrersDisponibles?: Array<{ numero: 1 | 2 | 3 | 4; nombre: string }>;
+  /** Lista moderna: trimestres y/o meses en los que la meta puede planificar. */
+  unidadesDisponibles?: UnidadDisponible[];
   busy: boolean;
   error: string | null;
   onCancel: () => void;
@@ -111,18 +115,32 @@ export function PlanMetaGeneradoPreview({
 
               <div className="space-y-3">
                 {plan.krs.map((kr, idx) => {
-                  const trimNombre =
-                    trimestrersDisponibles.find((t) => t.numero === kr.trimestre)?.nombre ??
-                    `Q${kr.trimestre}`;
+                  // Etiqueta de la unidad (trimestre o mes) usando la lista
+                  // moderna si está; si no, fallback al array viejo.
+                  let unidadLabel: string;
+                  if (kr.unidad_tiempo === "mes" && typeof kr.mes === "number") {
+                    const m = unidadesDisponibles?.find(
+                      (u) => u.unidad === "mes" && u.numero === kr.mes,
+                    );
+                    unidadLabel = m?.nombre ?? `Mes ${kr.mes}`;
+                  } else if (kr.unidad_tiempo === "trimestre" && typeof kr.trimestre === "number") {
+                    const t = (unidadesDisponibles ?? [])
+                      .filter((u) => u.unidad === "trimestre")
+                      .find((u) => u.numero === kr.trimestre);
+                    const t2 = trimestrersDisponibles?.find((x) => x.numero === kr.trimestre);
+                    unidadLabel = t?.nombre ?? t2?.nombre ?? `Q${kr.trimestre}`;
+                  } else {
+                    unidadLabel = "—";
+                  }
                   return (
                     <article
-                      key={`${kr.trimestre}-${idx}`}
+                      key={`${kr.unidad_tiempo}-${kr.trimestre ?? kr.mes}-${idx}`}
                       className="rounded-lg border border-border bg-muted/20 p-4"
                     >
                       <header className="mb-2 flex flex-wrap items-start justify-between gap-2">
                         <div>
                           <span className="inline-block rounded bg-violet-500/20 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-violet-700 dark:text-violet-300">
-                            {trimNombre}
+                            {unidadLabel}
                           </span>
                           <h3 className="mt-1 font-semibold tracking-tight">{kr.titulo}</h3>
                           {kr.descripcion && (

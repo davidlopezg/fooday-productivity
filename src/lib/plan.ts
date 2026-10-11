@@ -1297,8 +1297,14 @@ export async function generarCriterioTerminacionIA(
 // ============================================================================
 
 export type KrGenerado = {
-  /** Trimestre al que pertenece el KR (1..4). */
-  trimestre: 1 | 2 | 3 | 4;
+  /** Unidad temporal del KR (`trimestre` 1..4 o `mes` 1..12). A partir
+   *  de la migration 0025, una meta puede planificar por meses cuando su
+   *  rango es menor que un trimestre o no encaja en 4 casillas. */
+  unidad_tiempo: "trimestre" | "mes";
+  /** Trimestre al que pertenece el KR (1..4). Solo si `unidad_tiempo === 'trimestre'`. */
+  trimestre?: 1 | 2 | 3 | 4;
+  /** Mes al que pertenece el KR (1..12). Solo si `unidad_tiempo === 'mes'`. */
+  mes?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
   titulo: string;
   descripcion: string;
   metrica: string;
@@ -1323,26 +1329,63 @@ export type TareaGenerada = {
 };
 
 export type PlanMetaGenerado = {
-  trimestres_usados: Array<1 | 2 | 3 | 4>;
+  /** Lista de unidades temporales usadas (ordenadas). Tri mestres (1..4)
+   *  y/o meses (1..12) según cómo se planificó la meta. */
+  unidades_usadas: Array<{ unidad: "trimestre" | "mes"; numero: number }>;
   krs: KrGenerado[];
   prompt_usado: string;
 };
+
+/** Mes calendario con fechas reales y nombre legible. La migración 0025
+ *  deja que el planificador trabaje con meses sueltos dentro del rango de
+ *  la meta — no fuerza los 4 trimestres gregorianos. */
+export type MesDisponible = {
+  unidad: "mes";
+  numero: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
+  nombre: string; // p.ej. "Mayo 2026"
+  fecha_inicio: string; // YYYY-MM-DD (primer día del mes)
+  fecha_fin: string; // YYYY-MM-DD (último día del mes)
+};
+
+export type TrimestreDisponible = {
+  unidad: "trimestre";
+  numero: 1 | 2 | 3 | 4;
+  nombre: string;
+  fecha_inicio: string;
+  fecha_fin: string;
+};
+
+export type UnidadDisponible = MesDisponible | TrimestreDisponible;
 
 export type GenerarPlanMetaOpts = {
   meta_titulo: string;
   meta_descripcion?: string | null;
   meta_ambito?: "personal" | "profesional" | null;
   meta_plazo?: string | null;
-  /** Trimestres disponibles (1..4) con nombre legible, p.ej. ["Q1 2026", "Q2 2026", ...] */
-  trimestres_disponibles: Array<{ numero: 1 | 2 | 3 | 4; nombre: string }>;
-  /** Trimestres objetivo derivados del campo `plazo`. Si se omite, se
-   *  usan TODOS los disponibles. Si se pasa, la IA generará KRs SOLO en
-   *  estos trimestres (los demás no se mencionan ni aparecen en el plan).
-   *  El caller (página /metas/nueva o EditarMetaModal) lo calcula con
-   *  `parsearTrimestresDePlazo()`. */
+  /** Trimestres disponibles (1..4) con nombre legible. Se mantiene por
+   *  compatibilidad: si no se pasa `unidades_disponibles`, se usa este.
+   *  @deprecated desde migration 0025 — usar `unidades_disponibles`. */
+  trimestres_disponibles?: Array<{ numero: 1 | 2 | 3 | 4; nombre: string }>;
+  /** Lista de unidades (trimestres o meses) en las que la meta puede
+   *  planificar. Si se omite, se construye a partir de `unidades_objetivo`
+   *  o `trimestres_objetivo` (compat). */
+  unidades_disponibles?: UnidadDisponible[];
+  /** Trimestres objetivo derivados del campo `plazo` (compat). Si se
+   *  omite y no hay `unidades_objetivo`, se usan TODOS los disponibles. */
   trimestres_objetivo?: Array<1 | 2 | 3 | 4>;
+  /** Meses objetivo (1..12) — alternative moderna a `trimestres_objetivo`.
+   *  Lo calcula `parsearMesesDeRango()` en el caller a partir de
+   *  `fecha_inicio_meta` y `fecha_objetivo`. */
+  unidades_objetivo?: Array<{ unidad: "trimestre" | "mes"; numero: number }>;
+  /** Migration 0025: fecha en que David puede empezar (default = hoy). */
+  fecha_inicio_meta?: string | null;
+  /** Migration 0025: fecha dura de finalización (reusamos fecha_objetivo). */
+  fecha_objetivo?: string | null;
+  /** Migration 0025: si true, el prompt trata fecha_objetivo como HARD
+   *  constraint — nada se planifica después. */
+  fecha_fin_bloqueada?: boolean;
   anio: number;
-  /** Cuántos KRs por trimestre (defecto 3). */
+  /** Cuántos KRs por unidad (defecto 3). */
   krs_por_trimestre?: number;
 };
 
@@ -1356,7 +1399,19 @@ export type GenerarMetaYPlanOpts = {
   restricciones?: string[];
   meta_ambito?: "personal" | "profesional" | null;
   meta_plazo?: string | null;
+  /** @deprecated desde migration 0025 — usar `unidades_disponibles`. */
   trimestres_disponibles: Array<{ numero: 1 | 2 | 3 | 4; nombre: string }>;
+  /** Lista moderna de unidades (trimestres o meses). Si se omite, se
+   *  construye a partir de `trimestres_disponibles` (compat). */
+  unidades_disponibles?: UnidadDisponible[];
+  /** Meses objetivo (1..12) — alternative moderna a `trimestres_objetivo`.
+   *  Lo calcula `parsearMesesDeRango()` en el caller a partir de
+   *  `fecha_inicio_meta` y `fecha_objetivo`. */
+  unidades_objetivo?: Array<{ unidad: "trimestre" | "mes"; numero: number }>;
+  /** Migration 0025: fechas reales para que la IA deduzca plazo concreto. */
+  fecha_inicio_meta?: string | null;
+  fecha_objetivo?: string | null;
+  fecha_fin_bloqueada?: boolean;
   anio: number;
   krs_por_trimestre?: number;
 };
@@ -1493,6 +1548,141 @@ function sinAcentos(s: string): string {
   return s.normalize("NFD").replace(/\p{Diacritic}/gu, "");
 }
 
+// ============================================================================
+// parsearMesesDeRango — migration 0025
+// ----------------------------------------------------------------------------
+// Dado (fecha_inicio, fecha_objetivo, anio) devuelve el array de meses
+// calendario en los que la meta puede planificar. Es la versión moderna
+// de `parsearTrimestresDePlazo`: en lugar de trimestres sueltos, devuelve
+// meses sueltos dentro del rango real de la meta.
+//
+// Reglas:
+//   · Si fecha_inicio es null → usa hoy.
+//   · Si fecha_objetivo es null → asume fin del año (`anio`-12-31) Y marca
+//     la salida con `fin_abierto: true` para que el caller avise a la UI.
+//   · Solo devuelve meses del calendario GREGORIANO. Si el rango cruza
+//     años (ej. fecha_inicio=nov 2026, fecha_objetivo=feb 2027), devuelve
+//     los meses de los dos años (nov-dic del anio y ene-feb del anio+1).
+//   · Si el rango cabe en un solo mes, devuelve 1 mes. Si cabe en dos
+//     semanas que cruzan dos meses, devuelve 2 meses. NO fuerza 4 ni 12.
+//   · `meses` siempre viene ordenado por fecha ascendente.
+// ============================================================================
+export type MesDeRango = {
+  unidad: "mes";
+  numero: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
+  anio: number;
+  nombre: string;
+  fecha_inicio: string; // primer día del mes (YYYY-MM-DD)
+  fecha_fin: string; // último día del mes (YYYY-MM-DD)
+};
+
+export type ParsearMesesResultado = {
+  meses: MesDeRango[];
+  /** True si la IA tuvo que proponer fecha_objetivo porque venía null. */
+  fin_abierto: boolean;
+  /** La fecha_inicio resuelta (puede diferir del input si era null). */
+  fecha_inicio_efectiva: string;
+  /** La fecha_fin resuelta (puede diferir del input si era null). */
+  fecha_fin_efectiva: string;
+};
+
+const NOMBRES_MES = [
+  "Enero",
+  "Febrero",
+  "Marzo",
+  "Abril",
+  "Mayo",
+  "Junio",
+  "Julio",
+  "Agosto",
+  "Septiembre",
+  "Octubre",
+  "Noviembre",
+  "Diciembre",
+] as const;
+
+/** Devuelve el último día (28-31) de un mes del calendario gregoriano. */
+function ultimoDiaDelMes(anio: number, mes: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12): number {
+  // Truco: día 0 del mes siguiente = último día del mes pedido.
+  return new Date(Date.UTC(anio, mes, 0)).getUTCDate();
+}
+
+function ymd(d: Date): string {
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${dd}`;
+}
+
+function parseYMD(s: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s.trim());
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  if (!Number.isFinite(y) || !Number.isFinite(mo) || !Number.isFinite(d)) return null;
+  return new Date(Date.UTC(y, mo - 1, d));
+}
+
+export function parsearMesesDeRango(opts: {
+  fecha_inicio: string | null | undefined;
+  fecha_objetivo: string | null | undefined;
+  anio: number;
+  /** Fecha "hoy" en formato YYYY-MM-DD, hora local. Si no se pasa,
+   *  `parsearMesesDeRango` usará la fecha del sistema. Pasarla es util
+   *  en tests y para que la UI no dependa del reloj del cliente. */
+  hoy?: string;
+}): ParsearMesesResultado {
+  const hoyLocal = opts.hoy ?? ymd(new Date());
+  const fin_abierto = !opts.fecha_objetivo;
+
+  // 1) Resolver fecha_inicio.
+  const inicioInput = opts.fecha_inicio?.trim() || hoyLocal;
+  let inicio = parseYMD(inicioInput);
+  if (!inicio) inicio = parseYMD(hoyLocal) ?? new Date();
+
+  // 2) Resolver fecha_fin.
+  let finInput = opts.fecha_objetivo?.trim();
+  let fin: Date | null = finInput ? parseYMD(finInput) : null;
+  if (!fin) {
+    // Fallback elegante: fin del anio actual.
+    fin = new Date(Date.UTC(opts.anio, 11, 31));
+    finInput = fin.toISOString().slice(0, 10);
+  }
+
+  // 3) Si el rango es inválido (fin < inicio), devolvemos solo el mes de inicio.
+  if (fin.getTime() < inicio.getTime()) fin = new Date(inicio.getTime());
+
+  // 4) Iterar mes a mes desde inicio hasta fin (inclusive).
+  const meses: MesDeRango[] = [];
+  const cursor = new Date(Date.UTC(inicio.getUTCFullYear(), inicio.getUTCMonth(), 1));
+  while (cursor.getTime() <= fin.getTime()) {
+    const anioMes = cursor.getUTCFullYear();
+    const num = (cursor.getUTCMonth() + 1) as MesDeRango["numero"];
+    const inicioMes = new Date(Date.UTC(anioMes, num - 1, 1));
+    const finMes = new Date(Date.UTC(anioMes, num - 1, ultimoDiaDelMes(anioMes, num)));
+    meses.push({
+      unidad: "mes",
+      numero: num,
+      anio: anioMes,
+      nombre: `${NOMBRES_MES[num - 1]} ${anioMes}`,
+      fecha_inicio: ymd(inicioMes),
+      fecha_fin: ymd(finMes),
+    });
+    cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+    // Salvaguarda: si por lo que sea el cursor no avanza (cambio de año
+    // extremo), rompemos para no entrar en bucle infinito.
+    if (meses.length > 24) break;
+  }
+
+  return {
+    meses,
+    fin_abierto,
+    fecha_inicio_efectiva: ymd(inicio),
+    fecha_fin_efectiva: ymd(fin),
+  };
+}
+
 export type MetaYPlanGenerado = {
   meta_titulo: string;
   meta_descripcion: string;
@@ -1508,28 +1698,70 @@ function buildPromptPlanMeta(opts: GenerarPlanMetaOpts): string {
   const ambito = opts.meta_ambito || "(sin clasificar)";
   const plazo = opts.meta_plazo?.trim() || "(sin plazo concreto)";
 
-  // Regla de plazo: si el caller pasó `trimestres_objetivo`, FILTRAMOS los
-  // trimestres disponibles a ese subconjunto. La IA sólo verá y deberá
-  // rellenar estos. Si el caller no pasó nada (plazo vacío/no interpretable),
-  // se mantienen los 4 trimestres como antes.
-  let trimestresVisibles = opts.trimestres_disponibles;
-  if (opts.trimestres_objetivo && opts.trimestres_objetivo.length > 0) {
-    const nums = new Set<number>(opts.trimestres_objetivo);
-    trimestresVisibles = opts.trimestres_disponibles.filter((t) =>
-      nums.has(t.numero),
-    );
+  // —— (1) Resolver `unidadesVisibles` (meses o trimestres) ——
+  // Migration 0025: el planificador puede recibir meses sueltos dentro del
+  // rango real de la meta, no 4 trimestres a fuerza.
+  let unidadesVisibles: UnidadDisponible[];
+  if (opts.unidades_disponibles && opts.unidades_disponibles.length > 0) {
+    unidadesVisibles = opts.unidades_disponibles;
+    if (opts.unidades_objetivo && opts.unidades_objetivo.length > 0) {
+      const set = new Set(
+        opts.unidades_objetivo.map((u) => `${u.unidad}:${u.numero}`),
+      );
+      unidadesVisibles = unidadesVisibles.filter(
+        (u) => set.has(`${u.unidad}:${u.numero}`),
+      );
+    }
+  } else {
+    // Compat: trimestres_disponibles / trimestres_objetivo (lo viejo).
+    const trimestresBase = opts.trimestres_disponibles ?? [];
+    let visibles = trimestresBase;
+    if (opts.trimestres_objetivo && opts.trimestres_objetivo.length > 0) {
+      const nums = new Set<number>(opts.trimestres_objetivo);
+      visibles = trimestresBase.filter((t) => nums.has(t.numero));
+    }
+    unidadesVisibles = visibles.map<TrimestreDisponible>((t) => ({
+      unidad: "trimestre",
+      numero: t.numero as 1 | 2 | 3 | 4,
+      nombre: t.nombre,
+      fecha_inicio: "",
+      fecha_fin: "",
+    }));
   }
-  const trimestresStr =
-    trimestresVisibles.length > 0
-      ? trimestresVisibles
-          .map((t) => `  - Q${t.numero} (${t.nombre})`)
+
+  const unidadesStr =
+    unidadesVisibles.length > 0
+      ? unidadesVisibles
+          .map((u) =>
+            u.unidad === "trimestre"
+              ? `  - Q${u.numero} (${u.nombre})`
+              : `  - ${u.nombre} (mes ${u.numero})`,
+          )
           .join("\n")
-      : "  (ninguno — revisa el formato del campo 'plazo')";
+      : "  (ninguna — revisa fechas de inicio/fin o el campo 'plazo')";
 
   const hayFiltro =
-    !!opts.trimestres_objetivo && opts.trimestres_objetivo.length > 0;
+    unidadesVisibles.length > 0 &&
+    (unidadesVisibles.length <
+      (opts.unidades_disponibles?.length ??
+        opts.trimestres_disponibles?.length ??
+        4));
 
-  return `Eres un coach de OKR para David López. Tu trabajo: dado el contexto de una meta, generar el plan trimestral COMPLETO: KRs por trimestre + tareas/hábitos dentro de cada KR.
+  // —— (2) Cabecera con fechas y bloqueo duro (migration 0025) ——
+  const fechaInicioTxt = opts.fecha_inicio_meta?.trim()
+    ? opts.fecha_inicio_meta
+    : "hoy (no indicada)";
+  const fechaFinTxt = opts.fecha_objetivo?.trim()
+    ? opts.fecha_objetivo
+    : "sin fecha dura — propón una mirando el alcance";
+  const hardBlock = !!opts.fecha_fin_bloqueada;
+
+  const todasSonMeses = unidadesVisibles.every((u) => u.unidad === "mes");
+  const todasSonTrimestres = unidadesVisibles.every(
+    (u) => u.unidad === "trimestre",
+  );
+
+  return `Eres un coach de OKR para David López. Tu trabajo: dado el contexto de una meta, generar el plan COMPLETO: KRs por unidad temporal + tareas/hábitos dentro de cada KR.
 
 META DE DAVID:
   Título: ${opts.meta_titulo}
@@ -1538,19 +1770,39 @@ META DE DAVID:
   Plazo: ${plazo}
   Año: ${opts.anio}
 
-TRIMESTRES OBJETIVO${
-    hayFiltro
-      ? " (los únicos donde esta meta aplica — derivan del campo 'plazo' arriba; NO generes nada fuera de esta lista)"
-      : " (todos los del año actual)"
-  }:
-${trimestresStr}
+FECHAS REALES DE LA META (migration 0025):
+  Fecha de inicio (David puede empezar): ${fechaInicioTxt}
+  Fecha límite (deadline): ${fechaFinTxt}
+  ${hardBlock ? "⚠️ FECHA LÍMITE DURA / BLOQUEADA — no planificar NADA después de esta fecha." : "Fecha límite orientativa (orientativa, no dura)."}
+
+${
+  todasSonMeses
+    ? `MESES OBJETIVO${
+        hayFiltro
+          ? " (los únicos donde esta meta aplica — derivan del rango [inicio, fin]; NO generes nada fuera de esta lista):"
+          : " (todos los del rango):"
+      }`
+    : todasSonTrimestres
+      ? `TRIMESTRES OBJETIVO${
+          hayFiltro
+            ? " (los únicos donde esta meta aplica — derivan del campo 'plazo' arriba; NO generes nada fuera de esta lista):"
+            : " (todos los del año actual):"
+        }`
+      : `UNIDADES OBJETIVO${
+          hayFiltro
+            ? " (mezcla de trimestres y meses — solo dentro de esta lista):"
+            : " (todas las del rango):"
+        }`
+}
+${unidadesStr}
 
 ==========
 REGLAS (lelas 2 veces antes de generar)
 ==========
-0. ${hayFiltro ? "REGLA DE PLAZO (CRÍTICA): SOLO puedes crear KRs dentro de los trimestres listados arriba. Si el plazo es 'Q3 2026', NO generes KRs en Q1/Q2/Q4. Los demás trimestres quedan vacíos." : "Por defecto se generan los 4 trimestres del año. Si esto no encaja con la meta (ej: meta de un solo trimestre), el caller habrá recortado la lista de arriba."}
+0. ${hayFiltro ? "REGLA DE PLAZO (CRÍTICA): SOLO puedes crear KRs dentro de las unidades listadas arriba. Si la fecha límite es Q3 2026, NO generes KRs fuera de esos meses/trimestres. Las demás unidades quedan vacías." : "Por defecto se cubre todo el rango de la meta (de inicio a fin). Si esto no encaja (meta muy pequeña), el caller habrá recortado la lista de arriba."}
+${hardBlock ? "0b. HARD CONSTRAINT: NINGÚN KR puede planificar trabajo después de la fecha límite indicada. Si sobra alcance, indícalo en la sección 'notas' y muévelo a 'backlog' o 'no entra en plazo'." : ""}
 1. Cada KR = un HITO MEDIBLE que, si se cumple, demuestra que la meta avanza / se alcanza. Redacta los KRs como "lo que tiene que ocurrir para considerar esta meta lograda".
-2. Genera EXACTAMENTE ${krsXTrim} KRs por trimestre listado. Más satura, menos es vago.
+2. Genera EXACTAMENTE ${krsXTrim} KRs por unidad listada. Más satura, menos es vago.
 3. DENTRO de cada KR, añade 2-4 tareas concretas. Una tarea = una acción que se hace en ≤2 minutos de leerla sin ambigüedad. Si no se puede, es un proyecto, no una tarea.
 5. Mezcla ~30% HABITOS (recurrencia_tipo no nulo) y ~70% tareas PUNTUALES (null). Los hábitos son cosas que David repite (meditar, caminar, registrar, tomar pastillas, etc.).
 6. Para cada tarea incluye:
@@ -1564,15 +1816,16 @@ REGLAS (lelas 2 veces antes de generar)
    - titulo: ≤100 chars, específico y medible.
    - descripcion: 1-2 frases aclarando qué significa el KR.
    - metrica: nombre corto de la métrica (p.ej. "minutos de movimiento", "despertares por noche").
-   - valor_objetivo: número realista para el trimestre (p.ej. 15, 2, 80).
+   - valor_objetivo: número realista para la unidad (p.ej. 15, 2, 80).
    - unidad: unidad de la métrica (p.ej. "min/día", "desp/noche", "% noches").
    - peso: 1 (por defecto). Puede ser 1.5-2 si el KR es más crítico.
 8. Responde SOLO con JSON válido con esta estructura EXACTA:
 
 {
-  "trimestres_usados": [2, 3, 4],
+  "unidades_usadas": [{"unidad": "trimestre", "numero": 2}, {"unidad": "mes", "numero": 5}],
   "krs": [
     {
+      "unidad_tiempo": "trimestre",
       "trimestre": 2,
       "titulo": "...",
       "descripcion": "...",
@@ -1595,6 +1848,10 @@ REGLAS (lelas 2 veces antes de generar)
   ]
 }
 
+Notas de schema:
+   · \`unidad_tiempo\` debe ser exactamente \`"trimestre"\` o \`"mes"\` (en minúsculas). Si es \`"trimestre"\`, el campo obligatorio es \`trimestre\` (1..4). Si es \`"mes"\`, el campo obligatorio es \`mes\` (1..12). NO mezcles.
+   · \`unidades_usadas\` es un array con TODAS las unidades en las que generes al menos un KR.
+
 Usa conocimiento común del dominio (salud, finanzas, negocios) si la meta es genérica. Si David mencionó restricciones en la descripción (TDAH, cervicales, ansiedad, etc.), respétalas ABSOLUTAMENTE.
 `;
 }
@@ -1607,7 +1864,7 @@ export async function generarPlanMetaIA(
 ): Promise<PlanMetaGenerado> {
   const prompt = buildPromptPlanMeta(opts);
   const parsed = await llamarLLM<{
-    trimestres_usados?: unknown;
+    unidades_usadas?: unknown;
     krs?: unknown;
   }>(
     baseUrl,
@@ -1618,11 +1875,26 @@ export async function generarPlanMetaIA(
     true,
   );
 
-  const krs = saneKrsFromParsed(parsed?.krs, opts.trimestres_disponibles);
-  const trimestres_usados: Array<1 | 2 | 3 | 4> = Array.from(
-    new Set(krs.map((k) => k.trimestre)),
-  ).sort((a, b) => a - b) as Array<1 | 2 | 3 | 4>;
-  return { trimestres_usados, krs, prompt_usado: prompt };
+  const krs = saneKrsFromParsed(parsed?.krs, opts.unidades_disponibles, opts.trimestres_disponibles);
+  const unidadesSet = new Set<string>();
+  for (const k of krs) {
+    if (k.unidad_tiempo === "mes" && typeof k.mes === "number") {
+      unidadesSet.add(`mes:${k.mes}`);
+    } else if (k.unidad_tiempo === "trimestre" && typeof k.trimestre === "number") {
+      unidadesSet.add(`trimestre:${k.trimestre}`);
+    }
+  }
+  const unidades_usadas = Array.from(unidadesSet)
+    .map((s) => {
+      const [u, n] = s.split(":");
+      return { unidad: u as "trimestre" | "mes", numero: Number(n) };
+    })
+    .sort((a, b) => {
+      // Orden estable: por unidad (trimestre primero si están mezclados) y luego por numero.
+      if (a.unidad !== b.unidad) return a.unidad === "trimestre" ? -1 : 1;
+      return a.numero - b.numero;
+    });
+  return { unidades_usadas, krs, prompt_usado: prompt };
 }
 
 // ============================================================================
@@ -1641,7 +1913,7 @@ export async function generarPlanMetaIA(
 export type AplicarKrsResultado = {
   /** KRs nuevos creados en resultados_periodo. */
   krsCreados: number;
-  /** Trimestres del plan que se saltaron porque ya existía un KR. */
+  /** KRs saltados porque ya existía un KR en esa unidad. */
   krsExistentes: number;
   /** Tareas (subtareas cuentan aparte) creadas y asignadas al KR. */
   tareasCreadas: number;
@@ -1649,17 +1921,23 @@ export type AplicarKrsResultado = {
   tareasSinRecurrencia: number;
 };
 
+/** Map de periodos por unidad. La clave es `"trimestre:N"` (1..4) o
+ *  `"mes:N"` (1..12). Migration 0025 sustituye al viejo
+ *  `periodosByNumero` (trimestre 1..4) sin romper callers viejos
+ *  durante la migración. */
+export type PeriodosPorUnidad = Map<string, { id: string; tipo: "trimestre" | "mes" }>;
+
 export async function aplicarKrsYTareasEnMeta(
   metaId: string,
   plan: PlanMetaGenerado,
-  periodosByNumero: Map<1 | 2 | 3 | 4, { id: string }>,
+  periodosByUnidad: PeriodosPorUnidad,
   cfg: {
     base_url: string;
     minimax_api_key: string | null;
     model: string;
   },
   opts: {
-    /** Si true, trimestres que ya tengan KR en esta meta se saltan en
+    /** Si true, unidades que ya tengan KR en esta meta se saltan en
      *  silencio (no crean KR nuevo pero siguen creando tareas en el
      *  KR existente). Si false, el UNIQUE violation lanza error. */
     saltarExistentes?: boolean;
@@ -1673,7 +1951,7 @@ export async function aplicarKrsYTareasEnMeta(
   const supabase = (await import("@/lib/supabase/client")).createClient();
 
   // 1) Traemos los KRs ya existentes de esta meta (solo id + periodo_id
-  //    — lo justo para detectar duplicados por trimestre sin cargar más).
+  //    — lo justo para detectar duplicados por unidad sin cargar más).
   const { data: krsPrevios } = await supabase
     .from("resultados_periodo")
     .select("id,periodo_id")
@@ -1688,22 +1966,32 @@ export async function aplicarKrsYTareasEnMeta(
   let tareasSinRecurrencia = 0;
 
   for (const kr of plan.krs) {
-    const periodo = periodosByNumero.get(kr.trimestre);
-    if (!periodo) continue;
+    // Resolver la unidad (trimestre o mes) del KR.
+    const clave =
+      kr.unidad_tiempo === "mes" && typeof kr.mes === "number"
+        ? `mes:${kr.mes}`
+        : `trimestre:${kr.trimestre ?? 0}`;
+    const periodo = periodosByUnidad.get(clave);
+    if (!periodo) {
+      opts.onProgress?.(
+        `${clave}: sin periodo en BD (se omiten los KRs de esa unidad)`,
+      );
+      continue;
+    }
 
     let resultadoId: string;
     const krPrevioId = krPorPeriodo.get(periodo.id);
     if (krPrevioId) {
       if (!saltarExistentes) {
         throw new Error(
-          `Ya existe un KR para Q${kr.trimestre} en esta meta. ` +
+          `Ya existe un KR para ${clave} en esta meta. ` +
             `Quítalo primero o regenera con saltarExistentes=true.`,
         );
       }
       resultadoId = krPrevioId;
       krsExistentes++;
       opts.onProgress?.(
-        `Q${kr.trimestre}: KR existente — añadiendo tareas al KR actual.`,
+        `${clave}: KR existente — añadiendo tareas al KR actual.`,
       );
     } else {
       const r = await crearResultadoPeriodo({
@@ -1719,7 +2007,7 @@ export async function aplicarKrsYTareasEnMeta(
       });
       resultadoId = r.id;
       krsCreados++;
-      opts.onProgress?.(`Q${kr.trimestre}: KR nuevo creado.`);
+      opts.onProgress?.(`${clave}: KR nuevo creado.`);
     }
 
     for (const t of kr.tareas) {
@@ -1762,31 +2050,62 @@ export async function aplicarKrsYTareasEnMeta(
   return { krsCreados, krsExistentes, tareasCreadas, tareasSinRecurrencia };
 }
 
-/** Sanea el array `krs` devuelto por la IA: filtra por trimestre válido,
- *  limpia textos, sanea prioridades y recurrencias. Reutilizado por
- *  `generarPlanMetaIA` y `generarMetaYPlanIA` (mismo formato de respuesta). */
+/** Sanea el array `krs` devuelto por la IA: filtra por unidad válida
+ *  (trimestre o mes), limpia textos, sanea prioridades y recurrencias.
+ *  Reutilizado por `generarPlanMetaIA` y `generarMetaYPlanIA` (mismo
+ *  formato de respuesta). */
 function saneKrsFromParsed(
   raw: unknown,
-  trimestresDisponibles: Array<{ numero: 1 | 2 | 3 | 4; nombre: string }>,
+  unidadesDisponibles?: UnidadDisponible[],
+  trimestresDisponibles?: Array<{ numero: 1 | 2 | 3 | 4; nombre: string }>,
 ): KrGenerado[] {
   const krsRaw = Array.isArray(raw) ? raw : [];
-  const trimestresValidos = new Set<number>(trimestresDisponibles.map((t) => t.numero));
+  const unidadesValidas = new Set<string>();
+  if (unidadesDisponibles && unidadesDisponibles.length > 0) {
+    for (const u of unidadesDisponibles) unidadesValidas.add(`${u.unidad}:${u.numero}`);
+  } else if (trimestresDisponibles) {
+    for (const t of trimestresDisponibles) unidadesValidas.add(`trimestre:${t.numero}`);
+  } else {
+    // Sin unidades explícitas, aceptamos 4 trimestres por defecto.
+    for (let i = 1; i <= 4; i++) unidadesValidas.add(`trimestre:${i}`);
+  }
   const krs: KrGenerado[] = [];
   for (const k of krsRaw) {
-    const tNum = Number((k as { trimestre?: unknown })?.trimestre);
-    if (!Number.isInteger(tNum) || !trimestresValidos.has(tNum)) continue;
-    const titulo = String((k as { titulo?: unknown })?.titulo ?? "").trim().slice(0, 200);
+    const u = k as Record<string, unknown>;
+    const unidadTiempoRaw = String(u.unidad_tiempo ?? "").toLowerCase().trim();
+    const unidad_tiempo: "trimestre" | "mes" | null =
+      unidadTiempoRaw === "trimestre" || unidadTiempoRaw === "trimestral"
+        ? "trimestre"
+        : unidadTiempoRaw === "mes" || unidadTiempoRaw === "mensual"
+          ? "mes"
+          : null;
+
+    // Si no se rellenó unidad_tiempo, deducimos: si viene trimestre o mes.
+    const unidad_final: "trimestre" | "mes" = unidad_tiempo ?? "trimestre";
+    let trimestre: 1 | 2 | 3 | 4 | undefined;
+    let mes: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | undefined;
+    if (unidad_final === "trimestre") {
+      const tNum = Number(u.trimestre);
+      if (!Number.isInteger(tNum) || tNum < 1 || tNum > 4) continue;
+      if (!unidadesValidas.has(`trimestre:${tNum}`)) continue;
+      trimestre = tNum as 1 | 2 | 3 | 4;
+    } else {
+      const mNum = Number(u.mes);
+      if (!Number.isInteger(mNum) || mNum < 1 || mNum > 12) continue;
+      if (!unidadesValidas.has(`mes:${mNum}`)) continue;
+      mes = mNum as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
+    }
+
+    const titulo = String(u.titulo ?? "").trim().slice(0, 200);
     if (!titulo) continue;
-    const descripcion = String((k as { descripcion?: unknown })?.descripcion ?? "").trim().slice(0, 400);
-    const metrica = String((k as { metrica?: unknown })?.metrica ?? "").trim().slice(0, 80);
-    const valor_objetivo = Number((k as { valor_objetivo?: unknown })?.valor_objetivo);
-    const unidad = String((k as { unidad?: unknown })?.unidad ?? "").trim().slice(0, 40);
-    const pesoNum = Number((k as { peso?: unknown })?.peso);
+    const descripcion = String(u.descripcion ?? "").trim().slice(0, 400);
+    const metrica = String(u.metrica ?? "").trim().slice(0, 80);
+    const valor_objetivo = Number(u.valor_objetivo);
+    const unidad = String(u.unidad ?? "").trim().slice(0, 40);
+    const pesoNum = Number(u.peso);
     const peso = Number.isFinite(pesoNum) && pesoNum > 0 ? pesoNum : 1;
 
-    const tareasRaw = Array.isArray((k as { tareas?: unknown })?.tareas)
-      ? ((k as { tareas: unknown[] }).tareas)
-      : [];
+    const tareasRaw = Array.isArray(u.tareas) ? (u.tareas as unknown[]) : [];
     const tareas: TareaGenerada[] = [];
     for (const t of tareasRaw) {
       const tTitulo = String((t as { titulo?: unknown })?.titulo ?? "").trim().slice(0, 200);
@@ -1832,7 +2151,9 @@ function saneKrsFromParsed(
       if (tareas.length >= 6) break;
     }
     krs.push({
-      trimestre: tNum as 1 | 2 | 3 | 4,
+      unidad_tiempo: unidad_final,
+      trimestre,
+      mes,
       titulo,
       descripcion,
       metrica,
@@ -1946,7 +2267,7 @@ export async function generarMetaYPlanIA(
     meta_descripcion?: unknown;
     meta_ambito?: unknown;
     meta_plazo?: unknown;
-    trimestres_usados?: unknown;
+    unidades_usadas?: unknown;
     krs?: unknown;
   }>(
     baseUrl,
@@ -1969,26 +2290,56 @@ export async function generarMetaYPlanIA(
   }
 
   // Saneamos los KRs en UNA llamada (sin pasar otra vez por la IA).
-  const krs = saneKrsFromParsed(parsed?.krs, opts.trimestres_disponibles);
+  const krs = saneKrsFromParsed(parsed?.krs, opts.unidades_disponibles, opts.trimestres_disponibles);
 
   // Regla de plazo: la IA propone meta_plazo en su respuesta. Aplicamos
-  // el mismo parser que en /metas/nueva para FILTRAR los KRs a los
-  // trimestres que el propio agente declara como objetivo. Si el agente
-  // no puso plazo, mantenemos los 4 trimestres.
-  const trimestresObjetivo = parsearTrimestresDePlazo(meta_plazo);
-  const setNumeros = new Set<number>(trimestresObjetivo);
-  const krsFiltrados = krs.filter((k) => setNumeros.has(k.trimestre));
+  // el parser de trimestres por compat. Si el caller pasó `unidades_objetivo`
+  // (meses), ese filtro tiene prioridad.
+  const setUnidades = new Set<string>();
+  if (opts.unidades_objetivo && opts.unidades_objetivo.length > 0) {
+    for (const u of opts.unidades_objetivo)
+      setUnidades.add(`${u.unidad}:${u.numero}`);
+  }
+  const krsFiltrados = krs.filter((k) => {
+    if (setUnidades.size > 0) {
+      if (k.unidad_tiempo === "mes" && typeof k.mes === "number") {
+        return setUnidades.has(`mes:${k.mes}`);
+      }
+      if (k.unidad_tiempo === "trimestre" && typeof k.trimestre === "number") {
+        return setUnidades.has(`trimestre:${k.trimestre}`);
+      }
+      return false;
+    }
+    // Fallback al parser viejo (trimestres).
+    const trimestresObjetivo = parsearTrimestresDePlazo(meta_plazo);
+    const setNumeros = new Set<number>(trimestresObjetivo);
+    return typeof k.trimestre === "number" && setNumeros.has(k.trimestre);
+  });
 
-  const trimestres_usados: Array<1 | 2 | 3 | 4> = Array.from(
-    new Set(krsFiltrados.map((k) => k.trimestre)),
-  ).sort((a, b) => a - b) as Array<1 | 2 | 3 | 4>;
+  const unidadesSet = new Set<string>();
+  for (const k of krsFiltrados) {
+    if (k.unidad_tiempo === "mes" && typeof k.mes === "number") {
+      unidadesSet.add(`mes:${k.mes}`);
+    } else if (k.unidad_tiempo === "trimestre" && typeof k.trimestre === "number") {
+      unidadesSet.add(`trimestre:${k.trimestre}`);
+    }
+  }
+  const unidades_usadas = Array.from(unidadesSet)
+    .map((s) => {
+      const [u, n] = s.split(":");
+      return { unidad: u as "trimestre" | "mes", numero: Number(n) };
+    })
+    .sort((a, b) => {
+      if (a.unidad !== b.unidad) return a.unidad === "trimestre" ? -1 : 1;
+      return a.numero - b.numero;
+    });
 
   return {
     meta_titulo,
     meta_descripcion,
     meta_ambito,
     meta_plazo,
-    plan: { trimestres_usados, krs: krsFiltrados, prompt_usado: prompt },
+    plan: { unidades_usadas, krs: krsFiltrados, prompt_usado: prompt },
     prompt_usado: prompt,
   };
 }

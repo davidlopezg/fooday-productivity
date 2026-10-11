@@ -19,7 +19,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { actualizarMeta, ensurePeriodosAnio } from "@/lib/mutations";
+import { actualizarMeta, ensurePeriodosAnio, ensurePeriodosMeses } from "@/lib/mutations";
 import { fetchAreas, fetchPeriodos, fetchProyectos } from "@/lib/queries";
 import { useConfig } from "@/lib/configStore";
 import { useData } from "@/lib/useData";
@@ -156,15 +156,38 @@ export function EditarMetaModal({
     try {
       // Nos aseguramos de que los periodos del año existan (idempotente).
       await ensurePeriodosAnio(anioActual);
+      // Migration 0025: si el plan trae meses, también los pre-creamos.
+      const mesesEnPlan = Array.from(
+        new Set(
+          planGenerado.krs
+            .filter((k) => k.unidad_tiempo === "mes" && typeof k.mes === "number")
+            .map((k) => k.mes as number),
+        ),
+      );
+      if (mesesEnPlan.length > 0) {
+        try {
+          await ensurePeriodosMeses(
+            anioActual,
+            Math.min(...mesesEnPlan),
+            Math.max(...mesesEnPlan),
+          );
+        } catch (e) {
+          console.warn("[EditarMetaModal] ensurePeriodosMeses falló:", e);
+        }
+      }
       const periodosActuales = (periodos ?? []).filter(
-        (p) => p.tipo === "trimestre" && p.anio === anioActual,
+        (p) => p.anio === anioActual,
       );
-      const periodosByNumero = new Map(
-        periodosActuales.map((p) => [
-          p.numero as 1 | 2 | 3 | 4,
-          { id: p.id },
-        ]),
-      );
+      const periodosByUnidad = new Map<
+        string,
+        { id: string; tipo: "trimestre" | "mes" }
+      >();
+      for (const p of periodosActuales) {
+        periodosByUnidad.set(`${p.tipo}:${p.numero}`, {
+          id: p.id,
+          tipo: p.tipo as "trimestre" | "mes",
+        });
+      }
 
       // Aplica el plan a la meta YA EXISTENTE. NO modifica su estado:
       // por contrato del helper, solo crea KRs nuevos (los ya existentes
@@ -172,7 +195,7 @@ export function EditarMetaModal({
       await aplicarKrsYTareasEnMeta(
         meta.id,
         planGenerado,
-        periodosByNumero,
+        periodosByUnidad,
         cfg.data,
         { saltarExistentes: true },
       );

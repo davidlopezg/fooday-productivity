@@ -102,12 +102,21 @@ export interface Meta {
   /** Migration 0024: proyecto al que pertenece la meta. Null = meta suelta. */
   proyecto_id?: string | null;
   /** Migration 0024: fecha objetivo real (la que el agente sugiere).
-   *  Distinta de `plazo` (text libre) — esta es operativa. */
+   *  Distinta de `plazo` (text libre) — esta es operativa.
+   *  A partir de migration 0025 también actúa como `fecha_fin` del rango
+   *  de planificación (junto a `fecha_inicio_meta`). */
   fecha_objetivo?: string | null;
   /** Migration 0024: contexto libre para el agente (lo que rodea la meta). */
   contexto?: string | null;
   /** Migration 0024: situación actual (dónde estoy hoy con esta meta). */
   situacion_actual?: string | null;
+  /** Migration 0025: fecha en que David puede empezar a trabajar esta meta.
+   *  Si null, el planificador asume "hoy". */
+  fecha_inicio_meta?: string | null;
+  /** Migration 0025: true si `fecha_objetivo` es dura y NO se puede mover.
+   *  El planificador trata las metas con esta flag como hard constraint:
+   *  NADA puede planificarse después de `fecha_objetivo`. */
+  fecha_fin_bloqueada?: boolean;
 }
 
 // ============================================================================

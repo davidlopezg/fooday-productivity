@@ -76,7 +76,7 @@ const LAG_VS_LEAD: { dimension: string; lag: string; lead: string }[] = [
   },
   {
     dimension: "En la app",
-    lag: "Tabla `metas` + `periodos` + `resultados_periodo` (los KRs viven aquí, ver /metas/plan). El campo `plazo` de la meta define en cuáles trimestres la IA y el agente deben generar KRs.",
+    lag: "Tabla `metas` + `periodos` + `resultados_periodo` (los KRs viven aquí, ver /metas/plan). Desde la migración 0025, dos campos reales en `metas` (`fecha_inicio_meta`, `fecha_objetivo` + flag `fecha_fin_bloqueada`) definen el rango real de la meta — la IA reparte los KRs SOLO dentro de ese rango, como meses sueltos (no siempre 4 trimestres). El campo libre `plazo` queda como legacy.",
     lead: "Columna `es_wig` en `metas` (panel violeta) y en `tareas` (panel fucsia).",
   },
 ];
@@ -407,8 +407,10 @@ export default function MetodologiaPage() {
               <li className="flex gap-2">
                 <span className="text-fuchsia-500">·</span>
                 <span>
-                  <strong className="text-foreground">Alcance temporal de una meta (campo <code className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono">plazo</code>).</strong>{" "}
-                  Define en qué trimestres la IA y el agente generan KRs. Formatos: <code className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono">Q3 2026</code>, <code className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono">Q1-Q3</code>, <code className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono">Q1, Q3</code>, <code className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono">fin de 2026</code>, <code className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono">trimestre 3</code>… Si lo dejas vacío, se cubren los 4 trimestres. La función <code className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono">parsearTrimestresDePlazo()</code> en <code className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono">/lib/plan.ts</code> hace el mapeo texto → trimestres.
+                  <strong className="text-foreground">Alcance temporal de una meta (migration 0025 — rango real).</strong>{" "}
+                  /metas/nueva pide dos fechas reales: <em>inicio</em> (default hoy) y <em>límite</em> (opcional). Si marcas 🔒 Fecha crítica, la IA no puede planificar nada después del límite. La IA reparte los KRs como meses sueltos dentro del rango, no fuerza 4 trimestres. El viejo campo libre{" "}
+                  <code className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono">plazo</code>{" "}
+                  se conserva por compat pero ya no es la fuente de verdad. Helpers: <code className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono">parsearMesesDeRango()</code> y <code className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono">parsearTrimestresDePlazo()</code> (legacy) en <code className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono">/lib/plan.ts</code>.
                 </span>
               </li>
             </ul>

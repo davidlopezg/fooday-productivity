@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   crearMeta,
   ensurePeriodosAnio,
+  ensurePeriodosMeses,
 } from "@/lib/mutations";
 import { fetchAreas, fetchPeriodos, fetchProyectos } from "@/lib/queries";
 import { useConfig } from "@/lib/configStore";
@@ -13,8 +14,10 @@ import { useData } from "@/lib/useData";
 import {
   aplicarKrsYTareasEnMeta,
   generarPlanMetaIA,
+  parsearMesesDeRango,
   parsearTrimestresDePlazo,
   type PlanMetaGenerado,
+  type UnidadDisponible,
 } from "@/lib/plan";
 import { PlanMetaGeneradoPreview } from "@/components/PlanMetaGeneradoPreview";
 import type { AmbitoMeta, Area, Periodo, Proyecto } from "@/lib/types";
@@ -33,6 +36,15 @@ const AMBITOS: Array<{ id: AmbitoMeta; label: string }> = [
   { id: "profesional", label: "💼 Profesional" },
 ];
 
+/** YYYY-MM-DD de hoy en hora local del navegador. */
+function hoyYMD(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${dd}`;
+}
+
 export default function NuevaMetaPage() {
   const router = useRouter();
   const cfg = useConfig();
@@ -40,25 +52,40 @@ export default function NuevaMetaPage() {
   const { data: periodos } = useData<Periodo[]>(fetchPeriodos, []);
   const { data: proyectos } = useData<Proyecto[]>(() => fetchProyectos(), []);
   const anioActual = new Date().getFullYear();
+  const hoyStr = hoyYMD();
 
   const trimestresDisponibles = (periodos ?? [])
     .filter((p) => p.tipo === "trimestre" && p.anio === anioActual)
     .sort((a, b) => a.numero - b.numero)
-    .map((p) => ({ numero: p.numero as 1 | 2 | 3 | 4, nombre: p.nombre }));
+    .map((p) => ({
+      unidad: "trimestre" as const,
+      numero: p.numero as 1 | 2 | 3 | 4,
+      nombre: p.nombre,
+      fecha_inicio: p.fecha_inicio,
+      fecha_fin: p.fecha_fin,
+    }));
 
   const [titulo, setTitulo] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [estado, setEstado] = useState<(typeof ESTADOS)[number]>("sin_empezar");
   const [prioridad, setPrioridad] = useState<(typeof PRIORIDADES)[number]>("media");
-  const [plazo, setPlazo] = useState("");
   const [areaId, setAreaId] = useState<string>("");
   const [ambito, setAmbito] = useState<AmbitoMeta | "">("");
   const [tags, setTags] = useState("");
-  // Migration 0024: proyecto + fecha objetivo + contexto + situación actual.
+  // Migration 0024: proyecto + contexto + situación actual.
   const [proyectoId, setProyectoId] = useState<string>("");
-  const [fechaObjetivo, setFechaObjetivo] = useState<string>("");
   const [contexto, setContexto] = useState("");
   const [situacionActual, setSituacionActual] = useState("");
+  // Migration 0025: rango real de la meta (sustituye al campo libre `plazo`).
+  // Defaults sensatos: hoy como inicio, sin fecha límite. La IA propondrá
+  // si está vacía (orientativa, no dura) o la respetará si está bloqueada.
+  const [fechaInicioMeta, setFechaInicioMeta] = useState<string>(hoyStr);
+  const [fechaObjetivo, setFechaObjetivo] = useState<string>("");
+  const [fechaFinBloqueada, setFechaFinBloqueada] = useState<boolean>(false);
+  // Campo libre `plazo` se conserva por compat de UI (no se usa para
+  // planificar: la fuente de verdad son las fechas reales). Lo ocultamos
+  // por defecto y se mantiene en el form legacy si alguien lo necesita.
+  const [plazo, setPlazo] = useState("");
   const [autoTrimestres, setAutoTrimestres] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -70,9 +97,41 @@ export default function NuevaMetaPage() {
   const [errorIa, setErrorIa] = useState<string | null>(null);
   const [errorAplicar, setErrorAplicar] = useState<string | null>(null);
 
+  // —— Derivados de fechas ——
+  const rango = useMemo(
+    () =>
+      parsearMesesDeRango({
+        fecha_inicio: fechaInicioMeta || hoyStr,
+        fecha_objetivo: fechaObjetivo || null,
+        anio: anioActual,
+        hoy: hoyStr,
+      }),
+    [fechaInicioMeta, fechaObjetivo, anioActual, hoyStr],
+  );
+
+  const unidadesObjetivo = useMemo<UnidadDisponible[]>(() => {
+    return rango.meses.map<UnidadDisponible>((m) => ({
+      unidad: "mes",
+      numero: m.numero,
+      nombre: m.nombre,
+      fecha_inicio: m.fecha_inicio,
+      fecha_fin: m.fecha_fin,
+    }));
+  }, [rango]);
+
+  // Error de validación de fechas derivado en cada render (sin effect).
+  const fechaError =
+    fechaInicioMeta && fechaObjetivo && fechaInicioMeta > fechaObjetivo
+      ? "La fecha de inicio no puede ser posterior a la fecha límite."
+      : null;
+
   async function guardar() {
     if (!titulo.trim()) {
       setError("El título es obligatorio.");
+      return;
+    }
+    if (fechaError) {
+      setError(fechaError);
       return;
     }
     setGuardando(true);
@@ -94,13 +153,28 @@ export default function NuevaMetaPage() {
         fecha_objetivo: fechaObjetivo || null,
         contexto: contexto.trim() || null,
         situacion_actual: situacionActual.trim() || null,
+        fecha_inicio_meta: fechaInicioMeta || null,
+        fecha_fin_bloqueada: fechaFinBloqueada,
       });
       if (autoTrimestres) {
-        // Mejor esfuerzo: si falla, no bloquea la creación de la meta.
         try {
-          await ensurePeriodosAnio(new Date().getFullYear());
+          await ensurePeriodosAnio(anioActual);
         } catch (e) {
           console.warn("[NuevaMeta] auto-generar trimestres falló:", e);
+        }
+      }
+      // Pre-creamos también los periodos mensuales del rango para que la
+      // asignación KRs↔periodo no falle cuando David edite la meta sin
+      // volver a pasar por la IA.
+      if (rango.meses.length > 0) {
+        try {
+          await ensurePeriodosMeses(
+            anioActual,
+            rango.meses[0].numero,
+            rango.meses[rango.meses.length - 1].numero,
+          );
+        } catch (e) {
+          console.warn("[NuevaMeta] ensurePeriodosMeses falló:", e);
         }
       }
       router.push(`/metas/detalle?id=${meta.id}`);
@@ -120,9 +194,9 @@ export default function NuevaMetaPage() {
       setErrorIa("Configura la clave de IA en /configuracion antes de usar esta función.");
       return;
     }
-    if (trimestresDisponibles.length === 0) {
+    if (unidadesObjetivo.length === 0) {
       setErrorIa(
-        "No hay trimestres creados para este año. Pulsa el checkbox 'Auto-generar 4 trimestres' abajo y vuelve a intentarlo.",
+        "No hay meses en el rango seleccionado. Revisa las fechas de inicio y fin.",
       );
       return;
     }
@@ -130,9 +204,6 @@ export default function NuevaMetaPage() {
     setErrorIa(null);
     setPlanGenerado(null);
     try {
-      // Trimestres objetivo derivados del campo libre "plazo".
-      // Si el usuario no escribió nada, el parser devuelve los 4 trimestres.
-      const trimestresObjetivo = parsearTrimestresDePlazo(plazo.trim());
       const plan = await generarPlanMetaIA(
         cfg.data.base_url,
         cfg.data.minimax_api_key,
@@ -141,9 +212,24 @@ export default function NuevaMetaPage() {
           meta_titulo: titulo.trim(),
           meta_descripcion: descripcion.trim() || null,
           meta_ambito: (ambito || null) as "personal" | "profesional" | null,
-          meta_plazo: plazo.trim() || null,
+          meta_plazo:
+            plazo.trim() ||
+            (fechaObjetivo
+              ? fechaObjetivo
+              : `${rango.meses.length} mes(es) desde ${fechaInicioMeta || hoyStr}`),
+          // Migration 0025: pasar fechas reales (la IA las usa como hard
+          // constraint si `fecha_fin_bloqueada`).
+          fecha_inicio_meta: fechaInicioMeta || null,
+          fecha_objetivo: fechaObjetivo || null,
+          fecha_fin_bloqueada: fechaFinBloqueada,
+          unidades_disponibles: unidadesObjetivo,
+          unidades_objetivo: unidadesObjetivo.map((u) => ({
+            unidad: u.unidad,
+            numero: u.numero,
+          })),
+          // Se mantiene por compat con callers viejos.
           trimestres_disponibles: trimestresDisponibles,
-          trimestres_objetivo: trimestresObjetivo,
+          trimestres_objetivo: parsearTrimestresDePlazo(plazo.trim()),
           anio: anioActual,
         },
       );
@@ -162,14 +248,25 @@ export default function NuevaMetaPage() {
     setAplicando(true);
     setErrorAplicar(null);
     try {
-      // Asegurar periodos del año actual
-      await ensurePeriodosAnio(anioActual);
-      const periodosActuales = (periodos ?? []).filter(
-        (p) => p.tipo === "trimestre" && p.anio === anioActual,
+      // Asegurar periodos (trimestres del año + meses del rango).
+      if (autoTrimestres) {
+        try {
+          await ensurePeriodosAnio(anioActual);
+        } catch (e) {
+          console.warn("[NuevaMeta] auto-generar trimestres falló:", e);
+        }
+      }
+      // Refrescar periodos desde BD para tener los IDs recién creados.
+      const periodosRefrescados = (periodos ?? []).filter(
+        (p) => p.anio === anioActual,
       );
-      const periodosByNumero = new Map(
-        periodosActuales.map((p) => [p.numero as 1 | 2 | 3 | 4, { id: p.id }]),
-      );
+      const periodosByUnidad = new Map<string, { id: string; tipo: "trimestre" | "mes" }>();
+      for (const p of periodosRefrescados) {
+        periodosByUnidad.set(`${p.tipo}:${p.numero}`, {
+          id: p.id,
+          tipo: p.tipo as "trimestre" | "mes",
+        });
+      }
 
       // Crear meta con los campos del formulario (no los del plan)
       const meta = await crearMeta({
@@ -188,6 +285,8 @@ export default function NuevaMetaPage() {
         fecha_objetivo: fechaObjetivo || null,
         contexto: contexto.trim() || null,
         situacion_actual: situacionActual.trim() || null,
+        fecha_inicio_meta: fechaInicioMeta || null,
+        fecha_fin_bloqueada: fechaFinBloqueada,
       });
 
       // Materializar el plan (KRs + tareas) — helper compartido con
@@ -195,7 +294,7 @@ export default function NuevaMetaPage() {
       await aplicarKrsYTareasEnMeta(
         meta.id,
         planGenerado,
-        periodosByNumero,
+        periodosByUnidad,
         cfg.data,
         { saltarExistentes: true },
       );
@@ -212,13 +311,23 @@ export default function NuevaMetaPage() {
   const field =
     "h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring";
 
+  // Helpers visuales
+  const mesesLabel = useMemo(() => {
+    if (rango.meses.length === 0) return "sin rango";
+    if (rango.meses.length === 1) return `1 mes (${rango.meses[0].nombre})`;
+    const primero = rango.meses[0].nombre;
+    const ultimo = rango.meses[rango.meses.length - 1].nombre;
+    return `${rango.meses.length} meses · ${primero} → ${ultimo}`;
+  }, [rango]);
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Nueva meta</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Crea una meta. Opcionalmente genera los 4 trimestres del año actual.
+            Crea una meta con un rango de fechas real. La IA distribuirá los
+            KRs dentro del rango, no a 4 trimestres fijos.
           </p>
         </div>
         <Link
@@ -294,29 +403,6 @@ export default function NuevaMetaPage() {
             </select>
           </label>
           <label className="block">
-            <span className="mb-1 block text-xs font-medium">
-              Plazo{" "}
-              <span className="font-normal text-muted-foreground">
-                (define en qué trimestres se generan KRs)
-              </span>
-            </span>
-            <input
-              className={field}
-              value={plazo}
-              onChange={(e) => setPlazo(e.target.value)}
-              placeholder="p.ej. Q3 2026, Q1-Q3, fin de 2026, trimestre 3…"
-            />
-            <span className="mt-1 block text-[11px] text-muted-foreground">
-              Formatos: <code className="font-mono">Q3</code>,{" "}
-              <code className="font-mono">Q3 2026</code>,{" "}
-              <code className="font-mono">Q1-Q3</code>,{" "}
-              <code className="font-mono">Q1, Q3</code>,{" "}
-              <code className="font-mono">fin de 2026</code>,{" "}
-              <code className="font-mono">trimestre 3</code>… Si lo dejas
-              vacío, se generan los 4 trimestres.
-            </span>
-          </label>
-          <label className="block">
             <span className="mb-1 block text-xs font-medium">Ámbito</span>
             <select
               className={field}
@@ -331,23 +417,101 @@ export default function NuevaMetaPage() {
               ))}
             </select>
           </label>
-          <label className="block sm:col-span-2">
-            <span className="mb-1 block text-xs font-medium">
-              Tags{" "}
-              <span className="font-normal text-muted-foreground">
-                (separadas por coma, sin #)
-              </span>
-            </span>
-            <input
-              className={field}
-              value={tags}
-              onChange={(e) => setTags(e.target.value)}
-              placeholder="p.ej. salud, ansiedad, hábitos"
-            />
-          </label>
         </div>
 
-        {/* === Migration 0024: proyecto + fecha objetivo + contexto. === */}
+        {/* === Migration 0025: rango real de la meta === */}
+        <div className="mt-4 rounded-lg border border-border bg-muted/20 p-3">
+          <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Rango de la meta
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium">
+                Fecha de inicio
+                <span className="ml-1 font-normal text-muted-foreground">
+                  (cuándo puedes empezar)
+                </span>
+              </span>
+              <input
+                type="date"
+                className={field}
+                value={fechaInicioMeta}
+                onChange={(e) => setFechaInicioMeta(e.target.value)}
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium">
+                Fecha límite
+                <span className="ml-1 font-normal text-muted-foreground">
+                  (deadline; si la dejas vacía, la IA propone una)
+                </span>
+              </span>
+              <input
+                type="date"
+                className={field}
+                value={fechaObjetivo}
+                onChange={(e) => setFechaObjetivo(e.target.value)}
+                min={fechaInicioMeta || undefined}
+              />
+            </label>
+            <label className="flex items-end pb-1">
+              <span className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={fechaFinBloqueada}
+                  onChange={(e) => setFechaFinBloqueada(e.target.checked)}
+                  disabled={!fechaObjetivo}
+                  className="mt-0.5 h-4 w-4 rounded border-input disabled:opacity-50"
+                />
+                <span>
+                  <span className="font-medium">
+                    🔒 Fecha crítica — no se mueve
+                  </span>
+                  <span className="block text-[11px] text-muted-foreground">
+                    El planificador no podrá meter nada después de esta fecha.
+                  </span>
+                </span>
+              </span>
+            </label>
+          </div>
+          {fechaError && (
+            <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+              {fechaError}
+            </p>
+          )}
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
+            <span className="rounded-md bg-background px-2 py-0.5 font-mono text-muted-foreground">
+              Rango detectado: {mesesLabel}
+            </span>
+            {rango.fin_abierto && (
+              <span className="rounded-md bg-amber-500/10 px-2 py-0.5 text-amber-700 dark:text-amber-300">
+                ⚠️ Sin deadline — la IA propondrá uno orientativo
+              </span>
+            )}
+            {fechaFinBloqueada && fechaObjetivo && (
+              <span className="rounded-md bg-red-500/10 px-2 py-0.5 text-red-700 dark:text-red-300">
+                🔒 HARD CONSTRAINT
+              </span>
+            )}
+          </div>
+        </div>
+
+        <label className="block sm:col-span-2 mt-3">
+          <span className="mb-1 block text-xs font-medium">
+            Tags{" "}
+            <span className="font-normal text-muted-foreground">
+              (separadas por coma, sin #)
+            </span>
+          </span>
+          <input
+            className={field}
+            value={tags}
+            onChange={(e) => setTags(e.target.value)}
+            placeholder="p.ej. salud, ansiedad, hábitos"
+          />
+        </label>
+
+        {/* === Migration 0024: proyecto + contexto. === */}
         <details className="mt-4 rounded-md border border-border bg-muted/20 px-3 py-2">
           <summary className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground">
             Clasificación y contexto (ayuda al agente)
@@ -375,16 +539,16 @@ export default function NuevaMetaPage() {
             </label>
             <label className="block">
               <span className="mb-1 block text-xs font-medium">
-                Fecha objetivo
+                Plazo libre (legacy)
                 <span className="ml-1 font-normal text-muted-foreground">
-                  (la propondrá el agente)
+                  (opcional — solo informativo)
                 </span>
               </span>
               <input
-                type="date"
                 className={field}
-                value={fechaObjetivo}
-                onChange={(e) => setFechaObjetivo(e.target.value)}
+                value={plazo}
+                onChange={(e) => setPlazo(e.target.value)}
+                placeholder="p.ej. Q3 2026 (legacy)"
               />
             </label>
             <label className="block sm:col-span-2">
@@ -428,10 +592,10 @@ export default function NuevaMetaPage() {
             className="mt-0.5 h-4 w-4 rounded border-input"
           />
           <span>
-            <span className="font-medium">Auto-generar 4 trimestres del {new Date().getFullYear()}</span>
+            <span className="font-medium">Auto-generar 4 trimestres del {anioActual}</span>
             <span className="block text-xs text-muted-foreground">
-              Crea los periodos Q1–Q4 del año actual. Luego podrás añadir
-              resultados esperados por trimestre.
+              Crea los periodos Q1–Q4 del año. Los meses del rango los crea
+              la app al aplicar el plan.
             </span>
           </span>
         </label>
@@ -442,7 +606,15 @@ export default function NuevaMetaPage() {
         <div className="mt-4 flex flex-wrap gap-2">
           <button
             onClick={generarPlan}
-            disabled={generando || aplicando || guardando || !titulo.trim() || !cfg.data.minimax_api_key}
+            disabled={
+              generando ||
+              aplicando ||
+              guardando ||
+              !titulo.trim() ||
+              !cfg.data.minimax_api_key ||
+              !!fechaError ||
+              unidadesObjetivo.length === 0
+            }
             className="inline-flex items-center gap-1.5 rounded-md bg-violet-500 px-4 py-2 text-sm font-medium text-white hover:bg-violet-600 disabled:cursor-not-allowed disabled:opacity-50"
             title={
               !cfg.data.minimax_api_key
@@ -455,7 +627,7 @@ export default function NuevaMetaPage() {
           </button>
           <button
             onClick={guardar}
-            disabled={guardando}
+            disabled={guardando || !!fechaError}
             className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
           >
             {guardando ? "Guardando…" : "Crear meta"}
@@ -486,6 +658,7 @@ export default function NuevaMetaPage() {
           plan={planGenerado}
           metaTitulo={titulo}
           trimestrersDisponibles={trimestresDisponibles}
+          unidadesDisponibles={unidadesObjetivo}
           busy={aplicando}
           error={errorAplicar}
           onCancel={() => {

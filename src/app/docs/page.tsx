@@ -72,9 +72,9 @@ const PILARES: Pilar[] = [
           "La meta debe ser lo suficientemente alta para motivar al cerebro a superar el sesgo del presente, pero no tan extrema que se vuelva un castigo insostenible que lleve a abandonar la autorregulación. Ajusta cada trimestre.",
       },
       {
-        titulo: "Alcance temporal: campo plazo",
+        titulo: "Alcance temporal: rango real [inicio, fin]",
         cuerpo:
-          "Una meta sin plazo se diluye. La app usa el campo libre plazo para decidir EN QUÉ trimestres la IA debe generar los KRs (los hitos medibles que la cumplen). Acepta Q3 2026, Q1-Q3, Q1, Q3, fin de 2026, trimestre 3… Si lo dejas vacío, se cubren los 4 trimestres por defecto. Un KR es un resultado medible (no una acción): 'medir sueño 6h/noche' lo es; 'apagar el móvil a las 23h' es la tarea dentro de él.",
+          "Una meta sin plazo se diluye. Desde la migración 0025, /metas/nueva pide dos fechas reales (no texto libre): inicio (cuándo puedes empezar) y límite (deadline). La IA reparte los KRs SOLO dentro de ese rango como meses sueltos — una meta de 2 semanas cabe en un mes; una de 8 meses usa 8. Si el inicio cae en mitad de año (ej. mayo), Q1/Q2 quedan vacíos. Si el límite está marcado 🔒 HARD CONSTRAINT, la IA no puede planificar nada después. Razón: forzar 4 trimestres lineales sesga el plan cuando las metas son de tamaños muy distintos. Un KR es un resultado medible (no una acción): 'dormir 6h/noche' lo es; 'apagar el móvil a las 23h' es la tarea dentro de él.",
       },
     ],
   },
@@ -167,7 +167,7 @@ const FEATURES: Array<{ ruta: string; proposito: string; docs: string }> = [
 
   // ── Metas y planificación ──
   { ruta: "/metas", proposito: "Cards de metas con estado y progreso + botón IA Sugerir WIGs + EditarMetaModal con botón IA Generar plan", docs: "Pilar 2 · Ritual mensual · HelpDrawer" },
-  { ruta: "/metas/nueva", proposito: "Crear meta + botón IA Generar plan (KRs+tareas+hábitos) que respeta el campo plazo", docs: "Pilar 2 · HelpDrawer" },
+  { ruta: "/metas/nueva", proposito: "Crear meta con rango real [inicio, fin] + botón IA Generar plan (KRs+tareas+hábitos) que reparte los KRs SOLO dentro del rango. Hard constraint opcional 🔒", docs: "Pilar 2 · HelpDrawer" },
   { ruta: "/metas/agente", proposito: "Agente IA: contexto libre → meta + plan trimestral completo (atajo directo a meta; la entrada unificada es /agente)", docs: "Pilar 2 · HelpDrawer" },
   { ruta: "/agente", proposito: "Agente unificado: clasifica la idea (proyecto/meta/captura) y propone estructura. migration 0024", docs: "Pilar 2 · HelpDrawer" },
   { ruta: "/metas/auditoria", proposito: "Auditoría de metas: qué les falta (área, proyecto, fecha objetivo, contexto, KRs). migration 0024", docs: "Pilar 2 · HelpDrawer" },
@@ -336,10 +336,10 @@ export default function DocsPage() {
             Última actualización:
           </span>
           <span className="font-mono text-indigo-700 dark:text-indigo-300">
-            2026-10-11
+            2026-10-14
           </span>
           <span className="text-muted-foreground">
-            — selector de meta/KR en CrearModal/EditarModal. Chip visual hábito vs puntual (RecurrenciaChip). Badge "📊 N KRs · M trimestres" en /metas. Tres funciones IA nuevas: botón en /metas/nueva ("Generar plan"), botón en /metas ("Sugerir 3 WIGs"), y nueva ruta /metas/agente (contexto libre → meta + plan completo).
+            — migration 0025: las metas pasan a tener rango real (fecha_inicio_meta + fecha_objetivo + fecha_fin_bloqueada). El planificador reparte los KRs como meses sueltos dentro del rango, no fuerza 4 trimestres. /metas/nueva con dos date inputs + checkbox 🔒 Fecha crítica. Helpers nuevos: parsearMesesDeRango() y ensurePeriodosMeses() (RPC ensure_periodos_meses).
           </span>
         </div>
       </section>
@@ -1457,6 +1457,39 @@ export default function DocsPage() {
         </header>
 
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-10-14
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">Migración 0025: rango real en las metas (fin del sesgo a 4 trimestres).</strong>{" "}
+              Los tres huecos que veías en el planificador —(1) propuesta cerrada a Q1–Q4 aunque estuviéramos en Q4; (2) metas pequeñas de 2 semanas infladas a 4 trimestres, metas grandes de 6+ meses comprimidas; (3) imposibilidad de bloquear una fecha como dura— quedan cerrados con dos date inputs reales en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas/nueva</code>{" "}
+              (inicio con default hoy, límite opcional) y un checkbox “🔒 Fecha crítica”. El motor del planificador (en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/lib/plan.ts</code>
+              ) trabaja ahora con <em>unidades de tiempo</em> (trimestre <em>o</em> mes), no solo trimestres: si la meta cabe en un mes devuelve 1 mes; si dura 8 meses devuelve 8. El campo libre{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">plazo</code>{" "}
+              (texto) se conserva por compat pero ya no es la fuente de verdad. Migration nueva:{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">0025_metas_fecha_inicio_fin_bloqueada.sql</code>{" "}
+              añade <code className="rounded bg-muted px-1.5 py-0.5 text-xs">metas.fecha_inicio_meta</code>{" "}
+              (date) y <code className="rounded bg-muted px-1.5 py-0.5 text-xs">metas.fecha_fin_bloqueada</code>{" "}
+              (bool default false), más la RPC{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">ensure_periodos_meses(anio, mes_inicio, mes_fin)</code>{" "}
+              que crea periodos mensuales idempotentemente. Helpers exportados nuevos:{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">parsearMesesDeRango()</code>{" "}
+              y <code className="rounded bg-muted px-1.5 py-0.5 text-xs">ensurePeriodosMeses()</code>{" "}
+              (mutations). El tipo <code className="rounded bg-muted px-1.5 py-0.5 text-xs">KrGenerado</code>{" "}
+              sustituye <code className="rounded bg-muted px-1.5 py-0.5 text-xs">trimestre</code>{" "}
+              fijo por <code className="rounded bg-muted px-1.5 py-0.5 text-xs">{`{ unidad_tiempo: 'trimestre' | 'mes', trimestre?: 1..4, mes?: 1..12 }`}</code>; el viejo{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">trimestres_usados</code>{" "}
+              pasa a <code className="rounded bg-muted px-1.5 py-0.5 text-xs">unidades_usadas: Array&lt;{`{unidad, numero}`}&gt;</code>. Los tres callers de <code className="rounded bg-muted px-1.5 py-0.5 text-xs">aplicarKrsYTareasEnMeta()</code>{" "}
+              (<code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas/nueva</code>,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas/agente</code> y{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">EditarMetaModal</code>) ya están migrados: limpian periodos, construyen un <code className="rounded bg-muted px-1.5 py-0.5 text-xs">Map&lt;"trimestre:N"|"mes:N", {`{id, tipo}`}&gt;</code> y materializan el plan de forma uniforme. El preview{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">PlanMetaGeneradoPreview</code>{" "}
+              pinta la etiqueta de unidad correcta (Q1 o “Mayo 2026”). Prompt del planificador reescrito para soportar meses, hard constraint y múltiples unidades; cuando <code className="rounded bg-muted px-1.5 py-0.5 text-xs">fecha_fin_bloqueada</code>, añade la línea “NINGÚN KR puede planificar trabajo después de la fecha límite”. FEATURES actualizado (fila /metas/nueva con la nueva propuesta + hard constraint) y Pilar 2 reescrito (“Alcance temporal: rango real [inicio, fin]”) explicando por qué dejar de forzar 4 trimestres. Lo que sigue fuera de scope: botón “🔄 regenerar este KR” (sesión 2), calendario de disponibilidad (Abril, festivos), reajustar plan completo con histórico. Esta entrada es la única obligatoria de AGENTS.md.
+            </span>
+          </li>
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
               2026-10-13

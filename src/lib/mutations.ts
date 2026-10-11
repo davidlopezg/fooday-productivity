@@ -1593,6 +1593,10 @@ export async function crearMeta(datos: {
   fecha_objetivo?: string | null;
   contexto?: string | null;
   situacion_actual?: string | null;
+  /** Migration 0025: fecha en que David puede empezar la meta. */
+  fecha_inicio_meta?: string | null;
+  /** Migration 0025: ¿la fecha objetivo es dura y no se mueve? */
+  fecha_fin_bloqueada?: boolean;
 }): Promise<Meta> {
   const { data, error } = await createClient()
     .from("metas")
@@ -1610,6 +1614,8 @@ export async function crearMeta(datos: {
       fecha_objetivo: datos.fecha_objetivo ?? null,
       contexto: datos.contexto?.trim() || null,
       situacion_actual: datos.situacion_actual?.trim() || null,
+      fecha_inicio_meta: datos.fecha_inicio_meta ?? null,
+      fecha_fin_bloqueada: datos.fecha_fin_bloqueada ?? false,
     })
     .select("*")
     .single();
@@ -1622,6 +1628,7 @@ export async function actualizarMeta(
   campos: Partial<Pick<Meta,
     "titulo" | "descripcion" | "estado" | "prioridad" | "area_id" | "plazo" | "ambito" | "tags"
     | "proyecto_id" | "fecha_objetivo" | "contexto" | "situacion_actual"
+    | "fecha_inicio_meta" | "fecha_fin_bloqueada"
   >>,
 ): Promise<void> {
   const { error } = await createClient()
@@ -1668,6 +1675,27 @@ export async function ensurePeriodosAnio(anio: number): Promise<Periodo[]> {
     p_anio: anio,
   });
   if (error) throw new Error(`No se pudieron crear los periodos: ${error.message}`);
+  return (data ?? []) as Periodo[];
+}
+
+/** Migration 0025: crea idempotentemente los periodos mensuales
+ *  (`tipo='mes'`) que falten en `[p_mes_inicio, p_mes_fin]` y devuelve
+ *  esa lista. La RPC está en `supabase/migrations/0025_*`. */
+export async function ensurePeriodosMeses(
+  anio: number,
+  mes_inicio: number,
+  mes_fin: number,
+): Promise<Periodo[]> {
+  const { data, error } = await createClient().rpc("ensure_periodos_meses", {
+    p_anio: anio,
+    p_mes_inicio: mes_inicio,
+    p_mes_fin: mes_fin,
+  });
+  if (error) {
+    throw new Error(
+      `No se pudieron crear los periodos mensuales: ${error.message}`,
+    );
+  }
   return (data ?? []) as Periodo[];
 }
 
