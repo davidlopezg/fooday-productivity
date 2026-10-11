@@ -2604,7 +2604,7 @@ ${hardBlock ? "⚠️ HARD CONSTRAINT: la fecha límite es DURA. NINGUNA meta/kr
 
 UNIDADES HABILITADAS (usa SOLO estas): meses [${mesesHabilitados.join(", ")}].
 Para cada meta hija, en lugar de trimestre: 1..4, devuelve unidad_tiempo: "mes" y mes: N (1..12) indicando en qué mes concreto cae.
-Si necesitas más de 4 metas, NO las metas todas en los mismos meses: distribuye cada meta en un mes distinto dentro del rango.
+IMPORTANTE: aunque el rango sea corto, NO recortes el alcance del proyecto. Si una iniciativa tipo proyecto pide 4 fases (dossier, alternativas, propuesta, simulacro) y el rango solo tiene 3 meses, esas 4 metas deben caer en esos 3 meses, 2 metas en el primer mes, 1+1, o similares. Comprime fases, no recortes. Si después de comprimir siguen siendo demasiadas para el rango, indícalo en fuera_de_rango y propón solo las más críticas (las que NO aplicables se enumeran en la sección apropiada del JSON, no en metas).
 `
     : fechaInicio || fechaObjetivo
       ? `
