@@ -240,10 +240,13 @@ export default function AgentePage() {
       // 3) Asegurar periodos del año para poder crear los KRs.
       await ensurePeriodosAnio(anioActual);
 
-      // 4) Refrescar el mapa de periodos del estado de la UI ANTES
-      //    del loop (después de `ensurePeriodosAnio` algunos pueden ser
-      //    nuevos). Construimos aquí mismo para no depender del closure.
-      const periodosRefrescados = (periodos ?? []).filter(
+      // 4) Refrescar periodos desde BD (no del state de React, que puede
+      //    estar stale al llegar aquí). Esto garantiza que tenemos los
+      //    periodos recién creados por ensurePeriodosAnio.
+      //    Importamos dinámicamente para no crear dependencia circular.
+      const { fetchPeriodos } = await import("@/lib/queries");
+      const periodosBD = await fetchPeriodos();
+      const periodosRefrescados = (periodosBD ?? []).filter(
         (p) => p.tipo === "trimestre" && p.anio === anioActual,
       );
       const periodosByNumero = new Map<1 | 2 | 3 | 4, { id: string; nombre: string }>();
@@ -282,8 +285,14 @@ export default function AgentePage() {
                   unidad_tiempo: m.unidad_tiempo,
                   mes: m.mes,
                   trimestre: m.kr_inicial?.trimestre,
+                  fecha_objetivo: m.fecha_objetivo,
+                  meta_ambito: m.meta_ambito,
+                  meta_plazo: m.meta_plazo,
                 })),
               periodos_disponibles: Array.from(periodosByNumero.keys()),
+              periodo_ids: Array.from(periodosByNumero.entries()).map(
+                ([k, v]) => ({ trimestre: k, id: v.id }),
+              ),
               proyecto_id: proyectoId,
               area_id: areaId,
             }),
