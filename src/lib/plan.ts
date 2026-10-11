@@ -1552,6 +1552,17 @@ function sinAcentos(s: string): string {
   return s.normalize("NFD").replace(/\p{Diacritic}/gu, "");
 }
 
+/** Migration 0025: devuelve el trimestre natural (1..4) del mes actual.
+ *  ene-mar=1, abr-jun=2, jul-sep=3, oct-dic=4. Se usa como default
+ *  cuando la IA no devuelve `kr_inicial.trimestre`. */
+function trimestrePorNumeroDefault(): 1 | 2 | 3 | 4 {
+  const m = new Date().getMonth() + 1; // 1..12
+  if (m <= 3) return 1;
+  if (m <= 6) return 2;
+  if (m <= 9) return 3;
+  return 4;
+}
+
 // ============================================================================
 // parsearMesesDeRango — migration 0025
 // ----------------------------------------------------------------------------
@@ -2526,6 +2537,14 @@ export type MetaHijaGenerada = {
     valor_objetivo: number | null;
     unidad: string | null;
   } | null;
+  /**
+   * Migration 0025: trimestre sugerido por la IA en formato
+   * "mes" (1..12) o "trimestre" (1..4). Si se omite, se asume trimestre.
+   * Solo se usa cuando el caller pasa `unidades_disponibles` con meses
+   * (rango real con meses sueltos).
+   */
+  unidad_tiempo?: "trimestre" | "mes";
+  mes?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
 };
 
 export type ResultadoClasificador = {
@@ -2548,12 +2567,59 @@ export type ClasificarOpts = {
   contexto: string;
   restricciones?: string[];
   areasExistentes?: string[]; // nombres de áreas ya creadas (para sugerir la correcta)
+  /** Migration 0025: rango opcional. Si está, la IA debe respetarlo
+   *  tanto en el prompt como al proponer fecha_objetivo de cada meta. */
+  fecha_inicio_meta?: string | null;
+  fecha_objetivo?: string | null;
+  fecha_fin_bloqueada?: boolean;
+  /** Lista de meses (1..12) en los que puede planificar. Si está, la IA
+   *  prefiere `unidad_tiempo: "mes"` + `mes` en cada meta hija. */
+  unidades_objetivo?: Array<{ unidad: "trimestre" | "mes"; numero: number }>;
 };
 
 function buildPromptClasificador(opts: ClasificarOpts): string {
   const restricciones = (opts.restricciones ?? []).join("; ") || "(ninguna explícita)";
   const areas = (opts.areasExistentes ?? []).join(", ") || "(ninguna creada todavía)";
-  return `Eres un coach de productividad para David López. Tu trabajo: leer un texto libre en primera persona y decidir si lo que David cuenta es:
+  // —— Migration 0025: bloque de rango ——
+  const fechaInicio = opts.fecha_inicio_meta?.trim();
+  const fechaObjetivo = opts.fecha_objetivo?.trim();
+  const hardBlock = !!opts.fecha_fin_bloqueada;
+  const mesesHabilitados = (opts.unidades_objetivo ?? [])
+    .filter((u) => u.unidad === "mes")
+    .map((u) => u.numero);
+  const usarMeses = mesesHabilitados.length > 0;
+  const hoyYMDLocal = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  })();
+
+  const rangoBloque = usarMeses
+    ? `
+==========
+RANGO REAL QUE DAVID HA FIJADO EN EL FORMULARIO (migration 0025)
+==========
+- Fecha de inicio: ${fechaInicio || "no indicada (asume hoy ${new Date().toISOString().slice(0, 10)})"}
+- Fecha límite: ${fechaObjetivo || "no indicada — propón una realista"}
+${hardBlock ? "⚠️ HARD CONSTRAINT: la fecha límite es DURA. NINGUNA meta/kr puede planificar nada después. Si sobra alcance, muévelo al contexto o a la sección 'fuera_de_rango' (no la metas hijas)." : "- La fecha límite es orientativa."}
+
+UNIDADES HABILITADAS (usa SOLO estas): meses [${mesesHabilitados.join(", ")}].
+Para cada meta hija, en lugar de trimestre: 1..4, devuelve unidad_tiempo: "mes" y mes: N (1..12) indicando en qué mes concreto cae.
+Si necesitas más de 4 metas, NO las metas todas en los mismos meses: distribuye cada meta en un mes distinto dentro del rango.
+`
+    : fechaInicio || fechaObjetivo
+      ? `
+==========
+RANGO REAL QUE DAVID HA FIJADO EN EL FORMULARIO (migration 0025)
+==========
+- Fecha de inicio: ${fechaInicio || "no indicada"}
+- Fecha límite: ${fechaObjetivo || "no indicada — propón una"}
+${hardBlock ? "⚠️ HARD CONSTRAINT: la fecha límite es DURA. NINGUNA meta/kr puede planificar nada después." : "- La fecha límite es orientativa."}
+
+RESPETA el rango: fecha_objetivo de cada meta hija debe caer dentro de [${fechaInicio || "hoy"}, ${fechaObjetivo || "propón"}].
+`
+      : "";
+
+  return `Eres un coach de productividad para David López. Tu trabajo: leer un texto libre en primera persona y decidir si lo que David cuenta es:${rangoBloque}
 
   (a) PROYECTO  → una iniciativa que agrupa 2-4 metas relacionadas dentro de un área.
                    Ej: "Quiero lanzar la v1 de Sol de Nit" → proyecto con metas de producto, marketing, contratación.
@@ -2608,10 +2674,11 @@ Responde SOLO con JSON válido con esta forma EXACTA:
       "meta_descripcion": "≤400 chars",
       "meta_ambito": "personal" | "profesional",
       "meta_plazo": "Q3 2026 / fin de 2026 / etc. (texto libre)",
-      "fecha_objetivo": "YYYY-MM-DD",
+      "fecha_objetivo": "YYYY-MM-DD — ${usarMeses ? "DEBE caer dentro del rango [inicio, fin_bloqueada]. KR inicial va en el mismo mes." : "debe caer dentro del rango del usuario"}",
       "contexto": "≤400 chars (qué rodea a esta meta)",
       "kr_inicial": {
-        "trimestre": 1,
+        "unidad_tiempo": "${usarMeses ? '"mes"' : '"trimestre"'}",
+        ${usarMeses ? '"mes": <1..12 — elige uno de la lista de meses habilitados>",' : '"trimestre": <1..4>,"'}
         "titulo": "KR medible, ≤100 chars",
         "metrica": "nombre corto de la métrica o null",
         "valor_objetivo": 0,
@@ -2644,6 +2711,8 @@ export async function clasificarYGenerarIA(
       contexto?: unknown;
       kr_inicial?: {
         trimestre?: unknown;
+        unidad_tiempo?: unknown;
+        mes?: unknown;
         titulo?: unknown;
         metrica?: unknown;
         valor_objetivo?: unknown;
@@ -2688,19 +2757,61 @@ export async function clasificarYGenerarIA(
           ? (ambRaw as "personal" | "profesional")
           : null;
       const kr = m?.kr_inicial;
-      const trimestreRaw = Number(kr?.trimestre ?? 1);
-      const trimestre = (
-        trimestreRaw >= 1 && trimestreRaw <= 4 ? Math.floor(trimestreRaw) : 1
-      ) as 1 | 2 | 3 | 4;
+
+      // —— Migration 0025: aceptar trimestre o mes según lo que devuelva
+      // la IA. Si el caller pasó `unidades_objetivo` con meses, preferimos
+      // mes; si no, trimestre.
+      let unidad_tiempo: "trimestre" | "mes" = "trimestre";
+      let trimestre: 1 | 2 | 3 | 4 = 1;
+      let mes: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | undefined;
+
+      if (kr) {
+        const utRaw = String(kr.unidad_tiempo ?? "").toLowerCase().trim();
+        if (utRaw === "mes") {
+          const mNum = Number(kr.mes);
+          if (mNum >= 1 && mNum <= 12) {
+            unidad_tiempo = "mes";
+            mes = Math.floor(mNum) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
+            // Para mapear periodo_id también necesitamos el trimestre del mes.
+            // Aproximamos por mes calendario (ene-mar=Q1, abr-jun=Q2, jul-sep=Q3, oct-dic=Q4).
+            trimestre = (mes <= 3 ? 1 : mes <= 6 ? 2 : mes <= 9 ? 3 : 4) as 1 | 2 | 3 | 4;
+          } else {
+            // La IA dijo "mes" pero el número no es válido — fallback al trimestre.
+            const tNum = Number(kr.trimestre);
+            trimestre = (tNum >= 1 && tNum <= 4 ? Math.floor(tNum) : 1) as 1 | 2 | 3 | 4;
+          }
+        } else {
+          const tNum = Number(kr.trimestre ?? 1);
+          trimestre = (tNum >= 1 && tNum <= 4 ? Math.floor(tNum) : 1) as 1 | 2 | 3 | 4;
+        }
+      } else {
+        // Sin kr_inicial: trimestre por defecto al activo en la fecha.
+        trimestre = trimestrePorNumeroDefault();
+      }
+
+      // —— Validación de fecha_objetivo contra el rango (migration 0025).
+      // No fallamos: marcamos y se mostrará warning al aplicar.
+      let fecha_objetivo: string | null = null;
+      const fObjRaw = String(m?.fecha_objetivo ?? "").trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(fObjRaw)) {
+        fecha_objetivo = fObjRaw;
+        if (
+          (opts.fecha_inicio_meta && fecha_objetivo < opts.fecha_inicio_meta) ||
+          (opts.fecha_objetivo && fecha_objetivo > opts.fecha_objetivo)
+        ) {
+          (m as Record<string, unknown>).__fueraDeRango = true;
+        }
+      }
+
       return {
         meta_titulo,
         meta_descripcion: String(m?.meta_descripcion ?? "").trim().slice(0, 600),
         meta_ambito,
         meta_plazo: String(m?.meta_plazo ?? "").trim().slice(0, 80) || null,
-        fecha_objetivo: String(m?.fecha_objetivo ?? "").trim().match(/^\d{4}-\d{2}-\d{2}$/)
-          ? String(m?.fecha_objetivo).trim()
-          : null,
+        fecha_objetivo,
         contexto: String(m?.contexto ?? "").trim().slice(0, 600) || null,
+        unidad_tiempo,
+        mes,
         kr_inicial: kr
           ? {
               trimestre,

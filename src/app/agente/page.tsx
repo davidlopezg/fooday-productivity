@@ -99,12 +99,34 @@ export default function AgentePage() {
     [fechaInicioMeta, fechaObjetivo, anioActual, hoyStr],
   );
 
+  // True si David rellenó alguna fecha. Lo necesitamos ANTES de los
+  // siguientes useMemo (mesesLabel, unidadesObjetivo, metasFueraDeRango)
+  // para que no haya orden de declaración raro.
+  const hayFechas: boolean = !!fechaInicioMeta || !!fechaObjetivo;
+
   const fechaError =
     fechaInicioMeta && fechaObjetivo && fechaInicioMeta > fechaObjetivo
       ? "La fecha de inicio no puede ser posterior a la fecha límite."
       : null;
 
-  const hayFechas = !!fechaInicioMeta || !!fechaObjetivo;
+  // Migration 0025: derivamos warnings de metas hijas cuya fecha_objetivo
+  // cae fuera del rango marcado por David. El prompt del clasificador ya
+  // intenta evitar esto, pero como red de seguridad lo mostramos antes de
+  // aplicar y el humano decide si sigue.
+  const metasFueraDeRango = useMemo(() => {
+    if (!resultado || !hayFechas) return [];
+    return resultado.metas
+      .filter((m) => {
+        if (!m.fecha_objetivo) return false;
+        if (fechaInicioMeta && m.fecha_objetivo < fechaInicioMeta) return true;
+        if (fechaObjetivo && m.fecha_objetivo > fechaObjetivo) return true;
+        return false;
+      })
+      .map((m) => ({
+        titulo: m.meta_titulo,
+        fecha: m.fecha_objetivo as string,
+      }));
+  }, [resultado, hayFechas, fechaInicioMeta, fechaObjetivo]);
 
   const mesesLabel = useMemo(() => {
     if (!hayFechas) return null;
@@ -114,6 +136,17 @@ export default function AgentePage() {
     const ultimo = rango.meses[rango.meses.length - 1].nombre;
     return `${rango.meses.length} meses · ${primero} → ${ultimo}`;
   }, [hayFechas, rango]);
+
+  // Lista plana de meses habilitados (la recibe el prompt del
+  // clasificador para que use `unidad_tiempo: "mes"`).
+  const unidadesObjetivo = useMemo<Array<{ unidad: "mes"; numero: number }>>(
+    () =>
+      hayFechas
+        ? rango.meses.map((m) => ({ unidad: "mes" as const, numero: m.numero }))
+        : [],
+    [hayFechas, rango],
+  );
+
 
   async function generar() {
     if (!contexto.trim()) {
@@ -141,6 +174,17 @@ export default function AgentePage() {
             .map((s) => s.trim())
             .filter(Boolean),
           areasExistentes: (areas ?? []).map((a) => a.nombre),
+          // Migration 0025: propagamos fechas reales al prompt.
+          fecha_inicio_meta: fechaInicioMeta || null,
+          fecha_objetivo: fechaObjetivo || null,
+          fecha_fin_bloqueada:
+            !!fechaFinBloqueada && !!fechaObjetivo ? true : false,
+          unidades_objetivo: hayFechas
+            ? unidadesObjetivo.map((u) => ({
+                unidad: u.unidad,
+                numero: u.numero,
+              }))
+            : undefined,
         },
       );
       setResultado(res);
@@ -440,6 +484,10 @@ export default function AgentePage() {
           busy={aplicando}
           onCancel={cancelar}
           onConfirm={aplicar}
+          metasFueraDeRango={metasFueraDeRango}
+          fechaInicioMeta={fechaInicioMeta}
+          fechaObjetivo={fechaObjetivo}
+          fechaFinBloqueada={fechaFinBloqueada && !!fechaObjetivo}
         />
       )}
     </div>
@@ -457,6 +505,10 @@ function ResultadoPreview({
   busy,
   onCancel,
   onConfirm,
+  metasFueraDeRango,
+  fechaInicioMeta,
+  fechaObjetivo,
+  fechaFinBloqueada,
 }: {
   resultado: ResultadoClasificador;
   areas: Area[];
@@ -464,6 +516,10 @@ function ResultadoPreview({
   busy: boolean;
   onCancel: () => void;
   onConfirm: () => void;
+  metasFueraDeRango: Array<{ titulo: string; fecha: string }>;
+  fechaInicioMeta: string;
+  fechaObjetivo: string;
+  fechaFinBloqueada: boolean;
 }) {
   const areaMatch = resultado.area_nombre
     ? areas.find(
@@ -548,6 +604,40 @@ function ResultadoPreview({
           que lo trates cuando quieras. Si insistes en que es accionable,
           reformula el contexto.
         </p>
+      )}
+
+      {/* Migration 0025: warning si hay metas hijas cuya fecha_objetivo
+          cae fuera del rango que David marcó. Es una red de seguridad
+          por si el prompt del clasificador no logra encuadrar todo. */}
+      {metasFueraDeRango.length > 0 && (
+        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-200">
+          <p className="font-medium">
+            ⚠️ {metasFueraDeRango.length === 1 ? "1 meta hija" : `${metasFueraDeRango.length} metas hijas`} quedan fuera de tu rango:
+          </p>
+          <ul className="mt-1.5 list-disc space-y-0.5 pl-5 text-xs">
+            {metasFueraDeRango.map((m, i) => (
+              <li key={i}>
+                <span className="font-medium">{m.titulo}</span>
+                <span className="ml-1 text-amber-700 dark:text-amber-300">
+                  — objetivo: <span className="font-mono">{m.fecha}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          {fechaFinBloqueada ? (
+            <p className="mt-2 text-[11px]">
+              🔒 Tu fecha límite está marcada como dura. Si aplicas igualmente,
+              esas metas se crearán con objetivos anteriores a tu inicio.
+              Considera cancelar y reformular el contexto.
+            </p>
+          ) : (
+            <p className="mt-2 text-[11px]">
+              Tu rango era {fechaInicioMeta || "?"} → {fechaObjetivo || "?"}. Puedes
+              aplicar igualmente si los objetivos de la IA te convencen, o
+              cancelar para reformular.
+            </p>
+          )}
+        </div>
       )}
 
       <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border pt-3">
