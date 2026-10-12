@@ -74,6 +74,21 @@ export default function AgentePage() {
   const [aplicando, setAplicando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resultado, setResultado] = useState<ResultadoClasificador | null>(null);
+  /** Diagnóstico de la aplicación. Si está set, mostramos un panel
+   *  amarillo en lugar de redirigir a la primera meta. Esto es la red
+   *  de seguridad que David pidió: si solo se crea 1 meta de 4, queremos
+   *  ver QUÉ falló sin necesidad de abrir la consola del navegador. */
+  const [diagnostico, setDiagnostico] = useState<{
+    totalEsperadas: number;
+    totalCreadas: number;
+    idsCreadas: string[];
+    /** Nombres de las metas que se esperaban crear (para mostrar el gap). */
+    titulosEsperados: string[];
+    /** Nombres de las metas que SÍ se crearon (para cruzar con los esperados). */
+    titulosCreados: string[];
+    metasFallaron: Array<{ titulo: string; error: string }>;
+    krsFallaron: string[];
+  } | null>(null);
 
   const apiKeyOk = !!cfg.data.minimax_api_key;
 
@@ -162,6 +177,7 @@ export default function AgentePage() {
     setGenerando(true);
     setError(null);
     setResultado(null);
+    setDiagnostico(null);
     try {
       const res = await clasificarYGenerarIA(
         cfg.data.base_url,
@@ -219,6 +235,37 @@ export default function AgentePage() {
         // Si no existe, NO la creamos automáticamente: el humano debe
           // decidir. Pasamos null y que el editor lo arregle luego. (Regla
           // ponytail: no asumir acciones de escritura silenciosas.)
+      }
+
+      // 0) Refrescar la sesión ANTES del primer INSERT. Hipótesis causa
+      //    raíz del bug: el JWT está cerca de expirar y `autoRefreshToken`
+      //    se dispara entre inserts. El 1º pasa con el token viejo aún
+      //    válido; los siguientes fallan por RLS (`owner_id = auth.uid()`
+      //    devuelve null durante el refresh). Forzar getSession() aquí
+      //    serializa el refresh y garantiza que TODOS los inserts ven
+      //    una sesión estable.
+      try {
+        const { createClient } = await import("@/lib/supabase/client");
+        const supabase = createClient();
+        const { data: sesion } = await supabase.auth.getSession();
+        if (!sesion?.session) {
+          throw new Error(
+            "Sesión expirada. Recarga la página (F5) y vuelve a intentarlo.",
+          );
+        }
+        console.log(
+          `[Agente] sesión OK · expires_at=${sesion.session.expires_at} · user=${sesion.session.user.id}`,
+        );
+      } catch (e) {
+        if (
+          e instanceof Error &&
+          e.message.startsWith("Sesión expirada")
+        ) {
+          throw e; // sí, abortar — sin sesión no podemos seguir
+        }
+        // Cualquier otro error aquí NO debe abortar el flujo: lo
+        // logueamos y seguimos (la sesión puede estar bien igualmente).
+        console.warn("[Agente] getSession() no crítico falló:", e);
       }
 
       // 2) Si es proyecto, crearlo primero.
@@ -302,76 +349,176 @@ export default function AgentePage() {
         }
       }
 
-      for (const m of resultado.metas) {
-        try {
-          const meta = await crearMeta({
-            titulo: m.meta_titulo,
-            descripcion: m.meta_descripcion || null,
-            estado: "sin_empezar",
-            prioridad: "alta",
-            area_id: areaId,
-            proyecto_id: proyectoId,
-            plazo: m.meta_plazo || null,
-            ambito: m.meta_ambito,
-            fecha_objetivo:
-              (usarFechasDavid ? fechaObjetivo : null) ?? m.fecha_objetivo,
-            contexto: m.contexto,
-            fecha_inicio_meta: usarFechasDavid ? fechaInicioMeta || null : null,
-            fecha_fin_bloqueada:
-              usarFechasDavid && !!fechaObjetivo ? fechaFinBloqueada : false,
-          });
-          idsCreadas.push(meta.id);
+      // —— BUCLE PRINCIPAL con retry + árbitro adversarial ——
+      // Estrategia:
+      //   1) Primer pase: crear cada meta. Si falla, capturar y seguir.
+      //   2) Segundo pase: reintentar SOLO las metas que fallaron, una
+      //      vez, con un pequeño backoff. Si fallan otra vez, se reportan.
+      //   3) Árbitro: al final, si expected !== created, NO redirigir.
+      //      Mostrar el gap exacto y bloquear hasta que el humano decida.
+      type MetaResultado = {
+        meta_titulo: string;
+        meta: MetaHijaGenerada;
+        metaId?: string;
+        krCreado: boolean;
+        error?: string;
+      };
+      const todasMetas: MetaResultado[] = resultado.metas.map((m) => ({
+        meta_titulo: m.meta_titulo,
+        meta: m,
+        krCreado: false,
+      }));
 
-          if (m.kr_inicial) {
-            let periodoId: string | null = null;
-            if (m.unidad_tiempo === "mes" && typeof m.mes === "number") {
-              const num = m.mes;
-              const trim = (num <= 3 ? 1 : num <= 6 ? 2 : num <= 9 ? 3 : 4) as
-                | 1
-                | 2
-                | 3
-                | 4;
-              periodoId = periodosByNumero.get(trim)?.id ?? null;
-            } else {
-              periodoId =
-                periodosByNumero.get(m.kr_inicial.trimestre as 1 | 2 | 3 | 4)?.id ??
-                null;
-            }
+      async function intentarCrearMeta(slot: MetaResultado): Promise<void> {
+        const m = slot.meta;
+        const meta = await crearMeta({
+          titulo: m.meta_titulo,
+          descripcion: m.meta_descripcion || null,
+          estado: "sin_empezar",
+          prioridad: "alta",
+          area_id: areaId,
+          proyecto_id: proyectoId,
+          plazo: m.meta_plazo || null,
+          ambito: m.meta_ambito,
+          fecha_objetivo:
+            (usarFechasDavid ? fechaObjetivo : null) ?? m.fecha_objetivo,
+          contexto: m.contexto,
+          fecha_inicio_meta: usarFechasDavid ? fechaInicioMeta || null : null,
+          fecha_fin_bloqueada:
+            usarFechasDavid && !!fechaObjetivo ? fechaFinBloqueada : false,
+        });
+        slot.metaId = meta.id;
 
-            if (periodoId) {
-              try {
-                await crearResultadoPeriodo({
-                  meta_id: meta.id,
-                  periodo_id: periodoId,
-                  titulo: m.kr_inicial.titulo,
-                  descripcion: null,
-                  metrica: m.kr_inicial.metrica,
-                  valor_objetivo: m.kr_inicial.valor_objetivo,
-                  unidad: m.kr_inicial.unidad,
-                  peso: 1,
-                  estado: "pendiente",
-                });
-              } catch (e) {
-                console.warn("[Agente] crear KR inicial falló:", e);
-                krsFallaron.push(m.meta_titulo);
-              }
-            } else {
+        if (m.kr_inicial) {
+          let periodoId: string | null = null;
+          if (m.unidad_tiempo === "mes" && typeof m.mes === "number") {
+            const num = m.mes;
+            const trim = (num <= 3 ? 1 : num <= 6 ? 2 : num <= 9 ? 3 : 4) as
+              | 1
+              | 2
+              | 3
+              | 4;
+            periodoId = periodosByNumero.get(trim)?.id ?? null;
+          } else {
+            periodoId =
+              periodosByNumero.get(m.kr_inicial.trimestre as 1 | 2 | 3 | 4)?.id ??
+              null;
+          }
+
+          if (periodoId) {
+            try {
+              await crearResultadoPeriodo({
+                meta_id: meta.id,
+                periodo_id: periodoId,
+                titulo: m.kr_inicial.titulo,
+                descripcion: null,
+                metrica: m.kr_inicial.metrica,
+                valor_objetivo: m.kr_inicial.valor_objetivo,
+                unidad: m.kr_inicial.unidad,
+                peso: 1,
+                estado: "pendiente",
+              });
+              slot.krCreado = true;
+            } catch (e) {
+              // KR falla: la meta YA está guardada. Marcamos KR fallido
+              // pero NO marcamos la meta como fallida (está persistida).
+              const errStr = e instanceof Error ? e.message : String(e);
               console.warn(
-                "[Agente] KR sin periodo resoluble:",
-                m.kr_inicial,
+                `[Agente] KR inicial falló para "${m.meta_titulo}":`,
+                errStr,
               );
               krsFallaron.push(m.meta_titulo);
             }
+          } else {
+            console.warn(
+              `[Agente] KR sin periodo resoluble para "${m.meta_titulo}":`,
+              m.kr_inicial,
+            );
+            krsFallaron.push(m.meta_titulo);
           }
-        } catch (e) {
-          // —— Catch individual por meta ——
-          // Antes un throw aquí abortaba el resto del loop. Ahora
-          // capturamos por meta y seguimos con las demás.
-          const errorStr = e instanceof Error ? e.message : String(e);
-          console.error("[Agente] crearMeta falló:", m.meta_titulo, errorStr);
-          metasFallaron.push({ titulo: m.meta_titulo, error: errorStr });
         }
       }
+
+      // —— Pase 1: crear todas las metas en serie ——
+      for (let i = 0; i < todasMetas.length; i++) {
+        const slot = todasMetas[i];
+        console.log(
+          `[Agente] pase 1 — creando meta ${i + 1}/${todasMetas.length}: "${slot.meta_titulo}"`,
+        );
+        try {
+          await intentarCrearMeta(slot);
+          idsCreadas.push(slot.metaId!);
+          console.log(
+            `[Agente] ✅ meta creada id=${slot.metaId} ("${slot.meta_titulo}")`,
+          );
+        } catch (e) {
+          const errorStr = e instanceof Error ? e.message : String(e);
+          slot.error = errorStr;
+          console.error(
+            `[Agente] ❌ pase 1 falló para "${slot.meta_titulo}":`,
+            errorStr,
+          );
+        }
+        // Cedemos el event loop entre inserts. Hipótesis: autoRefreshToken
+        // del cliente Supabase puede dispararse aquí y romper el siguiente
+        // INSERT por RLS. Un await 0 fuerza a que el refresh se complete
+        // antes del próximo insert.
+        await new Promise((r) => setTimeout(r, 50));
+      }
+
+      // —— Pase 2: reintentar las que fallaron (UNA vez más) ——
+      const fallaronEnPase1 = todasMetas.filter((s) => !s.metaId);
+      if (fallaronEnPase1.length > 0) {
+        console.warn(
+          `[Agente] ${fallaronEnPase1.length} metas fallaron en pase 1. Reintentando en pase 2…`,
+        );
+        for (let i = 0; i < fallaronEnPase1.length; i++) {
+          const slot = fallaronEnPase1[i];
+          console.log(
+            `[Agente] pase 2 — reintentando "${slot.meta_titulo}"`,
+          );
+          try {
+            await intentarCrearMeta(slot);
+            idsCreadas.push(slot.metaId!);
+            console.log(
+              `[Agente] ✅ pase 2 OK: meta creada id=${slot.metaId} ("${slot.meta_titulo}")`,
+            );
+            slot.error = undefined;
+          } catch (e) {
+            const errorStr = e instanceof Error ? e.message : String(e);
+            slot.error = errorStr;
+            console.error(
+              `[Agente] ❌ pase 2 también falló para "${slot.meta_titulo}":`,
+              errorStr,
+            );
+          }
+        }
+      }
+
+      // —— Recopilar metas fallidas definitivas (las que no se pudieron
+      //     crear ni en el pase 2) ——
+      for (const slot of todasMetas) {
+        if (!slot.metaId && slot.error) {
+          metasFallaron.push({ titulo: slot.meta_titulo, error: slot.error });
+        }
+      }
+
+      // —— Mapear IDs creados a títulos (para cruzar con los esperados) ——
+      const titulosEsperados = resultado.metas.map((m) => m.meta_titulo);
+      const titulosCreados = todasMetas
+        .filter((s) => s.metaId)
+        .map((s) => s.meta_titulo);
+
+      // —— ÁRBITRO ADVERSARIAL ——
+      // Si los conteos no cuadran, NO mentir al usuario. Reportar gap.
+      const totalEsperadas = resultado.metas.length;
+      const totalCreadas = idsCreadas.length;
+      const gap = totalEsperadas - totalCreadas;
+      const arbitroOk = gap === 0 && metasFallaron.length === 0;
+
+      console.log(
+        `[Agente] árbitro: esperadas=${totalEsperadas}, creadas=${totalCreadas}, gap=${gap}, krs_fallaron=${krsFallaron.length}, metas_fallaron_definitivas=${metasFallaron.length}, OK=${arbitroOk}`,
+      );
 
       // —— Logging del resultado final del loop ——
       if (typeof window !== "undefined") {
@@ -426,21 +573,38 @@ export default function AgentePage() {
         }
       }
 
-      // 5) Redirigir al detalle de la primera meta creada (o al proyecto
-      //    si era proyecto). Para proyecto, vamos a /metas y filtramos;
-      //    más simple: ir a /metas/detalle de la primera meta — el
-      //    humano verá el resto en la lista.
-      const primera = idsCreadas[0];
-      if (primera) {
+      // 5) Decisión final basada en el ÁRBITRO. Si gap > 0 o hay metas
+      //    fallidas, NO redirigir — el humano debe ver el gap.
+      if (arbitroOk && idsCreadas.length > 0) {
+        // 100% creado. A la primera meta.
+        const primera = idsCreadas[0];
         router.push(`/metas/detalle?id=${primera}`);
       } else {
-        router.push("/metas");
+        // Algo no salió bien: panel diagnóstico en pantalla con el gap
+        // exacto. Esto es lo que el usuario verá si reaparece el bug.
+        setDiagnostico({
+          totalEsperadas,
+          totalCreadas,
+          idsCreadas,
+          titulosEsperados,
+          titulosCreados,
+          metasFallaron,
+          krsFallaron,
+        });
+        setAplicando(false);
       }
     } catch (e) {
+      // Catch exterior: si algo ANTES del bucle lanza (crearProyecto,
+      // ensurePeriodosAnio, import dinámico, fetch de periodos), el
+      // bucle nunca se ejecuta y no hay `idsCreadas`. Mostramos el error
+      // Y dejamos la opción de reintentar — antes esto silenciaba el
+      // hecho de que 0 metas se crearon.
+      const errorStr = e instanceof Error ? e.message : String(e);
+      console.error("[Agente] aplicar() falló antes del bucle:", errorStr);
       setError(
-        e instanceof Error
-          ? e.message
-          : "No se pudo aplicar la sugerencia. Puedes intentarlo de nuevo.",
+        `No se pudo aplicar la sugerencia: ${errorStr}. ` +
+          `Si se creó alguna meta, aparecerá en tu lista. ` +
+          `Puedes intentar de nuevo.`,
       );
       setAplicando(false);
     }
@@ -611,6 +775,113 @@ export default function AgentePage() {
       {error && (
         <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-300">
           {error}
+        </div>
+      )}
+
+      {diagnostico && (
+        <div
+          className={
+            "rounded-xl border-2 p-5 text-sm " +
+            (diagnostico.totalCreadas < diagnostico.totalEsperadas
+              ? "border-red-500/50 bg-red-500/10"
+              : "border-amber-500/40 bg-amber-500/10")
+          }
+        >
+          <header>
+            <div
+              className={
+                "text-[11px] font-semibold uppercase tracking-wider " +
+                (diagnostico.totalCreadas < diagnostico.totalEsperadas
+                  ? "text-red-700 dark:text-red-300"
+                  : "text-amber-700 dark:text-amber-300")
+              }
+            >
+              Diagnóstico de aplicación · árbitro adversarial
+            </div>
+            <h3 className="mt-1 text-base font-bold">
+              {diagnostico.totalCreadas < diagnostico.totalEsperadas
+                ? `❌ Faltan ${diagnostico.totalEsperadas - diagnostico.totalCreadas} de ${diagnostico.totalEsperadas} metas`
+                : `⚠️ Se crearon ${diagnostico.totalCreadas} de ${diagnostico.totalEsperadas}, pero hay KRs sin asignar`}
+            </h3>
+          </header>
+          <div className="mt-3 space-y-3">
+            {/* GAP: metas esperadas que NO se crearon */}
+            {diagnostico.titulosEsperados.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-amber-700 dark:text-amber-300">
+                  Esperadas ({diagnostico.titulosEsperados.length}):
+                </p>
+                <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs">
+                  {diagnostico.titulosEsperados.map((t, i) => {
+                    const creada = diagnostico.titulosCreados.includes(t);
+                    return (
+                      <li
+                        key={i}
+                        className={
+                          creada
+                            ? "text-green-700 dark:text-green-300"
+                            : "text-red-700 dark:text-red-300"
+                        }
+                      >
+                        {creada ? "✅" : "❌"} {t}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+            {diagnostico.idsCreadas.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-amber-700 dark:text-amber-300">
+                  IDs guardados ({diagnostico.idsCreadas.length}):
+                </p>
+                <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs text-amber-900 dark:text-amber-200">
+                  {diagnostico.idsCreadas.map((id, i) => (
+                    <li key={i} className="font-mono text-[10px]">
+                      {id}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {diagnostico.metasFallaron.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-red-700 dark:text-red-300">
+                  ❌ Motivo del fallo ({diagnostico.metasFallaron.length}):
+                </p>
+                <ul className="mt-1 space-y-1.5 text-xs">
+                  {diagnostico.metasFallaron.map((f, i) => (
+                    <li
+                      key={i}
+                      className="rounded border border-red-500/30 bg-red-500/5 p-2 font-mono text-[11px] leading-relaxed text-red-900 dark:text-red-200"
+                    >
+                      <div className="font-sans font-semibold">
+                        {f.titulo}
+                      </div>
+                      <div className="mt-1 break-words">{f.error}</div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {diagnostico.krsFallaron.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-orange-700 dark:text-orange-300">
+                  ⚠️ KRs sin asignar ({diagnostico.krsFallaron.length}): las metas sí se crearon pero su KR inicial no (el periodo reportado por la IA no existe en BD):
+                </p>
+                <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs text-orange-900 dark:text-orange-200">
+                  {diagnostico.krsFallaron.map((t, i) => (
+                    <li key={i}>{t}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <div className="mt-3 rounded-md bg-amber-500/20 p-2 text-[11px] text-amber-900 dark:text-amber-200">
+              💡 <strong>Para David:</strong> copia este diagnóstico y
+              pégalo tal cual. Es la pista que necesito para arreglar el
+              bug sin más idas y vueltas.
+            </div>
+          </div>
         </div>
       )}
 

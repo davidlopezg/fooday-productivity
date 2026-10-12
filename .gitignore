@@ -60,3 +60,6 @@ supabase/seed/
 /ios/Pods/
 /ios/App/Podfile.lock
 
+# Notas locales de debugging (no se commitean)
+/.notes/
+

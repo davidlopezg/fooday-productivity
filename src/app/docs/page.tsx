@@ -169,7 +169,7 @@ const FEATURES: Array<{ ruta: string; proposito: string; docs: string }> = [
   { ruta: "/metas", proposito: "Cards de metas con estado y progreso + botón IA Sugerir WIGs + EditarMetaModal con botón IA Generar plan", docs: "Pilar 2 · Ritual mensual · HelpDrawer" },
   { ruta: "/metas/nueva", proposito: "Crear meta con rango real [inicio, fin] + botón IA Generar plan (KRs+tareas+hábitos) que reparte los KRs SOLO dentro del rango. Hard constraint opcional 🔒", docs: "Pilar 2 · HelpDrawer" },
   { ruta: "/metas/agente", proposito: "Agente IA: contexto libre → meta + plan trimestral completo (atajo directo a meta; la entrada unificada es /agente)", docs: "Pilar 2 · HelpDrawer" },
-  { ruta: "/agente", proposito: "Agente unificado: clasifica la idea (proyecto/meta/captura) y propone estructura. migration 0024", docs: "Pilar 2 · HelpDrawer" },
+  { ruta: "/agente", proposito: "Agente unificado: clasifica la idea (proyecto/meta/captura) y propone estructura. Bucle de aplicación con 2 pases + árbitro adversarial que verifica que el 100% de las metas hijas se persistan en Supabase antes de redirigir; si hay gap muestra panel con nombres faltantes y motivo del error. Pre-bucle: getSession() para evitar fallo de RLS por JWT transitorio + backoff de 50ms entre inserts. migration 0024", docs: "Pilar 2 · HelpDrawer" },
   { ruta: "/metas/auditoria", proposito: "Auditoría de metas: qué les falta (área, proyecto, fecha objetivo, contexto, KRs). migration 0024", docs: "Pilar 2 · HelpDrawer" },
   { ruta: "/metas/plan", proposito: "Plan trimestral con scorecard de KRs + proyección", docs: "Pilar 2 · Ritual semanal (domingo) · Ritual mensual · HelpDrawer" },
   { ruta: "/plan-diario", proposito: "Estado emocional + plan diario generado por IA", docs: "Rituales §1 (mañana) · HelpDrawer" },
@@ -1660,6 +1660,56 @@ export default function DocsPage() {
               <em className="text-muted-foreground">No se han añadido/modificado pantallas, hábitos, rituales
               ni reglas de metodología, así que el índice FEATURES y los rituales no cambian. Esta entrada es
               la única actualización obligatoria del AGENTS.md.</em>
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-rose-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-rose-700 dark:text-rose-300 sm:text-sm">
+              2026-10-12
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">Bugfix /agente: hipótesis JWT transitorio como causa raíz + panel diagnóstico visible sin DevTools.</strong>{" "}
+              Síntoma original (2026-10-11) sigue: con un proyecto de 4 metas hijas el bucle persistía solo 1
+              y redirigía al detalle. El árbitro de la sesión anterior NO lo resolvió. Nueva hipótesis
+              (no confirmada todavía, pero altamente probable): el JWT está cerca de expirar cuando David
+              pulsa <em>Aplicar</em>, el 1º INSERT pasa con el token viejo aún válido,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">autoRefreshToken</code> se dispara
+              entre INSERTs, y los siguientes fallan con RLS (<code className="rounded bg-muted px-1.5 py-0.5 text-xs">owner_id = auth.uid()</code>{" "}
+              devuelve <code className="rounded bg-muted px-1.5 py-0.5 text-xs">null</code> durante el
+              refresh). Mitigación: (a) antes del bucle, <strong className="text-foreground">forzar{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">supabase.auth.getSession()</code></strong>{" "}
+              para serializar el refresh y garantizar sesión estable; (b) entre INSERTs,{" "}
+              <strong className="text-foreground">backoff de 50&nbsp;ms</strong> (cede el event loop para
+              que el refresh se complete); (c) si el gap sigue, el panel rojo/ámbar del árbitro (sesión
+              anterior) ahora muestra el mensaje de error de Supabase exacto — David puede copiarlo y
+              mandarlo sin abrir DevTools. FEATURES actualizado (fila /agente, propósito ampliado).{" "}
+              <em className="text-muted-foreground">Sin cambios de metodología ni rituales. Si la hipótesis
+              es correcta, el bug queda cerrado; si no, el panel de diagnóstico nos dará la causa real en el
+              próximo intento de David.</em>
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-rose-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-rose-700 dark:text-rose-300 sm:text-sm">
+              2026-10-11
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">Bugfix /agente: aplicar solo persistía 1 meta de N + árbitro adversarial.</strong>{" "}
+              Síntoma: con un proyecto de 4 metas hijas (caso real: “Renegociar el alquiler de Sol de Nit”),
+              al pulsar <em>Aplicar</em> solo quedaba guardada la primera y la app redirigía al detalle de esa,
+              dando la falsa sensación de éxito. Causa exacta no aislada todavía (el bucle tenía{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">try/catch</code> por meta y las mutaciones
+              son correctas, así que sospechamos un throw no catalogado del propio cliente Supabase o un lock
+              transitorio de RLS). Solución adoptada, alineada con la regla del proyecto
+              &ldquo;100% generado por el agente debe quedar guardado&rdquo;: (a) bucle con{" "}
+              <strong className="text-foreground">2 pases</strong> — pase 1 crea todas las metas en serie, pase
+              2 reintenta UNA vez las que no se pudieron crear; (b) cada intento se loguea con prefix{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">[Agente]</code>{" "}
+              para diagnóstico sin DevTools; (c) un{" "}
+              <strong className="text-foreground">árbitro adversarial</strong> al final compara
+              esperadas vs creadas y, si hay gap, NO redirige — muestra panel rojo con los nombres de las
+              metas que faltan y el motivo exacto del fallo; (d) si todo OK redirige; si hay KR fallido (sin
+              periodo resoluble) pero todas las metas creadas, muestra panel ámbar con la lista. FEATURES
+              actualizado (fila /agente, propósito ampliado).{" "}
+              <em className="text-muted-foreground">Sin cambios de metodología ni rituales.</em>
             </span>
           </li>
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
