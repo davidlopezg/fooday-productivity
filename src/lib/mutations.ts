@@ -1287,6 +1287,135 @@ export async function archivarProyecto(id: string, archivado = true): Promise<vo
   await actualizarProyecto(id, { archivado });
 }
 
+/** Archiva en cascada: marca el proyecto como archivado Y arrastra a sus
+ *  metas hijas y las tareas de esas metas al estado 'archivada'. El proyecto
+ *  se puede desarchivar (archivarProyecto(id, false)) y NO se tocan las
+ *  filas físicamente — todo se recupera. La cascada se hace en serie con
+ *  un backoff de 50ms entre updates para no disparar auto-refresh del JWT
+ *  de Supabase (mismo motivo que en /agente).
+ *
+ *  Devuelve el conteo de elementos afectados para que la UI pueda mostrarlo
+ *  en el confirm previo. */
+export async function archivarProyectoEnCascada(
+  id: string,
+  archivado: boolean,
+): Promise<{ metas: number; tareas: number; krs: number }> {
+  const supabase = createClient();
+  let metasActualizadas = 0;
+  let tareasActualizadas = 0;
+  let krsActualizados = 0;
+
+  // 1) Metas hijas (migration 0024: metas.proyecto_id).
+  const { data: metasHijas, error: errMetas } = await supabase
+    .from("metas")
+    .select("id,estado")
+    .eq("proyecto_id", id);
+  if (errMetas) throw new Error(`No se pudieron listar las metas: ${errMetas.message}`);
+
+  const metaIds: string[] = [];
+  for (const m of metasHijas ?? []) {
+    const estado = (m as { estado: string }).estado;
+    // Si estamos desarchivando, solo desarchivamos las que ya están archivadas.
+    // Si estamos archivando, archivamos todas las que no estén ya en
+    // 'completada' o 'archivada' — para no perder progreso.
+    if (archivado) {
+      if (estado !== "archivada" && estado !== "completada") {
+        metaIds.push((m as { id: string }).id);
+      }
+    } else {
+      if (estado === "archivada") {
+        metaIds.push((m as { id: string }).id);
+      }
+    }
+  }
+  if (metaIds.length > 0) {
+    const { error: errUpd } = await supabase
+      .from("metas")
+      .update({ estado: archivado ? "archivada" : "sin_empezar" })
+      .in("id", metaIds);
+    if (errUpd) throw new Error(`No se pudieron archivar las metas: ${errUpd.message}`);
+    metasActualizadas = metaIds.length;
+    await new Promise((r) => setTimeout(r, 50));
+  }
+
+  // 2) Tareas de esas metas (cualquier tarea con meta_id IN metaIds).
+  if (metaIds.length > 0) {
+    const { data: tareasMeta, error: errTareas } = await supabase
+      .from("tareas")
+      .select("id,estado")
+      .in("meta_id", metaIds);
+    if (errTareas) throw new Error(`No se pudieron listar las tareas: ${errTareas.message}`);
+    const tareaIds: string[] = [];
+    for (const t of tareasMeta ?? []) {
+      const estado = (t as { estado: string }).estado;
+      if (archivado) {
+        if (estado !== "hecha" && estado !== "archivada") {
+          tareaIds.push((t as { id: string }).id);
+        }
+      } else {
+        if (estado === "archivada") {
+          tareaIds.push((t as { id: string }).id);
+        }
+      }
+    }
+    if (tareaIds.length > 0) {
+      const { error: errUpdT } = await supabase
+        .from("tareas")
+        .update({ estado: archivado ? "archivada" : "pendiente" })
+        .in("id", tareaIds);
+      if (errUpdT) throw new Error(`No se pudieron archivar las tareas: ${errUpdT.message}`);
+      tareasActualizadas = tareaIds.length;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+  }
+
+  // 3) Tareas asignadas directamente al proyecto (sin meta_id) — algunas
+  //    tareas se asignan solo por proyecto_id.
+  const { data: tareasProyecto, error: errTP } = await supabase
+    .from("tareas")
+    .select("id,estado")
+    .eq("proyecto_id", id)
+    .is("meta_id", null);
+  if (errTP) throw new Error(`No se pudieron listar las tareas del proyecto: ${errTP.message}`);
+  const tIds2: string[] = [];
+  for (const t of tareasProyecto ?? []) {
+    const estado = (t as { estado: string }).estado;
+    if (archivado) {
+      if (estado !== "hecha" && estado !== "archivada") tIds2.push((t as { id: string }).id);
+    } else {
+      if (estado === "archivada") tIds2.push((t as { id: string }).id);
+    }
+  }
+  if (tIds2.length > 0) {
+    const { error: errUpdT2 } = await supabase
+      .from("tareas")
+      .update({ estado: archivado ? "archivada" : "pendiente" })
+      .in("id", tIds2);
+    if (errUpdT2) throw new Error(`No se pudieron archivar las tareas del proyecto: ${errUpdT2.message}`);
+    tareasActualizadas += tIds2.length;
+  }
+
+  // 4) KRs (resultados_periodo) de las metas — archivamos solo si archivado
+  //    (los KRs no tienen estado archivable, los dejamos 'pendiente'; pero
+  //    las metas archivadas no se usan en el planificador diario).
+  if (archivado && metaIds.length > 0) {
+    const { error: errKR } = await supabase
+      .from("resultados_periodo")
+      .update({ estado: "pendiente" })
+      .in("meta_id", metaIds);
+    if (errKR) {
+      console.warn("[archivarProyectoEnCascada] KRs no actualizados:", errKR.message);
+    } else {
+      krsActualizados = metaIds.length;
+    }
+  }
+
+  // 5) El proyecto en sí.
+  await actualizarProyecto(id, { archivado });
+
+  return { metas: metasActualizadas, tareas: tareasActualizadas, krs: krsActualizados };
+}
+
 export async function eliminarProyecto(id: string): Promise<void> {
   const { error } = await createClient().from("proyectos").delete().eq("id", id);
   if (error) throw new Error(`No se pudo eliminar: ${error.message}`);

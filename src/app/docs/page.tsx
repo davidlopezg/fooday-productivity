@@ -169,7 +169,7 @@ const FEATURES: Array<{ ruta: string; proposito: string; docs: string }> = [
   { ruta: "/metas", proposito: "Cards de metas con estado y progreso + botón IA Sugerir WIGs + EditarMetaModal con botón IA Generar plan", docs: "Pilar 2 · Ritual mensual · HelpDrawer" },
   { ruta: "/metas/nueva", proposito: "Crear meta con rango real [inicio, fin] + botón IA Generar plan (KRs+tareas+hábitos) que reparte los KRs SOLO dentro del rango. Hard constraint opcional 🔒", docs: "Pilar 2 · HelpDrawer" },
   { ruta: "/metas/agente", proposito: "Agente IA: contexto libre → meta + plan trimestral completo (atajo directo a meta; la entrada unificada es /agente)", docs: "Pilar 2 · HelpDrawer" },
-  { ruta: "/agente", proposito: "Agente unificado: clasifica la idea (proyecto/meta/captura) y propone estructura. Bucle de aplicación con 2 pases + árbitro adversarial que verifica que el 100% de las metas hijas se persistan en Supabase antes de redirigir; si hay gap muestra panel con nombres faltantes y motivo del error. Pre-bucle: getSession() para evitar fallo de RLS por JWT transitorio + backoff de 50ms entre inserts. migration 0024", docs: "Pilar 2 · HelpDrawer" },
+  { ruta: "/agente", proposito: "Agente unificado: clasifica la idea (proyecto/meta/captura) y propone estructura. Bucle de aplicación con 2 pases + árbitro adversarial que verifica que el 100% de las metas hijas se persistan en Supabase antes de redirigir; si hay gap muestra panel con nombres faltantes y motivo del error. Fase 2 automática: tras crear metas+KRs iniciales, genera el plan completo (KRs+tareas+hábitos) por meta con generarPlanMetaIA + aplicarKrsYTareasEnMeta. Pre-bucle: getSession() para evitar fallo de RLS por JWT transitorio + backoff de 50ms entre inserts. migration 0024", docs: "Pilar 2 · HelpDrawer" },
   { ruta: "/metas/auditoria", proposito: "Auditoría de metas: qué les falta (área, proyecto, fecha objetivo, contexto, KRs). migration 0024", docs: "Pilar 2 · HelpDrawer" },
   { ruta: "/metas/plan", proposito: "Plan trimestral con scorecard de KRs + proyección", docs: "Pilar 2 · Ritual semanal (domingo) · Ritual mensual · HelpDrawer" },
   { ruta: "/plan-diario", proposito: "Estado emocional + plan diario generado por IA", docs: "Rituales §1 (mañana) · HelpDrawer" },
@@ -187,7 +187,7 @@ const FEATURES: Array<{ ruta: string; proposito: string; docs: string }> = [
 
   // ── Sistema ──
   { ruta: "/pagos", proposito: "Pagos pendientes: ejecutar tesorería lunes 1ª hora", docs: "Apéndice §Bucle de equilibrio · Ritual semanal (lunes estricto) · HelpDrawer" },
-  { ruta: "/proyectos", proposito: "Gestión de proyectos con conteo de tareas y listado de metas hijas (migration 0024)", docs: "HelpDrawer" },
+  { ruta: "/proyectos", proposito: "Gestión de proyectos con conteo de tareas, listado de metas hijas (migration 0024), archivado en cascada a metas+tareas y confirm con preview de impacto al eliminar", docs: "HelpDrawer" },
   { ruta: "/configuracion", proposito: "Configuración: API key IA, base URL, modelo, tema", docs: "HelpDrawer" },
 
   // ── Documentación ──
@@ -1457,6 +1457,51 @@ export default function DocsPage() {
         </header>
 
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-10-16
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">Plan completo en /agente + archivado en cascada en /proyectos.</strong>{" "}
+              Tres cambios alineados con la regla “plan entero o nada”: (1){" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/agente</code>{" "}
+              ahora genera el plan completo (KRs + tareas + hábitos) en una
+              segunda fase automática, una llamada a{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">generarPlanMetaIA</code>{" "}
+              por meta (reutiliza el motor ya testeado de{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas/nueva</code> y{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">EditarMetaModal</code>), con{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">saltarExistentes=true</code>{" "}
+              para no duplicar el KR inicial. Si una meta falla, las otras
+              siguen; el panel diagnóstico del árbitro (sesiones
+              anteriores) lista por meta cuántas KRs+tareas se generaron
+              y el motivo del fallo si lo hubo. Spinner en el botón
+              Aplicar muestra “Generando plan para meta N/M…”. Resumen
+              final en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">sessionStorage</code>{" "}
+              para que el detalle de la primera meta lo muestre como
+              banner. (2){" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/proyectos</code>{" "}
+              archiva en cascada: al archivar un proyecto se archivan
+              sus metas hijas + las tareas de esas metas + las tareas
+              asignadas directamente al proyecto. La función nueva{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">archivarProyectoEnCascada</code>{" "}
+              (en <code className="rounded bg-muted px-1.5 py-0.5 text-xs">mutations.ts</code>)
+              respeta metas/tareas ya completadas o hechas (no se
+              revierte el progreso) y devuelve el conteo para que la UI
+              lo muestre en el confirm. (3) Tanto archivar como
+              eliminar tienen confirm con preview de impacto (“esto
+              arrastrará N metas y M tareas”). Eliminar sigue con{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">ON DELETE SET NULL</code>{" "}
+              de la FK (las metas quedan huérfanas pero vivas, no se
+              borra nada físicamente). FEATURES actualizado (filas
+              /agente y /proyectos).{" "}
+              <em className="text-muted-foreground">Sin cambios de metodología ni rituales. El
+              proyecto, la meta, los KRs y las tareas siguen siendo las 4 capas del modelo;
+              ahora el agente las crea todas en una sola transacción y el ciclo de vida del
+              proyecto es coherente (archivar arrastra, eliminar avisa).</em>
+            </span>
+          </li>
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
               2026-10-15

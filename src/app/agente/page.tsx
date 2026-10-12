@@ -32,6 +32,9 @@ import { useData } from "@/lib/useData";
 import {
   clasificarYGenerarIA,
   parsearMesesDeRango,
+  generarPlanMetaIA,
+  aplicarKrsYTareasEnMeta,
+  type PeriodosPorUnidad,
   type MetaHijaGenerada,
   type ResultadoClasificador,
 } from "@/lib/plan";
@@ -74,6 +77,11 @@ export default function AgentePage() {
   const [aplicando, setAplicando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resultado, setResultado] = useState<ResultadoClasificador | null>(null);
+  /** Mensaje de progreso durante la fase de generación del plan completo
+   *  (1 mensaje por meta, p.ej. "Generando plan para meta 2/4..."). El
+   *  spinner se queda visible durante la fase 2 sin perder el resultado
+   *  del clasificador. */
+  const [progresoPlan, setProgresoPlan] = useState<string | null>(null);
   /** Diagnóstico de la aplicación. Si está set, mostramos un panel
    *  amarillo en lugar de redirigir a la primera meta. Esto es la red
    *  de seguridad que David pidió: si solo se crea 1 meta de 4, queremos
@@ -88,6 +96,14 @@ export default function AgentePage() {
     titulosCreados: string[];
     metasFallaron: Array<{ titulo: string; error: string }>;
     krsFallaron: string[];
+    /** Resumen de la fase 2 (plan completo). null si no se intentó
+     *  todavía. Lista por meta: cuántas KRs+tareas OK, cuántos fallos. */
+    planPorMeta?: Array<{
+      titulo: string;
+      krs: number;
+      tareas: number;
+      error?: string;
+    }>;
   } | null>(null);
 
   const apiKeyOk = !!cfg.data.minimax_api_key;
@@ -286,6 +302,15 @@ export default function AgentePage() {
 
       // 3) Asegurar periodos del año para poder crear los KRs.
       await ensurePeriodosAnio(anioActual);
+      // Migration 0025: si David rellenó fechas, también necesitamos los
+      // periodos mensuales del rango para que el planificador batch
+      // pueda asignar tareas a meses sueltos (no solo a Q1..Q4).
+      if (hayFechas && rango.meses.length > 0) {
+        const mesInicio = rango.meses[0].numero;
+        const mesFin = rango.meses[rango.meses.length - 1].numero;
+        const { ensurePeriodosMeses } = await import("@/lib/mutations");
+        await ensurePeriodosMeses(anioActual, mesInicio, mesFin);
+      }
 
       // 4) Refrescar periodos desde BD (no del state de React, que puede
       //    estar stale al llegar aquí). Esto garantiza que tenemos los
@@ -294,11 +319,29 @@ export default function AgentePage() {
       const { fetchPeriodos } = await import("@/lib/queries");
       const periodosBD = await fetchPeriodos();
       const periodosRefrescados = (periodosBD ?? []).filter(
-        (p) => p.tipo === "trimestre" && p.anio === anioActual,
+        (p) => p.anio === anioActual,
       );
       const periodosByNumero = new Map<1 | 2 | 3 | 4, { id: string; nombre: string }>();
+      // PeriodosPorUnidad es el Map que espera aplicarKrsYTareasEnMeta:
+      // clave "trimestre:N" o "mes:N" → {id, tipo}. Lo construimos una
+      // sola vez aquí y lo reutilizamos en el bucle del plan completo.
+      const periodosByUnidad: PeriodosPorUnidad = new Map();
       for (const p of periodosRefrescados) {
-        periodosByNumero.set(p.numero as 1 | 2 | 3 | 4, { id: p.id, nombre: p.nombre });
+        if (p.tipo === "trimestre") {
+          periodosByNumero.set(p.numero as 1 | 2 | 3 | 4, {
+            id: p.id,
+            nombre: p.nombre,
+          });
+          periodosByUnidad.set(`trimestre:${p.numero}`, {
+            id: p.id,
+            tipo: "trimestre",
+          });
+        } else if (p.tipo === "mes") {
+          periodosByUnidad.set(`mes:${p.numero}`, {
+            id: p.id,
+            tipo: "mes",
+          });
+        }
       }
 
       // 4b) Crear cada meta hija + su KR inicial.
@@ -503,6 +546,110 @@ export default function AgentePage() {
         }
       }
 
+      // —— FASE 2: plan completo (KRs + tareas + hábitos) por meta ——
+      // Solo si la fase 1 dejó metas creadas. Para cada meta con metaId,
+      // llama a generarPlanMetaIA (1 LLM call por meta, ~5-15s cada una)
+      // y aplicarKrsYTareasEnMeta que materializa KRs/tareas/hábitos.
+      // Si una meta falla, las otras siguen. El KR inicial que el
+      // clasificador creó en pase 1 cuenta como "KR existente" y se
+      // respeta (saltarExistentes=true).
+      //
+      // El usuario pidió "plan completo o nada" — si esto falla entero,
+      // las metas siguen existiendo y el panel diagnóstico lo refleja.
+      const planPorMeta: Array<{
+        titulo: string;
+        krs: number;
+        tareas: number;
+        error?: string;
+      }> = [];
+      const metasConId = todasMetas.filter((s) => s.metaId);
+      if (metasConId.length > 0) {
+        console.log(
+          `[Agente] fase 2 — generando plan completo para ${metasConId.length} metas…`,
+        );
+        setProgresoPlan(
+          `Generando plan para meta 1/${metasConId.length}…`,
+        );
+        for (let i = 0; i < metasConId.length; i++) {
+          const slot = metasConId[i];
+          const m = slot.meta;
+          setProgresoPlan(
+            `Generando plan para meta ${i + 1}/${metasConId.length}: "${slot.meta_titulo}"`,
+          );
+          console.log(
+            `[Agente] fase 2 — meta ${i + 1}/${metasConId.length}: "${slot.meta_titulo}"`,
+          );
+          try {
+            // 1) LLM decide KRs + tareas para esta meta. Si la meta no
+            //    tiene rango (sin fechas de David), usamos los 4
+            //    trimestres del año como disponibles; si tiene rango,
+            //    usamos los meses del rango.
+            const plan = await generarPlanMetaIA(
+              cfg.data.base_url,
+              cfg.data.minimax_api_key!,
+              cfg.data.model,
+              {
+                meta_titulo: m.meta_titulo,
+                meta_descripcion: m.meta_descripcion,
+                meta_ambito: m.meta_ambito,
+                meta_plazo: m.meta_plazo,
+                anio: anioActual,
+                fecha_inicio_meta: usarFechasDavid ? fechaInicioMeta || null : null,
+                fecha_objetivo: usarFechasDavid ? fechaObjetivo || null : null,
+                fecha_fin_bloqueada:
+                  usarFechasDavid && !!fechaObjetivo ? fechaFinBloqueada : false,
+                krs_por_trimestre: hayFechas && rango.meses.length > 0 ? 1 : 2,
+              },
+            );
+            // 2) Materializar KRs y tareas. saltarExistentes=true para
+            //    que el KR inicial del clasificador se respete.
+            const r = await aplicarKrsYTareasEnMeta(
+              slot.metaId!,
+              plan,
+              periodosByUnidad,
+              {
+                base_url: cfg.data.base_url,
+                minimax_api_key: cfg.data.minimax_api_key,
+                model: cfg.data.model,
+              },
+              { saltarExistentes: true },
+            );
+            console.log(
+              `[Agente] ✅ plan de "${slot.meta_titulo}": ` +
+                `${r.krsCreados} KRs nuevos + ${r.krsExistentes} KRs existentes (con tareas añadidas) + ${r.tareasCreadas} tareas`,
+            );
+            planPorMeta.push({
+              titulo: slot.meta_titulo,
+              krs: r.krsCreados + r.krsExistentes,
+              tareas: r.tareasCreadas,
+            });
+          } catch (e) {
+            const errStr = e instanceof Error ? e.message : String(e);
+            console.error(
+              `[Agente] ❌ plan falló para "${slot.meta_titulo}":`,
+              errStr,
+            );
+            planPorMeta.push({
+              titulo: slot.meta_titulo,
+              krs: 0,
+              tareas: 0,
+              error: errStr,
+            });
+          }
+          // Cedemos el event loop entre metas para no disparar
+          // auto-refresh del JWT de Supabase en mitad de inserts.
+          await new Promise((r) => setTimeout(r, 50));
+        }
+        setProgresoPlan(null);
+        const totalKrs = planPorMeta.reduce((s, p) => s + p.krs, 0);
+        const totalTareas = planPorMeta.reduce((s, p) => s + p.tareas, 0);
+        const planesFallaron = planPorMeta.filter((p) => p.error);
+        console.log(
+          `[Agente] fase 2 resumen: ${totalKrs} KRs + ${totalTareas} tareas, ` +
+            `${planesFallaron.length} metas con plan fallido`,
+        );
+      }
+
       // —— Mapear IDs creados a títulos (para cruzar con los esperados) ——
       const titulosEsperados = resultado.metas.map((m) => m.meta_titulo);
       const titulosCreados = todasMetas
@@ -530,6 +677,7 @@ export default function AgentePage() {
               ids_creadas: idsCreadas,
               krs_fallaron: krsFallaron,
               metas_fallaron: metasFallaron,
+              plan_por_meta: planPorMeta,
             }),
           );
         } catch {
@@ -576,7 +724,28 @@ export default function AgentePage() {
       // 5) Decisión final basada en el ÁRBITRO. Si gap > 0 o hay metas
       //    fallidas, NO redirigir — el humano debe ver el gap.
       if (arbitroOk && idsCreadas.length > 0) {
-        // 100% creado. A la primera meta.
+        // 100% creado. Resumen de la fase 2 (plan completo) en
+        // sessionStorage para que el detalle de la primera meta lo
+        // pueda mostrar al usuario como toast/banner.
+        if (typeof window !== "undefined" && planPorMeta.length > 0) {
+          try {
+            const totalKrs = planPorMeta.reduce((s, p) => s + p.krs, 0);
+            const totalTareas = planPorMeta.reduce((s, p) => s + p.tareas, 0);
+            const planesFallaron = planPorMeta.filter((p) => p.error).length;
+            sessionStorage.setItem(
+              "agente_resumen_plan",
+              JSON.stringify({
+                krs: totalKrs,
+                tareas: totalTareas,
+                metas: planPorMeta.length,
+                planesFallaron,
+              }),
+            );
+          } catch {
+            // sessionStorage puede estar deshabilitado en algunos navegadores
+            // (modo privado). Fallar en silencio no rompe el flujo.
+          }
+        }
         const primera = idsCreadas[0];
         router.push(`/metas/detalle?id=${primera}`);
       } else {
@@ -590,6 +759,7 @@ export default function AgentePage() {
           titulosCreados,
           metasFallaron,
           krsFallaron,
+          planPorMeta: planPorMeta.length > 0 ? planPorMeta : undefined,
         });
         setAplicando(false);
       }
@@ -876,6 +1046,35 @@ export default function AgentePage() {
                 </ul>
               </div>
             )}
+            {diagnostico.planPorMeta && diagnostico.planPorMeta.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-violet-700 dark:text-violet-300">
+                  📊 Plan completo generado ({diagnostico.planPorMeta.length} metas):
+                </p>
+                <ul className="mt-1 space-y-1 text-xs">
+                  {diagnostico.planPorMeta.map((p, i) => (
+                    <li
+                      key={i}
+                      className={
+                        p.error
+                          ? "rounded border border-red-500/30 bg-red-500/5 p-2 font-mono text-[11px] text-red-900 dark:text-red-200"
+                          : "rounded border border-violet-500/20 bg-violet-500/5 p-2"
+                      }
+                    >
+                      <div className="font-sans font-medium">{p.titulo}</div>
+                      {p.error ? (
+                        <div className="mt-1 break-words">{p.error}</div>
+                      ) : (
+                        <div className="text-violet-900 dark:text-violet-200">
+                          {p.krs} KR{p.krs === 1 ? "" : "s"} + {p.tareas}{" "}
+                          tarea{p.tareas === 1 ? "" : "s"}
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <div className="mt-3 rounded-md bg-amber-500/20 p-2 text-[11px] text-amber-900 dark:text-amber-200">
               💡 <strong>Para David:</strong> copia este diagnóstico y
               pégalo tal cual. Es la pista que necesito para arreglar el
@@ -897,6 +1096,7 @@ export default function AgentePage() {
           fechaInicioMeta={fechaInicioMeta}
           fechaObjetivo={fechaObjetivo}
           fechaFinBloqueada={fechaFinBloqueada && !!fechaObjetivo}
+          progresoPlan={progresoPlan}
         />
       )}
     </div>
@@ -918,6 +1118,7 @@ function ResultadoPreview({
   fechaInicioMeta,
   fechaObjetivo,
   fechaFinBloqueada,
+  progresoPlan,
 }: {
   resultado: ResultadoClasificador;
   areas: Area[];
@@ -929,6 +1130,10 @@ function ResultadoPreview({
   fechaInicioMeta: string;
   fechaObjetivo: string;
   fechaFinBloqueada: boolean;
+  /** Mensaje de progreso de la fase 2 (plan completo por meta). Si
+   *  está set, el panel muestra un spinner con ese texto en vez del
+   *  botón estático "Aplicar". */
+  progresoPlan?: string | null;
 }) {
   const areaMatch = resultado.area_nombre
     ? areas.find(
@@ -1050,6 +1255,12 @@ function ResultadoPreview({
       )}
 
       <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border pt-3">
+        {progresoPlan && (
+          <div className="mr-auto inline-flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-violet-500 border-t-transparent" />
+            {progresoPlan}
+          </div>
+        )}
         <button
           onClick={onCancel}
           disabled={busy}
