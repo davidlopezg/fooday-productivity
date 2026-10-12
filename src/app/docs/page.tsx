@@ -171,6 +171,7 @@ const FEATURES: Array<{ ruta: string; proposito: string; docs: string }> = [
   { ruta: "/metas/agente", proposito: "Agente IA: contexto libre → meta + plan trimestral completo (atajo directo a meta; la entrada unificada es /agente)", docs: "Pilar 2 · HelpDrawer" },
   { ruta: "/agente", proposito: "Agente unificado: clasifica la idea (proyecto/meta/captura) y propone estructura. Bucle de aplicación con 2 pases + árbitro adversarial que verifica que el 100% de las metas hijas se persistan en Supabase antes de redirigir; si hay gap muestra panel con nombres faltantes y motivo del error. Fase 2 automática: tras crear metas+KRs iniciales, genera el plan completo (KRs+tareas+hábitos) por meta con generarPlanMetaIA + aplicarKrsYTareasEnMeta. Pre-bucle: getSession() para evitar fallo de RLS por JWT transitorio + backoff de 50ms entre inserts. migration 0024", docs: "Pilar 2 · HelpDrawer" },
   { ruta: "/metas/auditoria", proposito: "Auditoría de metas: qué les falta (área, proyecto, fecha objetivo, contexto, KRs). migration 0024", docs: "Pilar 2 · HelpDrawer" },
+  { ruta: "/metas/detalle", proposito: "Detalle de una meta con sus KRs por trimestre/mes + tareas por KR + botones Editar/✨ Generar plan con IA (KRs+tareas+hábitos, respeta KRs existentes) + Archivar + WIG + asignar tareas del inbox", docs: "Pilar 2 · HelpDrawer" },
   { ruta: "/metas/plan", proposito: "Plan trimestral con scorecard de KRs + proyección", docs: "Pilar 2 · Ritual semanal (domingo) · Ritual mensual · HelpDrawer" },
   { ruta: "/plan-diario", proposito: "Estado emocional + plan diario generado por IA", docs: "Rituales §1 (mañana) · HelpDrawer" },
   { ruta: "/plan-diario/detalle", proposito: "Detalle de un plan con notas e informe", docs: "Sub-ruta de /plan-diario" },
@@ -228,6 +229,162 @@ export default function DocsPage() {
           Cada botón "Por qué existe esto" en las pantallas apunta aquí.
         </p>
       </header>
+
+      {/* =====================================================================
+          Glosario — Arquitectura explicada para humanos.
+          La app tiene 4 capas (Proyecto → Meta → KR → Tarea/Hábito) que
+          encajan como una casa. Esta sección existe para que David pueda
+          volver aquí cuando dude qué es qué o cómo encaja. La metáfora es
+          deliberadamente doméstica: si la entiendes en 30 segundos, la
+          aplicación se vuelve autoexplicativa.
+         ===================================================================== */}
+      <section
+        id="glosario"
+        className="scroll-mt-20 rounded-2xl border-2 border-emerald-500/30 bg-gradient-to-br from-emerald-500/5 to-teal-500/5 p-6 sm:p-8"
+      >
+        <header>
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+            Glosario · Arquitectura en 4 capas
+          </div>
+          <h2 className="mt-1 text-2xl font-bold tracking-tight">
+            🏠 La casa de tus objetivos (explicado sin jerga)
+          </h2>
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+            Tu vida tiene <strong className="text-foreground">casas grandes</strong>{" "}
+            (proyectos). Cada casa tiene <strong className="text-foreground">habitaciones</strong>{" "}
+            (metas) que tienen que estar terminadas. Cada habitación tiene{" "}
+            <strong className="text-foreground">muebles medibles</strong> (KRs) que
+            dicen “esta habitación está X% hecha”. Y para tener los
+            muebles hay que <strong className="text-foreground">mover las manos</strong>{" "}
+            (tareas), algunas de ellas repetidas (hábitos). El orden importa:
+            no puedes decorar una habitación que no existe, ni montar un
+            mueble que no has comprado.
+          </p>
+        </header>
+
+        <ol className="mt-6 space-y-5 text-sm leading-relaxed">
+          <li className="rounded-xl border border-border bg-card p-4">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">🏠</span>
+              <h3 className="text-base font-semibold">Proyecto = la casa</h3>
+            </div>
+            <p className="mt-2 text-muted-foreground">
+              Una <strong className="text-foreground">iniciativa grande</strong>{" "}
+              que tiene sentido por sí sola y engloba varias metas. Ejemplos:
+              “Renegociar el alquiler de Sol de Nit”, “Lanzar la v1 de
+              Fooday”, “Ponerme en forma este trimestre”. Vive en la tabla{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">proyectos</code>.
+              Tiene color, descripción opcional, área opcional.
+            </p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              💡 Si tu idea es una sola cosa, no necesita proyecto: es una meta
+              directa (ver más abajo).
+            </p>
+          </li>
+
+          <li className="rounded-xl border border-border bg-card p-4">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">🚪</span>
+              <h3 className="text-base font-semibold">Meta = una habitación</h3>
+            </div>
+            <p className="mt-2 text-muted-foreground">
+              Un <strong className="text-foreground">resultado concreto con
+              plazo</strong>. Si la casa es “Renegociar alquiler”, las
+              habitaciones son: “Preparar el dossier financiero”, “Buscar 3
+              locales alternativos”, “Redactar la propuesta para Teresa”,
+              “Ensayar la reunión”. Las metas pueden vivir dentro de un
+              proyecto (<code className="rounded bg-muted px-1.5 py-0.5 text-xs">metas.proyecto_id</code>)
+              o sueltas (sin casa). Una meta sin KRs y sin tareas es una
+              habitación vacía.
+            </p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              💡 La migración 0025 añadió fechas reales (inicio + límite + 🔒
+              hard constraint) para que el planificador no fuerce 4 trimestres
+              lineales cuando tu meta dura 2 semanas.
+            </p>
+          </li>
+
+          <li className="rounded-xl border border-border bg-card p-4">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">🪟</span>
+              <h3 className="text-base font-semibold">KR (Key Result) = un mueble medible</h3>
+            </div>
+            <p className="mt-2 text-muted-foreground">
+              Una <strong className="text-foreground">medición</strong> que dice
+              “esta habitación está X% hecha”. Para “Buscar 3 locales
+              alternativos”: KR = “Tener 3 locales visitados y valorados
+              antes del 15 de noviembre”. Si los muebles están, la
+              habitación está hecha. Un KR sin tareas es un mueble que
+              todavía no has comprado: sabes lo que quieres, pero nadie lo
+              está montando.
+            </p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              💡 Los KRs viven en la tabla{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">resultados_periodo</code>{" "}
+              con FK a la meta y al periodo (trimestre 1–4 o mes 1–12
+              desde la migración 0025).
+            </p>
+          </li>
+
+          <li className="rounded-xl border border-border bg-card p-4">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">🔨</span>
+              <h3 className="text-base font-semibold">Tarea / Hábito = mover las manos</h3>
+            </div>
+            <p className="mt-2 text-muted-foreground">
+              Para tener los muebles necesitas <strong className="text-foreground">acciones
+              concretas</strong> que haces una vez (tarea) o que repites
+              (hábito). Para “Tener 3 locales visitados”: llamar a 3
+              inmobiliarias, visitar local 1 el martes, rellenar la ficha
+              comparativa. Si haces todas las tareas del KR, el KR se cumple.
+              Un <strong className="text-foreground">hábito</strong> es una
+              tarea con{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">recurrencia_tipo = diaria | semanal | mensual</code>{" "}
+              en vez de <code className="rounded bg-muted px-1.5 py-0.5 text-xs">null</code>.
+            </p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              💡 Resumen en una línea: <strong className="text-foreground">Proyecto</strong>{" "}
+              = la casa. <strong className="text-foreground">Meta</strong> = una
+              habitación. <strong className="text-foreground">KR</strong> = un
+              mueble medible. <strong className="text-foreground">Tarea</strong>{" "}
+              = la acción que haces para poner el mueble.{" "}
+              <strong className="text-foreground">Hábito</strong> = una tarea
+              que se repite.
+            </p>
+          </li>
+        </ol>
+
+        <div className="mt-6 rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4 text-sm">
+          <p className="font-semibold text-emerald-800 dark:text-emerald-200">
+            🧠 ¿Cómo encaja esto con el botón "IA" de cada capa?
+          </p>
+          <ul className="mt-2 space-y-1.5 text-muted-foreground">
+            <li>
+              · <strong className="text-foreground">/agente</strong> (la entrada
+              unificada): le cuentas un contexto y la IA decide si es
+              <em> proyecto / meta / captura</em>, lo clasifica, propone la
+              estructura completa (casa + habitaciones + mueble inicial por
+              habitación) y en una segunda fase genera el plan entero
+              (muebles + tareas + hábitos) por cada meta. Tú solo ejecutas.
+            </li>
+            <li>
+              · <strong className="text-foreground">/metas/nueva</strong> y el{" "}
+              <strong className="text-foreground">botón IA en EditarMetaModal</strong>:
+              si ya tienes una meta (suelta o dentro de un proyecto), pulsas
+              "✨ Generar plan con IA" y rellena los KRs + tareas + hábitos
+              que faltan. El KR inicial se respeta si ya existía.
+            </li>
+            <li>
+              · <strong className="text-foreground">Botón IA en cada KR</strong>{" "}
+              (en /metas/detalle): si ya tienes un KR puesto y quieres
+              afinarlo o regenerarle las tareas, este botón le pide a la IA
+              solo las tareas/hábitos para ese KR concreto, sin tocar los
+              demás. Útil cuando ajustas un KR a mano y el plan original ya
+              no encaja.
+            </li>
+          </ul>
+        </div>
+      </section>
 
       {/* =====================================================================
           Meta · Cómo se mantiene este documento actualizado
@@ -1457,6 +1614,32 @@ export default function DocsPage() {
         </header>
 
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-10-18
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">/docs: glosario “la casa de tus objetivos” + /metas/detalle: botón ✨ Generar plan con IA.</strong>{" "}
+              Dos cambios: (1) nueva sección <strong className="text-foreground">“Glosario · Arquitectura en 4 capas”</strong> al
+              principio de <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/docs</code> con
+              la metáfora casa/habitación/mueble/tarea/hábito explicada sin
+              jerga, más una subsección que aclara cómo encaja el botón IA
+              de cada capa (/agente → /metas/nueva+EditarMetaModal → KR
+              concreto). (2) el botón <strong className="text-foreground">“✨ Generar plan con
+              IA”</strong> ya estaba en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas/nueva</code> y en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">EditarMetaModal</code>,
+              pero faltaba en <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas/detalle</code>{" "}
+              — que es donde David más tiempo pasa mirando una meta ya
+              creada. Ahora al pulsar genera KRs+tareas+hábitos para esa
+              meta concreta, respeta KRs existentes (no duplica, les añade
+              tareas) y respeta el rango real (migration 0025) si lo
+              tiene. FEATURES actualizado (fila /metas/detalle añadida).{" "}
+              <em className="text-muted-foreground">Sin cambios de metodología ni rituales. La
+              respuesta a “cómo creo las tareas a partir de la meta” ahora es
+              obvia: agente → botón IA en la meta.</em>
+            </span>
+          </li>
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
               2026-10-17

@@ -21,6 +21,12 @@ import {
   fetchTareasSinMeta,
 } from "@/lib/queries";
 import { useData } from "@/lib/useData";
+import {
+  generarPlanMetaIA,
+  aplicarKrsYTareasEnMeta,
+  type PeriodosPorUnidad,
+} from "@/lib/plan";
+import { useConfig } from "@/lib/configStore";
 import type {
   Area,
   MetaConPlan,
@@ -35,6 +41,7 @@ import {
   IconArrowLeft,
   IconPencil,
   IconPlus,
+  IconSparkles,
   IconTarget,
   IconTrash,
 } from "@/components/icons";
@@ -89,6 +96,12 @@ export default function MetaDetallePage() {
   const plan = planQ.data;
   const periodos = periodosQ.data;
   const [editando, setEditando] = useState(false);
+  /** Estado del botón '✨ Generar plan con IA' (KRs+tareas+hábitos).
+   *  Si está generando, el botón se deshabilita y muestra progreso. */
+  const [generandoPlan, setGenerandoPlan] = useState(false);
+  const [progresoPlan, setProgresoPlan] = useState<string | null>(null);
+  const [errorPlan, setErrorPlan] = useState<string | null>(null);
+  const cfg = useConfig();
 
   // Trimestres del año actual que NO tienen aún un resultado en esta meta.
   // Se usan para el selector "+ Añadir resultado".
@@ -100,6 +113,104 @@ export default function MetaDetallePage() {
       .filter((p) => p.tipo === "trimestre" && p.anio === anioActual && !usados.has(p.id))
       .sort((a, b) => a.numero - b.numero);
   }, [plan, periodos, anioActual]);
+
+  /** Construye el Map que espera aplicarKrsYTareasEnMeta: clave
+   *  "trimestre:N" o "mes:N" → {id, tipo}. Necesario para resolver
+   *  las unidades que devuelve el LLM en periodos reales de BD. */
+  const periodosByUnidad: PeriodosPorUnidad = useMemo(() => {
+    const m: PeriodosPorUnidad = new Map();
+    if (!periodos) return m;
+    for (const p of periodos) {
+      if (p.anio !== anioActual) continue;
+      if (p.tipo === "trimestre") {
+        m.set(`trimestre:${p.numero}`, { id: p.id, tipo: "trimestre" });
+      } else if (p.tipo === "mes") {
+        m.set(`mes:${p.numero}`, { id: p.id, tipo: "mes" });
+      }
+    }
+    return m;
+  }, [periodos, anioActual]);
+
+  async function generarPlanParaMeta() {
+    if (!plan) return;
+    if (!cfg.data.minimax_api_key) {
+      setErrorPlan("Configura la clave de IA en /configuracion primero.");
+      return;
+    }
+    setGenerandoPlan(true);
+    setErrorPlan(null);
+    setProgresoPlan("Generando KRs y tareas con IA…");
+    try {
+      // 1) Asegurar periodos (trimestres del año + meses del rango si
+      //    los hay) para que la IA pueda asignar KRs a unidades reales.
+      await ensurePeriodosAnio(anioActual);
+      if (plan.meta.fecha_inicio_meta && plan.meta.fecha_objetivo) {
+        const fi = new Date(plan.meta.fecha_inicio_meta + "T00:00:00Z");
+        const fo = new Date(plan.meta.fecha_objetivo + "T00:00:00Z");
+        const mesInicio = fi.getUTCMonth() + 1;
+        const mesFin = fo.getUTCMonth() + 1;
+        if (mesInicio >= 1 && mesFin >= mesInicio && mesFin <= 12) {
+          const { ensurePeriodosMeses } = await import("@/lib/mutations");
+          await ensurePeriodosMeses(anioActual, mesInicio, mesFin);
+        }
+      }
+      const periodosFresh = await fetchPeriodos();
+      const periodosByUnidadFresh: PeriodosPorUnidad = new Map();
+      for (const p of periodosFresh ?? []) {
+        if (p.anio !== anioActual) continue;
+        if (p.tipo === "trimestre") {
+          periodosByUnidadFresh.set(`trimestre:${p.numero}`, {
+            id: p.id,
+            tipo: "trimestre",
+          });
+        } else if (p.tipo === "mes") {
+          periodosByUnidadFresh.set(`mes:${p.numero}`, {
+            id: p.id,
+            tipo: "mes",
+          });
+        }
+      }
+      await periodosQ.reload();
+      // 2) Generar plan con IA.
+      const planGenerado = await generarPlanMetaIA(
+        cfg.data.base_url,
+        cfg.data.minimax_api_key!,
+        cfg.data.model,
+        {
+          meta_titulo: plan.meta.titulo,
+          meta_descripcion: plan.meta.descripcion,
+          meta_ambito: plan.meta.ambito,
+          meta_plazo: plan.meta.plazo,
+          anio: anioActual,
+          fecha_inicio_meta: plan.meta.fecha_inicio_meta,
+          fecha_objetivo: plan.meta.fecha_objetivo,
+          fecha_fin_bloqueada: plan.meta.fecha_fin_bloqueada,
+        },
+      );
+      // 3) Materializar KRs y tareas (reusa KRs existentes si los hay).
+      const r = await aplicarKrsYTareasEnMeta(
+        plan.meta.id,
+        planGenerado,
+        periodosByUnidadFresh,
+        {
+          base_url: cfg.data.base_url,
+          minimax_api_key: cfg.data.minimax_api_key,
+          model: cfg.data.model,
+        },
+        { saltarExistentes: true },
+      );
+      setProgresoPlan(
+        `Listo: ${r.krsCreados} KR${r.krsCreados === 1 ? "" : "s"} nuevos + ${r.krsExistentes} KRs existentes ampliados + ${r.tareasCreadas} tareas${r.tareasSinRecurrencia > 0 ? ` (${r.tareasSinRecurrencia} sin recurrencia)` : ""}.`,
+      );
+      await planQ.reload();
+    } catch (e) {
+      setErrorPlan(
+        e instanceof Error ? e.message : "La IA no pudo generar el plan.",
+      );
+    } finally {
+      setGenerandoPlan(false);
+    }
+  }
 
   if (!id) {
     return (
@@ -214,12 +325,21 @@ export default function MetaDetallePage() {
                 <div className="text-xs text-muted-foreground">
                   {plan.tareas_hechas}/{plan.total_tareas} tareas hechas
                 </div>
-                <div className="mt-3 flex items-center justify-end gap-2">
+                <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
                   <button
                     onClick={() => setEditando(true)}
                     className="inline-flex items-center gap-1.5 rounded-md bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
                   >
                     <IconPencil className="h-3.5 w-3.5" /> Editar
+                  </button>
+                  <button
+                    onClick={generarPlanParaMeta}
+                    disabled={generandoPlan}
+                    className="inline-flex items-center gap-1.5 rounded-md bg-violet-500 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-violet-600 disabled:opacity-50"
+                    title="Genera o amplía KRs y tareas con IA. Los KRs existentes se respetan (no se duplican) y se les añaden tareas."
+                  >
+                    <IconSparkles className="h-3.5 w-3.5" />
+                    {generandoPlan ? "Generando…" : "✨ Generar plan con IA"}
                   </button>
                   <button
                     onClick={async () => {
@@ -232,6 +352,16 @@ export default function MetaDetallePage() {
                     <IconArchive className="h-3.5 w-3.5" /> Archivar
                   </button>
                 </div>
+                {progresoPlan && (
+                  <p className="mt-2 text-right text-[11px] text-violet-700 dark:text-violet-300">
+                    {progresoPlan}
+                  </p>
+                )}
+                {errorPlan && (
+                  <p className="mt-2 text-right text-[11px] text-red-700 dark:text-red-300">
+                    {errorPlan}
+                  </p>
+                )}
               </div>
             </div>
             <div className="mt-4">
