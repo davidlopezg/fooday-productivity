@@ -16,7 +16,7 @@
  * Para forzar una invalidación completa, sube CACHE_VERSION.
  * ========================================================================== */
 
-const CACHE_VERSION = "v1";
+const CACHE_VERSION = "v2";
 const CACHE_STATIC = `fooday-static-${CACHE_VERSION}`;
 const CACHE_PAGES = `fooday-pages-${CACHE_VERSION}`;
 
