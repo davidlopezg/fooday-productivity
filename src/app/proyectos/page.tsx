@@ -2,15 +2,15 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { fetchAreas, fetchProyectosConConteo, fetchTareas } from "@/lib/queries";
+import { fetchAreas, fetchMetas, fetchProyectosConConteo, fetchTareas } from "@/lib/queries";
 import {
   archivarProyecto,
   crearProyecto,
   eliminarProyecto,
 } from "@/lib/mutations";
 import { useData } from "@/lib/useData";
-import type { Area, Proyecto, Tarea } from "@/lib/types";
-import { IconArchive, IconTrash, IconX } from "@/components/icons";
+import type { Area, Meta, Proyecto, Tarea } from "@/lib/types";
+import { IconArchive, IconTarget, IconTrash, IconX } from "@/components/icons";
 
 type ProyectoConConteo = Proyecto & {
   total_tareas: number;
@@ -28,6 +28,10 @@ export default function ProyectosPage() {
   // liviana sin tocar la RPC de proyectos).
   const { data: tareas } = useData<Tarea[]>(() => fetchTareas(), []);
   const { data: areas } = useData<Area[]>(fetchAreas, []);
+  // Metas hijas de cada proyecto. Una sola query, agrupamos en cliente
+  // por proyecto_id. Migration 0024: metas.proyecto_id nullable; las
+  // metas sin proyecto se ignoran aquí (viven solo en /metas).
+  const { data: metas } = useData<Meta[]>(fetchMetas, []);
 
   const [mostrarForm, setMostrarForm] = useState(false);
   const [nombre, setNombre] = useState("");
@@ -83,13 +87,24 @@ export default function ProyectosPage() {
     }
   }
 
+  // Agrupar metas por proyecto. Orden estable: por `codigo` ascendente
+  // (que ya devuelve fetchMetas), luego por título como desempate.
+  const metasPorProyecto = new Map<string, Meta[]>();
+  for (const m of metas) {
+    if (m.proyecto_id) {
+      const arr = metasPorProyecto.get(m.proyecto_id) ?? [];
+      arr.push(m);
+      metasPorProyecto.set(m.proyecto_id, arr);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Proyectos</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Agrupa tareas por proyecto. {loading ? "…" : data.length} proyectos.
+            Agrupa metas y tareas por proyecto. {loading ? "…" : data.length} proyectos.
           </p>
         </div>
         <button
@@ -176,6 +191,7 @@ export default function ProyectosPage() {
             const activas = tareasDelProyecto.filter(
               (t) => t.estado !== "hecha" && t.estado !== "archivada",
             );
+            const metasDelProyecto = metasPorProyecto.get(p.id) ?? [];
             return (
               <li
                 key={p.id}
@@ -213,6 +229,52 @@ export default function ProyectosPage() {
                         </span>
                       )}
                     </div>
+                    {metasDelProyecto.length > 0 && (
+                      <div className="mt-3 border-t border-border pt-2">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                          Metas hijas ({metasDelProyecto.length})
+                        </p>
+                        <ul className="mt-1.5 space-y-1">
+                          {metasDelProyecto.map((m) => {
+                            const dotClass: Record<string, string> = {
+                              sin_empezar: "bg-slate-400",
+                              en_progreso: "bg-amber-500",
+                              bloqueada: "bg-red-500",
+                              completada: "bg-emerald-500",
+                              archivada: "bg-slate-300",
+                            };
+                            return (
+                              <li key={m.id} className="flex items-center gap-2 text-xs">
+                                <span
+                                  className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${
+                                    dotClass[m.estado] ?? "bg-slate-400"
+                                  }`}
+                                  aria-hidden
+                                />
+                                <Link
+                                  href={`/metas/detalle?id=${m.id}`}
+                                  className="min-w-0 flex-1 truncate text-foreground hover:underline"
+                                  title={m.titulo}
+                                >
+                                  {m.codigo ? (
+                                    <span className="mr-1 font-mono text-[10px] text-muted-foreground">
+                                      {m.codigo}
+                                    </span>
+                                  ) : null}
+                                  {m.titulo}
+                                </Link>
+                                {m.es_wig && (
+                                  <IconTarget
+                                    className="h-3 w-3 shrink-0 text-violet-500"
+                                    aria-label="WIG activo"
+                                  />
+                                )}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    )}
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
                     <Link

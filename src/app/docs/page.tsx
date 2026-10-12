@@ -187,7 +187,7 @@ const FEATURES: Array<{ ruta: string; proposito: string; docs: string }> = [
 
   // ── Sistema ──
   { ruta: "/pagos", proposito: "Pagos pendientes: ejecutar tesorería lunes 1ª hora", docs: "Apéndice §Bucle de equilibrio · Ritual semanal (lunes estricto) · HelpDrawer" },
-  { ruta: "/proyectos", proposito: "Gestión de proyectos con conteo de tareas", docs: "HelpDrawer" },
+  { ruta: "/proyectos", proposito: "Gestión de proyectos con conteo de tareas y listado de metas hijas (migration 0024)", docs: "HelpDrawer" },
   { ruta: "/configuracion", proposito: "Configuración: API key IA, base URL, modelo, tema", docs: "HelpDrawer" },
 
   // ── Documentación ──
@@ -1457,6 +1457,28 @@ export default function DocsPage() {
         </header>
 
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-10-15
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">/proyectos: card del proyecto ahora lista las metas hijas (migration 0024).</strong>{" "}
+              Antes la página <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/proyectos</code>{" "}
+              solo mostraba el conteo de tareas por proyecto. Si el agente creaba un proyecto con 4
+              metas hijas (caso real: “Renegociar el alquiler de Sol de Nit”), las metas vivían en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas</code> como cards sueltas sin
+              agrupación visible — el humano tenía que recordar qué metas colgaban de qué proyecto.
+              Ahora cada card de <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/proyectos</code>{" "}
+              lista sus metas hijas con: dot de estado (sin empezar / en progreso / bloqueada /
+              completada / archivada), código + título clicable a{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas/detalle</code>{" "}
+              y marcador de WIG si la meta está marcada como foco. Implementación: una query
+              adicional a <code className="rounded bg-muted px-1.5 py-0.5 text-xs">fetchMetas()</code> y
+              agrupación en cliente por <code className="rounded bg-muted px-1.5 py-0.5 text-xs">proyecto_id</code>{" "}
+              (las metas sin proyecto se ignoran aquí). FEATURES actualizado (fila /proyectos).{" "}
+              <em className="text-muted-foreground">Sin cambios de metodología ni rituales.</em>
+            </span>
+          </li>
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
               2026-10-14
