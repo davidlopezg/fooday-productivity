@@ -166,7 +166,7 @@ const FEATURES: Array<{ ruta: string; proposito: string; docs: string }> = [
   { ruta: "/calendario", proposito: "Time-blocking: 4 bloques fijos × 7 días", docs: "Pilar 3 · Rituales §1 (mañana) · HelpDrawer" },
 
   // ── Metas y planificación ──
-  { ruta: "/metas", proposito: "Cards de metas con estado y progreso + botón IA Sugerir WIGs + EditarMetaModal con botón IA Generar plan", docs: "Pilar 2 · Ritual mensual · HelpDrawer" },
+  { ruta: "/metas", proposito: "Cards de metas con estado y progreso + botones Archivar/Editar/WIG + IA Sugerir WIGs + filtro Archivadas + EditarMetaModal con botón IA Generar plan", docs: "Pilar 2 · Ritual mensual · HelpDrawer" },
   { ruta: "/metas/nueva", proposito: "Crear meta con rango real [inicio, fin] + botón IA Generar plan (KRs+tareas+hábitos) que reparte los KRs SOLO dentro del rango. Hard constraint opcional 🔒", docs: "Pilar 2 · HelpDrawer" },
   { ruta: "/metas/agente", proposito: "Agente IA: contexto libre → meta + plan trimestral completo (atajo directo a meta; la entrada unificada es /agente)", docs: "Pilar 2 · HelpDrawer" },
   { ruta: "/agente", proposito: "Agente unificado: clasifica la idea (proyecto/meta/captura) y propone estructura. Bucle de aplicación con 2 pases + árbitro adversarial que verifica que el 100% de las metas hijas se persistan en Supabase antes de redirigir; si hay gap muestra panel con nombres faltantes y motivo del error. Fase 2 automática: tras crear metas+KRs iniciales, genera el plan completo (KRs+tareas+hábitos) por meta con generarPlanMetaIA + aplicarKrsYTareasEnMeta. Pre-bucle: getSession() para evitar fallo de RLS por JWT transitorio + backoff de 50ms entre inserts. migration 0024", docs: "Pilar 2 · HelpDrawer" },
@@ -1457,6 +1457,32 @@ export default function DocsPage() {
         </header>
 
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-10-17
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">/metas: botón archivar en cada card + filtro "🗄️ Archivadas".</strong>{" "}
+              Antes la única forma de archivar una meta era entrar a{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">EditarMetaModal</code>{" "}
+              y cambiar el estado. Ahora cada card de{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas</code>{" "}
+              tiene un tercer botón (icono de archivador) al lado del
+              lápiz y de la WIG. Pulsarlo archiva la meta (estado
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs"> archivada</code>); la
+              meta desaparece del listado por defecto y aparece en el
+              nuevo filtro “🗄️ Archivadas” de la barra de ámbito. La
+              meta archivada deja de contar para WIGs (3/3 libres
+              otra vez) pero sus KRs y tareas NO se archivan
+              automáticamente — eso se hace desde sus propias pantallas
+              (consistente con el principio de “arrastrar la cascada es
+              decisión humana, no implícita”). El confirm avisa del
+              alcance (“tus N KRs y M tareas NO se archivan
+              automáticamente — hazlo desde sus pantallas si quieres”).
+              FEATURES actualizado (fila /metas).{" "}
+              <em className="text-muted-foreground">Sin cambios de metodología ni rituales.</em>
+            </span>
+          </li>
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
               2026-10-16

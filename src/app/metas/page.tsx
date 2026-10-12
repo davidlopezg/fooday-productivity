@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { fetchMetasConProgreso } from "@/lib/queries";
-import { marcarWig } from "@/lib/mutations";
+import { archivarMeta, marcarWig } from "@/lib/mutations";
 import { useData } from "@/lib/useData";
 import { useConfig } from "@/lib/configStore";
 import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
@@ -12,6 +12,7 @@ import { SugerirWigsModal } from "@/components/SugerirWigsModal";
 import { sugerirWigsIA, type SugerirWigsResultado } from "@/lib/plan";
 import type { AmbitoMeta, MetaConPlan } from "@/lib/types";
 import {
+  IconArchive,
   IconColumns,
   IconInbox,
   IconPencil,
@@ -48,7 +49,7 @@ const AMBITO_LABEL: Record<AmbitoMeta, string> = {
   profesional: "💼 Profesional",
 };
 
-type Filtro = "todas" | AmbitoMeta;
+type Filtro = "todas" | AmbitoMeta | "archivadas";
 
 function ProgressBar({ value }: { value: number }) {
   const pct = Math.max(0, Math.min(1, value));
@@ -195,7 +196,15 @@ export default function MetasPage() {
 
   const filtradas = useMemo(() => {
     let res = metas;
-    if (filtro !== "todas") res = res.filter((m) => m.meta.ambito === filtro);
+    // Por defecto ocultamos las archivadas. Si el filtro 'archivadas'
+    // está activo, mostramos solo esas. Esto se sincroniza con la barra
+    // de filtro de ámbito (todas / personal / profesional / archivadas).
+    if (filtro === "archivadas") {
+      res = res.filter((m) => m.meta.estado === "archivada");
+    } else {
+      res = res.filter((m) => m.meta.estado !== "archivada");
+      if (filtro !== "todas") res = res.filter((m) => m.meta.ambito === filtro);
+    }
     if (tagsSel.size > 0) {
       res = res.filter((m) =>
         (m.meta.tags ?? []).some((t) => tagsSel.has(t)),
@@ -227,6 +236,35 @@ export default function MetasPage() {
       }
     } catch (e) {
       setErrorWig(e instanceof Error ? e.message : "No se pudo actualizar");
+    } finally {
+      setGuardandoId(null);
+    }
+  }
+
+  async function archivarMetaCard(mp: MetaConPlan) {
+    const archivando = mp.meta.estado !== "archivada";
+    const accion = archivando ? "archivar" : "desarchivar";
+    const krsCount = mp.resultados.length;
+    const tareasCount = mp.total_tareas;
+    let msg = `¿${accion.charAt(0).toUpperCase() + accion.slice(1)} "${mp.meta.titulo}"?`;
+    if (archivando) {
+      msg += `\n\nLa meta deja de contar para WIGs y se oculta de /metas (sigue visible en el filtro “🗄️ Archivadas”).`;
+      if (krsCount > 0 || tareasCount > 0) {
+        msg += `\nSus ${krsCount} KR${krsCount === 1 ? "" : "s"} y ${tareasCount} tarea${tareasCount === 1 ? "" : "s"} NO se archivan automáticamente — se hace desde sus propias pantallas si quieres arrastrar la cascada.`;
+      }
+      msg += `\n\nPuedes desarchivar la meta después para revertir.`;
+    } else {
+      msg += `\n\nVolverá a estar activa en /metas.`;
+    }
+    if (!confirm(msg)) return;
+    setGuardandoId(mp.meta.id);
+    try {
+      await archivarMeta(mp.meta.id, archivando);
+      await reload();
+    } catch (e) {
+      setErrorWig(
+        e instanceof Error ? e.message : `No se pudo ${accion}`,
+      );
     } finally {
       setGuardandoId(null);
     }
@@ -384,6 +422,10 @@ export default function MetasPage() {
             { id: "todas", label: `Todas (${metas.length})` },
             { id: "personal", label: `👤 Personales (${conteoPersonal})` },
             { id: "profesional", label: `💼 Profesionales (${conteoProfesional})` },
+            {
+              id: "archivadas",
+              label: `🗄️ Archivadas (${metas.filter((mm) => mm.meta.estado === "archivada").length})`,
+            },
           ] as const
         ).map((f) => (
           <button
@@ -447,7 +489,7 @@ export default function MetasPage() {
                 m.es_wig ? "border-violet-500/40" : "border-border"
               }`}
             >
-              {/* Botones esquina superior derecha: Editar (lápiz) + WIG (diana) */}
+              {/* Botones esquina superior derecha: Editar (lápiz) + WIG (diana) + Archivar */}
               <div className="absolute right-3 top-3 z-10 flex items-center gap-1">
                 <button
                   type="button"
@@ -485,10 +527,24 @@ export default function MetasPage() {
                     <IconTarget className="h-4 w-4" />
                   )}
                 </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    archivarMetaCard(mp);
+                  }}
+                  disabled={guardandoId === m.id}
+                  className="rounded-full p-1.5 text-muted-foreground/40 transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
+                  title={m.estado === "archivada" ? "Desarchivar meta" : "Archivar meta"}
+                  aria-label={m.estado === "archivada" ? "Desarchivar meta" : "Archivar meta"}
+                >
+                  <IconArchive className="h-4 w-4" />
+                </button>
               </div>
 
               <Link href={`/metas/detalle?id=${m.id}`} className="block">
-                <div className="flex items-start justify-between gap-3 pr-20">
+                <div className="flex items-start justify-between gap-3 pr-24">
                   <span className="text-xs font-medium text-muted-foreground">
                     {m.codigo ?? "—"}
                   </span>
