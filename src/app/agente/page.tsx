@@ -584,52 +584,57 @@ export default function AgentePage() {
             //    tiene rango (sin fechas de David), usamos los 4
             //    trimestres del año como disponibles; si tiene rango,
             //    usamos los meses del rango.
-            const plan = await generarPlanMetaIA(
+            const planOpts = {
+              meta_titulo: m.meta_titulo,
+              meta_descripcion: m.meta_descripcion,
+              meta_ambito: m.meta_ambito,
+              meta_plazo: m.meta_plazo,
+              anio: anioActual,
+              fecha_inicio_meta: usarFechasDavid ? fechaInicioMeta || null : null,
+              fecha_objetivo: usarFechasDavid ? fechaObjetivo || null : null,
+              fecha_fin_bloqueada:
+                usarFechasDavid && !!fechaObjetivo ? fechaFinBloqueada : false,
+              krs_por_trimestre: hayFechas && rango.meses.length > 0 ? 1 : 2,
+            };
+            let plan = await generarPlanMetaIA(
               cfg.data.base_url,
               cfg.data.minimax_api_key!,
               cfg.data.model,
-              {
-                meta_titulo: m.meta_titulo,
-                meta_descripcion: m.meta_descripcion,
-                meta_ambito: m.meta_ambito,
-                meta_plazo: m.meta_plazo,
-                anio: anioActual,
-                fecha_inicio_meta: usarFechasDavid ? fechaInicioMeta || null : null,
-                fecha_objetivo: usarFechasDavid ? fechaObjetivo || null : null,
-                fecha_fin_bloqueada:
-                  usarFechasDavid && !!fechaObjetivo ? fechaFinBloqueada : false,
-                krs_por_trimestre: hayFechas && rango.meses.length > 0 ? 1 : 2,
-              },
+              planOpts,
             );
-            // 2) Materializar KRs y tareas. saltarExistentes=true para
-            //    que el KR inicial del clasificador se respete.
-            // Ponytail: si la IA devolvió un plan sin KRs (krs=[]) Y la
-            // meta no tenía ya KRs previos, es un éxito FALSO. La IA
-            // no generó nada pero el motor no lanza. Lo detectamos
-            // aquí y lo marcamos como error para que el panel
-            // diagnóstico lo muestre. Si la meta ya tenía KRs y la IA
-            // solo añadió tareas, lo aceptamos.
+            // 2) Si la IA devolvió un plan vacío (krs=[]), reintentamos
+            //    UNA vez. Si falla otra vez, marcamos como error. Esto
+            //    es lo que el usuario llevaba 3 días viendo: 2 de 4
+            //    metas con "0 KRs + 0 tareas" marcado como ✅. Era un
+            //    éxito falso.
             if (plan.krs.length === 0) {
-              const { fetchMetaConPlan } = await import("@/lib/queries");
-              const metaConPlan = await fetchMetaConPlan(slot.metaId!);
-              const krsPrevios = metaConPlan?.resultados.length ?? 0;
-              if (krsPrevios === 0) {
-                const msg = "La IA no devolvió KRs para esta meta (plan vacío). Vuelve a intentarlo.";
-                console.warn(
-                  `[Agente] ⚠️ plan vacío para "${slot.meta_titulo}"`,
-                );
-                planPorMeta.push({
-                  titulo: slot.meta_titulo,
-                  krs: 0,
-                  tareas: 0,
-                  error: msg,
-                });
-                // Cedemos el event loop entre metas (igual que al final
-                // del try).
-                await new Promise((r) => setTimeout(r, 50));
-                continue;
-              }
+              console.warn(
+                `[Agente] ⚠️ plan vacío para "${slot.meta_titulo}" — reintentando…`,
+              );
+              await new Promise((r) => setTimeout(r, 1000));
+              plan = await generarPlanMetaIA(
+                cfg.data.base_url,
+                cfg.data.minimax_api_key!,
+                cfg.data.model,
+                planOpts,
+              );
             }
+            if (plan.krs.length === 0) {
+              const msg = "La IA no devolvió KRs válidos tras 2 intentos para esta meta. Reabre el agente y vuelve a aplicar.";
+              console.error(
+                `[Agente] ❌ plan vacío tras retry para "${slot.meta_titulo}"`,
+              );
+              planPorMeta.push({
+                titulo: slot.meta_titulo,
+                krs: 0,
+                tareas: 0,
+                error: msg,
+              });
+              await new Promise((r) => setTimeout(r, 50));
+              continue;
+            }
+            // 3) Materializar KRs y tareas. saltarExistentes=true para
+            //    que el KR inicial del clasificador se respete.
             const r = await aplicarKrsYTareasEnMeta(
               slot.metaId!,
               plan,

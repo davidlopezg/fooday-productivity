@@ -1908,6 +1908,23 @@ export async function generarPlanMetaIA(
   );
 
   const krs = saneKrsFromParsed(parsed?.krs, opts.unidades_disponibles, opts.trimestres_disponibles);
+  // Log brutal para diagnosticar: qué entró del LLM y qué salió saneado.
+  if (typeof console !== "undefined") {
+    const rawKrs = Array.isArray(parsed?.krs) ? parsed.krs : [];
+    console.log(
+      `[generarPlanMetaIA] "${opts.meta_titulo}": raw_krs=${rawKrs.length}, saneados=${krs.length}`,
+    );
+    if (rawKrs.length > 0 && krs.length === 0) {
+      console.warn(
+        `[generarPlanMetaIA] ⚠️ LA IA DEVOLVIÓ KRS PERO saneKrsFromParsed LOS RECHAZÓ TODOS. Primer raw:`,
+        JSON.stringify(rawKrs[0]).slice(0, 300),
+      );
+      console.warn(
+        `[generarPlanMetaIA] unidades_disponibles:`,
+        JSON.stringify(opts.unidades_disponibles?.map((u) => `${u.unidad}:${u.numero}`)),
+      );
+    }
+  }
   const unidadesSet = new Set<string>();
   for (const k of krs) {
     if (k.unidad_tiempo === "mes" && typeof k.mes === "number") {
