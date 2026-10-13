@@ -107,6 +107,29 @@ export const AYUDA_POR_RUTA: Record<
       },
     ],
   },
+  "/tareas/pendientes-respuesta": {
+    pilares: [4],
+    items: [
+      {
+        titulo: "Es un panel de seguimiento, no un nuevo inbox",
+        cuerpo:
+          "Las tareas aquí siguen siendo tareas de /tareas (no se mueven a otra tabla). Lo que cambia es que tienen el flag ⏳ 'pendiente de respuesta' activo: la tarea existe, pero tu próximo paso depende de que alguien te conteste. Úsalo para evitar que se te 'caigan' del radar los follow-ups que dejaste a medias.",
+        pilar: 4,
+      },
+      {
+        titulo: "Orden: lo más antiguo primero",
+        cuerpo:
+          "El panel ordena por antigüedad del flag (lo que más tiempo lleva esperando primero). Lo que más tiempo lleva esperando es lo que más probablemente se ha enfriado: un follow-up corto basta para reavivarlo. Ataca de arriba abajo.",
+        pilar: 3,
+      },
+      {
+        titulo: "Cuando llega la respuesta, destilda el flag",
+        cuerpo:
+          "Pulsa el botón '✓ Respuesta recibida' en cada fila. El flag se quita, la tarea sale del panel y vuelve a /tareas como una tarea más. Si la tarea ya está hecha pero el flag sigue activo, probablemente significa 'ya hice lo que tocaba, solo me falta cerrar el bucle' — destildar es la señal de que el bucle se cerró.",
+        pilar: 4,
+      },
+    ],
+  },
   "/metas": {
     pilares: [2],
     items: [
@@ -173,6 +196,12 @@ export const AYUDA_POR_RUTA: Record<
         cuerpo:
           "Usa tags (#salud, #familia, #sol-de-nit) para filtrar y agrupar tareas transversales. Los chips bajo la barra de filtros son AND con el resto de filtros.",
         pilar: 3,
+      },
+      {
+        titulo: "⏳ Pendiente de respuesta",
+        cuerpo:
+          "El icono de reloj (junto a la diana 🎯 de WIG) marca la tarea como 'esperando respuesta externa'. La tarea sigue viviendo aquí, pero también aparece en /tareas/pendientes-respuesta ordenada por antigüedad. Úsalo para emails mandados, OKs pendientes, llamadas que dejaste apuntadas… cuando llega la respuesta, destildas.",
+        pilar: 4,
       },
       {
         titulo: "Auditoría 20/80: máximo 3 críticas por día",

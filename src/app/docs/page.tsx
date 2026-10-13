@@ -1620,6 +1620,42 @@ export default function DocsPage() {
         </header>
 
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-10-13
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">Tareas: flag ⏳ “pendiente de respuesta” + panel /tareas/pendientes-respuesta.</strong>{" "}
+              Migration 0026. Dos cambios relacionados con el
+              “Waiting For” de GTD: (1) las tareas admiten un flag binario
+              <code className="mx-1 rounded bg-muted px-1 py-0.5 text-xs">pendiente_respuesta</code>{" "}
+              (con timestamp
+              <code className="mx-1 rounded bg-muted px-1 py-0.5 text-xs">pendiente_respuesta_at</code>{" "}
+              para ordenar por antigüedad). El flag es un ATRIBUTO SEMÁNTICO
+              independiente de <code className="rounded bg-muted px-1 py-0.5 text-xs">estado</code>:
+              la tarea puede estar pendiente, en_progreso o hecha; el flag solo
+              dice “mi próximo paso depende de que alguien me conteste”. Toggle
+              con icono de reloj ⏳ al lado de la diana 🎯 de WIG en cada fila
+              de /tareas. (2) Nueva página{" "}
+              <Link href="/tareas/pendientes-respuesta" className="font-medium text-foreground underline underline-offset-4">
+                /tareas/pendientes-respuesta
+              </Link>{" "}
+              con todas las que tienen el flag activo, ordenadas por
+              antigüedad (las más viejas primero — lo que más probablemente
+              se te ha caído del radar). Métricas: total esperando + cuántas
+              hechas con flag activo (= probablemente ya respondieron, falta
+              destildar) + cuál es la más antigua. Botón
+              “✓ Respuesta recibida” para destildar en un click. Entrada
+              nueva en el sidebar (Ejecución) con icono de reloj. FEATURES
+              actualizado (filas /tareas y /tareas/pendientes-respuesta).{" "}
+              <em className="text-muted-foreground">Sin cambios de rituales.
+              Es un nuevo patrón arquitectónico: lo que NO depende de ti
+              se gestiona aparte para no contaminar la lista principal.
+              Sección “Pendientes de respuesta” añadida al Pilar 4, y nueva
+              SECCIÓN 8 en /metodologia (“Lo que NO depende de ti: panel
+              de pendientes de respuesta”).</em>
+            </span>
+          </li>
           <li className="flex gap-3 rounded-lg border border-rose-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-rose-700 dark:text-rose-300 sm:text-sm">
               2026-10-20

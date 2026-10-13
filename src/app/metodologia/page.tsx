@@ -8,6 +8,7 @@ import {
   IconCalendar,
   IconCheck,
   IconClipboardCheck,
+  IconClock,
   IconCompass,
   IconFlag,
   IconInbox,
@@ -220,6 +221,38 @@ const ANTIPATRONES: { titulo: string; por_que: string; que_hacer: string }[] = [
       "Sin Lead Measures concretas, el Lag Measure se queda en deseo. Sin Lag Measure, las tareas son actividad sin propósito. Ambas capas son obligatorias y se conectan por la columna `tareas.meta_id`.",
     que_hacer:
       "Cada vez que marques un WIG-meta, pregúntate: '¿cuáles son las 3 tareas semanales que, si las hago, garantizan que avanzo?'. Márcalas como WIGs-tarea.",
+  },
+];
+
+// ============================================================================
+// SECCIÓN 8 — Pendientes de respuesta (lo que NO depende de ti)
+// ============================================================================
+// Migration 0026. Hay un subtipo especial de pendiente que no es una
+// acción a ejecutar sino un BLOQUEO EXTERNO: la tarea existe, pero tu
+// próximo paso depende de que alguien te conteste. Marcar la tarea con
+// el flag ⏳ “pendiente de respuesta” la separa visualmente del
+// inventario activo y la muestra en /tareas/pendientes-respuesta.
+// ============================================================================
+const PENDIENTES_RESPUESTA: Punto[] = [
+  {
+    titulo: "Definición",
+    cuerpo:
+      "Una tarea está 'pendiente de respuesta' cuando ya iniciaste una acción (mandar un email, pedir un OK, dejar una llamada apuntada) y tu próximo paso es ESPERAR, no actuar. El flag ⏳ en /tareas lo marca. No es un estado (la tarea puede seguir en pendiente, en_progreso o hecha), es un ATRIBUTO SEMÁNTICO.",
+  },
+  {
+    titulo: "Por qué necesita un panel propio",
+    cuerpo:
+      "Porque el resto de la lista mide cosas que TÚ controlas (prioridad, deadline, esfuerzo). En cambio, una pendiente de respuesta es algo que depende de OTRO. Mezclada con la lista principal, compite por foco con cosas que sí puedes hacer ahora. Sacada a un panel propio, deja de 'pesar' en el inventario activo y solo reaparece cuando toca hacer follow-up.",
+  },
+  {
+    titulo: "Regla de uso: panel pequeño",
+    cuerpo:
+      "El panel /tareas/pendientes-respuesta debería tener pocos elementos. Si crece, o bien no estás haciendo follow-ups a tiempo (la antigüedad lo delata: lo de arriba lleva esperando más), o bien estás externalizando demasiado trabajo sin control. La acción correctiva casi siempre es la misma: un follow-up corto, escrito, con deadline ('si para el viernes no hay respuesta, escalo / replanteo / descarto').",
+  },
+  {
+    titulo: "Cuándo destildar el flag",
+    cuerpo:
+      "Tres situaciones: (1) llegó la respuesta y la tarea se cierra (destildas y, si era el objetivo, la marcas como hecha). (2) llegó la respuesta y te abre trabajo nuevo (destildas, queda como tarea normal, y creas la nueva si toca). (3) se enfrió y ya no aplica (destildas, opcionalmente archivas la tarea). El botón '✓ Respuesta recibida' en el panel hace (1)/(2)/(3) en un click.",
   },
 ];
 
@@ -777,6 +810,53 @@ export default function MetodologiaPage() {
       </section>
 
       {/* ================================================================
+          8. PENDIENTES DE RESPUESTA
+         ================================================================ */}
+      <Seccion
+        emoji="⏳"
+        tag="GTD · Waiting For"
+        tagColor="amber"
+        titulo="Lo que NO depende de ti: panel de pendientes de respuesta"
+        puntos={PENDIENTES_RESPUESTA}
+        extra={
+          <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-4">
+            <h3 className="text-sm font-semibold text-amber-700 dark:text-amber-300">
+              Cómo se materializa en la app
+            </h3>
+            <ul className="mt-3 space-y-1.5 text-sm text-muted-foreground">
+              <li>
+                · <strong className="text-foreground">BD</strong>: columnas
+                <code className="mx-1 rounded bg-muted px-1 py-0.5 text-xs">pendiente_respuesta</code>
+                (bool) y
+                <code className="mx-1 rounded bg-muted px-1 py-0.5 text-xs">pendiente_respuesta_at</code>
+                (timestamptz) en <code className="rounded bg-muted px-1 py-0.5 text-xs">tareas</code>.
+                Migration 0026.
+              </li>
+              <li>
+                · <strong className="text-foreground">Toggle</strong>: icono de reloj ⏳ al
+                lado de la diana 🎯 de WIG en cada fila de /tareas. Mismo patrón,
+                sin cap (puedes tener N esperando).
+              </li>
+              <li>
+                · <strong className="text-foreground">Panel</strong>:{" "}
+                <Link href="/tareas/pendientes-respuesta" className="font-medium text-foreground underline underline-offset-4">
+                  /tareas/pendientes-respuesta
+                </Link>{" "}
+                las lista ordenadas por antigüedad del flag (lo que más tiempo
+                lleva esperando primero) con métrica de “cuántas hechas
+                probablemente ya tienen respuesta” (= tienes que destildar).
+              </li>
+              <li>
+                · <strong className="text-foreground">Sidebar</strong>: nueva
+                entrada “Pendientes respuesta” (icono reloj) en el bloque
+                Ejecución.
+              </li>
+            </ul>
+          </div>
+        }
+      />
+
+      {/* ================================================================
           FOOTER
          ================================================================ */}
       <footer className="rounded-2xl border border-dashed border-border bg-muted/30 p-6">
@@ -804,6 +884,12 @@ export default function MetodologiaPage() {
             <Link href="/captura" className="inline-flex items-center gap-2 font-medium text-foreground underline underline-offset-4">
               <IconInbox className="h-4 w-4" />
               /captura · vaciar la cabeza (efecto Zeigarnik)
+            </Link>
+          </li>
+          <li>
+            <Link href="/tareas/pendientes-respuesta" className="inline-flex items-center gap-2 font-medium text-foreground underline underline-offset-4">
+              <IconClock className="h-4 w-4 text-amber-500" />
+              /tareas/pendientes-respuesta · lo que esperas de otros (Waiting For)
             </Link>
           </li>
         </ul>

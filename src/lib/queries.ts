@@ -48,6 +48,20 @@ export async function fetchTareas(estado?: string): Promise<Tarea[]> {
   return ordenarSubtareas((data ?? []) as Tarea[]);
 }
 
+/** Migration 0026: tareas con `pendiente_respuesta = true`, ordenadas
+ *  por antigüedad del flag (lo que más tiempo lleva esperando primero).
+ *  Incluye tareas hechas/archivadas para no perder el rastro de respuestas
+ *  que llegaron (el usuario puede destildarlas manualmente). */
+export async function fetchTareasPendientesRespuesta(): Promise<Tarea[]> {
+  const { data, error } = await createClient()
+    .from("tareas")
+    .select("*, subtareas:tareas_subtareas(*)")
+    .eq("pendiente_respuesta", true)
+    .order("pendiente_respuesta_at", { ascending: true, nullsFirst: false });
+  if (error) throw error;
+  return ordenarSubtareas((data ?? []) as Tarea[]);
+}
+
 /** Trae una tarea concreta con sus subtareas anidadas. */
 export async function fetchTareaById(id: string): Promise<Tarea | null> {
   const { data, error } = await createClient()

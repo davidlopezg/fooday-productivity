@@ -49,6 +49,26 @@ export async function archivarTarea(id: string) {
   if (error) throw new Error(`No se pudo archivar la tarea: ${error.message}`);
 }
 
+/** Migration 0026: marca/desmarca una tarea como "pendiente de respuesta".
+ *  Si `pendiente=true`, rellena `pendiente_respuesta_at=now()` para que
+ *  el panel pueda ordenar por antigüedad. Si `false`, lo limpia. */
+export async function setPendienteRespuesta(
+  id: string,
+  pendiente: boolean,
+): Promise<void> {
+  const { error } = await createClient()
+    .from("tareas")
+    .update({
+      pendiente_respuesta: pendiente,
+      pendiente_respuesta_at: pendiente ? new Date().toISOString() : null,
+    })
+    .eq("id", id);
+  if (error)
+    throw new Error(
+      `No se pudo actualizar el estado de pendiente de respuesta: ${error.message}`,
+    );
+}
+
 export async function desarchivarTarea(id: string) {
   const { error } = await createClient()
     .from("tareas")
@@ -84,6 +104,10 @@ export interface TareaCampos {
   /** Migration 0015: FK al KR concreto. Null = sin KR (puede tener meta
    *  o no). Si se pasa, se sincroniza también `meta_id` con el del KR. */
   resultado_periodo_id?: string | null;
+  /** Migration 0026: marcar la tarea como "pendiente de respuesta".
+   *  Si se pasa, también se actualiza `pendiente_respuesta_at` a
+   *  `now()` (o null si `false`). */
+  pendiente_respuesta?: boolean;
 }
 
 export async function actualizarTarea(datos: TareaCampos) {
@@ -91,6 +115,13 @@ export async function actualizarTarea(datos: TareaCampos) {
   const update: Record<string, unknown> = { ...campos };
   if (campos.estado !== undefined) {
     update.completada_at = campos.estado === "hecha" ? new Date().toISOString() : null;
+  }
+  // Migration 0026: sincroniza el timestamp del flag pendiente_respuesta
+  // con el valor que llega. Si el flag es false, limpiamos el timestamp.
+  if (campos.pendiente_respuesta !== undefined) {
+    update.pendiente_respuesta_at = campos.pendiente_respuesta
+      ? new Date().toISOString()
+      : null;
   }
 
   // Si nos pasan KR pero NO meta_id, derivamos meta_id del KR (mismo

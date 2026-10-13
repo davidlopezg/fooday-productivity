@@ -275,6 +275,14 @@ export interface Tarea {
   /** FK opcional a `resultados_periodo` (migration 0015). Null = bandeja
    *  de entrada (tarea suelta, sin meta o meta sin resultado). */
   resultado_periodo_id: string | null;
+  /** Migration 0026: true si la tarea está bloqueada externamente
+   *  (esperando respuesta de alguien). Estado SEMÁNTICO independiente
+   *  de `estado`: la tarea puede seguir activa o estar hecha pero
+   *  marcada como "esperando confirmación". */
+  pendiente_respuesta: boolean;
+  /** Migration 0026: última vez que se activó/renovó el flag. Sirve
+   *  para ordenar el panel por antigüedad. */
+  pendiente_respuesta_at: string | null;
   /** Tiempos del registro (la BD los devuelve siempre; reflejados aquí
    *  para poder ordenar por `created_at` sin casts). */
   created_at?: string;

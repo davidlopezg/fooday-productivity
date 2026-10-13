@@ -11,12 +11,14 @@ import {
   marcarHecha,
   marcarTareaWig,
   reabrirTarea,
+  setPendienteRespuesta,
 } from "@/lib/mutations";
 import { fetchProyectos } from "@/lib/queries";
 import { useData } from "@/lib/useData";
 import {
   IconArchive,
   IconCheck,
+  IconClock,
   IconPaperclip,
   IconPencil,
   IconSearch,
@@ -259,6 +261,20 @@ export function TasksTable({
     }
   }
 
+  // Migration 0026: toggle del flag "pendiente de respuesta". Sin cap
+  // (puedes tener N tareas esperando respuesta a la vez). Si la fila
+  // está hecha pero con flag activo, suele ser "la respuesta llegó,
+  // ya hice la tarea, solo falta destildar" — el botón /tareas/pendientes-respuesta
+  // expone esa acción masivamente.
+  async function togglePendienteRespuesta(t: Tarea) {
+    try {
+      await setPendienteRespuesta(t.id, !t.pendiente_respuesta);
+      onChanged();
+    } catch (e) {
+      console.error("[TasksTable] toggle pendiente_respuesta falló:", errorMessage(e));
+    }
+  }
+
   const proyectoFiltro = proyectoFiltroQS ? proyectoById.get(proyectoFiltroQS) : null;
 
   function run(fn: () => Promise<void>) {
@@ -428,6 +444,28 @@ export function TasksTable({
                         <IconTarget className="h-3.5 w-3.5" />
                       )}
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => togglePendienteRespuesta(t)}
+                      className={`shrink-0 rounded-full p-1 transition-colors ${
+                        t.pendiente_respuesta
+                          ? "bg-amber-500/20 text-amber-700 dark:text-amber-300"
+                          : "text-muted-foreground/40 hover:bg-accent hover:text-muted-foreground"
+                      }`}
+                      title={
+                        t.pendiente_respuesta
+                          ? "Pendiente de respuesta — quitar"
+                          : "Marcar como pendiente de respuesta"
+                      }
+                      aria-label={
+                        t.pendiente_respuesta
+                          ? "Quitar pendiente de respuesta"
+                          : "Marcar como pendiente de respuesta"
+                      }
+                      aria-pressed={t.pendiente_respuesta}
+                    >
+                      <IconClock className="h-3.5 w-3.5" />
+                    </button>
                   </div>
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                     <Badge tone={TONO_ESTADO[t.estado] ?? TONO_ESTADO.pendiente}>
@@ -446,6 +484,11 @@ export function TasksTable({
                     {t.es_wig && (
                       <span className="inline-flex items-center gap-1 rounded-full border border-violet-500/40 bg-violet-500/10 px-1.5 py-0.5 text-[11px] font-semibold text-violet-700 dark:text-violet-300">
                         🎯 WIG #{t.wig_orden ?? "?"}
+                      </span>
+                    )}
+                    {t.pendiente_respuesta && (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
+                        ⏳ Pendiente respuesta
                       </span>
                     )}
                     {t.proyecto_id && proyectoById.get(t.proyecto_id) && (
@@ -558,6 +601,28 @@ export function TasksTable({
                             <IconTarget className="h-3.5 w-3.5" />
                           )}
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => togglePendienteRespuesta(t)}
+                          className={`shrink-0 rounded-full p-1 transition-colors ${
+                            t.pendiente_respuesta
+                              ? "bg-amber-500/20 text-amber-700 dark:text-amber-300"
+                              : "text-muted-foreground/40 hover:bg-accent hover:text-muted-foreground"
+                          }`}
+                          title={
+                            t.pendiente_respuesta
+                              ? "Pendiente de respuesta — quitar"
+                              : "Marcar como pendiente de respuesta"
+                          }
+                          aria-label={
+                            t.pendiente_respuesta
+                              ? "Quitar pendiente de respuesta"
+                              : "Marcar como pendiente de respuesta"
+                          }
+                          aria-pressed={t.pendiente_respuesta}
+                        >
+                          <IconClock className="h-3.5 w-3.5" />
+                        </button>
                       </div>
                       <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
                         {t.codigo && <span>{t.codigo}</span>}
@@ -573,6 +638,11 @@ export function TasksTable({
                         {t.es_wig && (
                           <span className="inline-flex items-center gap-1 rounded-full border border-violet-500/40 bg-violet-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700 dark:text-violet-300">
                             🎯 WIG #{t.wig_orden ?? "?"}
+                          </span>
+                        )}
+                        {t.pendiente_respuesta && (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300">
+                            ⏳ Pendiente respuesta
                           </span>
                         )}
                         {(t.tags ?? []).map((tg) => (

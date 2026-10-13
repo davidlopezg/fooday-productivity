@@ -257,6 +257,8 @@ export default function PlanDiarioPage() {
           tags: [],
           es_wig: false,
           wig_orden: null,
+          pendiente_respuesta: false,
+          pendiente_respuesta_at: null,
         }));
 
       const plan = await generarPlanSimple(
