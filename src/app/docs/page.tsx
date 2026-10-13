@@ -1658,6 +1658,41 @@ export default function DocsPage() {
           </li>
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-10-22
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">Fix raíz: unidades_disponibles en /metas/detalle y single-source-of-truth en generarPlanMetaIA.</strong>{" "}
+              El bug{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">raw_krs=9, saneados=0</code>{" "}
+              se reproducía en{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas/detalle</code> porque esa página llamaba a{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">generarPlanMetaIA</code> sin pasar{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">unidades_disponibles</code>. Solución: (1) nuevo helper
+              reutilizable <code className="rounded bg-muted px-1.5 py-0.5 text-xs">construirUnidadesParaPlan</code> en{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/lib/plan.ts</code> — meses del rango si hay fechas, 4
+              trimestres si no. (2) <code className="rounded bg-muted px-1.5 py-0.5 text-xs">generarPlanMetaIA</code> ahora
+              siempre deriva las unidades internamente si el caller no las pasa, garantizando que el prompt y el saneador usen
+              EXACTAMENTE la misma lista. (3) <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas/detalle</code>{" "}
+              y <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/agente</code> usan el helper compartido (DRY).
+              Bonus: log mejorado cuando <code className="rounded bg-muted px-1.5 py-0.5 text-xs">saneados=0</code> muestra
+              unidades pedidas vs aceptadas (causa clara), y las funciones lanzan error si la IA no devolvió KRs válidos
+              en vez de presentar un plan vacío como éxito.{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">contexto_proyecto</code>{" "}
+              se pasa también desde la página de detalle cuando la meta pertenece a un proyecto (sin inventar asociaciones).{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/sw.js</code> v2→v3: no cachea navegaciones con
+              query params y devuelve 504 explícito en offline en vez de{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">Response.error()</code> críptico.{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">configStore</code>: logs con{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">code/message/details/hint</code> de Supabase (sin
+              filtrar API key) y detección de RLS bloqueante (upsert con 0 filas). Tests nuevos:{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">plan-unidades.test.mjs</code> (15 casos) +{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">llm-retry.test.mjs</code> (8 casos) +{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">configStore.test.mjs</code> (4 casos).{' '}
+              <em className="text-muted-foreground">Sin cambios de metodología ni rituales.</em>
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
               2026-10-21
             </span>
             <span className="text-muted-foreground">

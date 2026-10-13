@@ -16,7 +16,7 @@
  * Para forzar una invalidación completa, sube CACHE_VERSION.
  * ========================================================================== */
 
-const CACHE_VERSION = "v2";
+const CACHE_VERSION = "v3";
 const CACHE_STATIC = `fooday-static-${CACHE_VERSION}`;
 const CACHE_PAGES = `fooday-pages-${CACHE_VERSION}`;
 
@@ -88,16 +88,25 @@ self.addEventListener("fetch", (event) => {
           const fresh = new Request(req, { cache: "reload" });
           const res = await fetch(fresh);
           if (res.ok) {
-            const cache = await caches.open(CACHE_PAGES);
-            cache.put(req, res.clone());
+            // No cachear navegaciones con query strings: cada combinación
+            // de filtros/IDs es única y el cache crece sin aportar nada
+            // (ej: /metas/detalle?id=xxx cambia con cada meta).
+            const isDynamic = url.search.length > 0;
+            if (!isDynamic) {
+              const cache = await caches.open(CACHE_PAGES);
+              cache.put(req, res.clone());
+            }
           }
           return res;
-        } catch {
+        } catch (e) {
+          // Offline: servimos la copia cacheada si la hay; si no,
+          // devolvemos 504 en vez de un error críptico de FetchEvent.
           const cached = await caches.match(req);
           if (cached) return cached;
-          const cache = await caches.open(CACHE_PAGES);
-          const fallback = await cache.match(self.registration.scope);
-          return fallback || Response.error();
+          return new Response(
+            "Sin conexión y sin copia en caché para esta URL.",
+            { status: 504, statusText: "Offline" },
+          );
         }
       })(),
     );
@@ -111,7 +120,16 @@ self.addEventListener("fetch", (event) => {
         return await fetch(req);
       } catch {
         const cached = await caches.match(req);
-        return cached || Response.error();
+        // Devolvemos 504 explícito en vez de Response.error() para
+        // que el error se vea como un problema de red y no como un
+        // fallo críptico del FetchEvent.
+        return (
+          cached ||
+          new Response("Sin conexión y sin copia en caché.", {
+            status: 504,
+            statusText: "Offline",
+          })
+        );
       }
     })(),
   );

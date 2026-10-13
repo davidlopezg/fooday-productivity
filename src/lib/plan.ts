@@ -438,11 +438,14 @@ async function llamarLLM<T>(
 
     let parsed: unknown = tryParse(content, "JSON.parse directo");
     if (parsed === null) {
+      // FALLBACK ESPERADO: el LLM de reasoning (<think>) no respeta
+      // `response_format: json_object`, así que la respuesta llega con
+      // razonamiento antes del JSON. `extraerJSON` lo limpia. Esto NO
+      // es un error: lo logueamos como `info` y seguimos.
       if (typeof window !== "undefined") {
-        console.warn("[plan] JSON.parse directo falló:", errors[0]);
-        console.warn(
-          "[plan] Content (primeros 600 chars):",
-          content.slice(0, 600),
+        console.info(
+          "[plan] JSON.parse directo falló (esperado con LLMs de razonamiento), usando extraerJSON. Causa:",
+          errors[0],
         );
       }
       let json: string;
@@ -450,7 +453,10 @@ async function llamarLLM<T>(
         json = extraerJSON(content);
       } catch (e) {
         if (typeof window !== "undefined") {
-          console.warn("[plan] extraerJSON falló:", (e as Error).message);
+          console.error(
+            "[plan] extraerJSON también falló — respuesta NO recuperable. Mensaje:",
+            (e as Error).message,
+          );
         }
         throw new Error(
           `La IA no devolvió JSON válido. Primeros 200 chars: ${content.slice(0, 200).replace(/\n/g, " ")}`,
@@ -462,9 +468,19 @@ async function llamarLLM<T>(
         parsed = tryParse(saneado, "JSON.parse(saneado)");
       }
       if (parsed === null) {
+        if (typeof window !== "undefined") {
+          console.error(
+            "[plan] Los 3 intentos de parseo fallaron. Errores:",
+            errors,
+            "Primeros 200 chars:",
+            content.slice(0, 200).replace(/\n/g, " "),
+          );
+        }
         throw new Error(
           `La IA no devolvió JSON válido tras 3 intentos. Errores: ${errors.join(" | ")}. Primeros 200 chars: ${content.slice(0, 200).replace(/\n/g, " ")}`,
         );
+      } else if (typeof window !== "undefined") {
+        console.info("[plan] Respuesta recuperada por fallback (ok).");
       }
     }
 
@@ -1763,6 +1779,52 @@ export function parsearMesesDeRango(opts: {
   };
 }
 
+/** Resuelve la lista de unidades disponibles para una meta.
+ *  - Si hay fechas (inicio + objetivo): meses del rango.
+ *  - Si no: fallback a los 4 trimestres del año.
+ *
+ *  Es la ÚNICA fuente de verdad para `unidades_disponibles`: tanto
+ *  `/agente` como `/metas/detalle` deben llamar a esta función.
+ *  Hacerlo desde los dos sitios por separado era exactamente el bug
+ *  que dejó la página de detalle descartando todos los KRs mensuales
+ *  (`raw_krs=9, saneados=0, unidades_disponibles: undefined`).
+ */
+export function construirUnidadesParaPlan(opts: {
+  fecha_inicio_meta?: string | null;
+  fecha_objetivo?: string | null;
+  anio: number;
+  /** Si true, devuelve solo trimestres aunque haya fechas. Útil
+   *  para metas personales sin plazo definido. Por defecto false. */
+  forzarTrimestres?: boolean;
+}): UnidadDisponible[] {
+  const { fecha_inicio_meta, fecha_objetivo, anio, forzarTrimestres } = opts;
+
+  if (!forzarTrimestres && fecha_inicio_meta && fecha_objetivo) {
+    const rango = parsearMesesDeRango({
+      fecha_inicio: fecha_inicio_meta,
+      fecha_objetivo,
+      anio,
+    });
+    if (rango.meses.length > 0) {
+      return rango.meses.map<UnidadDisponible>((ms) => ({
+        unidad: "mes",
+        numero: ms.numero,
+        nombre: ms.nombre,
+        fecha_inicio: ms.fecha_inicio,
+        fecha_fin: ms.fecha_fin,
+      }));
+    }
+  }
+
+  // Fallback: 4 trimestres del año.
+  return [
+    { unidad: "trimestre", numero: 1, nombre: `Q1 ${anio}`, fecha_inicio: "", fecha_fin: "" },
+    { unidad: "trimestre", numero: 2, nombre: `Q2 ${anio}`, fecha_inicio: "", fecha_fin: "" },
+    { unidad: "trimestre", numero: 3, nombre: `Q3 ${anio}`, fecha_inicio: "", fecha_fin: "" },
+    { unidad: "trimestre", numero: 4, nombre: `Q4 ${anio}`, fecha_inicio: "", fecha_fin: "" },
+  ];
+}
+
 export type MetaYPlanGenerado = {
   meta_titulo: string;
   meta_descripcion: string;
@@ -1943,7 +2005,23 @@ export async function generarPlanMetaIA(
   model: string,
   opts: GenerarPlanMetaOpts,
 ): Promise<PlanMetaGenerado> {
-  const prompt = buildPromptPlanMeta(opts);
+  // Single source of truth: si el caller no pasó `unidades_disponibles`,
+  // las derivamos aquí mismo. Esto garantiza que el prompt y el
+  // saneador usen EXACTAMENTE la misma lista. Sin esto, un caller
+  // que olvide pasar las unidades acaba con `saneados=0` aunque la
+  // IA haya devuelto KRs válidos.
+  const unidadesEfectivas: UnidadDisponible[] =
+    opts.unidades_disponibles && opts.unidades_disponibles.length > 0
+      ? opts.unidades_disponibles
+      : construirUnidadesParaPlan({
+          fecha_inicio_meta: opts.fecha_inicio_meta ?? null,
+          fecha_objetivo: opts.fecha_objetivo ?? null,
+          anio: opts.anio,
+        });
+  const prompt = buildPromptPlanMeta({
+    ...opts,
+    unidades_disponibles: unidadesEfectivas,
+  });
   const { ESQUEMA_PLAN_META } = await import("./llm-parser");
   const parsed = await llamarLLM<{
     unidades_usadas?: unknown;
@@ -1958,7 +2036,11 @@ export async function generarPlanMetaIA(
     ESQUEMA_PLAN_META,
   );
 
-  const krs = saneKrsFromParsed(parsed?.krs, opts.unidades_disponibles, opts.trimestres_disponibles);
+  const krs = saneKrsFromParsed(
+    parsed?.krs,
+    unidadesEfectivas,
+    opts.trimestres_disponibles,
+  );
   // Log brutal para diagnosticar: qué entró del LLM y qué salió saneado.
   if (typeof console !== "undefined") {
     const rawKrs = Array.isArray(parsed?.krs) ? parsed.krs : [];
@@ -1966,13 +2048,37 @@ export async function generarPlanMetaIA(
       `[generarPlanMetaIA] "${opts.meta_titulo}": raw_krs=${rawKrs.length}, saneados=${krs.length}`,
     );
     if (rawKrs.length > 0 && krs.length === 0) {
-      console.warn(
-        `[generarPlanMetaIA] ⚠️ LA IA DEVOLVIÓ KRS PERO saneKrsFromParsed LOS RECHAZÓ TODOS. Primer raw:`,
-        JSON.stringify(rawKrs[0]).slice(0, 300),
+      // Diagnóstico claro: qué unidades pidió la IA y cuáles aceptamos.
+      const unidadesPedidas = new Set<string>();
+      for (const k of rawKrs) {
+        const ku = k as Record<string, unknown>;
+        const ut = String(ku.unidad_tiempo ?? "").toLowerCase();
+        if (ut === "mes" && typeof ku.mes === "number") {
+          unidadesPedidas.add(`mes:${ku.mes}`);
+        } else if (
+          (ut === "trimestre" || ut === "trimestral") &&
+          typeof ku.trimestre === "number"
+        ) {
+          unidadesPedidas.add(`trimestre:${ku.trimestre}`);
+        }
+      }
+      const unidadesAceptadas = unidadesEfectivas.map(
+        (u) => `${u.unidad}:${u.numero}`,
       );
       console.warn(
-        `[generarPlanMetaIA] unidades_disponibles:`,
-        JSON.stringify(opts.unidades_disponibles?.map((u) => `${u.unidad}:${u.numero}`)),
+        `[generarPlanMetaIA] ⚠️ LA IA DEVOLVIÓ KRS PERO saneKrsFromParsed LOS RECHAZÓ TODOS.`,
+      );
+      console.warn(
+        `[generarPlanMetaIA]   unidades que pidió la IA:`,
+        JSON.stringify(Array.from(unidadesPedidas)),
+      );
+      console.warn(
+        `[generarPlanMetaIA]   unidades aceptadas por el saneador:`,
+        JSON.stringify(unidadesAceptadas),
+      );
+      console.warn(
+        `[generarPlanMetaIA]   discrepancia: las unidades de la IA no están en las aceptadas. Causa probable: las fechas de la meta no abarcan esos meses, o la IA ignoró el prompt de unidades. Primer raw:`,
+        JSON.stringify(rawKrs[0]).slice(0, 300),
       );
     }
   }
@@ -1994,6 +2100,26 @@ export async function generarPlanMetaIA(
       if (a.unidad !== b.unidad) return a.unidad === "trimestre" ? -1 : 1;
       return a.numero - b.numero;
     });
+  // Si la IA no devolvió ningún KR válido, lanzamos error claro
+  // para que el caller NO presente un plan vacío como éxito.
+  // Antes esto se silenciaba: `krs=[]` se devolvía y `aplicarKrsYTareasEnMeta`
+  // mostraba "0 KRs + 0 tareas" como si todo hubiera ido bien.
+  if (krs.length === 0) {
+    const aceptadas = unidadesEfectivas
+      .map((u) => `${u.unidad}:${u.numero}`)
+      .join(", ");
+    const pedidasRaw = Array.isArray(parsed?.krs) ? (parsed.krs as unknown[]) : [];
+    const pedidasSample = pedidasRaw
+      .slice(0, 3)
+      .map((k) => {
+        const ku = k as Record<string, unknown>;
+        return `${ku.unidad_tiempo ?? "?"}:${ku.mes ?? ku.trimestre ?? "?"}`;
+      })
+      .join(", ");
+    throw new Error(
+      `La IA no generó KRs válidos. Causa probable: las unidades que pidió la IA (${pedidasSample || "ninguna"}) no están en las unidades aceptadas (${aceptadas || "ninguna"}). Revisa las fechas de la meta y vuelve a intentarlo.`,
+    );
+  }
   return { unidades_usadas, krs, prompt_usado: prompt };
 }
 
@@ -2182,7 +2308,7 @@ export async function aplicarKrsYTareasEnMeta(
  *  (trimestre o mes), limpia textos, sanea prioridades y recurrencias.
  *  Reutilizado por `generarPlanMetaIA` y `generarMetaYPlanIA` (mismo
  *  formato de respuesta). */
-function saneKrsFromParsed(
+export function saneKrsFromParsed(
   raw: unknown,
   unidadesDisponibles?: UnidadDisponible[],
   trimestresDisponibles?: Array<{ numero: 1 | 2 | 3 | 4; nombre: string }>,
@@ -2406,6 +2532,18 @@ export async function generarMetaYPlanIA(
     true,
   );
 
+  // Mismo single-source-of-truth que generarPlanMetaIA: si el caller
+  // no pasó `unidades_disponibles`, las derivamos aquí con el helper.
+  // Sin esto, un caller que olvide pasarlas acaba con `saneados=0`.
+  const unidadesEfectivasAg: UnidadDisponible[] =
+    opts.unidades_disponibles && opts.unidades_disponibles.length > 0
+      ? opts.unidades_disponibles
+      : construirUnidadesParaPlan({
+          fecha_inicio_meta: opts.fecha_inicio_meta ?? null,
+          fecha_objetivo: opts.fecha_objetivo ?? null,
+          anio: opts.anio,
+        });
+
   const meta_titulo = String(parsed?.meta_titulo ?? "").trim().slice(0, 200);
   const meta_descripcion = String(parsed?.meta_descripcion ?? "").trim().slice(0, 600);
   const ambitoRaw = String(parsed?.meta_ambito ?? "").toLowerCase().trim();
@@ -2418,7 +2556,11 @@ export async function generarMetaYPlanIA(
   }
 
   // Saneamos los KRs en UNA llamada (sin pasar otra vez por la IA).
-  const krs = saneKrsFromParsed(parsed?.krs, opts.unidades_disponibles, opts.trimestres_disponibles);
+  const krs = saneKrsFromParsed(
+    parsed?.krs,
+    unidadesEfectivasAg,
+    opts.trimestres_disponibles,
+  );
 
   // Regla de plazo: la IA propone meta_plazo en su respuesta. Aplicamos
   // el parser de trimestres por compat. Si el caller pasó `unidades_objetivo`
@@ -2461,6 +2603,17 @@ export async function generarMetaYPlanIA(
       if (a.unidad !== b.unidad) return a.unidad === "trimestre" ? -1 : 1;
       return a.numero - b.numero;
     });
+
+  // Si la IA no devolvió ningún KR válido tras el filtrado, lanzamos
+  // error claro en vez de presentar meta sin plan como éxito.
+  if (krsFiltrados.length === 0) {
+    const aceptadas = unidadesEfectivasAg
+      .map((u) => `${u.unidad}:${u.numero}`)
+      .join(", ");
+    throw new Error(
+      `La IA no generó KRs válidos. Causa probable: las unidades que pidió la IA no están en las unidades aceptadas (${aceptadas || "ninguna"}). Revisa el contexto y vuelve a intentarlo.`,
+    );
+  }
 
   return {
     meta_titulo,

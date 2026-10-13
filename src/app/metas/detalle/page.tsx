@@ -24,6 +24,7 @@ import { useData } from "@/lib/useData";
 import {
   generarPlanMetaIA,
   aplicarKrsYTareasEnMeta,
+  construirUnidadesParaPlan,
   type PeriodosPorUnidad,
 } from "@/lib/plan";
 import { useConfig } from "@/lib/configStore";
@@ -172,6 +173,33 @@ export default function MetaDetallePage() {
       }
       await periodosQ.reload();
       // 2) Generar plan con IA.
+      // FIX CRÍTICO: pasar SIEMPRE `unidades_disponibles` y, si la meta
+      // pertenece a un proyecto, `contexto_proyecto`. Si no lo hacemos,
+      // `saneKrsFromParsed` cae al fallback "solo trimestres 1-4" y
+      // descarta los KRs mensuales que devuelve la IA (caso real:
+      // meta 13/10/2026 - 17/12/2026 → IA devuelve 9 KRs para los
+      // meses 10/11/12, todos rechazados, `raw_krs=9, saneados=0`).
+      const unidadesDisponibles = construirUnidadesParaPlan({
+        fecha_inicio_meta: plan.meta.fecha_inicio_meta,
+        fecha_objetivo: plan.meta.fecha_objetivo,
+        anio: anioActual,
+      });
+      // Contexto del proyecto padre (si la meta está vinculada) para
+      // que la IA no malinterprete palabras ambiguas — "local" en un
+      // proyecto de pizzería = local comercial para pizzería, no bar.
+      let contextoProyecto: string | null = null;
+      if (plan.meta.proyecto_id) {
+        const proj = (proyectosQ.data ?? []).find(
+          (p) => p.id === plan.meta.proyecto_id,
+        );
+        if (proj) {
+          const partes: string[] = [`Proyecto: ${proj.nombre}`];
+          if (proj.descripcion) partes.push(proj.descripcion);
+          const area = (areasQ.data ?? []).find((a) => a.id === proj.area_id);
+          if (area) partes.push(`Área: ${area.nombre}`);
+          contextoProyecto = partes.join(". ");
+        }
+      }
       const planGenerado = await generarPlanMetaIA(
         cfg.data.base_url,
         cfg.data.minimax_api_key!,
@@ -185,6 +213,8 @@ export default function MetaDetallePage() {
           fecha_inicio_meta: plan.meta.fecha_inicio_meta,
           fecha_objetivo: plan.meta.fecha_objetivo,
           fecha_fin_bloqueada: plan.meta.fecha_fin_bloqueada,
+          unidades_disponibles: unidadesDisponibles,
+          contexto_proyecto: contextoProyecto,
         },
       );
       // 3) Materializar KRs y tareas (reusa KRs existentes si los hay).

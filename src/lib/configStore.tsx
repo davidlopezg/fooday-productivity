@@ -63,7 +63,19 @@ async function fetchRemote(): Promise<Config> {
     .from("configuracion")
     .select("base_url,minimax_api_key,model")
     .maybeSingle();
-  if (error) throw error;
+  if (error) {
+    // Log diagnóstico SIN exponer la API key. Solo registramos campos
+    // estructurales: código, mensaje, detalles y sugerencia si existe.
+    // El cuerpo del error de Supabase es un PostgrestError tipado: code,
+    // message, details, hint. Nunca contiene la key.
+    console.error("[configStore] fetchRemote Supabase error:", {
+      code: (error as { code?: string }).code ?? null,
+      message: (error as { message?: string }).message ?? null,
+      details: (error as { details?: string }).details ?? null,
+      hint: (error as { hint?: string }).hint ?? null,
+    });
+    throw error;
+  }
   if (!data) return DEFAULT;
   return {
     base_url: (data.base_url as string) || DEFAULT.base_url,
@@ -173,17 +185,39 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
           return;
         }
         const user = session.user;
-        const { error } = await supabase.from("configuracion").upsert(
-          {
-            user_id: user.id,
-            base_url: merged.base_url,
-            minimax_api_key: merged.minimax_api_key,
-            model: merged.model,
-          },
-          { onConflict: "user_id" },
-        );
+        // Hacemos el upsert pidiendo `.select()` para saber si la fila
+        // realmente se insertó/actualizó. Si la respuesta está vacía,
+        // sospechamos RLS bloqueó la operación.
+        const { data: upserted, error } = await supabase
+          .from("configuracion")
+          .upsert(
+            {
+              user_id: user.id,
+              base_url: merged.base_url,
+              minimax_api_key: merged.minimax_api_key,
+              model: merged.model,
+            },
+            { onConflict: "user_id" },
+          )
+          .select("user_id,base_url,model");
         if (error) {
+          // Log diagnóstico estructural — NUNCA la API key.
+          console.error("[configStore] upsert Supabase error:", {
+            code: (error as { code?: string }).code ?? null,
+            message: (error as { message?: string }).message ?? null,
+            details: (error as { details?: string }).details ?? null,
+            hint: (error as { hint?: string }).hint ?? null,
+          });
           setLastError(`Supabase: ${error.message}`);
+        } else if (!upserted || upserted.length === 0) {
+          // RLS pudo bloquear el upsert sin error explícito. Lo registramos
+          // y en la UI mostramos un mensaje accionable.
+          console.warn(
+            "[configStore] upsert devolvió 0 filas. Posible RLS o sesión inválida.",
+          );
+          setLastError(
+            "Supabase aceptó la operación pero no se insertó/actualizó ninguna fila. Revisa las políticas RLS de la tabla configuracion.",
+          );
         }
       } catch (e) {
         setLastError(

@@ -32,6 +32,7 @@ import { useData } from "@/lib/useData";
 import {
   clasificarYGenerarIA,
   parsearMesesDeRango,
+  construirUnidadesParaPlan,
   generarPlanMetaIA,
   aplicarKrsYTareasEnMeta,
   type PeriodosPorUnidad,
@@ -603,25 +604,13 @@ export default function AgentePage() {
             // 1-4" y rechaza los KRs de la IA que vienen con
             // unidad_tiempo="mes" + mes:N. Eso es lo que llevaba 3
             // días fallando. Construimos siempre las unidades
-            // disponibles: si David puso fechas, los meses del rango;
-            // si no, los 4 trimestres del año.
-            type UnidadAgente =
-              | { unidad: "mes"; numero: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12; nombre: string; fecha_inicio: string; fecha_fin: string }
-              | { unidad: "trimestre"; numero: 1 | 2 | 3 | 4; nombre: string; fecha_inicio: string; fecha_fin: string };
-            const unidadesDisponibles: UnidadAgente[] = hayFechas && rango.meses.length > 0
-              ? rango.meses.map((ms) => ({
-                  unidad: "mes" as const,
-                  numero: ms.numero as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12,
-                  nombre: ms.nombre,
-                  fecha_inicio: ms.fecha_inicio,
-                  fecha_fin: ms.fecha_fin,
-                }))
-              : [
-                  { unidad: "trimestre" as const, numero: 1 as const, nombre: `Q1 ${anioActual}`, fecha_inicio: "", fecha_fin: "" },
-                  { unidad: "trimestre" as const, numero: 2 as const, nombre: `Q2 ${anioActual}`, fecha_inicio: "", fecha_fin: "" },
-                  { unidad: "trimestre" as const, numero: 3 as const, nombre: `Q3 ${anioActual}`, fecha_inicio: "", fecha_fin: "" },
-                  { unidad: "trimestre" as const, numero: 4 as const, nombre: `Q4 ${anioActual}`, fecha_inicio: "", fecha_fin: "" },
-                ];
+            // disponibles con el helper compartido (mismo que usa
+            // /metas/detalle) para que ambos flows sean consistentes.
+            const unidadesDisponibles = construirUnidadesParaPlan({
+              fecha_inicio_meta: usarFechasDavid ? fechaInicioMeta || null : null,
+              fecha_objetivo: usarFechasDavid ? fechaObjetivo || null : null,
+              anio: anioActual,
+            });
             const planOpts = {
               meta_titulo: m.meta_titulo,
               meta_descripcion: m.meta_descripcion,
