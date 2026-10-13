@@ -25,6 +25,7 @@ import {
   generarPlanMetaIA,
   aplicarKrsYTareasEnMeta,
   construirUnidadesParaPlan,
+  generarTareasParaKrIA,
   type PeriodosPorUnidad,
 } from "@/lib/plan";
 import { useConfig } from "@/lib/configStore";
@@ -103,6 +104,25 @@ export default function MetaDetallePage() {
   const [progresoPlan, setProgresoPlan] = useState<string | null>(null);
   const [errorPlan, setErrorPlan] = useState<string | null>(null);
   const cfg = useConfig();
+
+  // Contexto del proyecto padre (si la meta está vinculada). Se
+  // calcula una vez y se pasa tanto al generador de plan completo
+  // como al botón "✨ Generar tareas con IA" dentro de cada KR. Sin
+  // esto, la IA malinterpreta palabras ambiguas: "local" en un
+  // proyecto de pizzería = local comercial, no bar.
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
+  const contextoProyecto = useMemo<string | null>(() => {
+    if (!plan?.meta.proyecto_id) return null;
+    const proj = (proyectosQ.data ?? []).find(
+      (p) => p.id === plan.meta.proyecto_id,
+    );
+    if (!proj) return null;
+    const partes: string[] = [`Proyecto: ${proj.nombre}`];
+    if (proj.descripcion) partes.push(proj.descripcion);
+    const area = (areasQ.data ?? []).find((a) => a.id === proj.area_id);
+    if (area) partes.push(`Área: ${area.nombre}`);
+    return partes.join(". ");
+  }, [plan?.meta.proyecto_id, proyectosQ.data, areasQ.data]);
 
   // Trimestres del año actual que NO tienen aún un resultado en esta meta.
   // Se usan para el selector "+ Añadir resultado".
@@ -184,22 +204,6 @@ export default function MetaDetallePage() {
         fecha_objetivo: plan.meta.fecha_objetivo,
         anio: anioActual,
       });
-      // Contexto del proyecto padre (si la meta está vinculada) para
-      // que la IA no malinterprete palabras ambiguas — "local" en un
-      // proyecto de pizzería = local comercial para pizzería, no bar.
-      let contextoProyecto: string | null = null;
-      if (plan.meta.proyecto_id) {
-        const proj = (proyectosQ.data ?? []).find(
-          (p) => p.id === plan.meta.proyecto_id,
-        );
-        if (proj) {
-          const partes: string[] = [`Proyecto: ${proj.nombre}`];
-          if (proj.descripcion) partes.push(proj.descripcion);
-          const area = (areasQ.data ?? []).find((a) => a.id === proj.area_id);
-          if (area) partes.push(`Área: ${area.nombre}`);
-          contextoProyecto = partes.join(". ");
-        }
-      }
       const planGenerado = await generarPlanMetaIA(
         cfg.data.base_url,
         cfg.data.minimax_api_key!,
@@ -470,6 +474,8 @@ export default function MetaDetallePage() {
                     resultado={r}
                     inbox={inboxQ.data ?? []}
                     metaId={plan.meta.id}
+                    cfg={cfg}
+                    contextoProyecto={contextoProyecto}
                     onChanged={async () => {
                       await planQ.reload();
                       await inboxQ.reload();
@@ -512,17 +518,24 @@ function ResultadoCard({
   inbox,
   metaId,
   onChanged,
+  cfg,
+  contextoProyecto,
 }: {
   resultado: ResultadoConTareas;
   inbox: TareaSinMeta[];
   metaId: string;
   onChanged: () => Promise<void> | void;
+  cfg: { data: { base_url: string; minimax_api_key: string | null; model: string } };
+  contextoProyecto: string | null;
 }) {
   const [openAdd, setOpenAdd] = useState(false);
   const [openAssign, setOpenAssign] = useState(false);
   const [nuevoTitulo, setNuevoTitulo] = useState("");
   const [nuevaPrioridad, setNuevaPrioridad] = useState("media");
   const [busy, setBusy] = useState(false);
+  const [generandoIa, setGenerandoIa] = useState(false);
+  const [progresoIa, setProgresoIa] = useState<string | null>(null);
+  const [errorIa, setErrorIa] = useState<string | null>(null);
 
   const hechas = resultado.tareas.filter((t) => t.estado === "hecha").length;
   const total = resultado.tareas.length;
@@ -542,6 +555,112 @@ function ResultadoCard({
       await onChanged();
     } finally {
       setBusy(false);
+    }
+  }
+
+  /** Genera SOLO las tareas de este KR (no el plan entero). Pensado
+   *  para el caso "tengo un KR sin tareas, o quiero ampliarlo, sin
+   *  tocar el resto de la meta". Reutiliza el helper de LLM, le pasa
+   *  el contexto del proyecto padre (si hay) y deduplica contra las
+   *  tareas existentes de la meta. */
+  async function generarTareasIa() {
+    if (!cfg.data.minimax_api_key) {
+      setErrorIa("Configura la clave de IA en /configuracion primero.");
+      return;
+    }
+    if (generandoIa) return;
+    setGenerandoIa(true);
+    setErrorIa(null);
+    setProgresoIa("Generando tareas con IA…");
+    try {
+      // 1) Pedimos SOLO las tareas al LLM.
+      const { tareas: tareasIa } = await generarTareasParaKrIA(
+        cfg.data.base_url,
+        cfg.data.minimax_api_key,
+        cfg.data.model,
+        {
+          meta: {
+            titulo: resultado.titulo, // usamos el KR como "meta" para prompt
+            descripcion: resultado.descripcion,
+            ambito: null,
+          },
+          // El contexto REAL de la meta va aparte (no lo tenemos aquí
+          // porque ResultadoCard solo conoce el KR). Lo pasamos vía
+          // contexto_proyecto. Para más contexto de meta, el caller
+          // puede ampliar este helper, pero con KR + proyecto + tareas
+          // existentes suele bastar.
+          kr: {
+            titulo: resultado.titulo,
+            descripcion: resultado.descripcion,
+            metrica: resultado.metrica,
+            valor_objetivo: resultado.valor_objetivo,
+            unidad: resultado.unidad,
+            periodo_nombre: resultado.periodo.nombre,
+          },
+          contexto_proyecto: contextoProyecto,
+          titulosExistentes: resultado.tareas.map((t) => t.titulo),
+        },
+      );
+      if (tareasIa.length === 0) {
+        setProgresoIa(null);
+        setErrorIa("La IA no propuso tareas nuevas (todas eran duplicados o el KR ya está cubierto).");
+        return;
+      }
+      setProgresoIa(`Creando ${tareasIa.length} tareas…`);
+      // 2) Materializamos cada tarea usando los mismos helpers que el
+      //    apply del plan completo (reuso, no reinvento).
+      const { crearTareaConIA, setRecurrencia } = await import(
+        "@/lib/mutations"
+      );
+      let creadas = 0;
+      let conRecurrencia = 0;
+      for (const t of tareasIa) {
+        const creada = await crearTareaConIA(
+          {
+            titulo: t.titulo,
+            descripcion: t.descripcion || null,
+            prioridad: t.prioridad,
+            estado: "pendiente",
+            criterio_terminacion_manual: t.criterio_terminacion || null,
+            meta_id: metaId,
+            resultado_periodo_id: resultado.id,
+          },
+          {
+            base_url: cfg.data.base_url,
+            minimax_api_key: cfg.data.minimax_api_key,
+            model: cfg.data.model,
+          },
+        );
+        creadas++;
+        if (t.recurrencia_tipo) {
+          try {
+            await setRecurrencia(creada.id, {
+              tipo: t.recurrencia_tipo,
+              dias_semana:
+                t.recurrencia_tipo === "semanal"
+                  ? t.recurrencia_dias_semana
+                  : null,
+              dia_mes:
+                t.recurrencia_tipo === "mensual"
+                  ? t.recurrencia_dia_mes
+                  : null,
+            });
+            conRecurrencia++;
+          } catch {
+            /* recurrencia opcional: no rompe el flujo */
+          }
+        }
+      }
+      setProgresoIa(
+        `Listo: ${creadas} tareas${conRecurrencia > 0 ? ` (${conRecurrencia} con recurrencia)` : ""}.`,
+      );
+      await onChanged();
+    } catch (e) {
+      setErrorIa(
+        e instanceof Error ? e.message : "La IA no pudo generar las tareas.",
+      );
+    } finally {
+      setGenerandoIa(false);
     }
   }
 
@@ -630,7 +749,28 @@ function ResultadoCard({
         >
           Asignar existente
         </button>
+        <button
+          onClick={generarTareasIa}
+          disabled={generandoIa}
+          className="inline-flex items-center gap-1.5 rounded-md border border-teal-500/30 bg-teal-500/10 px-2.5 py-1.5 text-xs font-medium text-teal-700 hover:bg-teal-500/20 disabled:opacity-50 dark:text-teal-300"
+          title="Genera solo las tareas de este KR con IA, sin tocar el resto de la meta"
+        >
+          <IconSparkles className="h-3.5 w-3.5" />
+          {generandoIa ? "Generando…" : "Generar tareas con IA"}
+        </button>
       </div>
+
+      {(progresoIa || errorIa) && (
+        <div
+          className={`mt-2 rounded-md border p-2 text-xs ${
+            errorIa
+              ? "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300"
+              : "border-teal-500/30 bg-teal-500/10 text-teal-700 dark:text-teal-300"
+          }`}
+        >
+          {errorIa ?? progresoIa}
+        </div>
+      )}
 
       {openAdd && (
         <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/30 p-2">

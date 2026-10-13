@@ -374,3 +374,35 @@ export const ESQUEMA_CLASIFICADOR: FieldSchema = {
     },
   },
 };
+
+/** Esquema para la respuesta de `generarTareasParaKrIA`: solo
+ *  devuelve un array de tareas, no un plan completo. Cada tarea tiene
+ *  título, prioridad, recurrencia opcional y criterio de terminación. */
+export const ESQUEMA_TAREAS_KR: FieldSchema = {
+  type: "object",
+  fields: {
+    tareas: {
+      type: "array",
+      items: {
+        type: "object",
+        fields: {
+          titulo: { type: "string" },
+          descripcion: { type: "string", optional: true },
+          prioridad: {
+            type: "string",
+            enum: ["critica", "alta", "media", "baja"],
+            optional: true,
+          },
+          recurrencia_tipo: {
+            type: "string",
+            enum: ["diaria", "semanal", "mensual"],
+            optional: true,
+          },
+          recurrencia_dias_semana: { type: "array", optional: true },
+          recurrencia_dia_mes: { type: "number", optional: true },
+          criterio_terminacion: { type: "string", optional: true },
+        },
+      },
+    },
+  },
+};

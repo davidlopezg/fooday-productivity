@@ -2123,6 +2123,152 @@ export async function generarPlanMetaIA(
   return { unidades_usadas, krs, prompt_usado: prompt };
 }
 
+/** Resultado de generar tareas para UN KR. */
+export type TareasParaKr = {
+  tareas: TareaGenerada[];
+  prompt_usado: string;
+};
+
+/** Genera SOLO las tareas (no el plan entero) para un Key Result
+ *  concreto. Usado por el botón "✨ Generar tareas con IA" dentro de
+ *  cada tarjeta de KR en /metas/detalle. Caso de uso: David ya tiene
+ *  KRs creados pero un KR específico no tiene tareas (o quiere
+ *  ampliarlo) y no quiere regenerar todo el plan.
+ *
+ *  Reutiliza `llamarLLM` + `extraerJSON` + `saneKrsFromParsed` para
+ *  mantener el mismo pipeline robusto. El prompt es reducido: solo
+ *  la meta, el KR, el proyecto padre (si hay) y el número de tareas
+ *  deseado. Devuelve 2-4 tareas, igual que el prompt del plan completo.
+ *
+ *  Aplica deduplicación por título normalizado contra las tareas
+ *  ya existentes de la meta (no se devuelven duplicados).
+ */
+export async function generarTareasParaKrIA(
+  baseUrl: string,
+  apiKey: string,
+  model: string,
+  opts: {
+    meta: {
+      titulo: string;
+      descripcion?: string | null;
+      ambito?: "personal" | "profesional" | null;
+    };
+    kr: {
+      titulo: string;
+      descripcion?: string | null;
+      metrica?: string | null;
+      valor_objetivo?: number | null;
+      unidad?: string | null;
+      /** Nombre legible de la unidad (ej: "Octubre 2026", "Q3 2026"). */
+      periodo_nombre: string;
+    };
+    contexto_proyecto?: string | null;
+    /** Títulos ya creados en esta meta, para deduplicar. */
+    titulosExistentes: string[];
+    /** Número objetivo de tareas a generar. Por defecto 3. */
+    nTareas?: number;
+  },
+): Promise<TareasParaKr> {
+  const nTareas = opts.nTareas ?? 3;
+  const prompt = `Eres un coach de OKR para David López. Tu trabajo: dado un Key Result existente dentro de una meta, proponer las tareas/hábitos concretos que lo harán realidad.
+
+META DE DAVID:
+  Título: ${opts.meta.titulo}
+  Descripción: ${opts.meta.descripcion ?? "(sin descripción)"}
+  Ámbito: ${opts.meta.ambito ?? "(no especificado)"}
+
+KEY RESULT AL QUE DEBES DARLE TAREAS:
+  Unidad temporal: ${opts.kr.periodo_nombre}
+  Título del KR: ${opts.kr.titulo}
+  Descripción: ${opts.kr.descripcion ?? "(sin descripción)"}
+  Métrica: ${opts.kr.metrica ?? "(sin métrica)"}${
+    opts.kr.valor_objetivo != null
+      ? ` (objetivo: ${opts.kr.valor_objetivo}${opts.kr.unidad ?? ""})`
+      : ""
+  }
+
+${
+  opts.contexto_proyecto?.trim()
+    ? `CONTEXTO DEL PROYECTO PADRE (úsalo para interpretar correctamente palabras ambiguas de la meta o del KR — ej: 'local' en un proyecto de pizzería = local comercial para pizzería, no un bar genérico):\n  ${opts.contexto_proyecto
+        .trim()
+        .replace(/\n/g, "\n  ")}\n`
+    : ""
+}
+TAREAS YA EXISTENTES EN ESTA META (NO las repitas):
+${
+  opts.titulosExistentes.length === 0
+    ? "  (ninguna todavía)"
+    : opts.titulosExistentes
+        .slice(0, 50)
+        .map((t) => `  - ${t}`)
+        .join("\n")
+}
+
+==========
+REGLAS
+==========
+1. Genera EXACTAMENTE ${nTareas} tareas para este KR (ni más ni menos).
+2. Cada tarea = una acción concreta, accionable hoy, que se entiende en ≤2 minutos sin ambigüedad. Si no se puede, es un proyecto, no una tarea.
+3. NO repitas ninguna tarea de la lista de existentes. Si el KR ya tiene alguna tarea, propón VARIANTES nuevas, no duplicados.
+4. Las tareas pueden ser one-shot (se hacen una vez) o recurrentes (hábitos: recurrencia_tipo: "diaria" | "semanal" | "mensual"). Para un KR, mezcla ambos tipos si tiene sentido.
+5. Prioridad: usa "alta" si la tarea es bloqueante para el KR, "media" para el resto, "baja" para nice-to-have. "critica" solo si el KR depende al 100% de esa tarea.
+
+Responde SOLO con JSON válido con esta estructura EXACTA:
+{
+  "tareas": [
+    {
+      "titulo": "...",
+      "descripcion": null,
+      "prioridad": "alta",
+      "recurrencia_tipo": "diaria" | "semanal" | "mensual" | null,
+      "recurrencia_dias_semana": [1, 3, 5] | null,
+      "recurrencia_dia_mes": 15 | null,
+      "criterio_terminacion": "..."
+    }
+  ]
+}
+`;
+  const { ESQUEMA_TAREAS_KR } = await import("./llm-parser");
+  const parsed = await llamarLLM<{ tareas?: unknown }>(
+    baseUrl,
+    apiKey,
+    model,
+    "Respondes SOLO con JSON válido, sin texto adicional.",
+    prompt,
+    true,
+    ESQUEMA_TAREAS_KR,
+  );
+  // Saneamos usando el mismo filtro que aplicarKrsYTareasEnMeta: KR fake
+  // con la unidad del periodo, y tareas normalizadas.
+  const krFalso = {
+    unidad_tiempo: "trimestre" as const,
+    trimestre: 1 as 1 | 2 | 3 | 4,
+    titulo: opts.kr.titulo,
+    descripcion: opts.kr.descripcion ?? null,
+    metrica: opts.kr.metrica ?? null,
+    valor_objetivo: opts.kr.valor_objetivo ?? 0,
+    unidad: opts.kr.unidad ?? null,
+    peso: 1,
+    tareas: Array.isArray(parsed?.tareas) ? (parsed.tareas as unknown[]) : [],
+  };
+  const saneado = saneKrsFromParsed([krFalso]);
+  // saneKrsFromParsed espera 4 trimestres por defecto; como el KR falso
+  // usa trimestre=1 y está en el set por defecto, pasa. Extraemos las
+  // tareas saneadas.
+  const tareas = saneado[0]?.tareas ?? [];
+  // Deduplicar contra titulos existentes (mismo criterio que el apply).
+  const norm = (s: string) => s.trim().toLowerCase();
+  const setExistentes = new Set(opts.titulosExistentes.map(norm));
+  const filtradas: typeof tareas = [];
+  for (const t of tareas) {
+    const clave = norm(t.titulo);
+    if (setExistentes.has(clave)) continue;
+    setExistentes.add(clave);
+    filtradas.push(t);
+  }
+  return { tareas: filtradas, prompt_usado: prompt };
+}
+
 // ============================================================================
 // aplicarKrsYTareasEnMeta — motor compartido para materializar un
 // `PlanMetaGenerado` en una meta (existente o recién creada).

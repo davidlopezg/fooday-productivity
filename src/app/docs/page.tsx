@@ -1658,6 +1658,25 @@ export default function DocsPage() {
           </li>
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-10-23
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">Botón "✨ Generar tareas con IA" dentro de cada KR en /metas/detalle.</strong>{" "}
+              Hasta ahora el único flujo de generación por IA regeneraba el plan entero (KRs + tareas + hábitos). Si un KR ya estaba creado pero sin tareas, o si querías ampliarlo, no había botón granular: o regenerabas todo, o escribías las tareas a mano. Ahora cada tarjeta de KR tiene su propio botón{' '}
+              <strong className="text-foreground">"Generar tareas con IA"</strong> que llama a un nuevo helper{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">generarTareasParaKrIA</code> en{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/lib/plan.ts</code>. Ese helper: (1) pide a la IA SOLO las tareas de ese KR, con la meta, la métrica, la unidad temporal y el contexto del proyecto padre (mismo que el plan completo); (2) le pasa la lista de tareas ya existentes para que no repita ninguna; (3) deduplica de nuevo en el cliente (case-insensitive, trim); (4) materializa cada tarea con{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">crearTareaConIA</code> +{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">setRecurrencia</code> (mismos helpers que el apply del plan completo — sin reinventar nada). Reutiliza el pipeline robusto:{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">llamarLLM</code> +{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">extraerJSON</code> +{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">saneKrsFromParsed</code>, con nuevo esquema{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">ESQUEMA_TAREAS_KR</code> que valida la estructura de respuesta. Estado local en la tarjeta: muestra progreso ("Generando…", "Creando N tareas…", "Listo: N tareas") y errores inline. Si la IA no propone tareas nuevas, se lo decimos al usuario en vez de presentar un éxito vacío. El contexto del proyecto se calcula una sola vez en el componente padre (useMemo) y se comparte con el botón "Generar plan completo", evitando duplicación de código.{" "}
+              <em className="text-muted-foreground">Sin cambios de metodología ni rituales.</em>
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
               2026-10-22
             </span>
             <span className="text-muted-foreground">
