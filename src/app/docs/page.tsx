@@ -1656,6 +1656,40 @@ export default function DocsPage() {
               de pendientes de respuesta”).</em>
             </span>
           </li>
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-10-21
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">Refactor: parser y validación LLM + contexto de proyecto + dedupe de tareas.</strong>{" "}
+              Tres bloques: (1) nuevo módulo{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/lib/llm-parser.ts</code>{" "}
+              centraliza la extracción del JSON de la respuesta del LLM
+              (limpieza de <code className="rounded bg-muted px-1.5 py-0.5 text-xs"><think></code>,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">```</code>, razonamiento,
+              balanceo de llaves sin regex frágiles) y añade un
+              validador de esquema manual (sin dependencias) con{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">ESQUEMA_PLAN_META</code>{" "}
+              y <code className="rounded bg-muted px-1.5 py-0.5 text-xs">ESQUEMA_CLASIFICADOR</code>.{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">llamarLLM</code> usa este
+              parser y valida contra esquema cuando se le pasa uno.
+              Si la validación falla, lanza{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">LLMSchemaError</code> con
+              qué campo falló. (2) el agente pasa el contexto del
+              proyecto padre a{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">generarPlanMetaIA</code>{" "}
+              (nombre, descripción, área). Esto evita que la IA
+              malinterprete palabras ambiguas: “local” en un proyecto
+              de pizzería = local comercial para pizzería, no un bar
+              genérico. (3) dedupe de tareas por título normalizado en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">aplicarKrsYTareasEnMeta</code>:
+              si una tarea con el mismo título ya existe, no se crea
+              de nuevo. Protege contra reintentos. Tests:{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">src/lib/llm-parser.test.mjs</code>,{" "}
+              31 casos — 31/31 pasan.{" "}
+              <em className="text-muted-foreground">Sin cambios de metodología ni rituales.</em>
+            </span>
+          </li>
           <li className="flex gap-3 rounded-lg border border-rose-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-rose-700 dark:text-rose-300 sm:text-sm">
               2026-10-20

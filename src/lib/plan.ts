@@ -14,6 +14,7 @@
 
 import type { InformePlan, PlanDiario, Tarea, Subtarea } from "@/lib/types";
 import { calcularTimeoutIA, mensajeTimeoutIA } from "@/lib/ai-timeout";
+import { extraerJSON } from "./llm-parser";
 
 export type EstadoEmocional = {
   despertar: string;
@@ -368,6 +369,10 @@ async function llamarLLM<T>(
   systemPrompt: string,
   userPrompt: string,
   parseJSON: boolean,
+  /** Esquema opcional para validar la respuesta. Si se pasa y la
+   *  validación falla, lanza LLMSchemaError (en vez de devolver un
+   *  objeto incompleto que el caller tendría que defenderse). */
+  schema?: import("./llm-parser").FieldSchema,
 ): Promise<T> {
   // Timeout adaptativo (migration 0025). Cálculo centralizado en
   // /lib/ai-timeout.ts para no duplicarlo en los 3 callers LLM.
@@ -414,39 +419,76 @@ async function llamarLLM<T>(
     const content: string = data?.choices?.[0]?.message?.content ?? "";
     if (!parseJSON) return content as T;
 
-    try {
-      return JSON.parse(content);
-    } catch (e1) {
+    // === Pipeline de parseo en cascada ===
+    // 1) Intento directo: si la IA respetó response_format, esto basta.
+    // 2) extractFirstJSON: limpia `` / ```json``` / razonamiento
+    //    y devuelve un bloque JSON balanceado.
+    // 3) sanearJSONComun: parchea trailing commas / comillas simples /
+    //    undefined / NaN. Esto es "best effort" — si falla, NO
+    //    seguimos parcheando, lanzamos error claro.
+    const errors: string[] = [];
+    const tryParse = (raw: string, label: string): unknown | null => {
+      try {
+        return JSON.parse(raw);
+      } catch (e) {
+        errors.push(`${label}: ${(e as Error).message}`);
+        return null;
+      }
+    };
+
+    let parsed: unknown = tryParse(content, "JSON.parse directo");
+    if (parsed === null) {
       if (typeof window !== "undefined") {
-        console.warn("[plan] JSON.parse directo falló:", (e1 as Error).message);
-        console.warn("[plan] Content (primeros 600 chars):", content.slice(0, 600));
-        console.warn("[plan] Alrededor de pos 322:", content.slice(280, 380));
+        console.warn("[plan] JSON.parse directo falló:", errors[0]);
+        console.warn(
+          "[plan] Content (primeros 600 chars):",
+          content.slice(0, 600),
+        );
+      }
+      let json: string;
+      try {
+        json = extraerJSON(content);
+      } catch (e) {
+        if (typeof window !== "undefined") {
+          console.warn("[plan] extraerJSON falló:", (e as Error).message);
+        }
+        throw new Error(
+          `La IA no devolvió JSON válido. Primeros 200 chars: ${content.slice(0, 200).replace(/\n/g, " ")}`,
+        );
+      }
+      parsed = tryParse(json, "JSON.parse(extraído)");
+      if (parsed === null) {
+        const saneado = sanearJSONComun(json);
+        parsed = tryParse(saneado, "JSON.parse(saneado)");
+      }
+      if (parsed === null) {
+        throw new Error(
+          `La IA no devolvió JSON válido tras 3 intentos. Errores: ${errors.join(" | ")}. Primeros 200 chars: ${content.slice(0, 200).replace(/\n/g, " ")}`,
+        );
       }
     }
 
-    try {
-      const json = extractFirstJSON(content);
-      return JSON.parse(json);
-    } catch (e2) {
-      if (typeof window !== "undefined") {
-        console.warn("[plan] extractFirstJSON falló:", (e2 as Error).message);
+    // Validación de esquema opcional.
+    if (schema) {
+      const { validarEsquema, LLMSchemaError } = await import("./llm-parser");
+      try {
+        validarEsquema(parsed, schema);
+      } catch (e) {
+        if (e instanceof LLMSchemaError) {
+          if (typeof window !== "undefined") {
+            console.warn(
+              "[plan] validación de esquema falló:",
+              e.message,
+              e.issues,
+            );
+          }
+          throw e;
+        }
+        throw e;
       }
     }
 
-    // Último intento: sanea problemas comunes de LLMs
-    try {
-      const json = extractFirstJSON(content);
-      const saneado = sanearJSONComun(json);
-      return JSON.parse(saneado);
-    } catch (e3) {
-      if (typeof window !== "undefined") {
-        console.warn("[plan] sanearJSONComun falló:", (e3 as Error).message);
-      }
-    }
-
-    throw new Error(
-      `La IA no devolvió JSON válido. Primeros 200 chars: ${content.slice(0, 200).replace(/\n/g, " ")}`,
-    );
+    return parsed as T;
   } catch (e) {
     // AbortError puede venir de dos sitios:
     //   1) Nuestro timeout de 45s: el `abort(reason)` de arriba le inyecta
@@ -1408,6 +1450,12 @@ export type GenerarPlanMetaOpts = {
   anio: number;
   /** Cuántos KRs por unidad (defecto 3). */
   krs_por_trimestre?: number;
+  /** Contexto del proyecto padre (si la meta está dentro de un proyecto).
+   *  Permite que la IA entienda el negocio y no malinterprete palabras
+   *  ambiguas. Ej: "Mapear 3 alternativas al local actual" en un proyecto
+   *  de pizzería → busca locales comerciales para pizzería, no bares
+   *  genéricos. */
+  contexto_proyecto?: string | null;
 };
 
 /** Variante del agente: parte de un contexto libre y la IA propone el nombre
@@ -1801,6 +1849,7 @@ META DE DAVID:
   Ámbito: ${ambito}
   Plazo: ${plazo}
   Año: ${opts.anio}
+${opts.contexto_proyecto?.trim() ? `\nCONTEXTO DEL PROYECTO PADRE (si la meta está dentro de un proyecto, esto te dice QUÉ NEGOCIO y QUÉ SECTOR es — úsalo para interpretar correctamente palabras ambiguas de la meta. Ej: 'local' en un proyecto de pizzería = local comercial para pizzería, no un bar genérico):\n  ${opts.contexto_proyecto.trim().replace(/\n/g, "\n  ")}\n` : ""}
 
 FECHAS REALES DE LA META (migration 0025):
   Fecha de inicio (David puede empezar): ${fechaInicioTxt}
@@ -1895,6 +1944,7 @@ export async function generarPlanMetaIA(
   opts: GenerarPlanMetaOpts,
 ): Promise<PlanMetaGenerado> {
   const prompt = buildPromptPlanMeta(opts);
+  const { ESQUEMA_PLAN_META } = await import("./llm-parser");
   const parsed = await llamarLLM<{
     unidades_usadas?: unknown;
     krs?: unknown;
@@ -1905,6 +1955,7 @@ export async function generarPlanMetaIA(
     "Respondes SOLO con JSON válido, sin texto adicional.",
     prompt,
     true,
+    ESQUEMA_PLAN_META,
   );
 
   const krs = saneKrsFromParsed(parsed?.krs, opts.unidades_disponibles, opts.trimestres_disponibles);
@@ -1966,6 +2017,8 @@ export type AplicarKrsResultado = {
   krsExistentes: number;
   /** Tareas (subtareas cuentan aparte) creadas y asignadas al KR. */
   tareasCreadas: number;
+  /** Tareas saltadas porque ya existía una con el mismo título en esta meta. */
+  tareasSaltadasDuplicadas: number;
   /** Tareas cuya recurrencia NO se pudo asignar tras crearse (no rompe). */
   tareasSinRecurrencia: number;
 };
@@ -2008,10 +2061,26 @@ export async function aplicarKrsYTareasEnMeta(
   const krPorPeriodo = new Map<string, string>();
   for (const r of krsPrevios ?? []) krPorPeriodo.set(r.periodo_id, r.id);
 
+  // 1b) Traemos los títulos de tareas ya creadas en esta meta. Sirve
+  //    para deduplicar si reintentamos: si la IA devuelve la misma
+  //    tarea en 2 KRs, o si re-ejecutamos el apply, no la creamos
+  //    dos veces. Usamos título normalizado (trim + lowercase) como
+  //    clave.
+  const { data: tareasExistentes } = await supabase
+    .from("tareas")
+    .select("titulo")
+    .eq("meta_id", metaId);
+  const titulosTareas = new Set<string>();
+  for (const t of tareasExistentes ?? []) {
+    const tit = String((t as { titulo: string }).titulo).trim().toLowerCase();
+    if (tit) titulosTareas.add(tit);
+  }
+
   const saltarExistentes = opts.saltarExistentes ?? true;
   let krsCreados = 0;
   let krsExistentes = 0;
   let tareasCreadas = 0;
+  let tareasSaltadasDuplicadas = 0;
   let tareasSinRecurrencia = 0;
 
   for (const kr of plan.krs) {
@@ -2060,6 +2129,16 @@ export async function aplicarKrsYTareasEnMeta(
     }
 
     for (const t of kr.tareas) {
+      // Dedupe: si ya existe una tarea con este título exacto en esta
+      // meta, no la creamos de nuevo. Esto protege contra reintentos
+      // del LLM (mismo prompt → mismo resultado) y contra la IA
+      // repitiendo una tarea en 2 KRs distintos.
+      const titNorm = t.titulo.trim().toLowerCase();
+      if (titulosTareas.has(titNorm)) {
+        tareasSaltadasDuplicadas++;
+        continue;
+      }
+      titulosTareas.add(titNorm);
       const creada = await crearTareaConIA(
         {
           titulo: t.titulo,
@@ -2096,7 +2175,7 @@ export async function aplicarKrsYTareasEnMeta(
     }
   }
 
-  return { krsCreados, krsExistentes, tareasCreadas, tareasSinRecurrencia };
+  return { krsCreados, krsExistentes, tareasCreadas, tareasSaltadasDuplicadas, tareasSinRecurrencia };
 }
 
 /** Sanea el array `krs` devuelto por la IA: filtra por unidad válida
@@ -2747,6 +2826,7 @@ export async function clasificarYGenerarIA(
   opts: ClasificarOpts,
 ): Promise<ResultadoClasificador> {
   const prompt = buildPromptClasificador(opts);
+  const { ESQUEMA_CLASIFICADOR } = await import("./llm-parser");
   const parsed = await llamarLLM<{
     clasificacion?: unknown;
     razon_clasificacion?: unknown;
@@ -2776,6 +2856,7 @@ export async function clasificarYGenerarIA(
     "Respondes SOLO con JSON válido, sin texto adicional.",
     prompt,
     true,
+    ESQUEMA_CLASIFICADOR,
   );
 
   const clasRaw = String(parsed?.clasificacion ?? "").toLowerCase().trim();

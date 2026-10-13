@@ -286,6 +286,7 @@ export default function AgentePage() {
 
       // 2) Si es proyecto, crearlo primero.
       let proyectoId: string | null = null;
+      let contextoProyecto: string | null = null;
       if (resultado.clasificacion === "proyecto" && resultado.proyecto) {
         const p: Proyecto = await crearProyecto({
           nombre: resultado.proyecto.nombre,
@@ -294,6 +295,19 @@ export default function AgentePage() {
           area_id: areaId,
         });
         proyectoId = p.id;
+        // Contexto de negocio que pasamos al planificador de cada meta
+        // hija para que NO malinterprete palabras ambiguas (ej: "local"
+        // en un proyecto de pizzería = local comercial, no un bar).
+        const partes: string[] = [];
+        partes.push(`Proyecto: ${p.nombre}`);
+        if (resultado.proyecto.descripcion) {
+          partes.push(resultado.proyecto.descripcion);
+        }
+        const areaNombre = areaId
+          ? (areas ?? []).find((a) => a.id === areaId)?.nombre
+          : null;
+        if (areaNombre) partes.push(`Área: ${areaNombre}`);
+        contextoProyecto = partes.join(". ");
       }
       // Las fechas de David (si las rellenó) se aplican en bloque a las
       // metas hijas más abajo. No se guardan en el proyecto porque la
@@ -620,6 +634,7 @@ export default function AgentePage() {
                 usarFechasDavid && !!fechaObjetivo ? fechaFinBloqueada : false,
               krs_por_trimestre: hayFechas && rango.meses.length > 0 ? 1 : 2,
               unidades_disponibles: unidadesDisponibles,
+              contexto_proyecto: contextoProyecto,
             };
             let plan = await generarPlanMetaIA(
               cfg.data.base_url,
