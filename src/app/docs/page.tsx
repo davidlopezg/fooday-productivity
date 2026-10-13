@@ -1665,7 +1665,7 @@ export default function DocsPage() {
               Tres bloques: (1) nuevo módulo{" "}
               <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/lib/llm-parser.ts</code>{" "}
               centraliza la extracción del JSON de la respuesta del LLM
-              (limpieza de <code className="rounded bg-muted px-1.5 py-0.5 text-xs"><think></code>,{" "}
+              (limpieza de <code className="rounded bg-muted px-1.5 py-0.5 text-xs">&lt;think&gt;</code>,{" "}
               <code className="rounded bg-muted px-1.5 py-0.5 text-xs">```</code>, razonamiento,
               balanceo de llaves sin regex frágiles) y añade un
               validador de esquema manual (sin dependencias) con{" "}
