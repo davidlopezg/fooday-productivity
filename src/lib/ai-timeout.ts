@@ -13,10 +13,10 @@
 
 /** Config por defecto del timeout. Ajustable exportando las constantes
  *  si en el futuro hay que parametrizar por modelo o entorno. */
-export const AI_TIMEOUT_BASE_MS = 45_000;
-export const AI_TIMEOUT_PER_CHARS_MS = 1000; // 1s extra cada 100 chars
+export const AI_TIMEOUT_BASE_MS = 90_000;
+export const AI_TIMEOUT_PER_CHARS_MS = 1500; // 1.5s extra cada 100 chars
 export const AI_TIMEOUT_PER_N_CHARS = 100;
-export const AI_TIMEOUT_MAX_MS = 180_000;
+export const AI_TIMEOUT_MAX_MS = 240_000;
 
 /** Calcula el timeout (ms) en función de los chars del prompt.
  *  @param promptLen suma de longitudes de system + user prompts. */

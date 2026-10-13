@@ -603,6 +603,33 @@ export default function AgentePage() {
             );
             // 2) Materializar KRs y tareas. saltarExistentes=true para
             //    que el KR inicial del clasificador se respete.
+            // Ponytail: si la IA devolvió un plan sin KRs (krs=[]) Y la
+            // meta no tenía ya KRs previos, es un éxito FALSO. La IA
+            // no generó nada pero el motor no lanza. Lo detectamos
+            // aquí y lo marcamos como error para que el panel
+            // diagnóstico lo muestre. Si la meta ya tenía KRs y la IA
+            // solo añadió tareas, lo aceptamos.
+            if (plan.krs.length === 0) {
+              const { fetchMetaConPlan } = await import("@/lib/queries");
+              const metaConPlan = await fetchMetaConPlan(slot.metaId!);
+              const krsPrevios = metaConPlan?.resultados.length ?? 0;
+              if (krsPrevios === 0) {
+                const msg = "La IA no devolvió KRs para esta meta (plan vacío). Vuelve a intentarlo.";
+                console.warn(
+                  `[Agente] ⚠️ plan vacío para "${slot.meta_titulo}"`,
+                );
+                planPorMeta.push({
+                  titulo: slot.meta_titulo,
+                  krs: 0,
+                  tareas: 0,
+                  error: msg,
+                });
+                // Cedemos el event loop entre metas (igual que al final
+                // del try).
+                await new Promise((r) => setTimeout(r, 50));
+                continue;
+              }
+            }
             const r = await aplicarKrsYTareasEnMeta(
               slot.metaId!,
               plan,
@@ -957,6 +984,46 @@ export default function AgentePage() {
               : "border-amber-500/40 bg-amber-500/10")
           }
         >
+          {/* Migration 0025+: si detectamos PGRST303 (JWT issued at
+              future) en CUALQUIER error del flujo, mostramos este banner
+              arriba del todo con la solución. Síntoma típico: las metas
+              se crean pero la fase 2 (plan completo) falla en serie con
+              el mismo error. Causa: el reloj del navegador de David
+              está adelantado y los JWT que firma aparecen como del
+              futuro al servidor PostgREST. */}
+          {(() => {
+            const allErrs = [
+              ...diagnostico.metasFallaron.map((m) => m.error),
+              ...(diagnostico.planPorMeta ?? []).map((p) => p.error ?? ""),
+              ...(diagnostico.krsFallaron ?? []).map(() => ""),
+            ].join(" | ");
+            if (
+              allErrs.includes("PGRST303") ||
+              allErrs.includes("JWT issued at future") ||
+              allErrs.toLowerCase().includes("clock skew")
+            ) {
+              return (
+                <div className="mb-4 rounded-md border-2 border-amber-500/60 bg-amber-500/15 p-3 text-amber-900 dark:text-amber-200">
+                  <p className="font-semibold">
+                    ⏰ Reloj de tu dispositivo desincronizado
+                  </p>
+                  <p className="mt-1 text-xs leading-relaxed">
+                    Supabase rechaza las peticiones porque el JWT aparece
+                    firmado en el futuro (<code className="rounded bg-amber-500/30 px-1 py-0.5 text-[10px]">PGRST303</code>).
+                    Causa: el reloj de este dispositivo está adelantado
+                    respecto al servidor. Solución: <strong>ajustes →
+                    fecha y hora → automático</strong> (o desactiva 10s y
+                    vuelve a activar). Cuando el reloj esté bien, las
+                    metas se podrán archivar pero la fase 2 (plan
+                    completo) seguirá fallando hasta que cierres sesión
+                    y vuelvas a entrar (para que se firme un JWT nuevo
+                    con el reloj correcto).
+                  </p>
+                </div>
+              );
+            }
+            return null;
+          })()}
           <header>
             <div
               className={

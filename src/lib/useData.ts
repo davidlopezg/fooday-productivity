@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { errorMessage } from "@/lib/errors";
+import { esErrorClockSkew, getClockSkewStore } from "@/lib/clockSkew";
 
 /**
  * Carga datos de forma asíncrona con estado de loading, error y `reload()`.
@@ -51,6 +52,9 @@ export function useData<T>(
         const msg = errorMessage(e);
         setError(msg);
         setLoaded(true); // no se queda en loading eterno
+        if (esErrorClockSkew(msg)) {
+          getClockSkewStore().reportar();
+        }
         console.warn("[useData] load falló:", msg);
       })
       .finally(() => {
@@ -72,6 +76,9 @@ export function useData<T>(
       .catch((e: unknown) => {
         const msg = errorMessage(e);
         setError(msg);
+        if (esErrorClockSkew(msg)) {
+          getClockSkewStore().reportar();
+        }
         console.warn("[useData] reload falló:", msg);
       })
       .finally(() => setPending(false));

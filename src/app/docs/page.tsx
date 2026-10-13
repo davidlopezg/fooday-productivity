@@ -169,7 +169,7 @@ const FEATURES: Array<{ ruta: string; proposito: string; docs: string }> = [
   { ruta: "/metas", proposito: "Cards de metas con estado y progreso + botones Archivar/Editar/WIG + IA Sugerir WIGs + filtro Archivadas + EditarMetaModal con botón IA Generar plan", docs: "Pilar 2 · Ritual mensual · HelpDrawer" },
   { ruta: "/metas/nueva", proposito: "Crear meta con rango real [inicio, fin] + botón IA Generar plan (KRs+tareas+hábitos) que reparte los KRs SOLO dentro del rango. Hard constraint opcional 🔒", docs: "Pilar 2 · HelpDrawer" },
   { ruta: "/metas/agente", proposito: "Agente IA: contexto libre → meta + plan trimestral completo (atajo directo a meta; la entrada unificada es /agente)", docs: "Pilar 2 · HelpDrawer" },
-  { ruta: "/agente", proposito: "Agente unificado: clasifica la idea (proyecto/meta/captura) y propone estructura. Bucle de aplicación con 2 pases + árbitro adversarial que verifica que el 100% de las metas hijas se persistan en Supabase antes de redirigir; si hay gap muestra panel con nombres faltantes y motivo del error. Fase 2 automática: tras crear metas+KRs iniciales, genera el plan completo (KRs+tareas+hábitos) por meta con generarPlanMetaIA + aplicarKrsYTareasEnMeta. Pre-bucle: getSession() para evitar fallo de RLS por JWT transitorio + backoff de 50ms entre inserts. migration 0024", docs: "Pilar 2 · HelpDrawer" },
+  { ruta: "/agente", proposito: "Agente unificado: clasifica la idea (proyecto/meta/captura) y propone estructura. Bucle de aplicación con 2 pases + árbitro adversarial que verifica que el 100% de las metas hijas se persistan en Supabase antes de redirigir; si hay gap muestra panel con nombres faltantes y motivo del error. Fase 2 automática: tras crear metas+KRs iniciales, genera el plan completo (KRs+tareas+hábitos) por meta con generarPlanMetaIA + aplicarKrsYTareasEnMeta. Pre-bucle: getSession() para evitar fallo de RLS por JWT transitorio + backoff de 50ms entre inserts. Detección de PGRST303 (reloj desincronizado) con banner en AppShell + panel diagnóstico. migration 0024", docs: "Pilar 2 · HelpDrawer" },
   { ruta: "/metas/auditoria", proposito: "Auditoría de metas: qué les falta (área, proyecto, fecha objetivo, contexto, KRs). migration 0024", docs: "Pilar 2 · HelpDrawer" },
   { ruta: "/metas/detalle", proposito: "Detalle de una meta con sus KRs por trimestre/mes + tareas por KR + botones Editar/✨ Generar plan con IA (KRs+tareas+hábitos, respeta KRs existentes) + Archivar + WIG + asignar tareas del inbox", docs: "Pilar 2 · HelpDrawer" },
   { ruta: "/metas/plan", proposito: "Plan trimestral con scorecard de KRs + proyección", docs: "Pilar 2 · Ritual semanal (domingo) · Ritual mensual · HelpDrawer" },
@@ -1614,6 +1614,66 @@ export default function DocsPage() {
         </header>
 
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
+          <li className="flex gap-3 rounded-lg border border-rose-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-rose-700 dark:text-rose-300 sm:text-sm">
+              2026-10-20
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">Bugfix: timeout IA 45s→90s + detección de plan vacío (éxito falso).</strong>{" "}
+              Síntoma: David vio en consola <code className="rounded bg-muted px-1.5 py-0.5 text-xs">[Agente] ❌ plan falló para "...": La IA no respondió a tiempo (más de 87s, prompt de 4159 chars)</code>{" "}
+              en 2 de 4 metas, y las otras 2 marcaban <code className="rounded bg-muted px-1.5 py-0.5 text-xs">✅ 0 KRs + 0 KRs + 0 tareas</code>{" "}
+              — éxito falso porque la IA devolvía <code className="rounded bg-muted px-1.5 py-0.5 text-xs">{krs: []}</code> y
+              el motor no lanzaba error. Dos fixes: (a){" "}
+              <strong className="text-foreground">ai-timeout.ts</strong>: base
+              45s→90s, ratio 1s/100ch→1.5s/100ch, max 180s→240s. Para
+              prompts de 4-5KB ahora se permite hasta 153s en vez de 87s.
+              (b) <strong className="text-foreground">/agente</strong>:
+              tras llamar a <code className="rounded bg-muted px-1.5 py-0.5 text-xs">generarPlanMetaIA</code>,
+              si <code className="rounded bg-muted px-1.5 py-0.5 text-xs">plan.krs.length === 0</code>{" "}
+              Y la meta no tenía KRs previos, marcamos el plan como
+              fallido (error explícito en el panel diagnóstico) en vez
+              de reportar <code className="rounded bg-muted px-1.5 py-0.5 text-xs">0 KRs</code>{" "}
+              como si fuera un éxito. Esto permite distinguir “la IA no
+              generó nada” de “la meta ya estaba bien y no hacía falta
+              añadir más”. Si David ve el plan vacío persistente, lo
+              lógico es reintentar la generación clicando otra vez en
+              Aplicar (las metas ya están creadas, así que la fase 2 se
+              vuelve a intentar sola).{" "}
+              <em className="text-muted-foreground">Sin cambios de metodología ni rituales.</em>
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-rose-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-rose-700 dark:text-rose-300 sm:text-sm">
+              2026-10-19
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">Bugfix reloj desincronizado (PGRST303 / JWT issued at future).</strong>{" "}
+              Síntoma: David reportó que el agente creaba las metas pero
+              no generaba las tareas ni los hábitos. Causa raíz: el
+              reloj de su dispositivo estaba adelantado respecto al
+              servidor PostgREST; los JWT que se firman localmente
+              aparecen como del futuro y Supabase los rechaza con{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">PGRST303</code>{" "}
+              (RLS evalúa <code className="rounded bg-muted px-1.5 py-0.5 text-xs">auth.uid()</code>{" "}
+              = null). Resultado: las queries de lectura fallaban en
+              todas las pantallas y los inserts de la fase 2 (plan
+              completo) se abortaban silenciosamente en el catch del
+              bucle. Solución: nuevo store global{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/lib/clockSkew.ts</code>{" "}
+              que detecta PGRST303 / JWT future / clock skew en
+              cualquier error de <code className="rounded bg-muted px-1.5 py-0.5 text-xs">useData</code>{" "}
+              y reporta un banner sticky arriba de toda la app
+              (AppShell) con la solución. Además, el panel de
+              diagnóstico del agente muestra un banner ámbar específico
+              si el flujo de aplicar detectó el problema (motivo
+              exacto, no genérico). La solución real sigue siendo
+              arreglar el reloj del dispositivo: <strong className="text-foreground">ajustes
+              → fecha y hora → automático</strong>. FEATURES
+              actualizado (fila /agente, propósito ampliado con
+              mención del clock skew).{" "}
+              <em className="text-muted-foreground">Sin cambios de metodología ni rituales.</em>
+            </span>
+          </li>
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
               2026-10-18
