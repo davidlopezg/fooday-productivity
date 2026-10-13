@@ -602,14 +602,20 @@ export default function AgentePage() {
               cfg.data.model,
               planOpts,
             );
-            // 2) Si la IA devolvió un plan vacío (krs=[]), reintentamos
-            //    UNA vez. Si falla otra vez, marcamos como error. Esto
-            //    es lo que el usuario llevaba 3 días viendo: 2 de 4
-            //    metas con "0 KRs + 0 tareas" marcado como ✅. Era un
-            //    éxito falso.
-            if (plan.krs.length === 0) {
+            // 2) Si la IA devolvió un plan vacío (krs=[] O todos los
+            //    KRs con tareas=[]), reintentamos UNA vez. Esto es lo
+            //    que David llevaba 3 días viendo: la IA devolvía KRs
+            //    con la estructura externa pero con el array de tareas
+            //    vacío, y el motor aplicaba "0 KRs + 0 tareas" como si
+            //    fuera un éxito.
+            const totalTareasEnPlan = plan.krs.reduce(
+              (s, k) => s + (k.tareas?.length ?? 0),
+              0,
+            );
+            if (plan.krs.length === 0 || totalTareasEnPlan === 0) {
               console.warn(
-                `[Agente] ⚠️ plan vacío para "${slot.meta_titulo}" — reintentando…`,
+                `[Agente] ⚠️ plan vacío para "${slot.meta_titulo}" ` +
+                  `(krs=${plan.krs.length}, tareas=${totalTareasEnPlan}) — reintentando…`,
               );
               await new Promise((r) => setTimeout(r, 1000));
               plan = await generarPlanMetaIA(
@@ -619,14 +625,21 @@ export default function AgentePage() {
                 planOpts,
               );
             }
-            if (plan.krs.length === 0) {
-              const msg = "La IA no devolvió KRs válidos tras 2 intentos para esta meta. Reabre el agente y vuelve a aplicar.";
+            const totalTareasTrasRetry = plan.krs.reduce(
+              (s, k) => s + (k.tareas?.length ?? 0),
+              0,
+            );
+            if (plan.krs.length === 0 || totalTareasTrasRetry === 0) {
+              const msg =
+                `La IA no devolvió tareas válidas tras 2 intentos ` +
+                `(krs=${plan.krs.length}, tareas=${totalTareasTrasRetry}). ` +
+                `Reabre el agente y vuelve a aplicar.`;
               console.error(
-                `[Agente] ❌ plan vacío tras retry para "${slot.meta_titulo}"`,
+                `[Agente] ❌ plan sin tareas tras retry para "${slot.meta_titulo}": krs=${plan.krs.length}, tareas=${totalTareasTrasRetry}`,
               );
               planPorMeta.push({
                 titulo: slot.meta_titulo,
-                krs: 0,
+                krs: plan.krs.length,
                 tareas: 0,
                 error: msg,
               });
