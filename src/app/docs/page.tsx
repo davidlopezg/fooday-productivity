@@ -119,6 +119,11 @@ const PILARES: Pilar[] = [
         cuerpo:
           "Intentar recordar todo genera estrés y activa el efecto Zeigarnik, donde las tareas pendientes interfieren constantemente con el pensamiento enfocado. Sacar los compromisos de la cabeza y llevarlos a un sistema confiable libera recursos mentales. La pantalla /captura es exactamente eso: tu 'vaciar cabeza' externo.",
       },
+      {
+        titulo: "Pendientes de respuesta: lo que NO depende de ti",
+        cuerpo:
+          "Hay un subtipo especial de pendiente que NO está en tu control: las tareas bloqueadas externamente (un email que mandaste esperando OK, una llamada pendiente, una confirmación que necesitas para avanzar). Marcar la tarea con el flag ⏳ “pendiente de respuesta” (icono de reloj en /tareas) la separa del resto y la muestra en /tareas/pendientes-respuesta ordenada por antigüedad. Razón: lo que más tiempo lleva esperando es lo que más probablemente se te ha “caído” del radar — y muchas veces también lo más fácil de desatascar con un follow-up corto. La regla: este panel debería ser pequeño. Si crece, o bien no haces follow-ups a tiempo, o bien estás delegando demasiado sin control. Cuando llega la respuesta, destildas el flag (botón ✓ Respuesta recibida en el panel) y la tarea vuelve a la lista normal.",
+      },
     ],
   },
   {
@@ -157,8 +162,9 @@ const FEATURES: Array<{ ruta: string; proposito: string; docs: string }> = [
   { ruta: "/estatus/ver", proposito: "Ver una entrada en detalle (racha + micro-acción)", docs: "Sub-ruta de /estatus" },
 
   // ── Tareas y GTD ──
-  { ruta: "/tareas", proposito: "Tareas pendientes: marcar hechas, adjuntos, asignar a meta/KR + panel WIGs (foco del ciclo)", docs: "Pilar 2 · WIGs §3 (cap de ejecución) · HelpDrawer" },
+  { ruta: "/tareas", proposito: "Tareas pendientes: marcar hechas, adjuntos, asignar a meta/KR + panel WIGs (foco del ciclo) + toggle ⏳ pendiente de respuesta por fila", docs: "Pilar 2 · WIGs §3 (cap de ejecución) · Pilar 4 (sección “Pendientes de respuesta”) · HelpDrawer" },
   { ruta: "/tareas/inbox", proposito: "Triaje residual: tareas sin meta o sin KR (después de asignar al crear)", docs: "HelpDrawer" },
+  { ruta: "/tareas/pendientes-respuesta", proposito: "Panel dedicado a tareas con el flag “pendiente de respuesta” (esperando a alguien). Ordenadas por antigüedad: lo que más tiempo lleva esperando primero. Botón para destildar cuando llega la respuesta", docs: "Pilar 4 (sección “Pendientes de respuesta”) · HelpDrawer" },
   { ruta: "/tareas/completadas", proposito: "Histórico de tareas hechas (7/30/90/365/todo)", docs: "HelpDrawer" },
 
   // ── Trabajo profundo ──
@@ -1622,7 +1628,7 @@ export default function DocsPage() {
               <strong className="text-foreground">Bugfix: timeout IA 45s→90s + detección de plan vacío (éxito falso).</strong>{" "}
               Síntoma: David vio en consola <code className="rounded bg-muted px-1.5 py-0.5 text-xs">[Agente] ❌ plan falló para "...": La IA no respondió a tiempo (más de 87s, prompt de 4159 chars)</code>{" "}
               en 2 de 4 metas, y las otras 2 marcaban <code className="rounded bg-muted px-1.5 py-0.5 text-xs">✅ 0 KRs + 0 KRs + 0 tareas</code>{" "}
-              — éxito falso porque la IA devolvía <code className="rounded bg-muted px-1.5 py-0.5 text-xs">{krs: []}</code> y
+              — éxito falso porque la IA devolvía <code className="rounded bg-muted px-1.5 py-0.5 text-xs">{"{krs: []}"}</code> y
               el motor no lanzaba error. Dos fixes: (a){" "}
               <strong className="text-foreground">ai-timeout.ts</strong>: base
               45s→90s, ratio 1s/100ch→1.5s/100ch, max 180s→240s. Para
