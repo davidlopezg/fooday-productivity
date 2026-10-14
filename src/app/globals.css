@@ -169,13 +169,17 @@ textarea:focus-visible {
 
 /* ---------------------------------------------------------------------------
    Reporte imprimible de un proyecto (/proyectos → "Exportar PDF").
-   Estrategia: "Imprimir a PDF" nativo del navegador. Al disparar
-   window.print() se añade en <body> la clase `printing-proyecto` y solo
-   el portal del reporte se muestra. Todo lo demás se oculta.
+   Estrategia: "Imprimir a PDF" nativo del navegador. El usuario abre la
+   vista previa como modal (`.proyecto-report-portal[data-preview="1"]`)
+   y pulsa "Imprimir". Al imprimir, `@media print` oculta el modal
+   (toolbar, backdrop, scroll) y deja solo el reporte en formato A4.
 --------------------------------------------------------------------------- */
 
-/* Estado normal (en pantalla, cuando NO estamos imprimiendo):
-   el reporte se mantiene oculto aunque esté montado en el DOM. */
+/* En pantalla, cuando NO estamos imprimiendo:
+   - Si el portal tiene data-preview="1" se muestra como hoja (modal).
+   - Si NO lo tiene, queda oculto (modo legacy, ya no se usa, pero
+     lo conservamos por si algún día hace falta imprimir "sin vista
+     previa" sin pasar por el modal). */
 .proyecto-report-portal {
   position: fixed;
   left: -10000px;
@@ -188,20 +192,34 @@ textarea:focus-visible {
 }
 
 @media print {
-  /* Oculta toda la UI de la app al imprimir. */
-  body.printing-proyecto > *:not(.proyecto-report-portal) {
+  /* Oculta toda la UI de la app y el chrome del propio modal al
+     imprimir: toolbar con "Imprimir", backdrop, scroll del modal…
+     Solo el reporte queda visible. */
+  body > *:not(.proyecto-report-portal),
+  .proyecto-report-modal,
+  .proyecto-report-modal__toolbar,
+  .proyecto-report-modal__scroll {
     display: none !important;
   }
-  body.printing-proyecto {
+  body {
     background: #fff !important;
   }
   /* Muestra el portal y lo posiciona en la página. */
-  .proyecto-report-portal {
+  .proyecto-report-portal,
+  .proyecto-report-portal[data-preview="1"] {
     position: static !important;
     left: auto !important;
     width: auto !important;
     z-index: auto !important;
     pointer-events: auto !important;
+    background: #fff !important;
+    color: #111 !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: none !important;
+    border-radius: 0 !important;
   }
 
   @page {

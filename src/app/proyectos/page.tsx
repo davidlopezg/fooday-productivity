@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { fetchAreas, fetchMetas, fetchProyectosConConteo, fetchTareas } from "@/lib/queries";
 import {
@@ -23,43 +23,89 @@ type DatosReporte = {
 };
 
 /**
- * Portal que monta el reporte dentro de un `<div>` con la clase
- * `proyecto-report-portal`. Por defecto está fuera de pantalla; solo
- * se hace visible cuando se imprime (reglas `@media print` en
- * globals.css). Escucha `fooday:proyecto-report` para saber qué pintar.
+ * Modal de vista previa + impresión a PDF.
+ *
+ * Por qué modal y no trigger automático de window.print():
+ *   - El usuario puede VER el documento antes de imprimir (sabemos
+ *     que "no se ve nada" era el síntoma de un problema de timing).
+ *   - El botón "Imprimir / Guardar PDF" dispara el diálogo nativo
+ *     con `requestAnimationFrame` doble para asegurar que el portal
+ *     ya está pintado.
+ *
+ * El reporte vive dentro de `.proyecto-report-portal[data-preview="1"]`
+ * (estilos ya definidos en globals.css para esta vista previa).
+ * Al imprimir, el `@media print` oculta todo lo demás y deja solo el
+ * reporte en formato A4.
  */
-function ReportePortal() {
-  const [datos, setDatos] = useState<DatosReporte | null>(null);
-
-  useEffect(() => {
-    function onReporte(e: Event) {
-      const ce = e as CustomEvent<DatosReporte>;
-      setDatos(ce.detail);
-      document.body.classList.add("printing-proyecto");
-    }
-    function onAfterPrint() {
-      // Limpia el portal cuando el usuario cierra el diálogo de impresión
-      // (imprima, guarde o cancele) para no dejar DOM gigante en la app.
-      setDatos(null);
-      document.body.classList.remove("printing-proyecto");
-    }
-    window.addEventListener("fooday:proyecto-report", onReporte as EventListener);
-    window.addEventListener("afterprint", onAfterPrint);
-    return () => {
-      window.removeEventListener("fooday:proyecto-report", onReporte as EventListener);
-      window.removeEventListener("afterprint", onAfterPrint);
-    };
-  }, []);
-
+function ReporteModal({
+  datos,
+  onCerrar,
+}: {
+  datos: DatosReporte | null;
+  onCerrar: () => void;
+}) {
   if (!datos) return null;
+
+  async function imprimir() {
+    // Doble rAF: asegura que el navegador ya pintó el portal antes
+    // de entrar al modo print (alivia problemas de timing reportados).
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        window.print();
+      });
+    });
+  }
+
   return (
-    <div className="proyecto-report-portal" aria-hidden>
-      <ProyectoReport
-        proyecto={datos.proyecto}
-        area={datos.area}
-        metas={datos.metas}
-        tareas={datos.tareas}
-      />
+    <div
+      className="proyecto-report-modal fixed inset-0 z-50 flex flex-col bg-black/60 p-0 backdrop-blur-sm sm:p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Vista previa del reporte de ${datos.proyecto.nombre}`}
+    >
+      {/* Toolbar flotante arriba (no se imprime; el modal está fuera del portal). */}
+      <div className="proyecto-report-modal__toolbar flex shrink-0 items-center justify-between gap-2 bg-background/95 px-4 py-2 shadow sm:rounded-t-lg">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium">
+            Vista previa · {datos.proyecto.nombre}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {datos.metas.length} metas · {datos.tareas.length} tareas
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            onClick={imprimir}
+            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90"
+          >
+            <IconFile className="h-4 w-4" />
+            Imprimir / Guardar PDF
+          </button>
+          <button
+            onClick={onCerrar}
+            className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+            aria-label="Cerrar vista previa"
+          >
+            <IconX className="h-5 w-5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Contenedor scrollable con la "hoja" del documento. */}
+      <div className="proyecto-report-modal__scroll flex-1 overflow-y-auto bg-muted/40 py-4">
+        <div
+          className="proyecto-report-portal"
+          data-preview="1"
+          aria-label="Documento del proyecto"
+        >
+          <ProyectoReport
+            proyecto={datos.proyecto}
+            area={datos.area}
+            metas={datos.metas}
+            tareas={datos.tareas}
+          />
+        </div>
+      </div>
     </div>
   );
 }
@@ -97,19 +143,18 @@ export default function ProyectosPage() {
   const [procesando, setProcesando] = useState<string | null>(null);
   /** Proyecto cuyo PDF estamos generando (muestra el spinner del botón). */
   const [exportando, setExportando] = useState<string | null>(null);
+  /** Datos del proyecto para el modal de vista previa. */
+  const [reporte, setReporte] = useState<DatosReporte | null>(null);
   /** Proyecto que falló al generar PDF y mensaje de error asociado. */
   const [errorExportPorProyecto, setErrorExportPorProyecto] = useState<
     Record<string, string>
   >({});
 
   /**
-   * Carga los datos del proyecto y dispara la impresión nativa del
-   * navegador. El documento se monta en un portal (`<ProyectoReport>`)
-   * y se imprime con la regla `@media print` de globals.css, que oculta
-   * toda la app y deja solo el reporte en la página.
-   *
-   * El usuario elige "Imprimir a PDF" en el diálogo del navegador para
-   * guardar el archivo. Sin librerías externas (jsPDF/html2canvas).
+   * Carga los datos del proyecto y abre el modal con la vista previa.
+   * El usuario ve el documento en pantalla y, si está bien, pulsa
+   * "Imprimir / Guardar PDF" para abrir el diálogo nativo del navegador.
+   * Cero librerías externas (sin jsPDF/html2canvas).
    */
   async function exportarPDF(proyectoId: string) {
     // Limpia error previo de ESTE proyecto.
@@ -124,14 +169,7 @@ export default function ProyectosPage() {
       if (!datos) {
         throw new Error("Proyecto no encontrado");
       }
-      // Dispara el evento que `ReportePortal` escucha para saber qué
-      // datos pintar.
-      window.dispatchEvent(
-        new CustomEvent("fooday:proyecto-report", { detail: datos }),
-      );
-      // Pequeño delay para que React monte el portal antes de imprimir.
-      await new Promise((r) => setTimeout(r, 80));
-      window.print();
+      setReporte(datos);
     } catch (e) {
       const msg = (e as Error).message;
       setErrorExportPorProyecto((prev) => ({ ...prev, [proyectoId]: msg }));
@@ -512,7 +550,8 @@ export default function ProyectosPage() {
           })}
         </ul>
       )}
-      <ReportePortal />
+
+      <ReporteModal datos={reporte} onCerrar={() => setReporte(null)} />
     </div>
   );
 }

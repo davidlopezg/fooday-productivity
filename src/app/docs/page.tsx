@@ -194,7 +194,7 @@ const FEATURES: Array<{ ruta: string; proposito: string; docs: string }> = [
 
   // ── Sistema ──
   { ruta: "/pagos", proposito: "Pagos pendientes: ejecutar tesorería lunes 1ª hora", docs: "Apéndice §Bucle de equilibrio · Ritual semanal (lunes estricto) · HelpDrawer" },
-  { ruta: "/proyectos", proposito: "Gestión de proyectos con conteo de tareas, listado de metas hijas (migration 0024), archivado en cascada a metas+tareas, confirm con preview de impacto al eliminar y exportación a PDF por proyecto (Imprimir a PDF nativo del navegador, sin librerías externas)", docs: "HelpDrawer" },
+  { ruta: "/proyectos", proposito: "Gestión de proyectos con conteo de tareas, listado de metas hijas (migration 0024), archivado en cascada a metas+tareas, confirm con preview de impacto al eliminar y exportación a PDF por proyecto (modal con vista previa + Imprimir a PDF nativo del navegador, sin librerías externas)", docs: "HelpDrawer" },
   { ruta: "/configuracion", proposito: "Configuración: API key IA, base URL, modelo, tema", docs: "HelpDrawer" },
 
   // ── Documentación ──
@@ -1663,19 +1663,23 @@ export default function DocsPage() {
             <span className="text-muted-foreground">
               <strong className="text-foreground">Exportar proyecto a PDF desde /proyectos.</strong>{" "}
               Cada card de proyecto tiene ahora un botón{' '}
-              <strong className="text-foreground">“PDF”</strong> con icono de archivo que abre el diálogo de impresión del navegador con un documento estructurado:{" "}
+              <strong className="text-foreground">“PDF”</strong> con icono de archivo que abre un modal de <strong className="text-foreground">vista previa</strong> con el documento estructurado:{" "}
               <em>(1) portada con nombre, área, color, totales y fecha de generación;</em>{' '}
               <em>(2) contexto general: descripción, estado (activo/archivado), color, totales;</em>{' '}
               <em>(3) metas hijas con sus KRs (resultados_periodo) y las tareas dentro de cada KR;</em>{' '}
               <em>(4) tareas no recurrentes del proyecto;</em>{' '}
               <em>(5) tareas recurrentes.</em>{' '}Las secciones 4 y 5 listan{' '}
-              <strong className="text-foreground">todas las tareas</strong>, hechas y no hechas (las hechas aparecen tachadas para distinguirlas a simple vista), ordenadas por estado y luego por fecha de creación. Se puede guardar como PDF eligiendo “Imprimir a PDF” en el diálogo del navegador — cero librerías externas (sin jsPDF ni html2canvas), todo CSS nativo vía{' '}
+              <strong className="text-foreground">todas las tareas</strong>, hechas y no hechas (las hechas aparecen tachadas para distinguirlas a simple vista), ordenadas por estado y luego por fecha de creación. El modal tiene un botón{" "}
+              <strong className="text-foreground">“Imprimir / Guardar PDF”</strong> que dispara el diálogo nativo del navegador (doble{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">requestAnimationFrame</code> para evitar problemas de timing); el usuario elige “Guardar como PDF” en el desplegable de destino. Cero librerías externas (sin jsPDF ni html2canvas), todo CSS nativo:{' '}
               <code className="rounded bg-muted px-1.5 py-0.5 text-xs">@media print</code> en{' '}
-              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">globals.css</code> (oculta la app y deja solo el reporte). Implementación: nuevo componente{' '}
-              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">ProyectoReport</code> + helper{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">globals.css</code> oculta el chrome del modal (toolbar, backdrop, scroll) y deja solo el reporte en formato A4. Implementación: nuevo componente{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">ProyectoReport</code> + componente modal{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">ReporteModal</code> dentro de{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/app/proyectos/page.tsx</code> + helper{' '}
               <code className="rounded bg-muted px-1.5 py-0.5 text-xs">cargarDatosProyectoParaReporte</code> en{' '}
               <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/lib/exportarProyecto.ts</code> que hace 6 queries en paralelo (proyecto, metas del proyecto, todos los resultados_periodo, periodos, todas las tareas del proyecto, áreas) y las agrupa en cliente. FEATURES actualizado (fila /proyectos).{' '}
-              <em className="text-muted-foreground">Sin cambios de metodología ni rituales. Es una nueva capacidad operativa: el humano puede “ver el proyecto entero de un vistazo” sin abrir cada sección de la app.</em>
+              <em className="text-muted-foreground">Sin cambios de metodología ni rituales. Es una nueva capacidad: el humano puede “ver el proyecto entero de un vistazo” y exportarlo a PDF sin abrir cada sección de la app.</em>
             </span>
           </li>
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
