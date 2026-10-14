@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { fetchAreas, fetchMetas, fetchProyectosConConteo, fetchTareas } from "@/lib/queries";
 import {
@@ -9,9 +9,60 @@ import {
   crearProyecto,
   eliminarProyecto,
 } from "@/lib/mutations";
+import { cargarDatosProyectoParaReporte } from "@/lib/exportarProyecto";
 import { useData } from "@/lib/useData";
-import type { Area, Meta, Proyecto, Tarea } from "@/lib/types";
-import { IconArchive, IconTarget, IconTrash, IconX } from "@/components/icons";
+import type { Area, Meta, MetaConPlan, Proyecto, Tarea } from "@/lib/types";
+import { IconArchive, IconFile, IconTarget, IconTrash, IconX } from "@/components/icons";
+import ProyectoReport from "@/components/ProyectoReport";
+
+type DatosReporte = {
+  proyecto: Proyecto;
+  area: Area | null;
+  metas: MetaConPlan[];
+  tareas: Tarea[];
+};
+
+/**
+ * Portal que monta el reporte dentro de un `<div>` con la clase
+ * `proyecto-report-portal`. Por defecto está fuera de pantalla; solo
+ * se hace visible cuando se imprime (reglas `@media print` en
+ * globals.css). Escucha `fooday:proyecto-report` para saber qué pintar.
+ */
+function ReportePortal() {
+  const [datos, setDatos] = useState<DatosReporte | null>(null);
+
+  useEffect(() => {
+    function onReporte(e: Event) {
+      const ce = e as CustomEvent<DatosReporte>;
+      setDatos(ce.detail);
+      document.body.classList.add("printing-proyecto");
+    }
+    function onAfterPrint() {
+      // Limpia el portal cuando el usuario cierra el diálogo de impresión
+      // (imprima, guarde o cancele) para no dejar DOM gigante en la app.
+      setDatos(null);
+      document.body.classList.remove("printing-proyecto");
+    }
+    window.addEventListener("fooday:proyecto-report", onReporte as EventListener);
+    window.addEventListener("afterprint", onAfterPrint);
+    return () => {
+      window.removeEventListener("fooday:proyecto-report", onReporte as EventListener);
+      window.removeEventListener("afterprint", onAfterPrint);
+    };
+  }, []);
+
+  if (!datos) return null;
+  return (
+    <div className="proyecto-report-portal" aria-hidden>
+      <ProyectoReport
+        proyecto={datos.proyecto}
+        area={datos.area}
+        metas={datos.metas}
+        tareas={datos.tareas}
+      />
+    </div>
+  );
+}
 
 type ProyectoConConteo = Proyecto & {
   total_tareas: number;
@@ -44,6 +95,58 @@ export default function ProyectosPage() {
   /** Spinner inline mientras se hace la cascada de archivado.
    *  Mostramos qué proyecto se está procesando y un mensaje neutro. */
   const [procesando, setProcesando] = useState<string | null>(null);
+  /** Proyecto cuyo PDF estamos generando (muestra el spinner del botón). */
+  const [exportando, setExportando] = useState<string | null>(null);
+  /** Proyecto que falló al generar PDF y mensaje de error asociado. */
+  const [errorExportPorProyecto, setErrorExportPorProyecto] = useState<
+    Record<string, string>
+  >({});
+
+  /**
+   * Carga los datos del proyecto y dispara la impresión nativa del
+   * navegador. El documento se monta en un portal (`<ProyectoReport>`)
+   * y se imprime con la regla `@media print` de globals.css, que oculta
+   * toda la app y deja solo el reporte en la página.
+   *
+   * El usuario elige "Imprimir a PDF" en el diálogo del navegador para
+   * guardar el archivo. Sin librerías externas (jsPDF/html2canvas).
+   */
+  async function exportarPDF(proyectoId: string) {
+    // Limpia error previo de ESTE proyecto.
+    setErrorExportPorProyecto((prev) => {
+      const { [proyectoId]: _ignored, ...rest } = prev;
+      void _ignored;
+      return rest;
+    });
+    setExportando(proyectoId);
+    try {
+      const datos = await cargarDatosProyectoParaReporte(proyectoId);
+      if (!datos) {
+        throw new Error("Proyecto no encontrado");
+      }
+      // Dispara el evento que `ReportePortal` escucha para saber qué
+      // datos pintar.
+      window.dispatchEvent(
+        new CustomEvent("fooday:proyecto-report", { detail: datos }),
+      );
+      // Pequeño delay para que React monte el portal antes de imprimir.
+      await new Promise((r) => setTimeout(r, 80));
+      window.print();
+    } catch (e) {
+      const msg = (e as Error).message;
+      setErrorExportPorProyecto((prev) => ({ ...prev, [proyectoId]: msg }));
+      // Auto-clear a los 5s para no saturar la card.
+      setTimeout(() => {
+        setErrorExportPorProyecto((prev) => {
+          const { [proyectoId]: _ignored, ...rest } = prev;
+          void _ignored;
+          return rest;
+        });
+      }, 5000);
+    } finally {
+      setExportando(null);
+    }
+  }
 
   async function crear() {
     if (!nombre.trim()) {
@@ -295,6 +398,23 @@ export default function ProyectosPage() {
                       ver
                     </Link>
                     <button
+                      onClick={() => exportarPDF(p.id)}
+                      disabled={
+                        exportando !== null || procesando !== null
+                      }
+                      className="inline-flex items-center gap-1 rounded-md p-2 text-xs text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50"
+                      title="Exportar proyecto a PDF (Imprimir a PDF del navegador)"
+                    >
+                      {exportando === p.id ? (
+                        <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      ) : (
+                        <IconFile className="h-4 w-4" />
+                      )}
+                      <span className="hidden sm:inline">
+                        {exportando === p.id ? "Generando…" : "PDF"}
+                      </span>
+                    </button>
+                    <button
                       onClick={async () => {
                         const accion = p.archivado ? "desarchivar" : "archivar";
                         // Cascade preview: contamos qué se va a afectar.
@@ -382,11 +502,17 @@ export default function ProyectosPage() {
                     </button>
                   </div>
                 </div>
+                {errorExportPorProyecto[p.id] && (
+                  <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+                    {errorExportPorProyecto[p.id]}
+                  </p>
+                )}
               </li>
             );
           })}
         </ul>
       )}
+      <ReportePortal />
     </div>
   );
 }

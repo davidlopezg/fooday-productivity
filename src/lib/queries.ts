@@ -82,6 +82,10 @@ function ordenarSubtareas<T extends { subtareas: TareaSubtarea[] | null }>(tarea
   }));
 }
 
+/** Export público: ordena subtareas por `orden` ascendente. Usado por el
+ *  reporte PDF de proyecto (ver /lib/exportarProyecto.ts). */
+export { ordenarSubtareas };
+
 /**
  * Tareas completadas (estado='hecha'), ordenadas por fecha de completación
  * descendente. Devuelve también las áreas relacionadas para poder pintar
