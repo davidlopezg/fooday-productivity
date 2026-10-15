@@ -10,6 +10,7 @@ import type {
   Periodo,
   PlanDiarioTarea,
   PlanGeneradoSimple,
+  Prioridad,
   ResultadoPeriodo,
   Subtarea,
   TareaAdjunto,
@@ -141,6 +142,41 @@ export async function actualizarTarea(datos: TareaCampos) {
   // Sin esto, un UPDATE fallido (RLS, red, columna inexistente) pasaba por
   // bueno y la UI mentia: el dato no se guardaba y nadie se enteraba.
   if (error) throw new Error(`No se pudo actualizar la tarea: ${error.message}`);
+}
+
+/** Aplica cambios de `prioridad` a N tareas en batch. Usado por el botón
+ *  IA de /matriz (SugerirMatrizModal) y por drag & drop entre cuadrantes.
+ *  Cada fila pasa por `actualizarTarea` para mantener el mismo invariante
+ *  (RLS, error handling, sincronización de `completada_at`).
+ *
+ *  Devuelve el reporte {aplicadas, fallidas} para que la UI pueda mostrar
+ *  "7/8 aplicadas" si una falla (RLS, etc.). */
+export async function aplicarPrioridadesTareas(
+  items: Array<{ tareaId: string; prioridad: Prioridad }>,
+): Promise<{
+  aplicadas: number;
+  fallidas: Array<{ tareaId: string; error: string }>;
+}> {
+  if (items.length === 0) return { aplicadas: 0, fallidas: [] };
+
+  const fallidas: Array<{ tareaId: string; error: string }> = [];
+  const resultados = await Promise.allSettled(
+    items.map(async (it) => {
+      await actualizarTarea({ id: it.tareaId, prioridad: it.prioridad });
+      return it.tareaId;
+    }),
+  );
+
+  const aplicadas = resultados.reduce((acc, r, idx) => {
+    if (r.status === "fulfilled") return acc + 1;
+    fallidas.push({
+      tareaId: items[idx].tareaId,
+      error: r.reason instanceof Error ? r.reason.message : String(r.reason),
+    });
+    return acc;
+  }, 0);
+
+  return { aplicadas, fallidas };
 }
 
 export type TareaCreada = {

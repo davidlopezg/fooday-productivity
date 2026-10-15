@@ -57,6 +57,7 @@ const EXEC_ITEMS: NavItem[] = [
   { href: "/tareas/inbox", label: "Inbox", Icon: IconInbox },
   { href: "/tareas/pendientes-respuesta", label: "Pendientes respuesta", Icon: IconClock },
   { href: "/pipeline", label: "Prioridad", Icon: IconFlag },
+  { href: "/matriz", label: "Matriz Eisenhower", Icon: IconTarget },
   { href: "/pagos", label: "Pagos", Icon: IconWallet },
   { href: "/plan-diario", label: "Plan diario", Icon: IconSparkles },
   { href: "/plan-diario/historico", label: "Histórico de planes", Icon: IconHistory },

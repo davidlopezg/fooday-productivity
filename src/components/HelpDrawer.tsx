@@ -577,6 +577,33 @@ export const AYUDA_POR_RUTA: Record<
       },
     ],
   },
+  "/matriz": {
+    pilares: [4],
+    items: [
+      {
+        titulo: "Por qué una matriz 2D y no solo prioridad",
+        cuerpo:
+          "Pipeline (/pipeline) ordena las tareas en una dimensión: prioridad (1D). La matriz Eisenhower añade la segunda dimensión: urgencia (cuándo vence). Una tarea puede ser muy urgente pero poco importante (Q3: delegar), o muy importante pero lejos en el tiempo (Q2: planificar). El campo `prioridad` no captura las dos — esta vista sí.",
+      },
+      {
+        titulo: "Cómo se calculan los cuadrantes",
+        cuerpo:
+          "Urgencia = fecha_fin / deadline (objetiva). Importancia = ¿la tarea es WIG? → ¿su meta es WIG? → ¿tiene meta activa? → huérfana. Cuadrante derivado: Q1 hacer YA, Q2 planificar, Q3 delegar, Q4 eliminar. Si la prioridad manual no coincide, verás un puntito violeta junto al título.",
+        pilar: 4,
+      },
+      {
+        titulo: "Arrastra entre cuadrantes",
+        cuerpo:
+          "Cada drop reasigna la `prioridad` de la tarea al valor del cuadrante destino (Q1→critica, Q2→alta, Q3→media, Q4→baja). Si sueltas en el mismo cuadrante, no se hace nada. Es una edición rápida: para cambios finos usa el modal de edición de la tarea.",
+      },
+      {
+        titulo: "IA: sugiere redistribución",
+        cuerpo:
+          "El botón '✨ Sugerir redistribución' analiza todas las tareas activas y propone mover solo las que considera desubicadas. Modal de revisión con checkboxes, override por fila, batch apply. La IA solo sugiere; tú decides.",
+        pilar: 2,
+      },
+    ],
+  },
   "/pagos": {
     // Sin `pilares` aquí: el contenido enlazado vive en /docs (modelo
     // financiero), no encaja con los 5 pilares de productividad personal.

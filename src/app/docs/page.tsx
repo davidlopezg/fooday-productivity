@@ -184,6 +184,7 @@ const FEATURES: Array<{ ruta: string; proposito: string; docs: string }> = [
   { ruta: "/plan-diario/historico", proposito: "Histórico de planes (7/30/90/365/todo)", docs: "Sub-ruta de /plan-diario" },
   { ruta: "/semana", proposito: "Pipeline semanal con drag & drop + IA 3 críticas/día", docs: "Ritual semanal (domingo noche) · HelpDrawer" },
   { ruta: "/pipeline", proposito: "Kanban por prioridad + motor IA de priorización", docs: "Ritual semanal (miércoles) · HelpDrawer" },
+  { ruta: "/matriz", proposito: "Matriz Eisenhower 2D (urgencia × importancia) de tareas activas. Drag & drop entre cuadrantes (dnd-kit/core) + botón IA “✨ Sugerir redistribución” que propone mover las tareas desubicadas al cuadrante correcto (módulo IA en src/lib/tareas/sugerirMatrizIA.ts). Sin migración: la clasificación se calcula en cada render desde fecha_fin + meta.es_wig; aplicar cambios solo escribe `prioridad`. Filtros: solo WIGs-meta / solo con fecha. Complemento visual de /pipeline (1D) — la matriz es 2D", docs: "Pilar 4 · HelpDrawer" },
 
   // ── Revisión y análisis ──
   { ruta: "/informes", proposito: "KPIs (incluye subtareas) + heatmap de actividad + chart de tareas y subtareas por día/semana + proyectos con conteo + metas y OKRs cerrados + comparación con plan vs sin plan", docs: "Ritual semanal (viernes) · Ritual mensual · HelpDrawer" },
@@ -1620,6 +1621,49 @@ export default function DocsPage() {
         </header>
 
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
+          <li className="flex gap-3 rounded-lg border border-blue-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-blue-700 dark:text-blue-300 sm:text-sm">
+              2026-10-15
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">/matriz — vista 2D Eisenhower con drag &amp; drop + IA “Sugerir redistribución”.</strong>{" "}
+              Nueva página <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/matriz</code>{" "}
+              (debajo de “Prioridad” en el sidebar, bloque Ejecución) que
+              distribuye las tareas activas en 4 cuadrantes calculados en
+              JS desde <code className="rounded bg-muted px-1.5 py-0.5 text-xs">fecha_fin</code>{" "}
+              + <code className="rounded bg-muted px-1.5 py-0.5 text-xs">meta.es_wig</code>.
+              <strong className="text-foreground"> Sin migración.</strong> La
+              clasificación (urgencia × importancia → cuadrante) vive en
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">src/lib/tareas/matriz.ts</code>; el
+              grid 2×2 con drag &amp; drop en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">src/components/tareas/MatrizEisenhower.tsx</code>{" "}
+              (<code className="rounded bg-muted px-1.5 py-0.5 text-xs">@dnd-kit/core</code>, ya
+              instalado). El drop reasigna{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">prioridad</code>{" "}
+              según el cuadrante destino (Q1→critica, Q2→alta, Q3→media, Q4→baja).
+              <br />
+              <br />
+              <strong className="text-foreground">Botón IA.</strong>{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">src/lib/tareas/sugerirMatrizIA.ts</code>{" "}
+              (patrón <code className="rounded bg-muted px-1.5 py-0.5 text-xs">sugerirPagosIA</code>;
+              JSON estricto, saneador que valida Q1..Q4).{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">SugerirMatrizModal</code>{" "}
+              con revisión por fila (override del cuadrante), checkbox para
+              excluir y batch apply. Mutación nueva{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">aplicarPrioridadesTareas()</code>{" "}
+              en <code className="rounded bg-muted px-1.5 py-0.5 text-xs">src/lib/mutations.ts</code>{" "}
+              (<code className="rounded bg-muted px-1.5 py-0.5 text-xs">Promise.allSettled</code>,
+              pasa por <code className="rounded bg-muted px-1.5 py-0.5 text-xs">actualizarTarea</code>{" "}
+              para mantener el invariante de RLS).
+              <br />
+              <br />
+              <strong className="text-foreground">UX.</strong>{" "}
+              Filtros “solo WIGs-meta” y “solo con fecha”. HelpDrawer
+              específico. Si la prioridad manual no coincide con el cuadrante
+              calculado, las cards llevan un puntito violeta junto al título.
+              Sincronizado con FEATURES y Aplicación pilar 4.
+            </span>
+          </li>
           <li className="flex gap-3 rounded-lg border border-violet-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-violet-700 dark:text-violet-300 sm:text-sm">
               2026-10-15
@@ -2574,6 +2618,7 @@ function AplicacionEnApp({ pilar }: { pilar: 1 | 2 | 3 | 4 | 5 }) {
       "Captura / Inbox para vaciar la cabeza (/captura)",
       "Micro-acción priorizada para mañana basada en patrón semanal",
       "Banner mental arriba de /tareas/pendientes-respuesta: «no te preocupes de lo que está pendiente de los demás» (reframe estoico/Covey, sin lógica)",
+      "Matriz Eisenhower 2D en /m (/matriz) con drag & drop entre cuadrantes y botón IA «Sugerir redistribución» — clasificación urgencia × importancia calculada en JS desde fecha_fin + meta.es_wig, sin migración",
     ],
     5: [
       "Límite de 4 bloques/día en el calendario (señal visual)",

@@ -908,6 +908,12 @@ export default function MetodologiaPage() {
               /pagos · botón IA “✨ Sugerir pagos” (migration 0027) — la IA programa los próximos 6 lunes con tu prompt editable en /configuracion
             </Link>
           </li>
+          <li>
+            <Link href="/matriz" className="inline-flex items-center gap-2 font-medium text-foreground underline underline-offset-4">
+              <IconTarget className="h-4 w-4 text-blue-500" />
+              /matriz · Matriz Eisenhower 2D con drag &amp; drop + IA “Sugerir redistribución” — urgencia × importancia calculada en JS, sin migración
+            </Link>
+          </li>
         </ul>
         <p className="mt-5 text-sm text-muted-foreground">
           🎯 ¿Quieres que configuremos juntos la estructura desglosada de
