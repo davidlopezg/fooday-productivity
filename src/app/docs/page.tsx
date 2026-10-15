@@ -162,8 +162,8 @@ const FEATURES: Array<{ ruta: string; proposito: string; docs: string }> = [
   { ruta: "/estatus/ver", proposito: "Ver una entrada en detalle (racha + micro-acción)", docs: "Sub-ruta de /estatus" },
 
   // ── Tareas y GTD ──
-  { ruta: "/tareas", proposito: "Tareas pendientes: marcar hechas, adjuntos, asignar a meta/KR + panel WIGs (foco del ciclo) + toggle ⏳ pendiente de respuesta por fila", docs: "Pilar 2 · WIGs §3 (cap de ejecución) · Pilar 4 (sección “Pendientes de respuesta”) · HelpDrawer" },
-  { ruta: "/tareas/inbox", proposito: "Triaje residual: tareas sin meta o sin KR (después de asignar al crear)", docs: "HelpDrawer" },
+  { ruta: "/tareas", proposito: "Tareas pendientes: marcar hechas, adjuntos, asignar a meta/KR + panel WIGs (foco del ciclo) + toggle ⏳ pendiente de respuesta por fila + botón IA ‘Sugerir 3 siguientes acciones’ sobre toda la lista abierta", docs: "Pilar 2 · WIGs §3 (cap de ejecución) · Pilar 4 (sección “Pendientes de respuesta”) · HelpDrawer" },
+  { ruta: "/tareas/inbox", proposito: "Triaje residual: tareas sin meta o sin KR (después de asignar al crear) + botón IA ‘Sugerir tareas con IA’ que extrae acciones de un email/contexto pegado", docs: "HelpDrawer" },
   { ruta: "/tareas/pendientes-respuesta", proposito: "Panel dedicado a tareas con el flag “pendiente de respuesta” (esperando a alguien). Ordenadas por antigüedad: lo que más tiempo lleva esperando primero. Botón para destildar cuando llega la respuesta", docs: "Pilar 4 (sección “Pendientes de respuesta”) · HelpDrawer" },
   { ruta: "/tareas/completadas", proposito: "Histórico de tareas hechas (7/30/90/365/todo)", docs: "HelpDrawer" },
 
@@ -1620,6 +1620,73 @@ export default function DocsPage() {
         </header>
 
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
+          <li className="flex gap-3 rounded-lg border border-violet-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-violet-700 dark:text-violet-300 sm:text-sm">
+              2026-10-14
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">Botones IA puntuales: extraer tareas de un email/contexto (/tareas/inbox) y sugerir 3 siguientes acciones (/tareas).</strong>{" "}
+              Dos botones nuevos que siguen el mismo principio del botón
+              ya existente “Sugerir 3 WIGs” en <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas</code>:
+              la IA <strong className="text-foreground">solo sugiere</strong>,
+              tú editas y confirmas; nunca escribe en la BD sin tu OK.
+              <br />
+              <br />
+              <strong className="text-foreground">(1) /tareas/inbox — “Sugerir tareas con IA”.</strong>{" "}
+              Nuevo panel violeta con un <code className="rounded bg-muted px-1.5 py-0.5 text-xs">textarea</code>{" "}
+              para pegar un email, un mensaje o un contexto. El botón “Sugerir
+              tareas” llama a la IA, que devuelve 1–8 sugerencias de tareas
+              accionables (título, descripción opcional, prioridad, motivo
+              corto y, si encaja, asociación a un proyecto existente).
+              Antes de añadirlas al inbox se muestran en un modal con cada
+              fila editable: checkbox para descartar, input para el título,
+              textarea para la descripción y select para la prioridad. Solo al
+              pulsar “Añadir N tareas” se persisten (vía{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">crearTarea()</code>).
+              Si fallan algunas, las que se crearon se quedan y las que no
+              se reintentan desde el formulario.
+              <br />
+              <br />
+              <strong className="text-foreground">(2) /tareas — “Sugerir 3 siguientes acciones”.</strong>{" "}
+              Nuevo botón en la cabecera, junto al HelpDrawer. Mira{" "}
+              <strong className="text-foreground">TODA</strong> la lista
+              abierta (tareas con{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">estado ≠ &apos;hecha&apos; ∧ &apos;archivada&apos;</code>{" "}
+              — incluye inbox, tareas con meta y tareas sueltas) y los{" "}
+              <strong className="text-foreground">argumentos</strong> de cada
+              una: meta + código, KR, prioridad, deadline, ámbito, tags,
+              si es WIG y días que lleva abierta. Pasa también los WIGs
+              activos (ancla al foco del ciclo) y los proyectos activos (por
+              si la IA quiere sugerir asociación). El prompt pide 3
+              acciones concretas para hoy/mañana, con razón mirando esos
+              argumentos. Mismo modal de revisión que (1) — la IA sugiere,
+              tú editas y confirmas.
+              <br />
+              <br />
+              <strong className="text-foreground">Implementación.</strong>{" "}
+              Nuevo módulo{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/lib/iaSugerencias.ts</code>{" "}
+              con dos funciones puras:{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">sugerirTareasDesdeContextoIA()</code>{" "}
+              y{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">sugerirProximasAccionesIA()</code>.
+              Reutilizan el parser robusto de{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">llm-parser.ts</code>{" "}
+              (sin Zod — coherente con el resto del proyecto) y el helper
+              de timeout de{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">ai-timeout.ts</code>.
+              El provider, modelo y API key se leen de{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">useConfig()</code>{" "}
+              (mismo flujo que el resto de botones IA). Nuevo componente
+              reutilizable{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/components/SugerenciasTareasModal.tsx</code>{" "}
+              que sirve a los dos botones (DRY).{" "}
+              <strong className="text-foreground">FEATURES actualizado</strong>{" "}
+              (filas <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/tareas/inbox</code>{" "}
+              y <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/tareas</code>) y
+              HelpDrawer de ambas rutas con el item correspondiente.
+            </span>
+          </li>
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
               2026-10-13

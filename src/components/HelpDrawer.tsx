@@ -105,6 +105,12 @@ export const AYUDA_POR_RUTA: Record<
           "Cuando tengas tareas 'huérfanas' (sin meta) o tareas de una meta que aún no has repartido por trimestres. Procesarlas es meterlas en algún resultado_periodo o dejarlas como sueltas a propósito. La regla: este inbox debería estar cerca de cero. Si crece semana tras semana, tienes más trabajo del que tu plan puede ejecutar — replantéate prioridades.",
         pilar: 2,
       },
+      {
+        titulo: "✨ Sugerir tareas con IA (pegar email/contexto)",
+        cuerpo:
+          "El botón ‘Sugerir tareas’ lee el texto que pegues (un email, un mensaje, notas mentales) y extrae las acciones concretas que tienes pendientes. Antes de añadir nada al inbox te muestra las propuestas editables: puedes cambiar títulos, descripciones y prioridades, descartar las que no quieras y solo entonces confirmar. La IA no escribe en la BD sin tu OK.",
+        pilar: 2,
+      },
     ],
   },
   "/tareas/pendientes-respuesta": {
@@ -208,6 +214,12 @@ export const AYUDA_POR_RUTA: Record<
         cuerpo:
           "Si tienes más de 3 tareas marcadas como 'crítica', ninguna lo es realmente. Resérvalo para lo que la sociedad rompe si no se hace hoy. El resto son 'altas' o 'medias'.",
         pilar: 3,
+      },
+      {
+        titulo: "✨ Sugerir 3 siguientes acciones con IA",
+        cuerpo:
+          "El botón ‘Sugerir 3 siguientes acciones’ mira TODA tu lista abierta (no completadas — incluye inbox, tareas con meta y tareas sin asignar) y los argumentos de cada una (meta, KR, deadline, prioridad, ámbito, tags, WIG) y propone 3 acciones concretas para mañana. Como en el resto de flujos IA: solo sugiere, tú editas y confirmas.",
+        pilar: 2,
       },
     ],
   },

@@ -454,6 +454,11 @@ textarea:focus-visible {
   font-size: 14px;
   line-height: 1.5;
 }
+/* Forzar que el reporte en pantalla tenga toda la altura necesaria
+   para verse completo al expandir el modal. */
+.proyecto-report-portal[data-preview="1"] .proyecto-report {
+  min-height: 100%;
+}
 .proyecto-report-portal[data-preview="1"] .proyecto-report h1 {
   font-size: 24px;
   font-weight: 700;
