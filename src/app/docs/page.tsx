@@ -154,7 +154,7 @@ const PILARES: Pilar[] = [
 // ----------------------------------------------------------------------------
 const FEATURES: Array<{ ruta: string; proposito: string; docs: string }> = [
   // ── Núcleo diario ──
-  { ruta: "/", proposito: "Hoy: semáforo del día + plan diario + contadores", docs: "Rituales §1 (mañana 1ª hora) · HelpDrawer" },
+  { ruta: "/", proposito: "Hoy: semáforo del día + plan diario + contadores + paneles WIGs (metas + tareas) + panel ‘Tareas con fecha’ (orden ascendente por deadline, las vencidas arriba) entre WIGs-tareas y Plan de hoy, con check inline para marcarlas hechas sin navegar", docs: "Rituales §1 (mañana 1ª hora) · HelpDrawer" },
   { ruta: "/captura", proposito: "Inbox rápido para vaciar la cabeza (efecto Zeigarnik)", docs: "Pilar 4 · Rituales §1 · HelpDrawer" },
   { ruta: "/estatus", proposito: "9 hábitos + auditoría 20/80 + cierre cognitivo", docs: "Pilar 4 · Rituales §1 (final del día) · HelpDrawer" },
   { ruta: "/estatus/nuevo", proposito: "Crear nueva entrada de Estatus (1 por día)", docs: "Sub-ruta de /estatus" },
@@ -1620,6 +1620,39 @@ export default function DocsPage() {
         </header>
 
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
+          <li className="flex gap-3 rounded-lg border border-amber-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-amber-700 dark:text-amber-300 sm:text-sm">
+              2026-10-15
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">/Hoy: nuevo panel ‘Tareas con fecha’ entre los WIGs-tareas y el Plan de hoy.</strong>{" "}
+              Panel ámbar que lista las tareas con{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">estado=&apos;pendiente&apos;</code>{" "}
+              que tengan{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">deadline</code> o{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">fecha_fin</code>, ordenadas
+              <strong className="text-foreground"> ascendente</strong> por fecha: las vencidas
+              arriba del todo (badge rojo “retrasada Xd”), después HOY (badge ámbar),
+              después futuras. Cada fila tiene un ☐ para marcar hecha{" "}
+              <strong className="text-foreground">inline</strong> (optimista: la fila se
+              oculta al instante; si falla, revierte y muestra el error). Si hay más de 8,
+              sale un enlace “+N más con fecha en /tareas” al final del panel. Si no hay
+              tareas pendientes con fecha, el panel no se pinta (no contamina la pantalla).
+              <br />
+              <br />
+              <strong className="text-foreground">Implementación.</strong>{" "}
+              Reutiliza el listado{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">data.pendientes</code>{" "}
+              que ya carga <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/</code>{" "}
+              desde <code className="rounded bg-muted px-1.5 py-0.5 text-xs">fetchTareas(&apos;pendiente&apos;)</code>:
+              cero fetch nuevo, cero cambio en queries.ts. Estado local para el check
+              optimista (<code className="rounded bg-muted px-1.5 py-0.5 text-xs">ocultas: Set&lt;string&gt;</code>)
+              + reload del fetch global al confirmar. <strong className="text-foreground">FEATURES actualizado</strong>{" "}
+              (fila <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/</code>, propósito ampliado)
+              y HelpDrawer de <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/</code>{" "}
+              con un item nuevo en el Pilar 3 (Tiempo).
+            </span>
+          </li>
           <li className="flex gap-3 rounded-lg border border-violet-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-violet-700 dark:text-violet-300 sm:text-sm">
               2026-10-14
