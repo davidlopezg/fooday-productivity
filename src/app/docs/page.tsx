@@ -122,7 +122,7 @@ const PILARES: Pilar[] = [
       {
         titulo: "Pendientes de respuesta: lo que NO depende de ti",
         cuerpo:
-          "Hay un subtipo especial de pendiente que NO está en tu control: las tareas bloqueadas externamente (un email que mandaste esperando OK, una llamada pendiente, una confirmación que necesitas para avanzar). Marcar la tarea con el flag ⏳ “pendiente de respuesta” (icono de reloj en /tareas) la separa del resto y la muestra en /tareas/pendientes-respuesta ordenada por antigüedad. Razón: lo que más tiempo lleva esperando es lo que más probablemente se te ha “caído” del radar — y muchas veces también lo más fácil de desatascar con un follow-up corto. La regla: este panel debería ser pequeño. Si crece, o bien no haces follow-ups a tiempo, o bien estás delegando demasiado sin control. Cuando llega la respuesta, destildas el flag (botón ✓ Respuesta recibida en el panel) y la tarea vuelve a la lista normal.",
+          "Hay un subtipo especial de pendiente que NO está en tu control: las tareas bloqueadas externamente (un email que mandaste esperando OK, una llamada pendiente, una confirmación que necesitas para avanzar). Marcar la tarea con el flag ⏳ “pendiente de respuesta” (icono de reloj en /tareas) la separa del resto y la muestra en /tareas/pendientes-respuesta ordenada por antigüedad. Razón: lo que más tiempo lleva esperando es lo que más probablemente se te ha “caído” del radar — y muchas veces también lo más fácil de desatascar con un follow-up corto. La regla: este panel debería ser pequeño. Si crece, o bien no haces follow-ups a tiempo, o bien estás delegando demasiado sin control. Cuando llega la respuesta, destildas el flag (botón ✓ Respuesta recibida en el panel) y la tarea vuelve a la lista normal. Encima de la lista hay un banner mental (estoico/Covey): «no te preocupes de lo que está pendiente de los demás». Es un reframe psicológico, no operativo — recuerda que la única acción posible bajo aquí es el follow-up y que el panel te lo recordará cuando toque actuar.",
       },
     ],
   },
@@ -164,7 +164,7 @@ const FEATURES: Array<{ ruta: string; proposito: string; docs: string }> = [
   // ── Tareas y GTD ──
   { ruta: "/tareas", proposito: "Tareas pendientes: marcar hechas, adjuntos, asignar a meta/KR + panel WIGs (foco del ciclo) + toggle ⏳ pendiente de respuesta por fila + botón IA ‘Sugerir 3 siguientes acciones’ sobre toda la lista abierta", docs: "Pilar 2 · WIGs §3 (cap de ejecución) · Pilar 4 (sección “Pendientes de respuesta”) · HelpDrawer" },
   { ruta: "/tareas/inbox", proposito: "Triaje residual: tareas sin meta o sin KR (después de asignar al crear) + botón IA ‘Sugerir tareas con IA’ que extrae acciones de un email/contexto pegado", docs: "HelpDrawer" },
-  { ruta: "/tareas/pendientes-respuesta", proposito: "Panel dedicado a tareas con el flag “pendiente de respuesta” (esperando a alguien). Ordenadas por antigüedad: lo que más tiempo lleva esperando primero. Botón para destildar cuando llega la respuesta", docs: "Pilar 4 (sección “Pendientes de respuesta”) · HelpDrawer" },
+  { ruta: "/tareas/pendientes-respuesta", proposito: "Panel dedicado a tareas con el flag “pendiente de respuesta” (esperando a alguien). Ordenadas por antigüedad: lo que más tiempo lleva esperando primero. Botón para destildar cuando llega la respuesta. Banner mental arriba (estoico/Covey): «no te preocupes de lo que está pendiente de los demás»", docs: "Pilar 4 (sección “Pendientes de respuesta”) · HelpDrawer" },
   { ruta: "/tareas/completadas", proposito: "Histórico de tareas hechas (7/30/90/365/todo)", docs: "HelpDrawer" },
 
   // ── Trabajo profundo ──
@@ -193,7 +193,7 @@ const FEATURES: Array<{ ruta: string; proposito: string; docs: string }> = [
   { ruta: "/norte", proposito: "Propósito, valores y visión (la brújula)", docs: "Pilar 2 · Ritual diario (despertar) · Ritual mensual · HelpDrawer" },
 
   // ── Sistema ──
-  { ruta: "/pagos", proposito: "Pagos pendientes: ejecutar tesorería lunes 1ª hora", docs: "Apéndice §Bucle de equilibrio · Ritual semanal (lunes estricto) · HelpDrawer" },
+  { ruta: "/pagos", proposito: "Pagos pendientes: ejecutar tesorería lunes 1ª hora + botón IA “✨ Sugerir pagos” (migration 0027) que analiza los pagos activos y propone programación para los próximos 6 lunes aplicando el prompt editable en /configuracion (snowball por defecto, ingresos viernes/sábado). Modal de revisión estilo SugerirWigs: la IA sugiere, tú marcas qué incluir, botón “Aplicar N marcadas” actualiza solo fecha_pago_programada y estado=programado (no registra pagos parciales). Prompt editable en /configuracion §Prompt de pagos (columna prompt_pagos)", docs: "Apéndice §Bucle de equilibrio · Ritual semanal (lunes estricto) · HelpDrawer" },
   { ruta: "/proyectos", proposito: "Gestión de proyectos con conteo de tareas, listado de metas hijas (migration 0024), archivado en cascada a metas+tareas, confirm con preview de impacto al eliminar y exportación a PDF por proyecto (modal con vista previa + Imprimir a PDF nativo del navegador, sin librerías externas)", docs: "HelpDrawer" },
   { ruta: "/configuracion", proposito: "Configuración: API key IA, base URL, modelo, tema", docs: "HelpDrawer" },
 
@@ -499,7 +499,7 @@ export default function DocsPage() {
             Última actualización:
           </span>
           <span className="font-mono text-indigo-700 dark:text-indigo-300">
-            2026-10-14
+            2026-10-15
           </span>
           <span className="text-muted-foreground">
             — migration 0025: las metas pasan a tener rango real (fecha_inicio_meta + fecha_objetivo + fecha_fin_bloqueada). El planificador reparte los KRs como meses sueltos dentro del rango, no fuerza 4 trimestres. /metas/nueva con dos date inputs + checkbox 🔒 Fecha crítica. Helpers nuevos: parsearMesesDeRango() y ensurePeriodosMeses() (RPC ensure_periodos_meses).
@@ -1620,6 +1620,89 @@ export default function DocsPage() {
         </header>
 
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
+          <li className="flex gap-3 rounded-lg border border-violet-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-violet-700 dark:text-violet-300 sm:text-sm">
+              2026-10-15
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">Botón IA “✨ Sugerir pagos” en /pagos (migration 0027) + prompt editable en /configuracion.</strong>{" "}
+              Nuevo botón en la cabecera de /pagos que llama a la IA con los
+              pagos activos y devuelve sugerencias de programación para los
+              próximos 6 lunes. Modal de revisión (estilo SugerirWigsModal):
+              cada fila muestra el pago actual + fecha sugerida + importe sugerido
+              + motivo + checkbox. El usuario marca qué aplicar y pulsa
+              “Aplicar N marcadas”. La IA <strong className="text-foreground">solo sugiere</strong>;
+              tú decides. Aplica únicamente cambios en
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">fecha_pago_programada</code>{" "}
+              + pone estado <code className="rounded bg-muted px-1.5 py-0.5 text-xs">programado</code>;
+              NO registra pagos parciales (para eso está el flujo normal).
+              <br />
+              <br />
+              <strong className="text-foreground">Prompt editable.</strong>{" "}
+              Nueva columna
+              <code className="mx-1 rounded bg-muted px-1.5 py-0.5 text-xs">prompt_pagos TEXT</code>{" "}
+              en la tabla <code className="rounded bg-muted px-1.5 py-0.5 text-xs">configuracion</code>{" "}
+              (migration 0027). Nueva sección “Prompt de pagos (IA)” en
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/configuracion</code>{" "}
+              con textarea monoespaciado, botón “Restaurar ejemplo” y contador
+              de chars. El prompt por defecto es snowball + ingresos
+              viernes/sábado + anticipar vencimientos al lunes anterior.
+              Si está vacío en BD, la app usa
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">DEFAULT_PROMPT_PAGOS</code>{" "}
+              en runtime (exportado tanto de
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">configStore.tsx</code>{" "}
+              como de
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">sugerirPagosIA.ts</code>;
+              si lo cambias, cambia los dos sitios).
+              <br />
+              <br />
+              <strong className="text-foreground">Implementación.</strong>{" "}
+              Archivos nuevos: <code className="rounded bg-muted px-1.5 py-0.5 text-xs">supabase/migrations/0027_configuracion_prompt_pagos.sql</code>,
+              <code className="mx-1 rounded bg-muted px-1.5 py-0.5 text-xs">src/lib/pagos/sugerirPagosIA.ts</code>{" "}
+              (buildPrompt + sanear + JSON estricto, mismo patrón que
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">motorPriorizacion.ts</code>),
+              <code className="mx-1 rounded bg-muted px-1.5 py-0.5 text-xs">src/components/pagos/SugerirPagosModal.tsx</code>{" "}
+              (revisión + checkboxes + per-row apply + batch apply).
+              Mutación nueva: <code className="rounded bg-muted px-1.5 py-0.5 text-xs">aplicarSugerenciasPagos()</code>{" "}
+              en <code className="rounded bg-muted px-1.5 py-0.5 text-xs">src/lib/pagos/mutations.ts</code>{" "}
+              (<code className="rounded bg-muted px-1.5 py-0.5 text-xs">Promise.allSettled</code> con
+              conteo de aplicadas vs fallidas por RLS).
+              <code className="mx-1 rounded bg-muted px-1.5 py-0.5 text-xs">configStore.tsx</code>{" "}
+              extendido para hacer upsert del <code className="rounded bg-muted px-1.5 py-0.5 text-xs">prompt_pagos</code>{" "}
+              (RLS existente aplica). Actualizado FEATURES (fila
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/pagos</code>),
+              Aplicación en la app (pilar 3 · Tiempo), este changelog y
+              sincronizado con <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metodologia</code>{" "}
+              §Apéndice Bucle de equilibrio.
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-emerald-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-emerald-700 dark:text-emerald-300 sm:text-sm">
+              2026-10-15
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">Banner mental arriba de /tareas/pendientes-respuesta: «No te preocupes de lo que está pendiente de los demás».</strong>{" "}
+              Reframe psicológico (estoico/Covey) sin lógica ni BD: emerald+teal,
+              cita a Covey («círculo de influencia vs preocupación») y Epicteto
+              («preocúpate solo de lo que depende de ti»). Refuerza la regla
+              operativa del panel («el panel debería ser pequeño, tu única acción
+              posible es el follow-up») con la regla mental («si hoy no toca,
+              déjalo aquí — el panel te lo recordará cuando lleve demasiado
+              tiempo esperando»).
+              <br />
+              <br />
+              <strong className="text-foreground">Implementación.</strong>{" "}
+              Un único{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">&lt;aside role=&quot;note&quot;&gt;</code>{" "}
+              encima del título en <code className="rounded bg-muted px-1.5 py-0.5 text-xs">src/app/tareas/pendientes-respuesta/page.tsx</code>.
+              Cero cambio en BD, queries, mutaciones ni estado. Solo JSX + texto.
+              Actualizado Pilar 4 («Pendientes de respuesta: lo que NO depende de
+              ti»), Aplicación en la app (pilar 4), fila del índice de features
+              (FEATURES) y este changelog. Sincronización equivalente en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metodologia</code>{" "}
+              §8.
+            </span>
+          </li>
           <li className="flex gap-3 rounded-lg border border-amber-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-amber-700 dark:text-amber-300 sm:text-sm">
               2026-10-15
@@ -2484,11 +2567,13 @@ function AplicacionEnApp({ pilar }: { pilar: 1 | 2 | 3 | 4 | 5 }) {
       "Time-blocking con 4 bloques fijos por día (/calendario)",
       "Auditoría 20/80 en el Estatus Diario",
       "Motor de priorización con IA que devuelve 1 sola acción (<45 min)",
+      "Botón IA “✨ Sugerir pagos” en /pagos (migration 0027): analiza los pagos activos y propone programación para los próximos 6 lunes con el prompt editable en /configuracion. Snowball + ingresos viernes/sábado por defecto",
     ],
     4: [
       "9 hábitos diarios con score 0-100 y racha (/estatus)",
       "Captura / Inbox para vaciar la cabeza (/captura)",
       "Micro-acción priorizada para mañana basada en patrón semanal",
+      "Banner mental arriba de /tareas/pendientes-respuesta: «no te preocupes de lo que está pendiente de los demás» (reframe estoico/Covey, sin lógica)",
     ],
     5: [
       "Límite de 4 bloques/día en el calendario (señal visual)",

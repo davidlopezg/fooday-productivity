@@ -250,3 +250,47 @@ export async function eliminarPago(pagoId: string): Promise<void> {
   const { error } = await db().from("pagos").delete().eq("id", pagoId);
   if (error) throw new Error(`No se pudo eliminar: ${error.message}`);
 }
+
+/** Aplica en batch las sugerencias de programación devueltas por la IA
+ *  (ver `src/lib/pagos/sugerirPagosIA.ts`). Solo actualiza
+ *  `fecha_pago_programada` y pone `estado = 'programado'`. NO toca
+ *  `importe_pagado` ni registra pagos parciales — eso lo hace el usuario
+ *  aparte desde el flujo normal `registrarPago()`.
+ *
+ *  Devuelve el número de pagos efectivamente actualizados.
+ *
+ *  Rationale: la IA sugiere; la app solo escribe en BD si el usuario
+ *  confirma cada fila (o un batch). Si una fila falla (p.ej. RLS), las
+ *  demás siguen aplicándose — el caller puede mostrar "7/8 aplicadas". */
+export async function aplicarSugerenciasPagos(
+  sugerencias: Array<{ pagoId: string; fechaProgramada: string }>,
+): Promise<{ aplicadas: number; fallidas: Array<{ pagoId: string; error: string }> }> {
+  if (sugerencias.length === 0) return { aplicadas: 0, fallidas: [] };
+
+  const fallidas: Array<{ pagoId: string; error: string }> = [];
+  const resultados = await Promise.allSettled(
+    sugerencias.map(async (s) => {
+      const { error } = await db()
+        .from("pagos")
+        .update({
+          fecha_pago_programada: s.fechaProgramada,
+          estado: "programado",
+        })
+        .eq("id", s.pagoId);
+      if (error) throw new Error(error.message);
+      return s.pagoId;
+    }),
+  );
+
+  const aplicadas = resultados.reduce((acc, r) => {
+    if (r.status === "fulfilled") return acc + 1;
+    const idx = resultados.indexOf(r);
+    fallidas.push({
+      pagoId: sugerencias[idx].pagoId,
+      error: r.reason instanceof Error ? r.reason.message : String(r.reason),
+    });
+    return acc;
+  }, 0);
+
+  return { aplicadas, fallidas };
+}

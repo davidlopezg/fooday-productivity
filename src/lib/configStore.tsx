@@ -14,12 +14,51 @@ export type Config = {
   base_url: string;
   minimax_api_key: string | null;
   model: string;
+  /** Migration 0027: prompt editable para el botón IA de /pagos.
+   *  Si es null/vacío en BD o localStorage, usamos DEFAULT_PROMPT_PAGOS. */
+  prompt_pagos: string | null;
 };
+
+/** Prompt por defecto para el botón IA de /pagos. El mismo literal vive
+ *  en `src/lib/pagos/sugerirPagosIA.ts` (DEFAULT_PROMPT_PAGOS) — lo
+ *  duplicamos aquí para no crear una dependencia circular
+ *  (configStore ← pagos ← ... ← configStore). Si lo cambias, cambia
+ *  los dos sitios. */
+export const DEFAULT_PROMPT_PAGOS = `Eres el asistente financiero de David. Tu trabajo es mirar sus pagos activos y proponer cuáles transferir esta semana y cuáles programar para las siguientes.
+
+CONTEXTO DEL NEGOCIO:
+- David factura el viernes y sábado por la noche.
+- Los ingresos llegan a su banco el sábado y el domingo.
+- El lunes es el día natural para hacer pagos porque la caja está fresca.
+- Si la fecha de vencimiento cae en festivo o fin de semana, anticipa al lunes anterior.
+
+REGLAS DE PRIORIDAD:
+1. Primero las deudas más pequeñas (snowball). Empieza por la más barata que esté pendiente para cancelarla y liberar lastre mental cuanto antes.
+2. Intenta pagar un poco más del mínimo en todas las que recomiendes — no dejes ninguna a 0 € salvo que no haya caja.
+3. Si un pago tiene fecha_vencimiento esta semana, tiene prioridad absoluta.
+4. Si vence el día 15 del mes, programa la transferencia el lunes anterior (o el lunes del propio día 15 si cae en lunes).
+5. Agrupa pagos del mismo proveedor si los hay, en un único movimiento.
+6. NUNCA propongas más pagos de los que la caja razonable permita: es preferible 2 hechos que 5 a medias.
+
+SALIDA — JSON estricto con un item por pago que recomiendas Mover de fecha:
+{
+  "sugerencias": [
+    {
+      "pago_id": "<uuid exacto de la lista de pagos>",
+      "fecha_pago_programada": "<YYYY-MM-DD — debe ser uno de los próximos lunes que te paso>",
+      "importe_a_pagar": <número o null si recomiendas pagar el total restante>,
+      "motivo": "<1 frase corta explicando por qué este lunes>"
+    }
+  ]
+}
+
+Si no hay nada que mover (todo ya está bien programado), devuelve { "sugerencias": [] }.`;
 
 const DEFAULT: Config = {
   base_url: "https://api.minimax.io/v1",
   minimax_api_key: null,
   model: "Minimax-M3",
+  prompt_pagos: null, // null = usar DEFAULT_PROMPT_PAGOS (la app lo inyecta en runtime)
 };
 
 const LS_KEY = "fooday.config.v1";
@@ -37,6 +76,10 @@ function readLS(): Config {
           ? parsed.minimax_api_key
           : null,
       model: parsed.model || DEFAULT.model,
+      prompt_pagos:
+        typeof parsed.prompt_pagos === "string" && parsed.prompt_pagos.length > 0
+          ? parsed.prompt_pagos
+          : null,
     };
   } catch {
     return DEFAULT;
@@ -61,7 +104,7 @@ async function fetchRemote(): Promise<Config> {
   }
   const { data, error } = await supabase
     .from("configuracion")
-    .select("base_url,minimax_api_key,model")
+    .select("base_url,minimax_api_key,model,prompt_pagos")
     .maybeSingle();
   if (error) {
     // Log diagnóstico SIN exponer la API key. Solo registramos campos
@@ -81,6 +124,7 @@ async function fetchRemote(): Promise<Config> {
     base_url: (data.base_url as string) || DEFAULT.base_url,
     minimax_api_key: (data.minimax_api_key as string | null) ?? null,
     model: (data.model as string) || DEFAULT.model,
+    prompt_pagos: (data.prompt_pagos as string | null) ?? null,
   };
 }
 
@@ -169,6 +213,10 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
             ? next.minimax_api_key
             : data.minimax_api_key,
         model: next.model ?? data.model,
+        prompt_pagos:
+          next.prompt_pagos !== undefined
+            ? next.prompt_pagos
+            : data.prompt_pagos,
       };
 
       // 1) Actualiza local + localStorage inmediatamente (no bloquea la UI).
@@ -196,6 +244,7 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
               base_url: merged.base_url,
               minimax_api_key: merged.minimax_api_key,
               model: merged.model,
+              prompt_pagos: merged.prompt_pagos,
             },
             { onConflict: "user_id" },
           )

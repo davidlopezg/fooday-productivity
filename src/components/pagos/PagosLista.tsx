@@ -10,17 +10,36 @@ import {
   fetchPagosPorFechaProgramada,
   fetchPagosUrgentes,
 } from "@/lib/pagos/queries";
-import { refreshPagosVencidos } from "@/lib/pagos/mutations";
+import {
+  aplicarSugerenciasPagos,
+  refreshPagosVencidos,
+} from "@/lib/pagos/mutations";
+import {
+  DEFAULT_PROMPT_PAGOS,
+  useConfig,
+} from "@/lib/configStore";
+import {
+  sugerirPagosIA,
+  type SugerirPagosResultado,
+} from "@/lib/pagos/sugerirPagosIA";
 import { localYMD } from "@/lib/semana";
 import { PagoCard } from "@/components/pagos/PagoCard";
 import { PagoFormModal } from "@/components/pagos/PagoFormModal";
 import { PagoPagarParcialModal } from "@/components/pagos/PagoPagarParcialModal";
 import { RecurrentesManager } from "@/components/pagos/RecurrentesManager";
+import { SugerirPagosModal } from "@/components/pagos/SugerirPagosModal";
 import {
   type EstadoPago,
   type PagoConUrgencia,
 } from "@/lib/pagos/types";
-import { IconPlus, IconRepeat, IconSearch, IconX } from "@/components/icons";
+import {
+  IconPlus,
+  IconRepeat,
+  IconSearch,
+  IconSparkles,
+  IconX,
+} from "@/components/icons";
+import { errorMessage } from "@/lib/errors";
 
 /** Estado del modal activo. Solo uno a la vez. */
 type ModalState =
@@ -28,6 +47,7 @@ type ModalState =
   | { tipo: "editar"; pago: PagoConUrgencia }
   | { tipo: "parcial"; pago: PagoConUrgencia }
   | { tipo: "recurrentes" }
+  | { tipo: "sugerirPagos" }
   | null;
 
 /** Filtra una lista de pagos por texto libre (proveedor o concepto).
@@ -68,6 +88,36 @@ function proximoLunesISO(): string {
   return localYMD(lunes);
 }
 
+/** Devuelve los próximos N lunes (incluido el primero si hoy es lunes) como
+ *  YYYY-MM-DD locales. Usado por la IA para que solo pueda proponer fechas
+ *  que David va a tener disponibles. */
+function proximosNLunes(n: number): string[] {
+  const out: string[] = [];
+  const base = new Date();
+  const dow = base.getDay() === 0 ? 7 : base.getDay(); // ISO: 1=lun, 7=dom
+  const diff = (8 - dow) % 7; // 0 si ya es lunes
+  base.setDate(base.getDate() + diff);
+  for (let i = 0; i < n; i++) {
+    out.push(localYMD(base));
+    base.setDate(base.getDate() + 7);
+  }
+  return out;
+}
+
+/** Día de la semana en español (en minúscula) para mostrar en prompts. */
+function diaSemanaES(d: Date): string {
+  const nombres = [
+    "domingo",
+    "lunes",
+    "martes",
+    "miércoles",
+    "jueves",
+    "viernes",
+    "sábado",
+  ];
+  return nombres[d.getDay()];
+}
+
 type Tab = "lunes" | "pendientes" | "historico";
 
 const TABS: { key: Tab; label: string; descripcion: string }[] = [
@@ -82,6 +132,19 @@ export function PagosLista() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [modal, setModal] = useState<ModalState>(null);
   const [busqueda, setBusqueda] = useState("");
+
+  // -------- Estado del botón IA "Sugerir pagos del próximo mes" --------
+  const { data: cfg } = useConfig();
+  const [sugResultado, setSugResultado] =
+    useState<SugerirPagosResultado | null>(null);
+  const [sugBusy, setSugBusy] = useState(false);
+  const [sugError, setSugError] = useState<string | null>(null);
+  const [sugApplyingId, setSugApplyingId] = useState<string | null>(null);
+  const [sugAppliedOk, setSugAppliedOk] = useState<string | null>(null);
+  const [sugAppliedFail, setSugAppliedFail] = useState<string[]>([]);
+  // Próximos 6 lunes que el caller pasa a la IA para que solo pueda
+  // proponer fechas válidas.
+  const lunesIA = useMemo(() => proximosNLunes(6), []);
 
   // Datos del tab "lunes": programado para el próximo lunes + urgentes pr. 7d
   const lunesISO = useMemo(() => proximoLunesISO(), []);
@@ -135,6 +198,110 @@ export function PagosLista() {
     setRefreshKey((k) => k + 1);
     router.refresh();
   };
+
+  // ---- Handlers del botón IA "Sugerir pagos del próximo mes" ----
+  function abrirSugerirPagos() {
+    setSugResultado(null);
+    setSugError(null);
+    setSugAppliedOk(null);
+    setSugAppliedFail([]);
+    setModal({ tipo: "sugerirPagos" });
+    void generarSugerenciasPagos();
+  }
+
+  async function generarSugerenciasPagos() {
+    if (!cfg?.minimax_api_key) {
+      setSugError(
+        "No hay API key de MiniMax configurada. Ve a /configuracion para añadir una.",
+      );
+      return;
+    }
+    setSugBusy(true);
+    setSugError(null);
+    setSugResultado(null);
+    try {
+      const hoy = new Date();
+      // Solo mandamos a la IA los pagos activos sobre los que tiene sentido
+      // decidir: pendiente, programado, vencido, pagado_parcial. NO
+      // históricos (pagado / anulado) — el caller los lista aparte.
+      const pagosActivos = pendientesQ.data;
+      const res = await sugerirPagosIA(cfg.base_url, cfg.minimax_api_key, cfg.model, {
+        pagos: pagosActivos,
+        promptUsuario: cfg.prompt_pagos,
+        fecha: localYMD(hoy),
+        diaSemana: diaSemanaES(hoy),
+        proximosLunes: lunesIA,
+      });
+      setSugResultado(res);
+    } catch (e) {
+      setSugError(errorMessage(e));
+    } finally {
+      setSugBusy(false);
+    }
+  }
+
+  async function aplicarSugerenciaIndividual(
+    pagoId: string,
+    fecha: string,
+  ): Promise<boolean> {
+    setSugApplyingId(pagoId);
+    setSugAppliedOk(null);
+    try {
+      const r = await aplicarSugerenciasPagos([
+        { pagoId, fechaProgramada: fecha },
+      ]);
+      if (r.aplicadas === 1) {
+        setSugAppliedOk("Programado correctamente.");
+        setSugAppliedFail((prev) => prev.filter((x) => x !== pagoId));
+        await reload();
+        return true;
+      }
+      setSugError(
+        r.fallidas[0]?.error ?? "No se pudo aplicar la sugerencia.",
+      );
+      setSugAppliedFail((prev) =>
+        prev.includes(pagoId) ? prev : [...prev, pagoId],
+      );
+      return false;
+    } catch (e) {
+      setSugError(errorMessage(e));
+      setSugAppliedFail((prev) =>
+        prev.includes(pagoId) ? prev : [...prev, pagoId],
+      );
+      return false;
+    } finally {
+      setSugApplyingId(null);
+    }
+  }
+
+  async function aplicarSugerenciasSeleccionadas(
+    seleccionados: string[],
+  ) {
+    if (!sugResultado || seleccionados.length === 0) return;
+    setSugBusy(true);
+    setSugError(null);
+    setSugAppliedOk(null);
+    setSugAppliedFail([]);
+    try {
+      const items = sugResultado.sugerencias
+        .filter((s) => seleccionados.includes(s.pago_id))
+        .map((s) => ({ pagoId: s.pago_id, fechaProgramada: s.fecha_pago_programada }));
+      const r = await aplicarSugerenciasPagos(items);
+      const ok = r.aplicadas;
+      const fail = r.fallidas;
+      setSugAppliedOk(
+        fail.length === 0
+          ? `${ok} ${ok === 1 ? "pago programado" : "pagos programados"} correctamente.`
+          : `${ok} aplicadas, ${fail.length} fallaron (revisa la conexión o RLS).`,
+      );
+      setSugAppliedFail(fail.map((f) => f.pagoId));
+      await reload();
+    } catch (e) {
+      setSugError(errorMessage(e));
+    } finally {
+      setSugBusy(false);
+    }
+  }
 
   const isLoading =
     lunesQ.loading ||
@@ -223,6 +390,16 @@ export function PagosLista() {
               </button>
             )}
           </div>
+          <button
+            type="button"
+            onClick={abrirSugerirPagos}
+            disabled={sugBusy}
+            className="inline-flex items-center gap-1.5 rounded-md bg-gradient-to-r from-violet-600 to-indigo-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:opacity-90 disabled:opacity-50"
+            title="La IA analiza tus pagos activos y sugiere programación para los próximos 6 lunes (snowball + ingresos viernes/sábado). Solo sugiere; tú decides."
+          >
+            <IconSparkles className="h-4 w-4" />
+            {sugBusy ? "Pensando…" : "Sugerir pagos"}
+          </button>
           <button
             type="button"
             onClick={() => setModal({ tipo: "recurrentes" })}
@@ -411,6 +588,21 @@ export function PagosLista() {
         <RecurrentesManager
           onClose={() => setModal(null)}
           onChanged={reload}
+        />
+      )}
+      {modal?.tipo === "sugerirPagos" && (
+        <SugerirPagosModal
+          resultado={sugResultado}
+          pagos={pendientesQ.data}
+          lunesValidos={lunesIA}
+          busy={sugBusy}
+          error={sugError}
+          applyingId={sugApplyingId}
+          appliedOk={sugAppliedOk}
+          appliedFail={sugAppliedFail}
+          onCancel={() => setModal(null)}
+          onAplicarUna={aplicarSugerenciaIndividual}
+          onAplicarTodas={aplicarSugerenciasSeleccionadas}
         />
       )}
     </div>
