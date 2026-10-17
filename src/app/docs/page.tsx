@@ -177,7 +177,7 @@ const FEATURES: Array<{ ruta: string; proposito: string; docs: string }> = [
   { ruta: "/metas/agente", proposito: "Agente IA: contexto libre → meta + plan trimestral completo (atajo directo a meta; la entrada unificada es /agente)", docs: "Pilar 2 · HelpDrawer" },
   { ruta: "/agente", proposito: "Agente unificado: clasifica la idea (proyecto/meta/captura) y propone estructura. Bucle de aplicación con 2 pases + árbitro adversarial que verifica que el 100% de las metas hijas se persistan en Supabase antes de redirigir; si hay gap muestra panel con nombres faltantes y motivo del error. Fase 2 automática: tras crear metas+KRs iniciales, genera el plan completo (KRs+tareas+hábitos) por meta con generarPlanMetaIA + aplicarKrsYTareasEnMeta. Pre-bucle: getSession() para evitar fallo de RLS por JWT transitorio + backoff de 50ms entre inserts. Detección de PGRST303 (reloj desincronizado) con banner en AppShell + panel diagnóstico. migration 0024", docs: "Pilar 2 · HelpDrawer" },
   { ruta: "/metas/auditoria", proposito: "Auditoría de metas: qué les falta (área, proyecto, fecha objetivo, contexto, KRs). migration 0024", docs: "Pilar 2 · HelpDrawer" },
-  { ruta: "/metas/detalle", proposito: "Detalle de una meta con sus KRs por trimestre/mes + tareas por KR + botones Editar/✨ Generar plan con IA (KRs+tareas+hábitos, respeta KRs existentes) + Archivar + WIG + asignar tareas del inbox", docs: "Pilar 2 · HelpDrawer" },
+  { ruta: "/metas/detalle", proposito: "Detalle de una meta con sus KRs (uno o varios por trimestre/mes) + tareas por KR + botones Editar/✨ Generar plan con IA (KRs+tareas+hábitos, respeta KRs existentes por título) + Archivar + WIG + asignar tareas del inbox. Migration 0028: ya no hay UNIQUE por (meta, trimestre) — puedes tener N KRs en el mismo trimestre.", docs: "Pilar 2 · HelpDrawer" },
   { ruta: "/metas/plan", proposito: "Plan trimestral con scorecard de KRs + proyección", docs: "Pilar 2 · Ritual semanal (domingo) · Ritual mensual · HelpDrawer" },
   { ruta: "/plan-diario", proposito: "Estado emocional + plan diario generado por IA", docs: "Rituales §1 (mañana) · HelpDrawer" },
   { ruta: "/plan-diario/detalle", proposito: "Detalle de un plan con notas e informe", docs: "Sub-ruta de /plan-diario" },
@@ -2579,6 +2579,37 @@ export default function DocsPage() {
               <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/pagos</code>{" "}
               marcado como estricto), ritual mensual (revisión profunda de
               OKR) y 3 hábitos innegociables.
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-amber-700 dark:text-amber-400 sm:text-sm">
+              2025-10-15
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">Migration 0028 — KR separado del trimestre.</strong>{" "}
+              Bug histórico: <code className="rounded bg-muted px-1.5 py-0.5 text-xs">unique(meta_id, periodo_id)</code> en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">resultados_periodo</code>{" "}
+              forzaba “1 KR por trimestre”. David reportaba “solo puedo poner
+              un KR por meta”. Refactor: la tabla{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">resultados_periodo</code>{" "}
+              ahora modela el KR (sin trimestre). La asignación a 1..N
+              trimestres/meses se hace en la nueva tabla puente{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">kr_periodos</code>.{" "}
+              <strong className="text-foreground">Ya puedes tener N KRs por meta, y cada KR puede vivir en varios trimestres.</strong>{" "}
+              Tareas siguen en <code className="rounded bg-muted px-1.5 py-0.5 text-xs">tareas.resultado_periodo_id</code>{" "}
+              apuntando al KR (la columna se mantiene; el nombre es legacy).
+              UI: <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas/detalle</code>{" "}
+              permite seleccionar 1..N trimestres al añadir un KR;{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas/plan</code>{" "}
+              muestra todos los KRs de cada trimestre (puede haber varios).
+              IA: <code className="rounded bg-muted px-1.5 py-0.5 text-xs">aplicarKrsYTareasEnMeta</code>{" "}
+              ahora deduplica por TÍTULO del KR (no por trimestre). Seed nuevo:{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">001b_seed_metas_2026_kr.sql</code>{" "}
+              (sustituye al 001 legacy, que queda documentado como
+              pre-0028). <strong className="text-foreground">Acción manual</strong>:{" "}
+              ejecutar{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">supabase/APLICAR-0028.sql</code>{" "}
+              en el SQL Editor para migrar la BD.
             </span>
           </li>
         </ul>

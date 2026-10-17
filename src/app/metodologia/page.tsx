@@ -77,7 +77,7 @@ const LAG_VS_LEAD: { dimension: string; lag: string; lead: string }[] = [
   },
   {
     dimension: "En la app",
-    lag: "Tabla `metas` + `periodos` + `resultados_periodo` (los KRs viven aquí, ver /metas/plan). Desde la migración 0025, dos campos reales en `metas` (`fecha_inicio_meta`, `fecha_objetivo` + flag `fecha_fin_bloqueada`) definen el rango real de la meta — la IA reparte los KRs SOLO dentro de ese rango, como meses sueltos (no siempre 4 trimestres). El campo libre `plazo` queda como legacy.",
+    lag: "Tabla `metas` + `periodos` + `resultados_periodo` (los KRs viven aquí, ver /metas/plan). Desde la migración 0025, dos campos reales en `metas` (`fecha_inicio_meta`, `fecha_objetivo` + flag `fecha_fin_bloqueada`) definen el rango real de la meta — la IA reparte los KRs SOLO dentro de ese rango, como meses sueltos (no siempre 4 trimestres). El campo libre `plazo` queda como legacy. Migration 0028: la tabla `resultados_periodo` ya no tiene `periodo_id`; un KR puede vivir en uno o varios trimestres/meses a través de la tabla puente `kr_periodos` (N:M). Eso elimina el límite “1 KR por trimestre” que el usuario vivía como bug.",
     lead: "Columna `es_wig` en `metas` (panel violeta) y en `tareas` (panel fucsia).",
   },
 ];

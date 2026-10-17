@@ -124,16 +124,24 @@ export default function MetaDetallePage() {
     return partes.join(". ");
   }, [plan?.meta.proyecto_id, proyectosQ.data, areasQ.data]);
 
-  // Trimestres del año actual que NO tienen aún un resultado en esta meta.
-  // Se usan para el selector "+ Añadir resultado".
-  // (useMemo antes de cualquier return temprano: regla de hooks.)
-  const trimestresLibres = useMemo(() => {
-    if (!plan || !periodos) return [];
-    const usados = new Set(plan.resultados.map((r) => r.periodo_id));
+  // Periodos del año actual para el selector "+ Añadir KR".
+  // Migration 0028: ya NO filtramos por trimestresLibres — un KR puede
+  // coexistir con otros en el mismo trimestre. Pasamos todos los
+  // periodos del año (trimestres + meses) para que el usuario pueda
+  // asignar el nuevo KR a 1..N de ellos.
+  const periodosAnioActual = useMemo(() => {
+    if (!periodos) return [];
     return periodos
-      .filter((p) => p.tipo === "trimestre" && p.anio === anioActual && !usados.has(p.id))
-      .sort((a, b) => a.numero - b.numero);
-  }, [plan, periodos, anioActual]);
+      .filter((p) => p.anio === anioActual)
+      .sort((a, b) => {
+        // Trimestres primero (orden natural Q1..Q4) luego meses.
+        if (a.tipo !== b.tipo) {
+          if (a.tipo === "trimestre") return -1;
+          if (b.tipo === "trimestre") return 1;
+        }
+        return a.numero - b.numero;
+      });
+  }, [periodos, anioActual]);
 
   /** Construye el Map que espera aplicarKrsYTareasEnMeta: clave
    *  "trimestre:N" o "mes:N" → {id, tipo}. Necesario para resolver
@@ -445,7 +453,7 @@ export default function MetaDetallePage() {
           <section className="space-y-3">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                Trimestres y resultados
+                Key Results (uno o varios por trimestre)
               </h2>
               <button
                 onClick={async () => {
@@ -462,7 +470,7 @@ export default function MetaDetallePage() {
             {plan.resultados.length === 0 ? (
               <div className="rounded-xl border border-dashed border-border bg-muted/30 p-6 text-center text-sm text-muted-foreground">
                 Esta meta aún no tiene resultados por trimestre.{" "}
-                {trimestresLibres.length > 0
+                {periodosAnioActual.length > 0
                   ? "Usa el selector de abajo para añadir el primero."
                   : "Asegúrate de tener periodos creados y añade un resultado."}
               </div>
@@ -485,9 +493,9 @@ export default function MetaDetallePage() {
               </div>
             )}
 
-            {trimestresLibres.length > 0 && (
+            {periodosAnioActual.length > 0 && (
               <NuevoResultadoForm
-                periodosLibres={trimestresLibres}
+                periodos={periodosAnioActual}
                 metaId={plan.meta.id}
                 onCreated={async () => {
                   await planQ.reload();
@@ -669,9 +677,29 @@ function ResultadoCard({
       <header className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="rounded bg-muted px-1.5 py-0.5 font-medium">
-              {resultado.periodo.nombre}
-            </span>
+            {/* Migration 0028: un KR puede vivir en 1..N periodos. Si
+                hay varios, mostramos todos como chips; si hay 1, mostramos
+                solo el nombre. Si no hay ninguno, mostramos "sin trimestre". */}
+            {resultado.periodos.length === 0 ? (
+              <span className="rounded bg-amber-500/10 px-1.5 py-0.5 font-medium text-amber-700 dark:text-amber-400">
+                sin trimestre
+              </span>
+            ) : resultado.periodos.length === 1 ? (
+              <span className="rounded bg-muted px-1.5 py-0.5 font-medium">
+                {resultado.periodo.nombre}
+              </span>
+            ) : (
+              <div className="flex flex-wrap gap-1">
+                {resultado.periodos.map((p) => (
+                  <span
+                    key={p.id}
+                    className="rounded bg-muted px-1.5 py-0.5 font-medium"
+                  >
+                    {p.nombre}
+                  </span>
+                ))}
+              </div>
+            )}
             <span
               className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${
                 ESTADO_RESULTADO[resultado.estado] ?? ESTADO_RESULTADO.pendiente
@@ -908,15 +936,20 @@ function AsignarExistente({
 }
 
 function NuevoResultadoForm({
-  periodosLibres,
+  periodos,
   metaId,
   onCreated,
 }: {
-  periodosLibres: Periodo[];
+  /** Migration 0028: ahora se pasan TODOS los periodos (no solo los
+   *  "libres"), porque un KR puede coexistir con otros en el mismo
+   *  trimestre. Antes: `periodosLibres`. */
+  periodos: Periodo[];
   metaId: string;
   onCreated: () => Promise<void> | void;
 }) {
-  const [periodoId, setPeriodoId] = useState(periodosLibres[0]?.id ?? "");
+  const [periodoIds, setPeriodoIds] = useState<string[]>(
+    periodos[0] ? [periodos[0].id] : [],
+  );
   const [titulo, setTitulo] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [metrica, setMetrica] = useState("");
@@ -925,9 +958,15 @@ function NuevoResultadoForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  function togglePeriodo(id: string) {
+    setPeriodoIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  }
+
   async function crear() {
-    if (!titulo.trim() || !periodoId) {
-      setError("Título y trimestre son obligatorios.");
+    if (!titulo.trim()) {
+      setError("El título es obligatorio.");
       return;
     }
     setBusy(true);
@@ -938,9 +977,12 @@ function NuevoResultadoForm({
         setError("El valor objetivo tiene que ser numérico.");
         return;
       }
+      // Migration 0028: el KR puede tener 1..N periodos. Si no se
+      // selecciona ninguno, se crea HUÉRFANO (sin trimestre) — la UI lo
+      // mostrará como "sin trimestre" para que el usuario lo corrija.
       await crearResultadoPeriodo({
         meta_id: metaId,
-        periodo_id: periodoId,
+        periodo_ids: periodoIds,
         titulo,
         descripcion: descripcion.trim() || null,
         metrica: metrica.trim() || null,
@@ -952,6 +994,7 @@ function NuevoResultadoForm({
       setMetrica("");
       setValorObjetivo("");
       setUnidad("");
+      setPeriodoIds(periodos[0] ? [periodos[0].id] : []);
       await onCreated();
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo crear el resultado.");
@@ -960,27 +1003,47 @@ function NuevoResultadoForm({
     }
   }
 
-  if (periodosLibres.length === 0) return null;
+  if (periodos.length === 0) return null;
   return (
     <section className="rounded-xl border border-dashed border-border bg-card/50 p-4">
-      <h3 className="text-sm font-semibold">Añadir resultado esperado</h3>
+      <h3 className="text-sm font-semibold">Añadir Key Result</h3>
       <p className="mt-0.5 text-xs text-muted-foreground">
-        Solo los trimestres del {new Date().getFullYear()} sin resultado aún.
+        Un KR es un resultado medible dentro de la meta. Puede vivir en uno
+        o varios trimestres/meses — selecciona los que correspondan. Tras
+        este cambio (migration 0028) puedes añadir varios KRs al mismo
+        trimestre.
       </p>
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
         <label className="block sm:col-span-2">
-          <span className="mb-1 block text-xs font-medium">Trimestre *</span>
-          <select
-            value={periodoId}
-            onChange={(e) => setPeriodoId(e.target.value)}
-            className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
-          >
-            {periodosLibres.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.nombre} ({p.fecha_inicio} → {p.fecha_fin})
-              </option>
-            ))}
-          </select>
+          <span className="mb-1 block text-xs font-medium">Trimestres / meses</span>
+          <div className="flex flex-wrap gap-1.5">
+            {periodos.map((p) => {
+              const sel = periodoIds.includes(p.id);
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => togglePeriodo(p.id)}
+                  className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs ${
+                    sel
+                      ? "border-primary bg-primary/10 text-foreground"
+                      : "border-border bg-background text-muted-foreground hover:bg-accent"
+                  }`}
+                  aria-pressed={sel}
+                >
+                  <span
+                    className={`h-2 w-2 rounded-sm ${sel ? "bg-primary" : "bg-muted-foreground/30"}`}
+                    aria-hidden
+                  />
+                  {p.nombre}
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-1 text-[10px] text-muted-foreground">
+            Si no seleccionas ninguno, el KR queda "sin trimestre" hasta que
+            lo corrijas.
+          </p>
         </label>
         <label className="block sm:col-span-2">
           <span className="mb-1 block text-xs font-medium">Título *</span>

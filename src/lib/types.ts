@@ -120,10 +120,19 @@ export interface Meta {
 }
 
 // ============================================================================
-// Plan trimestral (migration 0015)
-// Capa nueva: metas → periodos → resultados → tareas. La tabla `metas` y
-// `tareas` no se modifican (salvo +1 columna `resultado_periodo_id` en
-// tareas). Convive con `okrs` / `key_results` / `hitos` ya existentes.
+// Plan trimestral (migration 0015 + 0028)
+// Migration 0028 (KR separado del trimestre):
+//   · ANTES:  resultados_periodo = "KR-por-trimestre"
+//             unique(meta_id, periodo_id) → solo 1 KR por (meta, trimestre).
+//   · AHORA:  resultados_periodo = entidad "KR" (sin trimestre propio).
+//             Una meta puede tener N KRs.
+//             Un KR vive en uno o varios trimestres/meses a través de la
+//             tabla puente `kr_periodos`.
+//             Las tareas siguen apuntando a un KR (tareas.resultado_periodo_id
+//             = kr_id).
+//
+// El nombre de la tabla `resultados_periodo` se mantiene por compatibilidad
+// (PostgREST la publica así), pero el código la trata como "KR".
 // ============================================================================
 
 /** Fila persistida en `periodos`. Rango temporal con tipo flexible
@@ -145,12 +154,27 @@ export type EstadoResultado =
   | "completado"
   | "descartado";
 
-/** Fila persistida en `resultados_periodo` (resultado esperado por
- *  trimestre/mes dentro de una meta). */
+/** Fila persistida en `kr_periodos` (asignación N:M KR↔periodo).
+ *  Migration 0028. */
+export interface KrPeriodo {
+  id: string;
+  owner_id?: string;
+  kr_id: string;
+  periodo_id: string;
+  peso: number;
+  orden: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/** Fila persistida en `resultados_periodo` (= un KR).
+ *  Migration 0028: ya NO tiene `periodo_id` directo; el/los periodo(s)
+ *  del KR viven en `kr_periodos`.
+ *  Alias semántico recomendado: `KeyResult`. `ResultadoPeriodo` se
+ *  mantiene como alias para no romper imports existentes. */
 export interface ResultadoPeriodo {
   id: string;
   meta_id: string;
-  periodo_id: string;
   titulo: string;
   descripcion: string | null;
   metrica: string | null;
@@ -160,29 +184,42 @@ export interface ResultadoPeriodo {
   estado: EstadoResultado;
   peso: number;
   orden: number;
-  /** Trigger `set_updated_at` (migration 0015). Igual que en `Meta`, la
-   *  exponemos opcional para poder filtrar KRs por fecha de completado. */
+  /** Trigger `set_updated_at` (migration 0015). */
   updated_at?: string;
   created_at?: string;
 }
 
-/** Vista agregada: un resultado con su periodo y sus tareas anidadas.
- *  Es lo que devuelve `fetchMetaConPlan` y `fetchPlanTrimestral`. */
+/** Alias semántico recomendado para `ResultadoPeriodo` (migration 0028).
+ *  En BD sigue llamándose `resultados_periodo` por compatibilidad, pero
+ *  el código lo trata como un KR. Usa `KeyResult` en código nuevo. */
+export type KeyResult = ResultadoPeriodo;
+
+/** Vista agregada: un KR con sus periodos y sus tareas anidadas.
+ *  Migration 0028: `periodos: Periodo[]` (1..N), no `periodo: Periodo`. */
 export interface ResultadoConTareas extends ResultadoPeriodo {
+  /** Lista de periodos en los que vive este KR (1..N). Ordenados por
+   *  `kr_periodos.orden` ascendente. Migration 0028. */
+  periodos: Periodo[];
+  /** Periodo "principal" del KR (el de menor `orden` en `kr_periodos`).
+   *  Conveniencia para vistas que muestran "Q1 · KR" en una sola línea.
+   *  Migration 0028. */
   periodo: Periodo;
   tareas: Tarea[];
 }
 
-/** Meta con sus resultados (cada uno con su periodo + tareas) y
- *  métricas calculadas en cliente. */
+/** Alias semántico recomendado para `ResultadoConTareas` (migration 0028). */
+export type KeyResultConTareas = ResultadoConTareas;
+
+/** Meta con sus KRs (cada uno con sus periodos + tareas) y métricas
+ *  calculadas en cliente. */
 export interface MetaConPlan {
   meta: Meta;
   resultados: ResultadoConTareas[];
-  /** Nº total de tareas vinculadas (en todos los resultados). */
+  /** Nº total de tareas vinculadas (en todos los KRs). */
   total_tareas: number;
   /** Nº de tareas hechas. */
   tareas_hechas: number;
-  /** Progreso 0..1 (media ponderada por peso de resultado). */
+  /** Progreso 0..1 (media ponderada por peso de KR). */
   progreso: number;
 }
 
@@ -272,8 +309,10 @@ export interface Tarea {
   recurrencia_dia_mes: number | null;
   /** Última fecha en la que se generó la siguiente copia. */
   recurrencia_ultima_generada: string | null;
-  /** FK opcional a `resultados_periodo` (migration 0015). Null = bandeja
-   *  de entrada (tarea suelta, sin meta o meta sin resultado). */
+  /** FK opcional a `resultados_periodo` (migration 0015) — apunta al KR.
+   *  Migration 0028: la tabla `resultados_periodo` ya NO tiene
+   *  `periodo_id`; este FK apunta al KR directamente. Null = bandeja
+   *  de entrada (tarea suelta, sin meta o meta sin KR). */
   resultado_periodo_id: string | null;
   /** Migration 0026: true si la tarea está bloqueada externamente
    *  (esperando respuesta de alguien). Estado SEMÁNTICO independiente
