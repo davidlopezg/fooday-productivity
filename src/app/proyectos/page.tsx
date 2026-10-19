@@ -12,7 +12,7 @@ import {
 import { cargarDatosProyectoParaReporte } from "@/lib/exportarProyecto";
 import { useData } from "@/lib/useData";
 import type { Area, Meta, MetaConPlan, Proyecto, Tarea } from "@/lib/types";
-import { IconArchive, IconFile, IconPencil, IconTarget, IconTrash, IconX } from "@/components/icons";
+import { IconArchive, IconFile, IconFolder, IconPencil, IconTarget, IconTrash, IconX } from "@/components/icons";
 import ProyectoReport from "@/components/ProyectoReport";
 import { EditarProyectoModal } from "@/components/EditarProyectoModal";
 
@@ -238,11 +238,17 @@ export default function ProyectosPage() {
   // Agrupar metas por proyecto. Orden estable: por `codigo` ascendente
   // (que ya devuelve fetchMetas), luego por título como desempate.
   const metasPorProyecto = new Map<string, Meta[]>();
+  // Metas sin proyecto asignado (migration 0024: metas.proyecto_id nullable).
+  // Las mostramos en una sección aparte al final, igual que /areas hace
+  // con los proyectos sin área, para que David no las pierda.
+  const metasHuerfanas: Meta[] = [];
   for (const m of metas) {
     if (m.proyecto_id) {
       const arr = metasPorProyecto.get(m.proyecto_id) ?? [];
       arr.push(m);
       metasPorProyecto.set(m.proyecto_id, arr);
+    } else {
+      metasHuerfanas.push(m);
     }
   }
 
@@ -561,6 +567,59 @@ export default function ProyectosPage() {
             );
           })}
         </ul>
+      )}
+
+      {metasHuerfanas.length > 0 && (
+        <section className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+          <h2 className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+            ⚠️ {metasHuerfanas.length} meta{metasHuerfanas.length === 1 ? "" : "s"} sin proyecto
+          </h2>
+          <p className="mt-1 text-xs text-amber-700/80 dark:text-amber-300/80">
+            Estas metas no tienen proyecto asignado. Para vincularlas a uno,
+            edítalas desde{" "}
+            <Link href="/metas" className="underline">
+              /metas
+            </Link>
+            .
+          </p>
+          <ul className="mt-3 flex flex-wrap gap-2">
+            {metasHuerfanas.map((m) => {
+              const dotClass: Record<string, string> = {
+                sin_empezar: "bg-slate-400",
+                en_progreso: "bg-amber-500",
+                bloqueada: "bg-red-500",
+                completada: "bg-emerald-500",
+                archivada: "bg-slate-300",
+              };
+              return (
+                <li
+                  key={m.id}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/30 bg-background px-2 py-1 text-xs"
+                >
+                  <IconFolder className="h-3 w-3 text-amber-700 dark:text-amber-300" />
+                  <span
+                    className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${
+                      dotClass[m.estado] ?? "bg-slate-400"
+                    }`}
+                    aria-hidden
+                  />
+                  <Link
+                    href={`/metas/detalle?id=${m.id}`}
+                    className="text-foreground hover:underline"
+                    title={m.titulo}
+                  >
+                    {m.codigo ? (
+                      <span className="mr-1 font-mono text-[10px] text-muted-foreground">
+                        {m.codigo}
+                      </span>
+                    ) : null}
+                    {m.titulo}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
       )}
 
       <ReporteModal datos={reporte} onCerrar={() => setReporte(null)} />
