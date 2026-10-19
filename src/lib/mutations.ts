@@ -1319,7 +1319,7 @@ export async function aplicarPropuestaIA(payload: {
 // ============================================================================
 // Proyectos — CRUD (migration 0012)
 // ============================================================================
-import type { Proyecto, RecurrenciaTipo, TareaComentario } from "@/lib/types";
+import type { Area, Proyecto, RecurrenciaTipo, TareaComentario } from "@/lib/types";
 
 export async function crearProyecto(datos: {
   nombre: string;
@@ -1486,6 +1486,59 @@ export async function archivarProyectoEnCascada(
 export async function eliminarProyecto(id: string): Promise<void> {
   const { error } = await createClient().from("proyectos").delete().eq("id", id);
   if (error) throw new Error(`No se pudo eliminar: ${error.message}`);
+}
+
+// ============================================================================
+// Áreas — CRUD (migration 0001)
+// ============================================================================
+// La tabla `areas` ya tiene `owner_id = auth.uid()` por defecto y la
+// política RLS `own_insert/own_update/own_delete` está activa (migration
+// 0001), así que no necesitamos pasar `owner_id` en los inserts: lo
+// rellena el propio Postgres. `ON DELETE SET NULL` en las FKs hace que
+// proyectos/metas/tareas con esta área pasen a `area_id=null` (huérfanos)
+// si se elimina el área — NO se borra nada del árbol.
+
+export async function crearArea(datos: {
+  nombre: string;
+  color?: string;
+  orden?: number;
+}): Promise<Area> {
+  const supabase = createClient();
+  // Si no nos pasan `orden`, lo colocamos al final (max(orden)+1).
+  let orden = datos.orden;
+  if (orden == null) {
+    const { data: existing } = await supabase
+      .from("areas")
+      .select("orden")
+      .order("orden", { ascending: false })
+      .limit(1);
+    const maxOrden = (existing?.[0]?.orden as number | undefined) ?? -1;
+    orden = maxOrden + 1;
+  }
+  const { data, error } = await supabase
+    .from("areas")
+    .insert({
+      nombre: datos.nombre.trim(),
+      color: datos.color ?? "#64748b",
+      orden,
+    })
+    .select("id,nombre,color,orden")
+    .single();
+  if (error || !data) throw new Error(`No se pudo crear el área: ${error?.message}`);
+  return data as Area;
+}
+
+export async function actualizarArea(id: string, campos: Partial<Omit<Area, "id">>): Promise<void> {
+  const { error } = await createClient()
+    .from("areas")
+    .update(campos)
+    .eq("id", id);
+  if (error) throw new Error(`No se pudo actualizar el área: ${error.message}`);
+}
+
+export async function eliminarArea(id: string): Promise<void> {
+  const { error } = await createClient().from("areas").delete().eq("id", id);
+  if (error) throw new Error(`No se pudo eliminar el área: ${error.message}`);
 }
 
 // ============================================================================

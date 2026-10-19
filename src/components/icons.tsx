@@ -315,3 +315,12 @@ export const IconAlertTriangle = (p: IconProps) => (
   </svg>
 );
 
+/** Capas apiladas — para Áreas de responsabilidad. */
+export const IconLayers = (p: IconProps) => (
+  <svg {...base} {...p}>
+    <path d="m12 2 9 5-9 5-9-5 9-5Z" />
+    <path d="m3 12 9 5 9-5" />
+    <path d="m3 17 9 5 9-5" />
+  </svg>
+);
+

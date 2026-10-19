@@ -192,6 +192,7 @@ const FEATURES: Array<{ ruta: string; proposito: string; docs: string }> = [
 
   // ── Identidad y horizonte ──
   { ruta: "/norte", proposito: "Propósito, valores y visión (la brújula)", docs: "Pilar 2 · Ritual diario (despertar) · Ritual mensual · HelpDrawer" },
+  { ruta: "/areas", proposito: "Áreas de responsabilidad (ámbitos continuos sin fecha de cierre). CRUD + listado de proyectos hijos por área + sección 'Sin área' para huérfanos. Migración 0001 (la tabla ya existía; aquí se le da página propia estilo /proyectos). Icono IconLayers. Reordenado en el sidebar Estrategia (posición 2, entre Norte y Proyectos)", docs: "Pilar 2 · HelpDrawer" },
 
   // ── Sistema ──
   { ruta: "/pagos", proposito: "Pagos pendientes: ejecutar tesorería lunes 1ª hora + botón IA “✨ Sugerir pagos” (migration 0027) que analiza los pagos activos y propone programación para los próximos 6 lunes aplicando el prompt editable en /configuracion (snowball por defecto, ingresos viernes/sábado). Modal de revisión estilo SugerirWigs: la IA sugiere, tú marcas qué incluir, botón “Aplicar N marcadas” actualiza solo fecha_pago_programada y estado=programado (no registra pagos parciales). Prompt editable en /configuracion §Prompt de pagos (columna prompt_pagos)", docs: "Apéndice §Bucle de equilibrio · Ritual semanal (lunes estricto) · HelpDrawer" },
@@ -503,7 +504,7 @@ export default function DocsPage() {
             2026-10-15
           </span>
           <span className="text-muted-foreground">
-            — migration 0025: las metas pasan a tener rango real (fecha_inicio_meta + fecha_objetivo + fecha_fin_bloqueada). El planificador reparte los KRs como meses sueltos dentro del rango, no fuerza 4 trimestres. /metas/nueva con dos date inputs + checkbox 🔒 Fecha crítica. Helpers nuevos: parsearMesesDeRango() y ensurePeriodosMeses() (RPC ensure_periodos_meses).
+            — <strong className="text-foreground">Reordenado el menú Estrategia y nueva página /areas.</strong> Bloque "Estrategia" del sidebar pasa a (en este orden): 1. Norte · 2. Áreas · 3. Proyectos · 4. Metas · 5. Agente · 6. Plan trimestral. Las áreas son las áreas de responsabilidad (ya existían en BD, tabla migration 0001) y ahora tienen página propia estilo /proyectos con CRUD (crear/editar/eliminar, color) + listado de proyectos hijos por área + sección "sin área" para huérfanos. Mutaciones nuevas en <code className="rounded bg-muted px-1.5 py-0.5 text-xs">src/lib/mutations.ts</code>: <code className="rounded bg-muted px-1.5 py-0.5 text-xs">crearArea()</code>, <code className="rounded bg-muted px-1.5 py-0.5 text-xs">eliminarArea()</code> y update inline vía supabase (RLS ya cubierta por migration 0001). Icono nuevo <code className="rounded bg-muted px-1.5 py-0.5 text-xs">IconLayers</code>. <strong className="text-foreground">Sin migración</strong>: la tabla areas ya tenía <code className="rounded bg-muted px-1.5 py-0.5 text-xs">ON DELETE SET NULL</code> en las FKs, así que eliminar un área no rompe proyectos (pasan a "Sin área"). También: migration 0025: las metas pasan a tener rango real (fecha_inicio_meta + fecha_objetivo + fecha_fin_bloqueada). El planificador reparte los KRs como meses sueltos dentro del rango, no fuerza 4 trimestres. /metas/nueva con dos date inputs + checkbox 🔒 Fecha crítica. Helpers nuevos: parsearMesesDeRango() y ensurePeriodosMeses() (RPC ensure_periodos_meses).
           </span>
         </div>
       </section>
@@ -1621,6 +1622,39 @@ export default function DocsPage() {
         </header>
 
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
+          <li className="flex gap-3 rounded-lg border border-blue-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-blue-700 dark:text-blue-300 sm:text-sm">
+              2026-10-15
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">Reordenado el menú Estrategia + nueva página /areas.</strong>{" "}
+              Bloque "Estrategia" del sidebar pasa a (en este orden):
+              <strong className="text-foreground"> 1. Norte · 2. Áreas · 3. Proyectos · 4. Metas · 5. Agente · 6. Plan trimestral</strong>.
+              Las áreas son las áreas de responsabilidad (ya existían en BD, tabla{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">areas</code>{" "}
+              migration 0001) y ahora tienen página propia{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/areas</code>{" "}
+              estilo /proyectos con CRUD (crear/editar/eliminar + color) +
+              listado de proyectos hijos por área + sección "⚠️ proyectos sin área"
+              para que David no pierda los huérfanos. Mutaciones nuevas en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">src/lib/mutations.ts</code>:
+              <code className="mx-1 rounded bg-muted px-1.5 py-0.5 text-xs">crearArea()</code>,
+              <code className="mx-1 rounded bg-muted px-1.5 py-0.5 text-xs">eliminarArea()</code>{" "}
+              (el update de nombre/color va inline en la página; podría
+              convertirse en helper dedicado si se reusa). Icono nuevo{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">IconLayers</code>{" "}
+              añadido al final de{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">src/components/icons.tsx</code>.
+              <strong className="text-foreground"> Sin migración nueva</strong>:
+              la tabla <code className="rounded bg-muted px-1.5 py-0.5 text-xs">areas</code> ya
+              tenía políticas RLS (own_insert/own_update/own_delete) y las FKs{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">ON DELETE SET NULL</code>,
+              así que eliminar un área no rompe proyectos (pasan a "Sin área")
+              ni metas ni tareas. FEATURES actualizado (nueva fila /areas bajo
+              "Identidad y horizonte"). Sidebar reordenado (bloque 2).
+              Regla de sincronización AGENTS.md cumplida en esta sesión.
+            </span>
+          </li>
           <li className="flex gap-3 rounded-lg border border-blue-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-blue-700 dark:text-blue-300 sm:text-sm">
               2026-10-15
