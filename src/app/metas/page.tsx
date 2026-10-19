@@ -587,7 +587,11 @@ export default function MetasPage() {
                     eliminarMetaCard(mp);
                   }}
                   disabled={eliminandoId === m.id}
-                  className="rounded-full p-1.5 text-muted-foreground/40 transition-colors hover:bg-accent hover:text-red-500 disabled:opacity-50"
+                  // Color rojo tenue siempre visible (no opacidad 40%) porque
+                  // es una acción destructiva que el usuario debe poder
+                  // encontrar sin tener que hacer hover. Al hover se
+                  // intensifica y se le añade fondo de aviso.
+                  className="rounded-full p-1.5 text-red-500/70 transition-colors hover:bg-red-500/10 hover:text-red-600 disabled:opacity-50"
                   title="Eliminar meta (acción irreversible: tareas y KRs se desvinculan)"
                   aria-label={`Eliminar meta ${m.titulo}`}
                 >
