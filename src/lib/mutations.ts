@@ -1917,6 +1917,20 @@ export async function archivarMeta(id: string, archivada = true): Promise<void> 
   });
 }
 
+/** Elimina una meta físicamente. Las FKs del schema 0001 se encargan del
+ *  impacto en cascada:
+ *    - hitos y okrs de esta meta → ON DELETE CASCADE (se borran).
+ *    - tarea_comentarios con meta_id → ON DELETE CASCADE (se borran).
+ *    - resultados_periodo (KRs) → ON DELETE SET NULL (quedan huérfanos).
+ *    - tareas.meta_id → ON DELETE SET NULL (las tareas NO se borran, solo
+ *      se desvinculan de la meta — siguen vivas en /tareas sin asignar).
+ *  Por eso el confirm previo en la UI avisa del conteo esperado antes de
+ *  borrar: para que el usuario no se lleve sorpresas. */
+export async function eliminarMeta(id: string): Promise<void> {
+  const { error } = await createClient().from("metas").delete().eq("id", id);
+  if (error) throw new Error(`No se pudo eliminar la meta: ${error.message}`);
+}
+
 /** Asegura que existen los 4 trimestres del año (idempotente) llamando
  *  a la RPC `ensure_periodos_anio`. Devuelve la lista completa. */
 export async function ensurePeriodosAnio(anio: number): Promise<Periodo[]> {

@@ -7,6 +7,7 @@ import {
   archivarProyecto,
   archivarProyectoEnCascada,
   crearProyecto,
+  eliminarMeta,
   eliminarProyecto,
 } from "@/lib/mutations";
 import { cargarDatosProyectoParaReporte } from "@/lib/exportarProyecto";
@@ -152,6 +153,8 @@ export default function ProyectosPage() {
   >({});
   /** Proyecto abierto en el modal de edición. Null = modal oculto. */
   const [editando, setEditando] = useState<Proyecto | null>(null);
+  /** ID de la meta que estamos eliminando (escribe el botón del chip). */
+  const [eliminandoMetaId, setEliminandoMetaId] = useState<string | null>(null);
 
   /**
    * Carga los datos del proyecto y abre el modal con la vista previa.
@@ -240,7 +243,10 @@ export default function ProyectosPage() {
   const metasPorProyecto = new Map<string, Meta[]>();
   // Metas sin proyecto asignado (migration 0024: metas.proyecto_id nullable).
   // Las mostramos en una sección aparte al final, igual que /areas hace
-  // con los proyectos sin área, para que David no las pierda.
+  // con los proyectos sin área, para que David no las pierda. Filtramos
+  // las archivadas: ya no son accionables y solo contaminarían la vista.
+  // Si todas las huérfanas están archivadas, no mostramos la sección.
+  const metasHuerfanasTodas: Meta[] = [];
   const metasHuerfanas: Meta[] = [];
   for (const m of metas) {
     if (m.proyecto_id) {
@@ -248,9 +254,13 @@ export default function ProyectosPage() {
       arr.push(m);
       metasPorProyecto.set(m.proyecto_id, arr);
     } else {
-      metasHuerfanas.push(m);
+      metasHuerfanasTodas.push(m);
+      if (m.estado !== "archivada") {
+        metasHuerfanas.push(m);
+      }
     }
   }
+  const metasHuerfanasArchivadas = metasHuerfanasTodas.length - metasHuerfanas.length;
 
   return (
     <div className="space-y-6">
@@ -580,8 +590,14 @@ export default function ProyectosPage() {
             <Link href="/metas" className="underline">
               /metas
             </Link>
-            .
+            . Si no las vas a retomar, puedes eliminarlas (las tareas{" "}
+            <strong>no se borran</strong>, solo se desvinculan de la meta).
           </p>
+          {metasHuerfanasArchivadas > 0 && (
+            <p className="mt-1 text-xs text-amber-700/60 dark:text-amber-300/60">
+              ({metasHuerfanasArchivadas} archivada{metasHuerfanasArchivadas === 1 ? "" : "s"} oculta{metasHuerfanasArchivadas === 1 ? "" : "s"})
+            </p>
+          )}
           <ul className="mt-3 flex flex-wrap gap-2">
             {metasHuerfanas.map((m) => {
               const dotClass: Record<string, string> = {
@@ -591,10 +607,14 @@ export default function ProyectosPage() {
                 completada: "bg-emerald-500",
                 archivada: "bg-slate-300",
               };
+              const tareasDeEstaMeta = tareas.filter((t) => t.meta_id === m.id);
+              const tareasActivas = tareasDeEstaMeta.filter(
+                (t) => t.estado !== "hecha" && t.estado !== "archivada",
+              ).length;
               return (
                 <li
                   key={m.id}
-                  className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/30 bg-background px-2 py-1 text-xs"
+                  className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/30 bg-background py-1 pl-2 pr-1 text-xs"
                 >
                   <IconFolder className="h-3 w-3 text-amber-700 dark:text-amber-300" />
                   <span
@@ -615,6 +635,35 @@ export default function ProyectosPage() {
                     ) : null}
                     {m.titulo}
                   </Link>
+                  <button
+                    onClick={async () => {
+                      let msg = `¿Eliminar la meta "${m.titulo}"?`;
+                      if (tareasDeEstaMeta.length > 0) {
+                        msg += `\n\nEsto NO borra tareas. Las ${tareasDeEstaMeta.length} tarea${tareasDeEstaMeta.length === 1 ? "" : "s"} asociada${tareasDeEstaMeta.length === 1 ? "" : "s"} (${tareasActivas} activa${tareasActivas === 1 ? "" : "s"}) quedarán sin meta asignada.`;
+                      }
+                      msg += `\n\nEsta acción no se puede deshacer.`;
+                      if (!confirm(msg)) return;
+                      setEliminandoMetaId(m.id);
+                      try {
+                        await eliminarMeta(m.id);
+                        await reload();
+                      } catch (e) {
+                        alert(`No se pudo eliminar: ${(e as Error).message}`);
+                      } finally {
+                        setEliminandoMetaId(null);
+                      }
+                    }}
+                    disabled={eliminandoMetaId === m.id || procesando !== null}
+                    className="ml-0.5 rounded p-1 text-muted-foreground hover:bg-accent hover:text-red-500 disabled:opacity-50"
+                    title="Eliminar meta (las tareas no se borran, solo se desvinculan)"
+                    aria-label={`Eliminar meta ${m.titulo}`}
+                  >
+                    {eliminandoMetaId === m.id ? (
+                      <span className="block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    ) : (
+                      <IconTrash className="h-3 w-3" />
+                    )}
+                  </button>
                 </li>
               );
             })}
