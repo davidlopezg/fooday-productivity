@@ -12,8 +12,9 @@ import {
 import { cargarDatosProyectoParaReporte } from "@/lib/exportarProyecto";
 import { useData } from "@/lib/useData";
 import type { Area, Meta, MetaConPlan, Proyecto, Tarea } from "@/lib/types";
-import { IconArchive, IconFile, IconTarget, IconTrash, IconX } from "@/components/icons";
+import { IconArchive, IconFile, IconPencil, IconTarget, IconTrash, IconX } from "@/components/icons";
 import ProyectoReport from "@/components/ProyectoReport";
+import { EditarProyectoModal } from "@/components/EditarProyectoModal";
 
 type DatosReporte = {
   proyecto: Proyecto;
@@ -149,6 +150,8 @@ export default function ProyectosPage() {
   const [errorExportPorProyecto, setErrorExportPorProyecto] = useState<
     Record<string, string>
   >({});
+  /** Proyecto abierto en el modal de edición. Null = modal oculto. */
+  const [editando, setEditando] = useState<Proyecto | null>(null);
 
   /**
    * Carga los datos del proyecto y abre el modal con la vista previa.
@@ -436,6 +439,15 @@ export default function ProyectosPage() {
                       ver
                     </Link>
                     <button
+                      onClick={() => setEditando(p)}
+                      disabled={procesando !== null}
+                      className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50"
+                      title="Editar proyecto"
+                      aria-label="Editar proyecto"
+                    >
+                      <IconPencil className="h-4 w-4" />
+                    </button>
+                    <button
                       onClick={() => exportarPDF(p.id)}
                       disabled={
                         exportando !== null || procesando !== null
@@ -552,6 +564,15 @@ export default function ProyectosPage() {
       )}
 
       <ReporteModal datos={reporte} onCerrar={() => setReporte(null)} />
+
+      {editando && (
+        <EditarProyectoModal
+          proyecto={editando}
+          areas={areas}
+          onClose={() => setEditando(null)}
+          onSaved={reload}
+        />
+      )}
     </div>
   );
 }

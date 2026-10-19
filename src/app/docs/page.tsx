@@ -196,7 +196,7 @@ const FEATURES: Array<{ ruta: string; proposito: string; docs: string }> = [
 
   // ── Sistema ──
   { ruta: "/pagos", proposito: "Pagos pendientes: ejecutar tesorería lunes 1ª hora + botón IA “✨ Sugerir pagos” (migration 0027) que analiza los pagos activos y propone programación para los próximos 6 lunes aplicando el prompt editable en /configuracion (snowball por defecto, ingresos viernes/sábado). Modal de revisión estilo SugerirWigs: la IA sugiere, tú marcas qué incluir, botón “Aplicar N marcadas” actualiza solo fecha_pago_programada y estado=programado (no registra pagos parciales). Prompt editable en /configuracion §Prompt de pagos (columna prompt_pagos)", docs: "Apéndice §Bucle de equilibrio · Ritual semanal (lunes estricto) · HelpDrawer" },
-  { ruta: "/proyectos", proposito: "Gestión de proyectos con conteo de tareas, listado de metas hijas (migration 0024), archivado en cascada a metas+tareas, confirm con preview de impacto al eliminar y exportación a PDF por proyecto (modal con vista previa + Imprimir a PDF nativo del navegador, sin librerías externas)", docs: "HelpDrawer" },
+  { ruta: "/proyectos", proposito: "Gestión de proyectos con conteo de tareas, listado de metas hijas (migration 0024), archivado en cascada a metas+tareas, confirm con preview de impacto al eliminar, botón Editar (modal ligero con nombre/color/descripción/área), exportación a PDF por proyecto (modal con vista previa + Imprimir a PDF nativo del navegador, sin librerías externas). Al pulsar 'ver' se navega a /tareas?proyecto=X y se abre el filtro en 'todas' (no 'activas') para que las tareas hechas/archivadas del mismo proyecto sean visibles, especialmente en proyectos ya cerrados o arrastrados", docs: "HelpDrawer" },
   { ruta: "/configuracion", proposito: "Configuración: API key IA, base URL, modelo, tema", docs: "HelpDrawer" },
 
   // ── Documentación ──
@@ -1622,6 +1622,23 @@ export default function DocsPage() {
         </header>
 
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-10-26
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">Proyectos: botón Editar + fix de &ldquo;tabla vacía&rdquo; al pulsar &ldquo;ver&rdquo;.</strong>{" "}
+              Dos arreglos en <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/proyectos</code>:
+              <em> (1)</em> cada card de proyecto gana un botón{' '}
+              <strong className="text-foreground">Editar</strong> (icono lápiz) que abre un modal ligero con nombre, color, descripción y área (mismos campos que el formulario de creación, precargados con los valores actuales). Al guardar llama a{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">actualizarProyecto</code> ya existente y recarga la lista. Implementación: nuevo componente{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/components/EditarProyectoModal.tsx</code>.{' '}
+              <em>(2)</em> al pulsar &ldquo;ver&rdquo; (que navega a <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/tareas?proyecto=X</code>) el filtro de estado por defecto era &ldquo;activas&rdquo; y descartaba las tareas hechas/archivadas del proyecto, dejando la tabla vacía en cualquier proyecto ya cerrado o arrastrado en cascada. Fix mínimo: si la URL trae <code className="rounded bg-muted px-1.5 py-0.5 text-xs">?proyecto=X</code>, el filtro se inicializa a &ldquo;todas&rdquo; para que la vista del proyecto sea completa. Sin migración ni cambio en mutaciones (la query de proyecto a tareas ya estaba bien; era solo la preselección de estado en el cliente).{' '}
+              <strong className="text-foreground">FEATURES actualizado</strong>{" "}
+              (fila <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/proyectos</code>).{' '}
+              <em className="text-muted-foreground">Sin cambios de metodología ni rituales. Es una mejora de UX en una pantalla de gestión existente.</em>
+            </span>
+          </li>
           <li className="flex gap-3 rounded-lg border border-blue-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-blue-700 dark:text-blue-300 sm:text-sm">
               2026-10-15
