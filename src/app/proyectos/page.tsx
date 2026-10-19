@@ -7,7 +7,6 @@ import {
   archivarProyecto,
   archivarProyectoEnCascada,
   crearProyecto,
-  eliminarMeta,
   eliminarProyecto,
 } from "@/lib/mutations";
 import { cargarDatosProyectoParaReporte } from "@/lib/exportarProyecto";
@@ -153,8 +152,6 @@ export default function ProyectosPage() {
   >({});
   /** Proyecto abierto en el modal de edición. Null = modal oculto. */
   const [editando, setEditando] = useState<Proyecto | null>(null);
-  /** ID de la meta que estamos eliminando (escribe el botón del chip). */
-  const [eliminandoMetaId, setEliminandoMetaId] = useState<string | null>(null);
 
   /**
    * Carga los datos del proyecto y abre el modal con la vista previa.
@@ -607,10 +604,6 @@ export default function ProyectosPage() {
                 completada: "bg-emerald-500",
                 archivada: "bg-slate-300",
               };
-              const tareasDeEstaMeta = tareas.filter((t) => t.meta_id === m.id);
-              const tareasActivas = tareasDeEstaMeta.filter(
-                (t) => t.estado !== "hecha" && t.estado !== "archivada",
-              ).length;
               return (
                 <li
                   key={m.id}
@@ -635,35 +628,6 @@ export default function ProyectosPage() {
                     ) : null}
                     {m.titulo}
                   </Link>
-                  <button
-                    onClick={async () => {
-                      let msg = `¿Eliminar la meta "${m.titulo}"?`;
-                      if (tareasDeEstaMeta.length > 0) {
-                        msg += `\n\nEsto NO borra tareas. Las ${tareasDeEstaMeta.length} tarea${tareasDeEstaMeta.length === 1 ? "" : "s"} asociada${tareasDeEstaMeta.length === 1 ? "" : "s"} (${tareasActivas} activa${tareasActivas === 1 ? "" : "s"}) quedarán sin meta asignada.`;
-                      }
-                      msg += `\n\nEsta acción no se puede deshacer.`;
-                      if (!confirm(msg)) return;
-                      setEliminandoMetaId(m.id);
-                      try {
-                        await eliminarMeta(m.id);
-                        await reload();
-                      } catch (e) {
-                        alert(`No se pudo eliminar: ${(e as Error).message}`);
-                      } finally {
-                        setEliminandoMetaId(null);
-                      }
-                    }}
-                    disabled={eliminandoMetaId === m.id || procesando !== null}
-                    className="ml-0.5 rounded p-1 text-muted-foreground hover:bg-accent hover:text-red-500 disabled:opacity-50"
-                    title="Eliminar meta (las tareas no se borran, solo se desvinculan)"
-                    aria-label={`Eliminar meta ${m.titulo}`}
-                  >
-                    {eliminandoMetaId === m.id ? (
-                      <span className="block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                    ) : (
-                      <IconTrash className="h-3 w-3" />
-                    )}
-                  </button>
                 </li>
               );
             })}
