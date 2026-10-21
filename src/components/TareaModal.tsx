@@ -10,7 +10,7 @@
 //   <CrearModal  onClose={...} onChanged={...} />
 // ============================================================================
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   IconBolt,
   IconDownload,
@@ -32,13 +32,13 @@ import {
   subirAdjuntos,
   type Recurrencia,
 } from "@/lib/mutations";
-import { fetchAdjuntosTarea, fetchMetasConProgreso, fetchProyectos } from "@/lib/queries";
+import { fetchAdjuntosTarea, fetchMetas, fetchMetasConProgreso, fetchProyectos } from "@/lib/queries";
 import { useConfig } from "@/lib/configStore";
 import { usePomodoro } from "@/lib/pomodoroStore";
 import { generarCriterioTerminacionIA } from "@/lib/plan";
 import { useData } from "@/lib/useData";
 import { ComentariosTarea } from "@/components/ComentariosTarea";
-import type { MetaConPlan, Proyecto, RecurrenciaTipo, Subtarea, Tarea, TareaAdjunto } from "@/lib/types";
+import type { Meta, MetaConPlan, Proyecto, RecurrenciaTipo, Subtarea, Tarea, TareaAdjunto } from "@/lib/types";
 import { IconRepeat } from "@/components/icons";
 import { errorMessage } from "@/lib/errors";
 
@@ -124,15 +124,32 @@ function ProyectoRecurrenciaEditor({
   onProyectoChange,
   recurrencia,
   onRecurrenciaChange,
+  metaId,
+  metaProyectoNombre,
+  metaSinProyecto,
 }: {
   proyectos: Proyecto[];
   proyectoId: string | null;
   onProyectoChange: (v: string | null) => void;
   recurrencia: Recurrencia;
   onRecurrenciaChange: (r: Recurrencia) => void;
+  /**
+   * Si se pasa `metaId`, el campo "Proyecto" pasa a ser READONLY derivado:
+   * la jerarquía proyecto → meta → KR → tarea (migration 0024 + 0015) dice
+   * que la tarea, si vive dentro de una meta, hereda el proyecto de la meta.
+   * Solo cuando NO hay meta (tarea huérfana) se permite asignar un proyecto
+   * directo. Esto evita la incoherencia "elijo meta→proyecto A y escribo
+   * proyecto B en la tarea" que era posible antes.
+   */
+  metaId?: string | null;
+  /** Nombre del proyecto al que está asignada la meta actual. Null si la meta existe sin proyecto. */
+  metaProyectoNombre?: string | null;
+  /** True si la meta seleccionada existe pero NO tiene proyecto asignado (huérfana). */
+  metaSinProyecto?: boolean;
 }) {
   const field =
     "h-9 w-full rounded-md border border-input bg-background px-2 text-sm outline-none focus:ring-2 focus:ring-ring";
+  const derivadoDeMeta = !!metaId;
   return (
     <section className="rounded-lg border border-border bg-muted/30 p-3">
       <div className="mb-2 flex items-center gap-2">
@@ -142,19 +159,49 @@ function ProyectoRecurrenciaEditor({
         </span>
       </div>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <label className="block">
-          <span className="mb-1 block text-[11px] text-muted-foreground">Proyecto</span>
-          <select
-            className={field}
-            value={proyectoId ?? ""}
-            onChange={(e) => onProyectoChange(e.target.value || null)}
-          >
-            <option value="">— Sin proyecto —</option>
-            {proyectos.map((p) => (
-              <option key={p.id} value={p.id}>{p.nombre}</option>
-            ))}
-          </select>
-        </label>
+        <div className="block">
+          <span className="mb-1 block text-[11px] text-muted-foreground">
+            Proyecto
+            {derivadoDeMeta && (
+              <span className="ml-1 text-[10px] text-violet-600 dark:text-violet-400">
+                · 🔒 derivado de la meta
+              </span>
+            )}
+          </span>
+          {derivadoDeMeta ? (
+            // Modo READONLY: hay meta → el proyecto vive arriba (en la meta).
+            <div className="flex h-9 w-full items-center gap-2 rounded-md border border-dashed border-border bg-muted/40 px-2 text-sm">
+              {metaProyectoNombre ? (
+                <>
+                  <span aria-hidden>📁</span>
+                  <span className="truncate font-medium">{metaProyectoNombre}</span>
+                  <span className="ml-auto text-[10px] text-muted-foreground">
+                    cambia la meta para moverlo de proyecto
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span aria-hidden>🔓</span>
+                  <span className="truncate text-muted-foreground">
+                    Meta huérfana · asígnale un proyecto en /metas para anidar la tarea
+                  </span>
+                </>
+              )}
+            </div>
+          ) : (
+            // Modo EDITABLE: no hay meta → tarea huérfana con posible proyecto.
+            <select
+              className={field}
+              value={proyectoId ?? ""}
+              onChange={(e) => onProyectoChange(e.target.value || null)}
+            >
+              <option value="">— Sin proyecto —</option>
+              {proyectos.map((p) => (
+                <option key={p.id} value={p.id}>{p.nombre}</option>
+              ))}
+            </select>
+          )}
+        </div>
         <label className="block">
           <span className="mb-1 block text-[11px] text-muted-foreground">Repetir</span>
           <select
@@ -1016,6 +1063,12 @@ export function EditarModal({
 }) {
   const { data: cfg } = useConfig();
   const { data: proyectos } = useData<Proyecto[]>(() => fetchProyectos(), []);
+  // Migration 0024: la tarea, si vive dentro de una meta, hereda el
+  // proyecto de la meta (proyecto → meta → KR → tarea). Cargamos TODAS
+  // las metas (no solo activas) para mostrar el nombre del proyecto
+  // aunque la meta esté archivada — el MetaKrEditor ya filtra a activas
+  // en su propio select.
+  const { data: metas } = useData<Meta[]>(() => fetchMetas(), []);
   const [form, setForm] = useState<{
     titulo: string;
     descripcion: string;
@@ -1060,6 +1113,29 @@ export function EditarModal({
   );
   const [desgranando, setDesgranando] = useState(false);
   const [iaError, setIaError] = useState<string | null>(null);
+
+  // Resolución de la jerarquía proyecto → meta → KR (migration 0024).
+  // Necesita `metaId` y `proyectoId` ya inicializados, por eso va DESPUÉS
+  // de los useState.
+  const metaById = useMemo(
+    () => new Map((metas ?? []).map((m) => [m.id, m])),
+    [metas],
+  );
+  const proyectoById = useMemo(
+    () => new Map((proyectos ?? []).map((p) => [p.id, p])),
+    [proyectos],
+  );
+  const metaActual = metaId ? metaById.get(metaId) : null;
+  const metaProyectoId = metaActual?.proyecto_id ?? null;
+  const metaProyectoNombre = metaProyectoId
+    ? proyectoById.get(metaProyectoId)?.nombre ?? null
+    : null;
+  const metaSinProyecto = !!metaId && !metaProyectoId;
+  // Si hay meta con proyecto, el proyectoId efectivo de la tarea es ese
+  // (sincronizamos al guardar). Si hay meta sin proyecto, forzamos null.
+  // Si NO hay meta, respetamos el proyectoId que el usuario haya puesto
+  // libremente (caso "tarea huérfana con casa para agrupación operativa").
+  const proyectoIdEfectivo: string | null = metaId ? metaProyectoId : proyectoId;
   const [pending, startTransition] = useTransition();
 
   async function desgranar() {
@@ -1113,7 +1189,10 @@ export function EditarModal({
           pts: form.pts ? Number(form.pts) : null,
           esfuerzo: form.esfuerzo || null,
           criterio_terminacion: form.criterio_terminacion.trim() || null,
-          proyecto_id: proyectoId,
+          // Jerarquía proyecto → meta → KR → tarea (migration 0024): si hay
+          // meta, el proyecto va con ella. Si no hay meta, respetamos lo que
+          // haya escrito el usuario (tarea huérfana con casa para agrupación).
+          proyecto_id: proyectoIdEfectivo,
           ambito: ambito,
           tags: tagsLimpios,
           meta_id: metaId,
@@ -1244,11 +1323,14 @@ export function EditarModal({
           />
 
           <ProyectoRecurrenciaEditor
-            proyectos={proyectos}
+            proyectos={proyectos ?? []}
             proyectoId={proyectoId}
             onProyectoChange={setProyectoId}
             recurrencia={recurrencia}
             onRecurrenciaChange={setRecurrenciaState}
+            metaId={metaId}
+            metaProyectoNombre={metaProyectoNombre}
+            metaSinProyecto={metaSinProyecto}
           />
 
           <ComentariosTarea tareaId={tarea.id} />
@@ -1291,6 +1373,10 @@ export function CrearModal({
 }) {
   const { data: cfg } = useConfig();
   const { data: proyectos } = useData<Proyecto[]>(() => fetchProyectos(), []);
+  // Migration 0024: si hay meta, el proyecto se deduce de ella. Cargamos
+  // metas para resolver el nombre cuando el usuario seleccione una (mismo
+  // patrón que en EditarModal).
+  const { data: metas } = useData<Meta[]>(() => fetchMetas(), []);
   const [form, setForm] = useState<{
     titulo: string;
     descripcion: string;
@@ -1327,6 +1413,24 @@ export function CrearModal({
   const [adjMsg, setAdjMsg] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [guardarError, setGuardarError] = useState<string | null>(null);
+
+  // Resolución de la jerarquía proyecto → meta → KR (migration 0024). Va
+  // DESPUÉS de los useState porque necesita `metaId` y `proyectoId`.
+  const metaById = useMemo(
+    () => new Map((metas ?? []).map((m) => [m.id, m])),
+    [metas],
+  );
+  const proyectoById = useMemo(
+    () => new Map((proyectos ?? []).map((p) => [p.id, p])),
+    [proyectos],
+  );
+  const metaActual = metaId ? metaById.get(metaId) : null;
+  const metaProyectoId = metaActual?.proyecto_id ?? null;
+  const metaProyectoNombre = metaProyectoId
+    ? proyectoById.get(metaProyectoId)?.nombre ?? null
+    : null;
+  const metaSinProyecto = !!metaId && !metaProyectoId;
+  const proyectoIdEfectivo: string | null = metaId ? metaProyectoId : proyectoId;
 
   const quiereSubtareas = subtareas.filter((s) => s.descripcion.trim()).length === 0;
   const quiereCriterio = !form.criterio_terminacion.trim();
@@ -1385,9 +1489,22 @@ export function CrearModal({
 
         // Proyecto y recurrencia (post-creación, no bloquea la creación):
         // si falla, la tarea ya está creada, no se pierde nada.
-        if (proyectoId) {
-          await actualizarTarea({ id: creada.id, proyecto_id: proyectoId }).catch(
-            (e) => console.warn("[CrearModal] set proyecto falló:", e),
+        // Si hay meta, el proyectoIdEfectivo es el derivado de la meta
+        // (puede ser null si la meta es huérfana). Si no hay meta,
+        // respetamos lo que el usuario haya puesto en el campo libre.
+        if (proyectoIdEfectivo) {
+          await actualizarTarea({
+            id: creada.id,
+            proyecto_id: proyectoIdEfectivo,
+          }).catch((e) =>
+            console.warn("[CrearModal] set proyecto falló:", e),
+          );
+        } else if (metaId && !metaProyectoId) {
+          // Hay meta pero sin proyecto: forzamos null explícito para limpiar
+          // cualquier proyecto_id residual que la tarea pudiera tener.
+          await actualizarTarea({ id: creada.id, proyecto_id: null }).catch(
+            (e) =>
+              console.warn("[CrearModal] limpiar proyecto huérfano falló:", e),
           );
         }
         if (recurrencia.tipo) {
@@ -1560,11 +1677,14 @@ export function CrearModal({
           />
 
           <ProyectoRecurrenciaEditor
-            proyectos={proyectos}
+            proyectos={proyectos ?? []}
             proyectoId={proyectoId}
             onProyectoChange={setProyectoId}
             recurrencia={recurrencia}
             onRecurrenciaChange={setRecurrenciaState}
+            metaId={metaId}
+            metaProyectoNombre={metaProyectoNombre}
+            metaSinProyecto={metaSinProyecto}
           />
         </div>
 

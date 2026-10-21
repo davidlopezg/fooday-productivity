@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useSearchParams } from "next/navigation";
-import type { Subtarea, Tarea } from "@/lib/types";
+import type { Meta, Proyecto, ResultadoPeriodo, Subtarea, Tarea } from "@/lib/types";
 import {
   actualizarTarea,
   archivarTarea,
@@ -13,7 +13,7 @@ import {
   reabrirTarea,
   setPendienteRespuesta,
 } from "@/lib/mutations";
-import { fetchProyectos } from "@/lib/queries";
+import { fetchMetas, fetchProyectos, fetchResultadosPeriodo } from "@/lib/queries";
 import { useData } from "@/lib/useData";
 import {
   IconArchive,
@@ -80,6 +80,105 @@ function Badge({ tone, children }: { tone: string; children: React.ReactNode }) 
 
 const inputCls =
   "h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring";
+
+/**
+ * Pinta la cascada jerárquica donde vive la tarea:
+ *   📁 proyecto (si tiene) › 🎯 meta (si tiene) › 🪟 kr (si tiene)
+ * Cada nivel es opcional. Si solo hay meta sin proyecto, muestra
+ * 🎯 meta y la marca como "🔓 huérfana". Si no hay nada, devuelve null.
+ *
+ * Es derivado, no editable: si la tarea tiene meta, su proyecto es
+ * el derivado del meta.proyecto_id (regla del formulario). Esto es lo
+ * que el usuario ve de un vistazo en la tabla.
+ */
+function JerarquiaChips({
+  tarea,
+  proyectoById,
+  metaById,
+  resultadoById,
+  truncate,
+}: {
+  tarea: Tarea;
+  proyectoById: Map<string, Proyecto>;
+  metaById: Map<string, Meta>;
+  resultadoById: Map<string, ResultadoPeriodo>;
+  /** Si true (modo tabla densa), trunca a 1 nivel visible + tooltip con el resto. */
+  truncate?: boolean;
+}) {
+  const meta = tarea.meta_id ? metaById.get(tarea.meta_id) : null;
+  const kr = tarea.resultado_periodo_id
+    ? resultadoById.get(tarea.resultado_periodo_id)
+    : null;
+  // Proyecto derivado: si hay meta, su proyecto manda. Si no, miramos el
+  // proyecto_id directo (tarea huérfana con casa para agrupación operativa).
+  const proyecto = meta?.proyecto_id
+    ? proyectoById.get(meta.proyecto_id)
+    : tarea.proyecto_id
+      ? proyectoById.get(tarea.proyecto_id)
+      : null;
+
+  if (!proyecto && !meta && !kr) return null;
+
+  // Chips normalizados.
+  const proyectoChip = proyecto ? (
+    <span
+      key="proyecto"
+      className="inline-flex items-center gap-0.5 rounded-full border border-border px-1.5 py-0.5 text-[10px] font-medium"
+      style={{
+        backgroundColor: `${proyecto.color ?? "#64748b"}1A`,
+        color: proyecto.color ?? undefined,
+      }}
+      title={proyecto.nombre}
+    >
+      📁 {proyecto.nombre}
+    </span>
+  ) : meta ? (
+    <span
+      key="huerfano"
+      className="inline-flex items-center gap-0.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300"
+      title="Meta huérfana · asígnale un proyecto en /metas"
+    >
+      🔓 huérfana
+    </span>
+  ) : null;
+
+  const metaChip = meta ? (
+    <span
+      key="meta"
+      className="inline-flex items-center gap-0.5 rounded-full border border-violet-500/30 bg-violet-500/10 px-1.5 py-0.5 text-[10px] font-medium text-violet-700 dark:text-violet-300"
+      title={meta.codigo ? `${meta.codigo} · ${meta.titulo}` : meta.titulo}
+    >
+      🎯 {meta.codigo ? `${meta.codigo} ` : ""}
+      <span className="truncate">{meta.titulo}</span>
+    </span>
+  ) : null;
+
+  const krChip = kr ? (
+    <span
+      key="kr"
+      className="inline-flex items-center gap-0.5 rounded-full border border-sky-500/30 bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-medium text-sky-700 dark:text-sky-300"
+      title={kr.titulo}
+    >
+      🪟 {kr.titulo}
+    </span>
+  ) : null;
+
+  const all = [proyectoChip, metaChip, krChip].filter(Boolean) as React.ReactNode[];
+
+  if (truncate && all.length > 2) {
+    // En escritorio, mostramos los 3 niveles pero el primero (proyecto) se
+    // trunca si la fila es muy estrecha. Aquí al menos mostramos los 3
+    // en cascada horizontal con un separador.
+    return (
+      <div className="flex flex-wrap items-center gap-1">
+        {all}
+      </div>
+    );
+  }
+
+  return <div className="flex flex-wrap items-center gap-1">{all}</div>;
+}
+
 
 /** Pinta la fecha_fin con color segun su estado vs hoy.
  *  Devuelve null si no hay fecha_fin (en ese caso, el caller hace fallback a `deadline` texto). */
@@ -199,6 +298,23 @@ export function TasksTable({
   const proyectoById = useMemo(
     () => new Map(proyectos.map((p) => [p.id, p])),
     [proyectos],
+  );
+  // Migration 0024 + 0015: para pintar la cascada proyecto → meta → KR en la fila,
+  // necesitamos los nombres de meta y KR. Cargamos metas (ligeras, ~decenas) y
+  // resultados_periodo (también ligero). El MetaKrEditor ya cargaba esto en el modal,
+  // aquí también lo necesitamos para mostrarlo de un vistazo en la tabla.
+  const { data: metas } = useData<Meta[]>(() => fetchMetas(), []);
+  const metaById = useMemo(
+    () => new Map((metas ?? []).map((m) => [m.id, m])),
+    [metas],
+  );
+  const { data: resultados } = useData<ResultadoPeriodo[]>(
+    () => fetchResultadosPeriodo(),
+    [],
+  );
+  const resultadoById = useMemo(
+    () => new Map((resultados ?? []).map((r) => [r.id, r])),
+    [resultados],
   );
 
   /** Todos los tags únicos de las tareas del usuario, ordenados alfabéticamente. */
@@ -491,17 +607,13 @@ export function TasksTable({
                         ⏳ Pendiente respuesta
                       </span>
                     )}
-                    {t.proyecto_id && proyectoById.get(t.proyecto_id) && (
-                      <span
-                        className="inline-flex items-center gap-1 rounded-full border border-border px-1.5 py-0.5 text-[11px] font-medium"
-                        style={{
-                          backgroundColor: `${proyectoById.get(t.proyecto_id)?.color ?? "#64748b"}1A`,
-                          color: proyectoById.get(t.proyecto_id)?.color ?? undefined,
-                        }}
-                      >
-                        📁 {proyectoById.get(t.proyecto_id)?.nombre}
-                      </span>
-                    )}
+                    {/* Cascada jerárquica proyecto › meta › kr (migration 0024 + 0015) */}
+                    <JerarquiaChips
+                      tarea={t}
+                      proyectoById={proyectoById}
+                      metaById={metaById}
+                      resultadoById={resultadoById}
+                    />
                     {t.recurrencia_tipo && (
                       <span className="inline-flex items-center gap-0.5 rounded-full border border-border bg-background px-1.5 py-0.5 text-[11px] text-muted-foreground">
                         🔁 {t.recurrencia_tipo}
@@ -653,17 +765,14 @@ export function TasksTable({
                             #{tg}
                           </span>
                         ))}
-                        {t.proyecto_id && proyectoById.get(t.proyecto_id) && (
-                          <span
-                            className="inline-flex items-center gap-1 rounded-full border border-border px-1.5 py-0.5 text-[10px] font-medium"
-                            style={{
-                              backgroundColor: `${proyectoById.get(t.proyecto_id)?.color ?? "#64748b"}1A`,
-                              color: proyectoById.get(t.proyecto_id)?.color ?? undefined,
-                            }}
-                          >
-                            📁 {proyectoById.get(t.proyecto_id)?.nombre}
-                          </span>
-                        )}
+                        {/* Cascada jerárquica proyecto › meta › kr */}
+                        <JerarquiaChips
+                          tarea={t}
+                          proyectoById={proyectoById}
+                          metaById={metaById}
+                          resultadoById={resultadoById}
+                          truncate
+                        />
                         {t.recurrencia_tipo && (
                           <RecurrenciaChip tarea={t} />
                         )}

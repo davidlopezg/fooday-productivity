@@ -162,7 +162,7 @@ const FEATURES: Array<{ ruta: string; proposito: string; docs: string }> = [
   { ruta: "/estatus/ver", proposito: "Ver una entrada en detalle (racha + micro-acción)", docs: "Sub-ruta de /estatus" },
 
   // ── Tareas y GTD ──
-  { ruta: "/tareas", proposito: "Tareas pendientes: marcar hechas, adjuntos, asignar a meta/KR + panel WIGs (foco del ciclo) + toggle ⏳ pendiente de respuesta por fila", docs: "Pilar 2 · WIGs §3 (cap de ejecución) · Pilar 4 (sección “Pendientes de respuesta”) · HelpDrawer" },
+  { ruta: "/tareas", proposito: "Tareas pendientes: marcar hechas, adjuntos, asignar a meta/KR + cascada jerárquica proyecto › meta › KR en cada fila + panel WIGs (foco del ciclo) + toggle ⏳ pendiente de respuesta por fila + botón “Buscar duplicadas” (heurística cliente, archivar reversible)", docs: "Pilar 2 · WIGs §3 (cap de ejecución) · Pilar 4 (sección “Pendientes de respuesta”) · Glosario §“Casa de tus objetivos” · HelpDrawer" },
   { ruta: "/tareas/inbox", proposito: "Triaje residual: tareas sin meta o sin KR (después de asignar al crear)", docs: "HelpDrawer" },
   { ruta: "/tareas/pendientes-respuesta", proposito: "Panel dedicado a tareas con el flag “pendiente de respuesta” (esperando a alguien). Ordenadas por antigüedad: lo que más tiempo lleva esperando primero. Botón para destildar cuando llega la respuesta", docs: "Pilar 4 (sección “Pendientes de respuesta”) · HelpDrawer" },
   { ruta: "/tareas/completadas", proposito: "Histórico de tareas hechas (7/30/90/365/todo)", docs: "HelpDrawer" },
@@ -499,10 +499,10 @@ export default function DocsPage() {
             Última actualización:
           </span>
           <span className="font-mono text-indigo-700 dark:text-indigo-300">
-            2026-10-14
+            2026-11-20
           </span>
           <span className="text-muted-foreground">
-            — migration 0025: las metas pasan a tener rango real (fecha_inicio_meta + fecha_objetivo + fecha_fin_bloqueada). El planificador reparte los KRs como meses sueltos dentro del rango, no fuerza 4 trimestres. /metas/nueva con dos date inputs + checkbox 🔒 Fecha crítica. Helpers nuevos: parsearMesesDeRango() y ensurePeriodosMeses() (RPC ensure_periodos_meses).
+            — migration 0025: las metas pasan a tener rango real (fecha_inicio_meta + fecha_objetivo + fecha_fin_bloqueada). El planificador reparte los KRs como meses sueltos dentro del rango, no fuerza 4 trimestres. /metas/nueva con dos date inputs + checkbox 🔒 Fecha crítica. Helpers nuevos: parsearMesesDeRango() y ensurePeriodosMeses() (RPC ensure_periodos_meses). · <strong className="text-foreground">/tareas jerárquico + detectar duplicadas</strong>: (1) jerarquía respetada en UI — el campo “Proyecto” del editor de tarea pasa a READONLY cuando hay meta (se deduce de meta.proyecto_id); sigue siendo editable solo para tareas huérfanas (sin meta). En la tabla y la lista móvil se pinta la cascada 📁 proyecto › 🎯 meta › 🪟 kr por fila (JerarquiaChips). (2) botón “Buscar duplicadas” en /tareas — heurística cliente en <code className="rounded bg-muted px-1 py-0.5 text-xs">/lib/dedupeTareas.ts</code> (Levenshtein ≤ 3 + Jaccard(shingles 3) ≥ 80%). Acción segura: archivar la perdedora (reversible), confirm si tiene subtareas. Modulo nuevo: <code className="rounded bg-muted px-1 py-0.5 text-xs">DedupeModal</code>. Sin IA, sin RPC nueva.
           </span>
         </div>
       </section>
@@ -1620,6 +1620,96 @@ export default function DocsPage() {
         </header>
 
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-11-20
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">/tareas: jerarquía respetada + detectar duplicadas.</strong>{" "}
+              Tres cambios en <code className="rounded bg-muted px-1 py-0.5 text-xs">/tareas</code>: (1){" "}
+              <strong className="text-foreground">Proyecto readonly derivado de la meta</strong> — cuando la
+              tarea tiene meta, el campo "Proyecto" del editor pasa a ser read-only (chip con 📁 nombre + 🔒
+              “derivado de la meta”). Si la meta es huérfana (sin proyecto), muestra 🔓 avisando de cómo
+              anidarla desde <code className="rounded bg-muted px-1 py-0.5 text-xs">/metas</code>. Si la tarea
+              NO tiene meta, sigue siendo editable (caso "huérfana con casa"). Esto elimina la incoherencia
+              que el modelo de datos permitía: elegir meta→proyecto A y escribir proyecto B en la tarea. (2){" "}
+              <strong className="text-foreground">Cascada jerárquica visible por fila</strong> — nuevo{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">JerarquiaChips</code> en{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">TasksTable.tsx</code> pinta 📁 proyecto › 🎯 meta › 🪟 kr
+              como chips en cascada (móvil + escritorio), resolviendo los nombres con{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">fetchMetas</code> +{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">fetchResultadosPeriodo</code>. (3){" "}
+              <strong className="text-foreground">Botón "Buscar duplicadas"</strong> — heurística cliente en{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">/lib/dedupeTareas.ts</code>:
+              Levenshtein ≤ 3 caracteres + Jaccard ≥ 80% sobre shingles de 3 palabras, sobre título
+              normalizado (sin acentos/minusculas/signos). Agrupación transitiva via union-find.{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">DedupeModal</code> muestra los grupos
+              con motivo y similitud; acción segura = <strong className="text-foreground">archivar</strong>{" "}
+              la perdedora (reversible desde /tareas), con confirm previo si tiene subtareas o está hecha.
+              Sin IA, sin RPC nueva, ~150 líneas TS + union-find.{" "}
+              <em className="text-muted-foreground">Sin migración SQL: la BD ya permitía la jerarquía, solo cambiaba la UI. {""}
+              Razón: la BD ya tenía la foreign key y la mutación ya deducia meta_id del KR; el “bug” era
+              solo de formulario.</em>
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-10-21
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">/informes: tres bugs que silenciaban KPIs de productividad.</strong>{" "}
+              Síntoma que reportó David: KRs cerrados, pomodoros y minutos de
+              foco aparecían a 0 en /informes aunque claramente había trabajo
+              hecho. Tres causas independientes, tres arreglos: (1){' '}
+              <strong className="text-foreground">KRs cerrados siempre a 0</strong>:
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">fetchMetasConProgreso</code>
+              {' '}no incluía <code className="rounded bg-muted px-1 py-0.5 text-xs">updated_at</code>
+              {' '}en el <code className="rounded bg-muted px-1 py-0.5 text-xs">SELECT</code>
+              {' '}de <code className="rounded bg-muted px-1 py-0.5 text-xs">resultados_periodo</code>,
+              {' '}así que el filtro <code className="rounded bg-muted px-1 py-0.5 text-xs">updated_at &gt;= desde</code>
+              {' '}caía siempre en <code className="rounded bg-muted px-1 py-0.5 text-xs">&quot;&quot; &gt;= fecha</code> = false.
+              {' '}Fix de 1 línea en{' '}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">/lib/queries.ts</code>.
+              {' '}(2) <strong className="text-foreground">Pomodoros libres nunca se grababan</strong>:
+              {' '}<code className="rounded bg-muted px-1 py-0.5 text-xs">grabarSesion</code>
+              {' '}en <code className="rounded bg-muted px-1 py-0.5 text-xs">pomodoroStore.tsx</code> tenía
+              un <code className="rounded bg-muted px-1 py-0.5 text-xs">if (tarea_id === &quot;libre&quot;) return</code>{' '}
+              silencioso que descartaba TODAS las sesiones lanzadas desde el
+              botón “Foco libre” de /focus. Migración 0027 hace nullable la
+              columna <code className="rounded bg-muted px-1 py-0.5 text-xs">pomodoro_sesiones.tarea_id</code>{' '}
+              y el helper ahora traduce el sentinel a <code className="rounded bg-muted px-1 py-0.5 text-xs">null</code>{' '}
+              en BD. (3) <strong className="text-foreground">“Metas cerradas” usaba{' '}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">updated_at</code> como proxy</strong>,
+              {' '}lo cual mentía hacia ambos lados (reabrir una meta la
+              &quot;trasladaba&quot; al presente; cerrarla y no tocarla la
+              mantenía en el bucket incorrecto). Migración 0028 añade{' '}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">metas.fecha_cierre timestamptz</code>{' '}
+              con trigger <code className="rounded bg-muted px-1 py-0.5 text-xs">trg_metas_fecha_cierre</code>{' '}
+              que sella la fecha al pasar a <code className="rounded bg-muted px-1 py-0.5 text-xs">completada</code>{' '}
+              y la limpia si la meta se reabre. Backfill best-effort desde{' '}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">updated_at</code>{' '}
+              para metas ya cerradas en BD. Tipo <code className="rounded bg-muted px-1 py-0.5 text-xs">Meta</code> extendido
+              con <code className="rounded bg-muted px-1 py-0.5 text-xs">fecha_cierre?: string | null</code>.
+              {' '}Para no perder metas cerradas ANTES de la migración,
+              {' '}<code className="rounded bg-muted px-1 py-0.5 text-xs">/informes</code> hace fallback a{' '}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">updated_at</code>. Además el KPI
+              “Metas cerradas” ahora muestra “X en ventana · Y totales”
+              (en el header de la sección) y “de Y totales · últimos Nd”
+              (en el sub-texto de la tarjeta) para que un 0 en la ventana
+              no se lea como “no he cerrado nada”.{' '}
+              <strong className="text-foreground">Acción manual obligatoria</strong>:
+              {' '}pegar el contenido de{' '}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">supabase/APLICAR-0027.sql</code> y{' '}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">supabase/APLICAR-0028.sql</code> en
+              Supabase → SQL Editor → Run (idempotentes) antes de
+              desplegar este cambio. Sin las migraciones, las queries
+              que dependen de las nuevas columnas fallarán. FEATURES fila{' '}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">/informes</code> mantiene su propósito
+              (las features ya estaban listadas; el cambio es de
+              precisión de las métricas, no de superficie).{' '}
+              <em className="text-muted-foreground">Metodología y rituales sin cambios.</em>
+            </span>
+          </li>
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
               2026-10-13

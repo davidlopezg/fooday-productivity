@@ -503,6 +503,18 @@ export default function MetodologiaPage() {
                 </span>
               </li>
             </ul>
+            <div className="mt-3 rounded-md border border-amber-500/30 bg-background/60 p-3 text-xs text-muted-foreground">
+              <p>
+                <strong className="text-foreground">Regla de jerarquía (migration 0024 + 0015)</strong>:{" "}
+                la tarea que vive dentro de una meta hereda el proyecto de esa meta (no se puede asignar
+                a otro proyecto). Si la meta NO tiene proyecto, la tarea queda sin proyecto — pero se
+                puede asignarle uno editando la meta en <Link href="/metas" className="font-medium text-foreground underline underline-offset-4">/metas</Link>.
+                En el editor y la tabla, esta jerarquía se pinta como una cascada de chips{" "}
+                <code className="rounded bg-muted px-1 py-0.5 text-[10px]">📁 proyecto › 🎯 meta › 🪟 kr</code>.
+                Las tareas sin meta (inbox) sí pueden tener un proyecto directo para agrupación
+                operativa sin necesidad de crear una meta.
+              </p>
+            </div>
           </div>
         }
       />

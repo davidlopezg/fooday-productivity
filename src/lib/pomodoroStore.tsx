@@ -611,11 +611,14 @@ async function grabarSesion(row: SesionInsert) {
       console.warn("[pomodoro] sin sesión, no se grabó la sesión");
       return;
     }
-    // Ignorar pomodoros "libres" (tarea_id="libre" es sentinel del UI)
-    if (row.tarea_id === "libre") return;
+    // "libre" es sentinel del UI para foco sin tarea. La columna
+    // `pomodoro_sesiones.tarea_id` es NULL-able (migration 0027), así
+    // que traducimos a NULL en BD y grabamos igual — antes se descartaba
+    // la sesión y KPIs/contadores siempre salían a 0 para focó libres.
+    const tareaId = row.tarea_id === "libre" ? null : row.tarea_id;
     const { error } = await supabase.from("pomodoro_sesiones").insert({
       owner_id: session.user.id,
-      tarea_id: row.tarea_id,
+      tarea_id: tareaId,
       subtarea_id: row.subtarea_id,
       started_at: row.started_at,
       ended_at: row.ended_at,

@@ -152,16 +152,30 @@ export default function InformesPage() {
   const maxTareasDia = Math.max(1, ...serie.map((d) => d.tareas));
   const maxFocoDia = Math.max(1, ...serie.map((d) => d.foco_min));
 
-  // ── Metas completadas (filtradas a la ventana usando updated_at como
-  // proxy de la fecha en que se cerró la meta: el trigger set_updated_at
-  // se dispara al cambiar `estado` a 'completada'). ──
+  // ── Metas completadas.
+  // Fuente de verdad: `metas.fecha_cierre` (migration 0028, fijada por el
+  // trigger `trg_metas_fecha_cierre` cuando `estado` pasa a 'completada').
+  // Fallback a `updated_at` para metas cerradas ANTES de la migration
+  // (el backfill en BD ya intenta copiar updated_at → fecha_cierre, pero
+  // por si acaso la app tolera la ausencia sin perderlas).
+  // `metasCerradasTotal` se usa en el KPI para mostrar "X ventana / Y total"
+  // y que un 0 en la ventana no se lea como "no he cerrado nada". ──
+  const metasCerradasTotal = useMemo(
+    () => metas.filter((m) => m.meta.estado === "completada").length,
+    [metas],
+  );
   const metasCompletadas = useMemo<MetaConPlan[]>(() => {
     return metas
       .filter((m) => m.meta.estado === "completada")
-      .filter((m) => (m.meta.updated_at ?? "") >= desde)
-      .sort((a, b) =>
-        (b.meta.updated_at ?? "").localeCompare(a.meta.updated_at ?? ""),
-      );
+      .filter((m) => {
+        const f = m.meta.fecha_cierre ?? m.meta.updated_at ?? "";
+        return f >= desde;
+      })
+      .sort((a, b) => {
+        const fa = a.meta.fecha_cierre ?? a.meta.updated_at ?? "";
+        const fb = b.meta.fecha_cierre ?? b.meta.updated_at ?? "";
+        return fb.localeCompare(fa);
+      });
   }, [metas, desde]);
 
   // ── KRs (resultados_periodo) completados: aplanamos todas las metas y
@@ -350,7 +364,7 @@ export default function InformesPage() {
         <Kpi
           label="Metas cerradas"
           value={loading ? "—" : metasCompletadas.length.toString()}
-          sub={`últimos ${dias} días`}
+          sub={`de ${metasCerradasTotal} totales · últimos ${dias} días`}
           accent="violet"
         />
         <Kpi
@@ -529,7 +543,7 @@ export default function InformesPage() {
             Metas completadas
           </h2>
           <span className="text-[11px] tabular-nums text-muted-foreground">
-            últimos {dias} días · {metasCompletadas.length}
+            {metasCompletadas.length} en ventana · {metasCerradasTotal} totales
           </span>
         </header>
         {metasCompletadas.length === 0 ? (

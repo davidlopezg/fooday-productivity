@@ -905,7 +905,7 @@ export async function fetchMetasConProgreso(): Promise<MetaConPlan[]> {
     supabase.from("metas").select("*").order("codigo", { ascending: true, nullsFirst: false }),
     supabase
       .from("resultados_periodo")
-      .select("id,meta_id,periodo_id,titulo,descripcion,metrica,valor_objetivo,valor_actual,unidad,estado,peso,orden"),
+      .select("id,meta_id,periodo_id,titulo,descripcion,metrica,valor_objetivo,valor_actual,unidad,estado,peso,orden,updated_at"),
     supabase
       .from("tareas")
       .select("id,meta_id,resultado_periodo_id,estado")

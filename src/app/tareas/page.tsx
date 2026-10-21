@@ -7,6 +7,8 @@ import { useData } from "@/lib/useData";
 import { TasksTable } from "@/components/TasksTable";
 import { PanelWigTareas } from "@/components/PanelWigTareas";
 import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
+import { DedupeModal } from "@/components/DedupeModal";
+import { IconSparkles } from "@/components/icons";
 import type { Tarea } from "@/lib/types";
 
 export default function TareasPage() {
@@ -17,6 +19,8 @@ export default function TareasPage() {
   // los dos. Así no toco la API interna de TasksTable.
   const [guardandoWigId, setGuardandoWigId] = useState<string | null>(null);
   const [errorWig, setErrorWig] = useState<string | null>(null);
+  // Modal "Buscar duplicadas" — abierta/cerrada.
+  const [dedupeAbierto, setDedupeAbierto] = useState(false);
 
   // Tareas marcadas como WIG (4DX), ordenadas por wig_orden (1, 2, 3).
   const wigTareas = useMemo(
@@ -79,9 +83,27 @@ export default function TareasPage() {
               Filtra, edita, archiva o elimina. {loading ? "…" : tareas.length} tareas en total.
             </p>
           </div>
-          <HelpDrawer title="Tareas" items={AYUDA_POR_RUTA["/tareas"]?.items ?? []} />
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setDedupeAbierto(true)}
+              className="inline-flex items-center gap-1.5 rounded-md border border-violet-500/30 bg-background px-2.5 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-500/10 dark:text-violet-300"
+              title="Detectar tareas con títulos casi iguales (heurística cliente)"
+            >
+              <IconSparkles className="h-3.5 w-3.5" />
+              Buscar duplicadas
+            </button>
+            <HelpDrawer title="Tareas" items={AYUDA_POR_RUTA["/tareas"]?.items ?? []} />
+          </div>
         </div>
       </header>
+
+      {dedupeAbierto && (
+        <DedupeModal
+          tareas={tareas}
+          onClose={() => setDedupeAbierto(false)}
+          onChanged={reload}
+        />
+      )}
 
       {/* Panel WIG — siempre arriba, antes de la tabla. Mismo patrón que
           el PanelWig de /metas: lista las 1-3 tareas foco del ciclo. */}

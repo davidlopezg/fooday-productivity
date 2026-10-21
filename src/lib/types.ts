@@ -117,6 +117,12 @@ export interface Meta {
    *  El planificador trata las metas con esta flag como hard constraint:
    *  NADA puede planificarse después de `fecha_objetivo`. */
   fecha_fin_bloqueada?: boolean;
+  /** Migration 0028: timestamp real en que `estado` pasó a `'completada'`.
+   *  La fija el trigger `trg_metas_fecha_cierre` (se limpia si la meta
+   *  vuelve a abrirse). Es la fuente de verdad para "cuándo se cerró"
+   *  — sustituye al proxy `updated_at` en /informes.
+   *  NULL si la meta nunca se ha cerrado. */
+  fecha_cierre?: string | null;
 }
 
 // ============================================================================
