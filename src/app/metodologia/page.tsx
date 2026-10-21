@@ -77,7 +77,7 @@ const LAG_VS_LEAD: { dimension: string; lag: string; lead: string }[] = [
   },
   {
     dimension: "En la app",
-    lag: "Tabla `metas` + `periodos` + `resultados_periodo` (los KRs viven aquí, ver /metas/plan). Desde la migración 0025, dos campos reales en `metas` (`fecha_inicio_meta`, `fecha_objetivo` + flag `fecha_fin_bloqueada`) definen el rango real de la meta — la IA reparte los KRs SOLO dentro de ese rango, como meses sueltos (no siempre 4 trimestres). El campo libre `plazo` queda como legacy.",
+    lag: "Tabla `metas` + `periodos` + `resultados_periodo` (los KRs viven aquí, ver /metas/plan). Desde la migración 0025, dos campos reales en `metas` (`fecha_inicio_meta`, `fecha_objetivo` + flag `fecha_fin_bloqueada`) definen el rango real de la meta — la IA reparte los KRs SOLO dentro de ese rango, como meses sueltos (no siempre 4 trimestres). El campo libre `plazo` queda como legacy. Migration 0028: la tabla `resultados_periodo` ya no tiene `periodo_id`; un KR puede vivir en uno o varios trimestres/meses a través de la tabla puente `kr_periodos` (N:M). Eso elimina el límite “1 KR por trimestre” que el usuario vivía como bug.",
     lead: "Columna `es_wig` en `metas` (panel violeta) y en `tareas` (panel fucsia).",
   },
 ];
@@ -232,12 +232,22 @@ const ANTIPATRONES: { titulo: string; por_que: string; que_hacer: string }[] = [
 // próximo paso depende de que alguien te conteste. Marcar la tarea con
 // el flag ⏳ “pendiente de respuesta” la separa visualmente del
 // inventario activo y la muestra en /tareas/pendientes-respuesta.
+//
+// Encima de la lista, el panel tiene un banner mental (estoico/Covey)
+// que recuerda «no te preocupes de lo que está pendiente de los demás».
+// Es un reframe psicológico que refuerza la utilidad operativa del
+// panel con la utilidad mental: soltar la preocupación.
 // ============================================================================
 const PENDIENTES_RESPUESTA: Punto[] = [
   {
     titulo: "Definición",
     cuerpo:
       "Una tarea está 'pendiente de respuesta' cuando ya iniciaste una acción (mandar un email, pedir un OK, dejar una llamada apuntada) y tu próximo paso es ESPERAR, no actuar. El flag ⏳ en /tareas lo marca. No es un estado (la tarea puede seguir en pendiente, en_progreso o hecha), es un ATRIBUTO SEMÁNTICO.",
+  },
+  {
+    titulo: "El reframe mental: estoico y Covey",
+    cuerpo:
+      "Encima de la lista de /tareas/pendientes-respuesta hay un banner que dice «No te preocupes de lo que está pendiente de los demás». No es un añadido decorativo: es la mitad del trabajo. La utilidad operativa del panel ya te dice cuándo hacer follow-up; este banner te recuerda la regla de fondo: cada fila representa algo que NO está bajo tu control, tu única acción posible es el follow-up, y si hoy no toca, déjalo aquí — el panel vuelve a sacarlo cuando lleve demasiado tiempo esperando. Razón: según Covey (Los 7 hábitos), preocuparse por lo que está fuera del círculo de influencia gasta energía sin mover la aguja; según Epicteto, lo que no depende de ti ni siquiera merece preocupación. El panel te ayuda operativamente a desatascar; el banner te ayuda mentalmente a soltar.",
   },
   {
     titulo: "Por qué necesita un panel propio",
@@ -902,6 +912,18 @@ export default function MetodologiaPage() {
             <Link href="/tareas/pendientes-respuesta" className="inline-flex items-center gap-2 font-medium text-foreground underline underline-offset-4">
               <IconClock className="h-4 w-4 text-amber-500" />
               /tareas/pendientes-respuesta · lo que esperas de otros (Waiting For)
+            </Link>
+          </li>
+          <li>
+            <Link href="/pagos" className="inline-flex items-center gap-2 font-medium text-foreground underline underline-offset-4">
+              <IconClock className="h-4 w-4 text-violet-500" />
+              /pagos · botón IA “✨ Sugerir pagos” (migration 0027) — la IA programa los próximos 6 lunes con tu prompt editable en /configuracion
+            </Link>
+          </li>
+          <li>
+            <Link href="/matriz" className="inline-flex items-center gap-2 font-medium text-foreground underline underline-offset-4">
+              <IconTarget className="h-4 w-4 text-blue-500" />
+              /matriz · Matriz Eisenhower 2D con drag &amp; drop + IA “Sugerir redistribución” — urgencia × importancia calculada en JS, sin migración
             </Link>
           </li>
         </ul>

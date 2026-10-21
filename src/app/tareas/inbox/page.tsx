@@ -10,24 +10,51 @@ import {
 } from "@/lib/mutations";
 import {
   fetchMetasConProgreso,
+  fetchProyectos,
   fetchTareasSinMeta,
 } from "@/lib/queries";
 import { useData } from "@/lib/useData";
+import { useConfig } from "@/lib/configStore";
+import {
+  sugerirTareasDesdeContextoIA,
+  type SugerenciaTarea,
+} from "@/lib/iaSugerencias";
 import type {
   MetaConPlan,
+  Proyecto,
   ResultadoConTareas,
   TareaSinMeta,
 } from "@/lib/types";
-import { IconArrowLeft, IconInbox, IconPlus } from "@/components/icons";
+import {
+  IconArrowLeft,
+  IconInbox,
+  IconPlus,
+  IconSparkles,
+} from "@/components/icons";
 import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
+import {
+  SugerenciasTareasModal,
+  type SugerenciaEditada,
+} from "@/components/SugerenciasTareasModal";
 
 export default function InboxPage() {
   const inboxQ = useData<TareaSinMeta[]>(fetchTareasSinMeta, [], []);
   const metasQ = useData<MetaConPlan[]>(fetchMetasConProgreso, [], []);
+  // Proyectos activos para que la IA pueda asociar las tareas extraídas
+  // del email/contexto a uno existente si tiene sentido.
+  const proyectosQ = useData<Proyecto[]>(() => fetchProyectos(), []);
+  const cfg = useConfig();
 
   const [nuevoTitulo, setNuevoTitulo] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Sugerencias IA a partir del textarea de contexto
+  const [contextoIA, setContextoIA] = useState("");
+  const [sugerenciasIA, setSugerenciasIA] = useState<SugerenciaTarea[] | null>(null);
+  const [sugiriendoIA, setSugiriendoIA] = useState(false);
+  const [errorSugIA, setErrorSugIA] = useState<string | null>(null);
+  const [aplicandoSugIA, setAplicandoSugIA] = useState(false);
 
   async function crearYCapturar() {
     if (!nuevoTitulo.trim()) return;
@@ -41,6 +68,85 @@ export default function InboxPage() {
       setError(e instanceof Error ? e.message : "No se pudo crear la tarea.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function pedirSugerenciasIA() {
+    if (!contextoIA.trim()) {
+      setErrorSugIA("Pega primero un email o contexto en el campo de arriba.");
+      return;
+    }
+    if (!cfg.data.minimax_api_key) {
+      setErrorSugIA("Configura la clave de IA en /configuracion primero.");
+      setSugerenciasIA([]);
+      return;
+    }
+    setSugiriendoIA(true);
+    setErrorSugIA(null);
+    setSugerenciasIA(null);
+    try {
+      const proyectosActivos = (proyectosQ.data ?? []).filter(
+        (p) => !p.archivado,
+      );
+      const res = await sugerirTareasDesdeContextoIA(
+        cfg.data.base_url,
+        cfg.data.minimax_api_key,
+        cfg.data.model,
+        {
+          contexto: contextoIA,
+          proyectos: proyectosActivos.map((p) => ({ id: p.id, nombre: p.nombre })),
+          maxSugerencias: 8,
+        },
+      );
+      setSugerenciasIA(res.sugerencias);
+    } catch (e) {
+      setErrorSugIA(
+        e instanceof Error
+          ? e.message
+          : "La IA no pudo sugerir tareas a partir de ese texto.",
+      );
+      setSugerenciasIA([]);
+    } finally {
+      setSugiriendoIA(false);
+    }
+  }
+
+  async function aplicarSugerenciasIA(seleccionadas: SugerenciaEditada[]) {
+    if (seleccionadas.length === 0) {
+      setSugerenciasIA(null);
+      return;
+    }
+    setAplicandoSugIA(true);
+    setErrorSugIA(null);
+    let creadas = 0;
+    const fallidas: string[] = [];
+    for (const s of seleccionadas) {
+      try {
+        await crearTarea({
+          titulo: s.titulo.trim(),
+          descripcion: s.descripcion.trim() || null,
+          prioridad: s.prioridad ?? "media",
+        });
+        creadas++;
+      } catch (e) {
+        fallidas.push(s.titulo);
+        console.error("[Inbox] fallo creando tarea IA:", s.titulo, e);
+      }
+    }
+    setAplicandoSugIA(false);
+    if (creadas > 0) {
+      // Si todo fue bien, limpiamos modal + textarea. Si hubo fallos,
+      // dejamos el modal abierto con el motivo para que el usuario decida.
+      if (fallidas.length === 0) {
+        setSugerenciasIA(null);
+        setContextoIA("");
+        await inboxQ.reload();
+      } else {
+        setErrorSugIA(
+          `Se crearon ${creadas}, pero fallaron: ${fallidas.join(", ")}. Puedes reintentarlas desde el formulario de arriba.`,
+        );
+        await inboxQ.reload();
+      }
     }
   }
 
@@ -101,6 +207,46 @@ export default function InboxPage() {
         {error && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>}
       </section>
 
+      {/* Sugerir tareas con IA desde un email / contexto */}
+      <section className="rounded-xl border border-violet-500/30 bg-gradient-to-br from-violet-500/5 to-fuchsia-500/5 p-4">
+        <header className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <h2 className="flex items-center gap-1.5 text-sm font-semibold">
+              <IconSparkles className="h-4 w-4 text-violet-500" />
+              Sugerir tareas con IA
+            </h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Pega un email, un mensaje o un contexto. La IA extrae las
+              tareas accionables y te las muestra para que las edites antes
+              de añadirlas al inbox.
+            </p>
+          </div>
+        </header>
+        <textarea
+          value={contextoIA}
+          onChange={(e) => setContextoIA(e.target.value)}
+          rows={5}
+          placeholder="Pega aquí el email, mensaje o contexto del que quieres extraer tareas…"
+          className="mt-3 w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+        />
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button
+            onClick={pedirSugerenciasIA}
+            disabled={sugiriendoIA || !contextoIA.trim()}
+            className="inline-flex items-center gap-1.5 rounded-md bg-violet-500 px-3 py-2 text-sm font-medium text-white hover:bg-violet-600 disabled:opacity-50"
+            title="La IA lee el texto y propone tareas editables"
+          >
+            <IconSparkles className="h-4 w-4" />
+            {sugiriendoIA ? "Pensando…" : "Sugerir tareas"}
+          </button>
+          <p className="text-[11px] text-muted-foreground">
+            {cfg.data.minimax_api_key
+              ? `Modelo: ${cfg.data.model}. La IA solo sugiere; tú decides qué entra.`
+              : "⚠️ Configura primero la clave de IA en /configuracion."}
+          </p>
+        </div>
+      </section>
+
       {/* Listado */}
       {inboxQ.loading ? (
         <p className="text-sm text-muted-foreground">Cargando…</p>
@@ -159,6 +305,24 @@ export default function InboxPage() {
             )}
           </section>
         </>
+      )}
+
+      {sugerenciasIA !== null && (
+        <SugerenciasTareasModal
+          titulo="Tareas extraídas por la IA"
+          subtitulo="Mira el contexto y propone tareas accionables."
+          sugerencias={sugerenciasIA}
+          busy={aplicandoSugIA}
+          error={errorSugIA}
+          textoBotonConfirmar={
+            `Añadir ${sugerenciasIA.length} tarea${sugerenciasIA.length === 1 ? "" : "s"} al inbox`
+          }
+          onCancel={() => {
+            setSugerenciasIA(null);
+            setErrorSugIA(null);
+          }}
+          onConfirmar={aplicarSugerenciasIA}
+        />
       )}
     </div>
   );

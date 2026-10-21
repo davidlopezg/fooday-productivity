@@ -12,8 +12,9 @@ import {
 import { cargarDatosProyectoParaReporte } from "@/lib/exportarProyecto";
 import { useData } from "@/lib/useData";
 import type { Area, Meta, MetaConPlan, Proyecto, Tarea } from "@/lib/types";
-import { IconArchive, IconFile, IconTarget, IconTrash, IconX } from "@/components/icons";
+import { IconArchive, IconFile, IconFolder, IconPencil, IconTarget, IconTrash, IconX } from "@/components/icons";
 import ProyectoReport from "@/components/ProyectoReport";
+import { EditarProyectoModal } from "@/components/EditarProyectoModal";
 
 type DatosReporte = {
   proyecto: Proyecto;
@@ -149,6 +150,8 @@ export default function ProyectosPage() {
   const [errorExportPorProyecto, setErrorExportPorProyecto] = useState<
     Record<string, string>
   >({});
+  /** Proyecto abierto en el modal de edición. Null = modal oculto. */
+  const [editando, setEditando] = useState<Proyecto | null>(null);
 
   /**
    * Carga los datos del proyecto y abre el modal con la vista previa.
@@ -235,13 +238,26 @@ export default function ProyectosPage() {
   // Agrupar metas por proyecto. Orden estable: por `codigo` ascendente
   // (que ya devuelve fetchMetas), luego por título como desempate.
   const metasPorProyecto = new Map<string, Meta[]>();
+  // Metas sin proyecto asignado (migration 0024: metas.proyecto_id nullable).
+  // Las mostramos en una sección aparte al final, igual que /areas hace
+  // con los proyectos sin área, para que David no las pierda. Filtramos
+  // las archivadas: ya no son accionables y solo contaminarían la vista.
+  // Si todas las huérfanas están archivadas, no mostramos la sección.
+  const metasHuerfanasTodas: Meta[] = [];
+  const metasHuerfanas: Meta[] = [];
   for (const m of metas) {
     if (m.proyecto_id) {
       const arr = metasPorProyecto.get(m.proyecto_id) ?? [];
       arr.push(m);
       metasPorProyecto.set(m.proyecto_id, arr);
+    } else {
+      metasHuerfanasTodas.push(m);
+      if (m.estado !== "archivada") {
+        metasHuerfanas.push(m);
+      }
     }
   }
+  const metasHuerfanasArchivadas = metasHuerfanasTodas.length - metasHuerfanas.length;
 
   return (
     <div className="space-y-6">
@@ -436,6 +452,15 @@ export default function ProyectosPage() {
                       ver
                     </Link>
                     <button
+                      onClick={() => setEditando(p)}
+                      disabled={procesando !== null}
+                      className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50"
+                      title="Editar proyecto"
+                      aria-label="Editar proyecto"
+                    >
+                      <IconPencil className="h-4 w-4" />
+                    </button>
+                    <button
                       onClick={() => exportarPDF(p.id)}
                       disabled={
                         exportando !== null || procesando !== null
@@ -551,7 +576,75 @@ export default function ProyectosPage() {
         </ul>
       )}
 
+      {metasHuerfanas.length > 0 && (
+        <section className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+          <h2 className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+            ⚠️ {metasHuerfanas.length} meta{metasHuerfanas.length === 1 ? "" : "s"} sin proyecto
+          </h2>
+          <p className="mt-1 text-xs text-amber-700/80 dark:text-amber-300/80">
+            Estas metas no tienen proyecto asignado. Para vincularlas a uno,
+            edítalas desde{" "}
+            <Link href="/metas" className="underline">
+              /metas
+            </Link>
+            . Si no las vas a retomar, puedes eliminarlas (las tareas{" "}
+            <strong>no se borran</strong>, solo se desvinculan de la meta).
+          </p>
+          {metasHuerfanasArchivadas > 0 && (
+            <p className="mt-1 text-xs text-amber-700/60 dark:text-amber-300/60">
+              ({metasHuerfanasArchivadas} archivada{metasHuerfanasArchivadas === 1 ? "" : "s"} oculta{metasHuerfanasArchivadas === 1 ? "" : "s"})
+            </p>
+          )}
+          <ul className="mt-3 flex flex-wrap gap-2">
+            {metasHuerfanas.map((m) => {
+              const dotClass: Record<string, string> = {
+                sin_empezar: "bg-slate-400",
+                en_progreso: "bg-amber-500",
+                bloqueada: "bg-red-500",
+                completada: "bg-emerald-500",
+                archivada: "bg-slate-300",
+              };
+              return (
+                <li
+                  key={m.id}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/30 bg-background py-1 pl-2 pr-1 text-xs"
+                >
+                  <IconFolder className="h-3 w-3 text-amber-700 dark:text-amber-300" />
+                  <span
+                    className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${
+                      dotClass[m.estado] ?? "bg-slate-400"
+                    }`}
+                    aria-hidden
+                  />
+                  <Link
+                    href={`/metas/detalle?id=${m.id}`}
+                    className="text-foreground hover:underline"
+                    title={m.titulo}
+                  >
+                    {m.codigo ? (
+                      <span className="mr-1 font-mono text-[10px] text-muted-foreground">
+                        {m.codigo}
+                      </span>
+                    ) : null}
+                    {m.titulo}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
       <ReporteModal datos={reporte} onCerrar={() => setReporte(null)} />
+
+      {editando && (
+        <EditarProyectoModal
+          proyecto={editando}
+          areas={areas}
+          onClose={() => setEditando(null)}
+          onSaved={reload}
+        />
+      )}
     </div>
   );
 }

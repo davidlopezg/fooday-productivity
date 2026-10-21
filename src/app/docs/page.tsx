@@ -122,7 +122,7 @@ const PILARES: Pilar[] = [
       {
         titulo: "Pendientes de respuesta: lo que NO depende de ti",
         cuerpo:
-          "Hay un subtipo especial de pendiente que NO está en tu control: las tareas bloqueadas externamente (un email que mandaste esperando OK, una llamada pendiente, una confirmación que necesitas para avanzar). Marcar la tarea con el flag ⏳ “pendiente de respuesta” (icono de reloj en /tareas) la separa del resto y la muestra en /tareas/pendientes-respuesta ordenada por antigüedad. Razón: lo que más tiempo lleva esperando es lo que más probablemente se te ha “caído” del radar — y muchas veces también lo más fácil de desatascar con un follow-up corto. La regla: este panel debería ser pequeño. Si crece, o bien no haces follow-ups a tiempo, o bien estás delegando demasiado sin control. Cuando llega la respuesta, destildas el flag (botón ✓ Respuesta recibida en el panel) y la tarea vuelve a la lista normal.",
+          "Hay un subtipo especial de pendiente que NO está en tu control: las tareas bloqueadas externamente (un email que mandaste esperando OK, una llamada pendiente, una confirmación que necesitas para avanzar). Marcar la tarea con el flag ⏳ “pendiente de respuesta” (icono de reloj en /tareas) la separa del resto y la muestra en /tareas/pendientes-respuesta ordenada por antigüedad. Razón: lo que más tiempo lleva esperando es lo que más probablemente se te ha “caído” del radar — y muchas veces también lo más fácil de desatascar con un follow-up corto. La regla: este panel debería ser pequeño. Si crece, o bien no haces follow-ups a tiempo, o bien estás delegando demasiado sin control. Cuando llega la respuesta, destildas el flag (botón ✓ Respuesta recibida en el panel) y la tarea vuelve a la lista normal. Encima de la lista hay un banner mental (estoico/Covey): «no te preocupes de lo que está pendiente de los demás». Es un reframe psicológico, no operativo — recuerda que la única acción posible bajo aquí es el follow-up y que el panel te lo recordará cuando toque actuar.",
       },
     ],
   },
@@ -154,7 +154,7 @@ const PILARES: Pilar[] = [
 // ----------------------------------------------------------------------------
 const FEATURES: Array<{ ruta: string; proposito: string; docs: string }> = [
   // ── Núcleo diario ──
-  { ruta: "/", proposito: "Hoy: semáforo del día + plan diario + contadores", docs: "Rituales §1 (mañana 1ª hora) · HelpDrawer" },
+  { ruta: "/", proposito: "Hoy: semáforo del día + plan diario + contadores + paneles WIGs (metas + tareas) + panel ‘Tareas con fecha’ (orden ascendente por deadline, las vencidas arriba) entre WIGs-tareas y Plan de hoy, con check inline para marcarlas hechas sin navegar", docs: "Rituales §1 (mañana 1ª hora) · HelpDrawer" },
   { ruta: "/captura", proposito: "Inbox rápido para vaciar la cabeza (efecto Zeigarnik)", docs: "Pilar 4 · Rituales §1 · HelpDrawer" },
   { ruta: "/estatus", proposito: "9 hábitos + auditoría 20/80 + cierre cognitivo", docs: "Pilar 4 · Rituales §1 (final del día) · HelpDrawer" },
   { ruta: "/estatus/nuevo", proposito: "Crear nueva entrada de Estatus (1 por día)", docs: "Sub-ruta de /estatus" },
@@ -162,7 +162,7 @@ const FEATURES: Array<{ ruta: string; proposito: string; docs: string }> = [
   { ruta: "/estatus/ver", proposito: "Ver una entrada en detalle (racha + micro-acción)", docs: "Sub-ruta de /estatus" },
 
   // ── Tareas y GTD ──
-  { ruta: "/tareas", proposito: "Tareas pendientes: marcar hechas, adjuntos, asignar a meta/KR + cascada jerárquica proyecto › meta › KR en cada fila + panel WIGs (foco del ciclo) + toggle ⏳ pendiente de respuesta por fila + botón “Buscar duplicadas” (heurística cliente, archivar reversible)", docs: "Pilar 2 · WIGs §3 (cap de ejecución) · Pilar 4 (sección “Pendientes de respuesta”) · Glosario §“Casa de tus objetivos” · HelpDrawer" },
+  { ruta: "/tareas", proposito: "Tareas pendientes: marcar hechas, adjuntos, asignar a meta/KR + panel WIGs (foco del ciclo) + toggle ⏳ pendiente de respuesta por fila", docs: "Pilar 2 · WIGs §3 (cap de ejecución) · Pilar 4 (sección “Pendientes de respuesta”) · HelpDrawer" },
   { ruta: "/tareas/inbox", proposito: "Triaje residual: tareas sin meta o sin KR (después de asignar al crear)", docs: "HelpDrawer" },
   { ruta: "/tareas/pendientes-respuesta", proposito: "Panel dedicado a tareas con el flag “pendiente de respuesta” (esperando a alguien). Ordenadas por antigüedad: lo que más tiempo lleva esperando primero. Botón para destildar cuando llega la respuesta", docs: "Pilar 4 (sección “Pendientes de respuesta”) · HelpDrawer" },
   { ruta: "/tareas/completadas", proposito: "Histórico de tareas hechas (7/30/90/365/todo)", docs: "HelpDrawer" },
@@ -172,18 +172,19 @@ const FEATURES: Array<{ ruta: string; proposito: string; docs: string }> = [
   { ruta: "/calendario", proposito: "Time-blocking: 4 bloques fijos × 7 días", docs: "Pilar 3 · Rituales §1 (mañana) · HelpDrawer" },
 
   // ── Metas y planificación ──
-  { ruta: "/metas", proposito: "Cards de metas con estado y progreso + botones Archivar/Editar/WIG + IA Sugerir WIGs + filtro Archivadas + EditarMetaModal con botón IA Generar plan", docs: "Pilar 2 · Ritual mensual · HelpDrawer" },
+  { ruta: "/metas", proposito: "Cards de metas con estado y progreso + botones Archivar/Editar/WIG/Eliminar + IA Sugerir WIGs + filtro Archivadas + EditarMetaModal con botón IA Generar plan. El botón Eliminar muestra preview del impacto (cuántos KRs y tareas quedarán huérfanos) antes de borrar — aprovecha el ON DELETE SET NULL/CASCADE de migration 0001 para que las tareas sigan vivas sin meta", docs: "Pilar 2 · Ritual mensual · HelpDrawer" },
   { ruta: "/metas/nueva", proposito: "Crear meta con rango real [inicio, fin] + botón IA Generar plan (KRs+tareas+hábitos) que reparte los KRs SOLO dentro del rango. Hard constraint opcional 🔒", docs: "Pilar 2 · HelpDrawer" },
   { ruta: "/metas/agente", proposito: "Agente IA: contexto libre → meta + plan trimestral completo (atajo directo a meta; la entrada unificada es /agente)", docs: "Pilar 2 · HelpDrawer" },
   { ruta: "/agente", proposito: "Agente unificado: clasifica la idea (proyecto/meta/captura) y propone estructura. Bucle de aplicación con 2 pases + árbitro adversarial que verifica que el 100% de las metas hijas se persistan en Supabase antes de redirigir; si hay gap muestra panel con nombres faltantes y motivo del error. Fase 2 automática: tras crear metas+KRs iniciales, genera el plan completo (KRs+tareas+hábitos) por meta con generarPlanMetaIA + aplicarKrsYTareasEnMeta. Pre-bucle: getSession() para evitar fallo de RLS por JWT transitorio + backoff de 50ms entre inserts. Detección de PGRST303 (reloj desincronizado) con banner en AppShell + panel diagnóstico. migration 0024", docs: "Pilar 2 · HelpDrawer" },
   { ruta: "/metas/auditoria", proposito: "Auditoría de metas: qué les falta (área, proyecto, fecha objetivo, contexto, KRs). migration 0024", docs: "Pilar 2 · HelpDrawer" },
-  { ruta: "/metas/detalle", proposito: "Detalle de una meta con sus KRs por trimestre/mes + tareas por KR + botones Editar/✨ Generar plan con IA (KRs+tareas+hábitos, respeta KRs existentes) + Archivar + WIG + asignar tareas del inbox", docs: "Pilar 2 · HelpDrawer" },
+  { ruta: "/metas/detalle", proposito: "Detalle de una meta con sus KRs (uno o varios por trimestre/mes) + tareas por KR + botones Editar/✨ Generar plan con IA (KRs+tareas+hábitos, respeta KRs existentes por título) + Archivar + WIG + asignar tareas del inbox. Migration 0028: ya no hay UNIQUE por (meta, trimestre) — puedes tener N KRs en el mismo trimestre.", docs: "Pilar 2 · HelpDrawer" },
   { ruta: "/metas/plan", proposito: "Plan trimestral con scorecard de KRs + proyección", docs: "Pilar 2 · Ritual semanal (domingo) · Ritual mensual · HelpDrawer" },
   { ruta: "/plan-diario", proposito: "Estado emocional + plan diario generado por IA", docs: "Rituales §1 (mañana) · HelpDrawer" },
   { ruta: "/plan-diario/detalle", proposito: "Detalle de un plan con notas e informe", docs: "Sub-ruta de /plan-diario" },
   { ruta: "/plan-diario/historico", proposito: "Histórico de planes (7/30/90/365/todo)", docs: "Sub-ruta de /plan-diario" },
   { ruta: "/semana", proposito: "Pipeline semanal con drag & drop + IA 3 críticas/día", docs: "Ritual semanal (domingo noche) · HelpDrawer" },
   { ruta: "/pipeline", proposito: "Kanban por prioridad + motor IA de priorización", docs: "Ritual semanal (miércoles) · HelpDrawer" },
+  { ruta: "/matriz", proposito: "Matriz Eisenhower 2D (urgencia × importancia) de tareas activas. Drag & drop entre cuadrantes (dnd-kit/core) + botón IA “✨ Sugerir redistribución” que propone mover las tareas desubicadas al cuadrante correcto (módulo IA en src/lib/tareas/sugerirMatrizIA.ts). Sin migración: la clasificación se calcula en cada render desde fecha_fin + meta.es_wig; aplicar cambios solo escribe `prioridad`. Filtros: solo WIGs-meta / solo con fecha. Complemento visual de /pipeline (1D) — la matriz es 2D", docs: "Pilar 4 · HelpDrawer" },
 
   // ── Revisión y análisis ──
   { ruta: "/informes", proposito: "KPIs (incluye subtareas) + heatmap de actividad + chart de tareas y subtareas por día/semana + proyectos con conteo + metas y OKRs cerrados + comparación con plan vs sin plan", docs: "Ritual semanal (viernes) · Ritual mensual · HelpDrawer" },
@@ -191,10 +192,11 @@ const FEATURES: Array<{ ruta: string; proposito: string; docs: string }> = [
 
   // ── Identidad y horizonte ──
   { ruta: "/norte", proposito: "Propósito, valores y visión (la brújula)", docs: "Pilar 2 · Ritual diario (despertar) · Ritual mensual · HelpDrawer" },
+  { ruta: "/areas", proposito: "Áreas de responsabilidad (ámbitos continuos sin fecha de cierre). CRUD + listado de proyectos hijos por área + sección 'Sin área' para huérfanos. Migración 0001 (la tabla ya existía; aquí se le da página propia estilo /proyectos). Icono IconLayers. Reordenado en el sidebar Estrategia (posición 2, entre Norte y Proyectos)", docs: "Pilar 2 · HelpDrawer" },
 
   // ── Sistema ──
-  { ruta: "/pagos", proposito: "Pagos pendientes: ejecutar tesorería lunes 1ª hora", docs: "Apéndice §Bucle de equilibrio · Ritual semanal (lunes estricto) · HelpDrawer" },
-  { ruta: "/proyectos", proposito: "Gestión de proyectos con conteo de tareas, listado de metas hijas (migration 0024), archivado en cascada a metas+tareas, confirm con preview de impacto al eliminar y exportación a PDF por proyecto (modal con vista previa + Imprimir a PDF nativo del navegador, sin librerías externas)", docs: "HelpDrawer" },
+  { ruta: "/pagos", proposito: "Pagos pendientes: ejecutar tesorería lunes 1ª hora + botón IA “✨ Sugerir pagos” (migration 0027) que analiza los pagos activos y propone programación para los próximos 6 lunes aplicando el prompt editable en /configuracion (snowball por defecto, ingresos viernes/sábado). Modal de revisión estilo SugerirWigs: la IA sugiere, tú marcas qué incluir, botón “Aplicar N marcadas” actualiza solo fecha_pago_programada y estado=programado (no registra pagos parciales). Prompt editable en /configuracion §Prompt de pagos (columna prompt_pagos)", docs: "Apéndice §Bucle de equilibrio · Ritual semanal (lunes estricto) · HelpDrawer" },
+  { ruta: "/proyectos", proposito: "Gestión de proyectos con conteo de tareas, listado de metas hijas (migration 0024), archivado en cascada a metas+tareas, confirm con preview de impacto al eliminar, botón Editar (modal ligero con nombre/color/descripción/área), exportación a PDF por proyecto (modal con vista previa + Imprimir a PDF nativo del navegador, sin librerías externas). Al pulsar 'ver' se navega a /tareas?proyecto=X y se abre el filtro en 'todas' (no 'activas') para que las tareas hechas/archivadas del mismo proyecto sean visibles, especialmente en proyectos ya cerrados o arrastrados. Sección ámbar final con metas sin proyecto asignado (huérfanas, patrón simétrico a /areas → proyectos sin área) para que David no las pierda — archivadas ocultas, y cada huérfana trae un botón Eliminar con preview de impacto (las tareas no se borran, solo se desvinculan de la meta gracias a ON DELETE SET NULL)", docs: "HelpDrawer" },
   { ruta: "/configuracion", proposito: "Configuración: API key IA, base URL, modelo, tema", docs: "HelpDrawer" },
 
   // ── Documentación ──
@@ -499,10 +501,10 @@ export default function DocsPage() {
             Última actualización:
           </span>
           <span className="font-mono text-indigo-700 dark:text-indigo-300">
-            2026-11-20
+            2026-10-14
           </span>
           <span className="text-muted-foreground">
-            — migration 0025: las metas pasan a tener rango real (fecha_inicio_meta + fecha_objetivo + fecha_fin_bloqueada). El planificador reparte los KRs como meses sueltos dentro del rango, no fuerza 4 trimestres. /metas/nueva con dos date inputs + checkbox 🔒 Fecha crítica. Helpers nuevos: parsearMesesDeRango() y ensurePeriodosMeses() (RPC ensure_periodos_meses). · <strong className="text-foreground">/tareas jerárquico + detectar duplicadas</strong>: (1) jerarquía respetada en UI — el campo “Proyecto” del editor de tarea pasa a READONLY cuando hay meta (se deduce de meta.proyecto_id); sigue siendo editable solo para tareas huérfanas (sin meta). En la tabla y la lista móvil se pinta la cascada 📁 proyecto › 🎯 meta › 🪟 kr por fila (JerarquiaChips). (2) botón “Buscar duplicadas” en /tareas — heurística cliente en <code className="rounded bg-muted px-1 py-0.5 text-xs">/lib/dedupeTareas.ts</code> (Levenshtein ≤ 3 + Jaccard(shingles 3) ≥ 80%). Acción segura: archivar la perdedora (reversible), confirm si tiene subtareas. Modulo nuevo: <code className="rounded bg-muted px-1 py-0.5 text-xs">DedupeModal</code>. Sin IA, sin RPC nueva.
+            — migration 0025: las metas pasan a tener rango real (fecha_inicio_meta + fecha_objetivo + fecha_fin_bloqueada). El planificador reparte los KRs como meses sueltos dentro del rango, no fuerza 4 trimestres. /metas/nueva con dos date inputs + checkbox 🔒 Fecha crítica. Helpers nuevos: parsearMesesDeRango() y ensurePeriodosMeses() (RPC ensure_periodos_meses).
           </span>
         </div>
       </section>
@@ -1622,96 +1624,6 @@ export default function DocsPage() {
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
-              2026-11-20
-            </span>
-            <span className="text-muted-foreground">
-              <strong className="text-foreground">/tareas: jerarquía respetada + detectar duplicadas.</strong>{" "}
-              Tres cambios en <code className="rounded bg-muted px-1 py-0.5 text-xs">/tareas</code>: (1){" "}
-              <strong className="text-foreground">Proyecto readonly derivado de la meta</strong> — cuando la
-              tarea tiene meta, el campo "Proyecto" del editor pasa a ser read-only (chip con 📁 nombre + 🔒
-              “derivado de la meta”). Si la meta es huérfana (sin proyecto), muestra 🔓 avisando de cómo
-              anidarla desde <code className="rounded bg-muted px-1 py-0.5 text-xs">/metas</code>. Si la tarea
-              NO tiene meta, sigue siendo editable (caso "huérfana con casa"). Esto elimina la incoherencia
-              que el modelo de datos permitía: elegir meta→proyecto A y escribir proyecto B en la tarea. (2){" "}
-              <strong className="text-foreground">Cascada jerárquica visible por fila</strong> — nuevo{" "}
-              <code className="rounded bg-muted px-1 py-0.5 text-xs">JerarquiaChips</code> en{" "}
-              <code className="rounded bg-muted px-1 py-0.5 text-xs">TasksTable.tsx</code> pinta 📁 proyecto › 🎯 meta › 🪟 kr
-              como chips en cascada (móvil + escritorio), resolviendo los nombres con{" "}
-              <code className="rounded bg-muted px-1 py-0.5 text-xs">fetchMetas</code> +{" "}
-              <code className="rounded bg-muted px-1 py-0.5 text-xs">fetchResultadosPeriodo</code>. (3){" "}
-              <strong className="text-foreground">Botón "Buscar duplicadas"</strong> — heurística cliente en{" "}
-              <code className="rounded bg-muted px-1 py-0.5 text-xs">/lib/dedupeTareas.ts</code>:
-              Levenshtein ≤ 3 caracteres + Jaccard ≥ 80% sobre shingles de 3 palabras, sobre título
-              normalizado (sin acentos/minusculas/signos). Agrupación transitiva via union-find.{" "}
-              <code className="rounded bg-muted px-1 py-0.5 text-xs">DedupeModal</code> muestra los grupos
-              con motivo y similitud; acción segura = <strong className="text-foreground">archivar</strong>{" "}
-              la perdedora (reversible desde /tareas), con confirm previo si tiene subtareas o está hecha.
-              Sin IA, sin RPC nueva, ~150 líneas TS + union-find.{" "}
-              <em className="text-muted-foreground">Sin migración SQL: la BD ya permitía la jerarquía, solo cambiaba la UI. {""}
-              Razón: la BD ya tenía la foreign key y la mutación ya deducia meta_id del KR; el “bug” era
-              solo de formulario.</em>
-            </span>
-          </li>
-          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
-            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
-              2026-10-21
-            </span>
-            <span className="text-muted-foreground">
-              <strong className="text-foreground">/informes: tres bugs que silenciaban KPIs de productividad.</strong>{" "}
-              Síntoma que reportó David: KRs cerrados, pomodoros y minutos de
-              foco aparecían a 0 en /informes aunque claramente había trabajo
-              hecho. Tres causas independientes, tres arreglos: (1){' '}
-              <strong className="text-foreground">KRs cerrados siempre a 0</strong>:
-              <code className="rounded bg-muted px-1 py-0.5 text-xs">fetchMetasConProgreso</code>
-              {' '}no incluía <code className="rounded bg-muted px-1 py-0.5 text-xs">updated_at</code>
-              {' '}en el <code className="rounded bg-muted px-1 py-0.5 text-xs">SELECT</code>
-              {' '}de <code className="rounded bg-muted px-1 py-0.5 text-xs">resultados_periodo</code>,
-              {' '}así que el filtro <code className="rounded bg-muted px-1 py-0.5 text-xs">updated_at &gt;= desde</code>
-              {' '}caía siempre en <code className="rounded bg-muted px-1 py-0.5 text-xs">&quot;&quot; &gt;= fecha</code> = false.
-              {' '}Fix de 1 línea en{' '}
-              <code className="rounded bg-muted px-1 py-0.5 text-xs">/lib/queries.ts</code>.
-              {' '}(2) <strong className="text-foreground">Pomodoros libres nunca se grababan</strong>:
-              {' '}<code className="rounded bg-muted px-1 py-0.5 text-xs">grabarSesion</code>
-              {' '}en <code className="rounded bg-muted px-1 py-0.5 text-xs">pomodoroStore.tsx</code> tenía
-              un <code className="rounded bg-muted px-1 py-0.5 text-xs">if (tarea_id === &quot;libre&quot;) return</code>{' '}
-              silencioso que descartaba TODAS las sesiones lanzadas desde el
-              botón “Foco libre” de /focus. Migración 0027 hace nullable la
-              columna <code className="rounded bg-muted px-1 py-0.5 text-xs">pomodoro_sesiones.tarea_id</code>{' '}
-              y el helper ahora traduce el sentinel a <code className="rounded bg-muted px-1 py-0.5 text-xs">null</code>{' '}
-              en BD. (3) <strong className="text-foreground">“Metas cerradas” usaba{' '}
-              <code className="rounded bg-muted px-1 py-0.5 text-xs">updated_at</code> como proxy</strong>,
-              {' '}lo cual mentía hacia ambos lados (reabrir una meta la
-              &quot;trasladaba&quot; al presente; cerrarla y no tocarla la
-              mantenía en el bucket incorrecto). Migración 0028 añade{' '}
-              <code className="rounded bg-muted px-1 py-0.5 text-xs">metas.fecha_cierre timestamptz</code>{' '}
-              con trigger <code className="rounded bg-muted px-1 py-0.5 text-xs">trg_metas_fecha_cierre</code>{' '}
-              que sella la fecha al pasar a <code className="rounded bg-muted px-1 py-0.5 text-xs">completada</code>{' '}
-              y la limpia si la meta se reabre. Backfill best-effort desde{' '}
-              <code className="rounded bg-muted px-1 py-0.5 text-xs">updated_at</code>{' '}
-              para metas ya cerradas en BD. Tipo <code className="rounded bg-muted px-1 py-0.5 text-xs">Meta</code> extendido
-              con <code className="rounded bg-muted px-1 py-0.5 text-xs">fecha_cierre?: string | null</code>.
-              {' '}Para no perder metas cerradas ANTES de la migración,
-              {' '}<code className="rounded bg-muted px-1 py-0.5 text-xs">/informes</code> hace fallback a{' '}
-              <code className="rounded bg-muted px-1 py-0.5 text-xs">updated_at</code>. Además el KPI
-              “Metas cerradas” ahora muestra “X en ventana · Y totales”
-              (en el header de la sección) y “de Y totales · últimos Nd”
-              (en el sub-texto de la tarjeta) para que un 0 en la ventana
-              no se lea como “no he cerrado nada”.{' '}
-              <strong className="text-foreground">Acción manual obligatoria</strong>:
-              {' '}pegar el contenido de{' '}
-              <code className="rounded bg-muted px-1 py-0.5 text-xs">supabase/APLICAR-0027.sql</code> y{' '}
-              <code className="rounded bg-muted px-1 py-0.5 text-xs">supabase/APLICAR-0028.sql</code> en
-              Supabase → SQL Editor → Run (idempotentes) antes de
-              desplegar este cambio. Sin las migraciones, las queries
-              que dependen de las nuevas columnas fallarán. FEATURES fila{' '}
-              <code className="rounded bg-muted px-1 py-0.5 text-xs">/informes</code> mantiene su propósito
-              (las features ya estaban listadas; el cambio es de
-              precisión de las métricas, no de superficie).{' '}
-              <em className="text-muted-foreground">Metodología y rituales sin cambios.</em>
-            </span>
-          </li>
-          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
-            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
               2026-10-13
             </span>
             <span className="text-muted-foreground">
@@ -2444,6 +2356,37 @@ export default function DocsPage() {
               OKR) y 3 hábitos innegociables.
             </span>
           </li>
+          <li className="flex gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-amber-700 dark:text-amber-400 sm:text-sm">
+              2025-10-15
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">Migration 0028 — KR separado del trimestre.</strong>{" "}
+              Bug histórico: <code className="rounded bg-muted px-1.5 py-0.5 text-xs">unique(meta_id, periodo_id)</code> en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">resultados_periodo</code>{" "}
+              forzaba “1 KR por trimestre”. David reportaba “solo puedo poner
+              un KR por meta”. Refactor: la tabla{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">resultados_periodo</code>{" "}
+              ahora modela el KR (sin trimestre). La asignación a 1..N
+              trimestres/meses se hace en la nueva tabla puente{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">kr_periodos</code>.{" "}
+              <strong className="text-foreground">Ya puedes tener N KRs por meta, y cada KR puede vivir en varios trimestres.</strong>{" "}
+              Tareas siguen en <code className="rounded bg-muted px-1.5 py-0.5 text-xs">tareas.resultado_periodo_id</code>{" "}
+              apuntando al KR (la columna se mantiene; el nombre es legacy).
+              UI: <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas/detalle</code>{" "}
+              permite seleccionar 1..N trimestres al añadir un KR;{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas/plan</code>{" "}
+              muestra todos los KRs de cada trimestre (puede haber varios).
+              IA: <code className="rounded bg-muted px-1.5 py-0.5 text-xs">aplicarKrsYTareasEnMeta</code>{" "}
+              ahora deduplica por TÍTULO del KR (no por trimestre). Seed nuevo:{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">001b_seed_metas_2026_kr.sql</code>{" "}
+              (sustituye al 001 legacy, que queda documentado como
+              pre-0028). <strong className="text-foreground">Acción manual</strong>:{" "}
+              ejecutar{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">supabase/APLICAR-0028.sql</code>{" "}
+              en el SQL Editor para migrar la BD.
+            </span>
+          </li>
         </ul>
       </section>
 
@@ -2474,11 +2417,14 @@ function AplicacionEnApp({ pilar }: { pilar: 1 | 2 | 3 | 4 | 5 }) {
       "Time-blocking con 4 bloques fijos por día (/calendario)",
       "Auditoría 20/80 en el Estatus Diario",
       "Motor de priorización con IA que devuelve 1 sola acción (<45 min)",
+      "Botón IA “✨ Sugerir pagos” en /pagos (migration 0027): analiza los pagos activos y propone programación para los próximos 6 lunes con el prompt editable en /configuracion. Snowball + ingresos viernes/sábado por defecto",
     ],
     4: [
       "9 hábitos diarios con score 0-100 y racha (/estatus)",
       "Captura / Inbox para vaciar la cabeza (/captura)",
       "Micro-acción priorizada para mañana basada en patrón semanal",
+      "Banner mental arriba de /tareas/pendientes-respuesta: «no te preocupes de lo que está pendiente de los demás» (reframe estoico/Covey, sin lógica)",
+      "Matriz Eisenhower 2D en /m (/matriz) con drag & drop entre cuadrantes y botón IA «Sugerir redistribución» — clasificación urgencia × importancia calculada en JS desde fecha_fin + meta.es_wig, sin migración",
     ],
     5: [
       "Límite de 4 bloques/día en el calendario (señal visual)",

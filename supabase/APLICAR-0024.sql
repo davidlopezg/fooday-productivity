@@ -25,26 +25,62 @@
 
 -- ----------------------------------------------------------------------------
 -- 1. Crear el KR faltante "Alimentación consciente" en Q3 (si no existe).
---    unique(meta_id, periodo_id) garantiza idempotencia.
+--    Migration 0028: el INSERT a `resultados_periodo` ya no incluye
+--    `periodo_id`; la asignación al trimestre se hace en `kr_periodos`.
+--    Idempotencia: el SELECT comprueba si ya existe un KR con ese título
+--    en la meta (si existe, no se duplica).
 -- ----------------------------------------------------------------------------
-insert into public.resultados_periodo (owner_id, meta_id, periodo_id, titulo, descripcion, metrica, valor_objetivo, valor_actual, unidad, peso, orden)
-select
-  public.current_owner_id(),
-  m.id,
-  p.id,
-  'Alimentación consciente (calidad y registro)',
-  'Reducir comida rápida, asegurar 5 porciones de fruta/verdura al día, llevar diario. Es la palanca principal para llegar al objetivo de IMC en Q4.',
-  'días con alimentación consciente',
-  5,
-  0,
-  'días/sem',
-  1,
-  4
-from public.metas m
-cross join public.periodos p
-where m.owner_id = public.current_owner_id() and m.codigo = 'M8101'
-  and p.owner_id = public.current_owner_id() and p.tipo = 'trimestre' and p.anio = 2026 and p.numero = 3
-on conflict (meta_id, periodo_id) do nothing;
+do $$
+declare
+  v_meta_id uuid;
+  v_periodo_id uuid;
+  v_existente uuid;
+begin
+  select id into v_meta_id from public.metas
+    where owner_id = public.current_owner_id() and codigo = 'M8101' limit 1;
+  select id into v_periodo_id from public.periodos
+    where owner_id = public.current_owner_id()
+      and tipo = 'trimestre' and anio = 2026 and numero = 3 limit 1;
+
+  if v_meta_id is null or v_periodo_id is null then
+    raise notice 'M8101 o Q3 2026 no existen — saltando creación del KR';
+    return;
+  end if;
+
+  -- ¿Ya existe un KR con ese título en esta meta? Si sí, no duplicamos.
+  select id into v_existente from public.resultados_periodo
+    where meta_id = v_meta_id
+      and titulo = 'Alimentación consciente (calidad y registro)'
+    limit 1;
+
+  if v_existente is null then
+    with ins as (
+      insert into public.resultados_periodo (owner_id, meta_id, titulo, descripcion, metrica, valor_objetivo, valor_actual, unidad, peso, orden)
+      values (
+        public.current_owner_id(),
+        v_meta_id,
+        'Alimentación consciente (calidad y registro)',
+        'Reducir comida rápida, asegurar 5 porciones de fruta/verdura al día, llevar diario. Es la palanca principal para llegar al objetivo de IMC en Q4.',
+        'días con alimentación consciente',
+        5,
+        0,
+        'días/sem',
+        1,
+        4
+      )
+      returning id
+    )
+    insert into public.kr_periodos (owner_id, kr_id, periodo_id, peso, orden)
+    select public.current_owner_id(), ins.id, v_periodo_id, 1, 0
+    from ins
+    on conflict (kr_id, periodo_id) do nothing;
+  else
+    -- Si ya existe el KR pero no estaba asignado a Q3, lo añadimos.
+    insert into public.kr_periodos (owner_id, kr_id, periodo_id, peso, orden)
+    values (public.current_owner_id(), v_existente, v_periodo_id, 1, 0)
+    on conflict (kr_id, periodo_id) do nothing;
+  end if;
+end $$;
 
 
 -- ----------------------------------------------------------------------------
@@ -53,13 +89,15 @@ on conflict (meta_id, periodo_id) do nothing;
 -- ----------------------------------------------------------------------------
 
 -- N8101-07 · Reducir comidas rápidas a 1/semana → Q3 "Alimentación consciente"
+-- Migration 0028: el JOIN es vía kr_periodos, no vía resultados_periodo.periodo_id.
 update public.tareas t
 set resultado_periodo_id = (
-  select rp.id from public.resultados_periodo rp
-    join public.metas m on m.id = rp.meta_id
-    join public.periodos p on p.id = rp.periodo_id
+  select kr.id from public.resultados_periodo kr
+    join public.metas m on m.id = kr.meta_id
+    join public.kr_periodos kp on kp.kr_id = kr.id
+    join public.periodos p on p.id = kp.periodo_id
   where m.codigo = 'M8101' and p.anio = 2026 and p.numero = 3
-    and rp.titulo like 'Alimentación consciente%'
+    and kr.titulo like 'Alimentación consciente%'
   limit 1
 )
 where t.codigo = 'N8101-07'
@@ -69,11 +107,12 @@ where t.codigo = 'N8101-07'
 -- N8101-08 · 5 porciones frutas/verduras → Q3 "Alimentación consciente"
 update public.tareas t
 set resultado_periodo_id = (
-  select rp.id from public.resultados_periodo rp
-    join public.metas m on m.id = rp.meta_id
-    join public.periodos p on p.id = rp.periodo_id
+  select kr.id from public.resultados_periodo kr
+    join public.metas m on m.id = kr.meta_id
+    join public.kr_periodos kp on kp.kr_id = kr.id
+    join public.periodos p on p.id = kp.periodo_id
   where m.codigo = 'M8101' and p.anio = 2026 and p.numero = 3
-    and rp.titulo like 'Alimentación consciente%'
+    and kr.titulo like 'Alimentación consciente%'
   limit 1
 )
 where t.codigo = 'N8101-08'
@@ -83,11 +122,12 @@ where t.codigo = 'N8101-08'
 -- N8101-09 · Llevar diario de alimentación → Q3 "Alimentación consciente"
 update public.tareas t
 set resultado_periodo_id = (
-  select rp.id from public.resultados_periodo rp
-    join public.metas m on m.id = rp.meta_id
-    join public.periodos p on p.id = rp.periodo_id
+  select kr.id from public.resultados_periodo kr
+    join public.metas m on m.id = kr.meta_id
+    join public.kr_periodos kp on kp.kr_id = kr.id
+    join public.periodos p on p.id = kp.periodo_id
   where m.codigo = 'M8101' and p.anio = 2026 and p.numero = 3
-    and rp.titulo like 'Alimentación consciente%'
+    and kr.titulo like 'Alimentación consciente%'
   limit 1
 )
 where t.codigo = 'N8101-09'
@@ -97,11 +137,12 @@ where t.codigo = 'N8101-09'
 -- N8101-10 · Meditación/respiración 3x/sem → Q3 "3 sesiones de relajación/semana"
 update public.tareas t
 set resultado_periodo_id = (
-  select rp.id from public.resultados_periodo rp
-    join public.metas m on m.id = rp.meta_id
-    join public.periodos p on p.id = rp.periodo_id
+  select kr.id from public.resultados_periodo kr
+    join public.metas m on m.id = kr.meta_id
+    join public.kr_periodos kp on kp.kr_id = kr.id
+    join public.periodos p on p.id = kp.periodo_id
   where m.codigo = 'M8101' and p.anio = 2026 and p.numero = 3
-    and rp.titulo like '3 sesiones de relajaci%'
+    and kr.titulo like '3 sesiones de relajaci%'
   limit 1
 )
 where t.codigo = 'N8101-10'
@@ -111,11 +152,12 @@ where t.codigo = 'N8101-10'
 -- N8101-11 · Pesarse semanalmente → Q4 "IMC saludable"
 update public.tareas t
 set resultado_periodo_id = (
-  select rp.id from public.resultados_periodo rp
-    join public.metas m on m.id = rp.meta_id
-    join public.periodos p on p.id = rp.periodo_id
+  select kr.id from public.resultados_periodo kr
+    join public.metas m on m.id = kr.meta_id
+    join public.kr_periodos kp on kp.kr_id = kr.id
+    join public.periodos p on p.id = kp.periodo_id
   where m.codigo = 'M8101' and p.anio = 2026 and p.numero = 4
-    and rp.titulo like 'IMC saludable%'
+    and kr.titulo like 'IMC saludable%'
   limit 1
 )
 where t.codigo = 'N8101-11'
@@ -125,11 +167,12 @@ where t.codigo = 'N8101-11'
 -- N8101-13 · Pausas 10-15 min cada 2-3h → Q4 "Nivel de energía"
 update public.tareas t
 set resultado_periodo_id = (
-  select rp.id from public.resultados_periodo rp
-    join public.metas m on m.id = rp.meta_id
-    join public.periodos p on p.id = rp.periodo_id
+  select kr.id from public.resultados_periodo kr
+    join public.metas m on m.id = kr.meta_id
+    join public.kr_periodos kp on kp.kr_id = kr.id
+    join public.periodos p on p.id = kp.periodo_id
   where m.codigo = 'M8101' and p.anio = 2026 and p.numero = 4
-    and rp.titulo like 'Nivel de energ%'
+    and kr.titulo like 'Nivel de energ%'
   limit 1
 )
 where t.codigo = 'N8101-13'
@@ -139,11 +182,12 @@ where t.codigo = 'N8101-13'
 -- N8101-14 · Revisar y ajustar plan cada mes → Q4 "Satisfacción bienestar"
 update public.tareas t
 set resultado_periodo_id = (
-  select rp.id from public.resultados_periodo rp
-    join public.metas m on m.id = rp.meta_id
-    join public.periodos p on p.id = rp.periodo_id
+  select kr.id from public.resultados_periodo kr
+    join public.metas m on m.id = kr.meta_id
+    join public.kr_periodos kp on kp.kr_id = kr.id
+    join public.periodos p on p.id = kp.periodo_id
   where m.codigo = 'M8101' and p.anio = 2026 and p.numero = 4
-    and rp.titulo like 'Satisfacci%'
+    and kr.titulo like 'Satisfacci%'
   limit 1
 )
 where t.codigo = 'N8101-14'
@@ -164,11 +208,12 @@ select
   'Registrar nº despertares cada mañana (campo libre /estatus)',
   'media', 'pendiente',
   m.id,
-  (select rp.id from public.resultados_periodo rp
-    join public.metas m2 on m2.id = rp.meta_id
-    join public.periodos p on p.id = rp.periodo_id
+  (select kr.id from public.resultados_periodo kr
+    join public.metas m2 on m2.id = kr.meta_id
+    join public.kr_periodos kp on kp.kr_id = kr.id
+    join public.periodos p on p.id = kp.periodo_id
    where m2.codigo = 'M8101' and p.anio = 2026 and p.numero = 2
-     and rp.titulo like 'Despertares%' limit 1)
+     and kr.titulo like 'Despertares%' limit 1)
 from public.metas m
 where m.codigo = 'M8101' and m.owner_id = public.current_owner_id()
 on conflict (owner_id, codigo) do nothing;
@@ -181,11 +226,12 @@ select
   'Revisión semanal de la palabra de ánimo (domingo noche, /estatus)',
   'baja', 'pendiente',
   m.id,
-  (select rp.id from public.resultados_periodo rp
-    join public.metas m2 on m2.id = rp.meta_id
-    join public.periodos p on p.id = rp.periodo_id
+  (select kr.id from public.resultados_periodo kr
+    join public.metas m2 on m2.id = kr.meta_id
+    join public.kr_periodos kp on kp.kr_id = kr.id
+    join public.periodos p on p.id = kp.periodo_id
    where m2.codigo = 'M8101' and p.anio = 2026 and p.numero = 2
-     and rp.titulo like 'Estado %nimo%' limit 1)
+     and kr.titulo like 'Estado %nimo%' limit 1)
 from public.metas m
 where m.codigo = 'M8101' and m.owner_id = public.current_owner_id()
 on conflict (owner_id, codigo) do nothing;
@@ -198,11 +244,12 @@ select
   'Anotar calidad de sueño subjetiva (1-5) en /estatus cada mañana',
   'media', 'pendiente',
   m.id,
-  (select rp.id from public.resultados_periodo rp
-    join public.metas m2 on m2.id = rp.meta_id
-    join public.periodos p on p.id = rp.periodo_id
+  (select kr.id from public.resultados_periodo kr
+    join public.metas m2 on m2.id = kr.meta_id
+    join public.kr_periodos kp on kp.kr_id = kr.id
+    join public.periodos p on p.id = kp.periodo_id
    where m2.codigo = 'M8101' and p.anio = 2026 and p.numero = 3
-     and rp.titulo like '%oches%' limit 1)
+     and kr.titulo like '%oches%' limit 1)
 from public.metas m
 where m.codigo = 'M8101' and m.owner_id = public.current_owner_id()
 on conflict (owner_id, codigo) do nothing;
@@ -215,11 +262,12 @@ select
   'Listar 3 disparadores principales de estrés (1 vez al inicio del trimestre)',
   'media', 'pendiente',
   m.id,
-  (select rp.id from public.resultados_periodo rp
-    join public.metas m2 on m2.id = rp.meta_id
-    join public.periodos p on p.id = rp.periodo_id
+  (select kr.id from public.resultados_periodo kr
+    join public.metas m2 on m2.id = kr.meta_id
+    join public.kr_periodos kp on kp.kr_id = kr.id
+    join public.periodos p on p.id = kp.periodo_id
    where m2.codigo = 'M8101' and p.anio = 2026 and p.numero = 3
-     and rp.titulo like 'Reducir estr%' limit 1)
+     and kr.titulo like 'Reducir estr%' limit 1)
 from public.metas m
 where m.codigo = 'M8101' and m.owner_id = public.current_owner_id()
 on conflict (owner_id, codigo) do nothing;
@@ -231,11 +279,12 @@ select
   'Revisión mensual del nivel de estrés percibido (escala 0-100, en /estatus)',
   'baja', 'pendiente',
   m.id,
-  (select rp.id from public.resultados_periodo rp
-    join public.metas m2 on m2.id = rp.meta_id
-    join public.periodos p on p.id = rp.periodo_id
+  (select kr.id from public.resultados_periodo kr
+    join public.metas m2 on m2.id = kr.meta_id
+    join public.kr_periodos kp on kp.kr_id = kr.id
+    join public.periodos p on p.id = kp.periodo_id
    where m2.codigo = 'M8101' and p.anio = 2026 and p.numero = 3
-     and rp.titulo like 'Reducir estr%' limit 1)
+     and kr.titulo like 'Reducir estr%' limit 1)
 from public.metas m
 where m.codigo = 'M8101' and m.owner_id = public.current_owner_id()
 on conflict (owner_id, codigo) do nothing;
@@ -248,11 +297,12 @@ select
   'Medir % grasa corporal mensualmente (báscula o cinta métrica)',
   'baja', 'pendiente',
   m.id,
-  (select rp.id from public.resultados_periodo rp
-    join public.metas m2 on m2.id = rp.meta_id
-    join public.periodos p on p.id = rp.periodo_id
+  (select kr.id from public.resultados_periodo kr
+    join public.metas m2 on m2.id = kr.meta_id
+    join public.kr_periodos kp on kp.kr_id = kr.id
+    join public.periodos p on p.id = kp.periodo_id
    where m2.codigo = 'M8101' and p.anio = 2026 and p.numero = 4
-     and rp.titulo like 'IMC saludable%' limit 1)
+     and kr.titulo like 'IMC saludable%' limit 1)
 from public.metas m
 where m.codigo = 'M8101' and m.owner_id = public.current_owner_id()
 on conflict (owner_id, codigo) do nothing;
@@ -264,11 +314,12 @@ select
   'Revisar tendencia de peso / IMC (línea temporal, /informes)',
   'baja', 'pendiente',
   m.id,
-  (select rp.id from public.resultados_periodo rp
-    join public.metas m2 on m2.id = rp.meta_id
-    join public.periodos p on p.id = rp.periodo_id
+  (select kr.id from public.resultados_periodo kr
+    join public.metas m2 on m2.id = kr.meta_id
+    join public.kr_periodos kp on kp.kr_id = kr.id
+    join public.periodos p on p.id = kp.periodo_id
    where m2.codigo = 'M8101' and p.anio = 2026 and p.numero = 4
-     and rp.titulo like 'IMC saludable%' limit 1)
+     and kr.titulo like 'IMC saludable%' limit 1)
 from public.metas m
 where m.codigo = 'M8101' and m.owner_id = public.current_owner_id()
 on conflict (owner_id, codigo) do nothing;
@@ -281,11 +332,12 @@ select
   'Auto-evaluación semanal de energía (escala 1-10, /estatus)',
   'baja', 'pendiente',
   m.id,
-  (select rp.id from public.resultados_periodo rp
-    join public.metas m2 on m2.id = rp.meta_id
-    join public.periodos p on p.id = rp.periodo_id
+  (select kr.id from public.resultados_periodo kr
+    join public.metas m2 on m2.id = kr.meta_id
+    join public.kr_periodos kp on kp.kr_id = kr.id
+    join public.periodos p on p.id = kp.periodo_id
    where m2.codigo = 'M8101' and p.anio = 2026 and p.numero = 4
-     and rp.titulo like 'Nivel de energ%' limit 1)
+     and kr.titulo like 'Nivel de energ%' limit 1)
 from public.metas m
 where m.codigo = 'M8101' and m.owner_id = public.current_owner_id()
 on conflict (owner_id, codigo) do nothing;
@@ -298,11 +350,12 @@ select
   'Encuesta trimestral de bienestar (escala 1-10 + 3 notas, en /estatus)',
   'baja', 'pendiente',
   m.id,
-  (select rp.id from public.resultados_periodo rp
-    join public.metas m2 on m2.id = rp.meta_id
-    join public.periodos p on p.id = rp.periodo_id
+  (select kr.id from public.resultados_periodo kr
+    join public.metas m2 on m2.id = kr.meta_id
+    join public.kr_periodos kp on kp.kr_id = kr.id
+    join public.periodos p on p.id = kp.periodo_id
    where m2.codigo = 'M8101' and p.anio = 2026 and p.numero = 4
-     and rp.titulo like 'Satisfacci%' limit 1)
+     and kr.titulo like 'Satisfacci%' limit 1)
 from public.metas m
 where m.codigo = 'M8101' and m.owner_id = public.current_owner_id()
 on conflict (owner_id, codigo) do nothing;
@@ -315,16 +368,17 @@ on conflict (owner_id, codigo) do nothing;
 -- select
 --   m.codigo as meta,
 --   p.nombre as trimestre,
---   rp.titulo as kr,
+--   kr.titulo as kr,
 --   count(t.id) as total_tareas,
 --   count(t.id) filter (where t.estado = 'hecha') as hechas
 -- from public.metas m
--- join public.resultados_periodo rp on rp.meta_id = m.id
--- join public.periodos p on p.id = rp.periodo_id
--- left join public.tareas t on t.resultado_periodo_id = rp.id
+-- join public.resultados_periodo kr on kr.meta_id = m.id
+-- join public.kr_periodos kp on kp.kr_id = kr.id
+-- join public.periodos p on p.id = kp.periodo_id
+-- left join public.tareas t on t.resultado_periodo_id = kr.id
 -- where m.codigo = 'M8101'
--- group by m.codigo, p.nombre, rp.titulo, p.numero, rp.orden
--- order by p.numero, rp.orden;
+-- group by m.codigo, p.nombre, kr.titulo, p.numero, kr.orden
+-- order by p.numero, kr.orden;
 --
 -- select count(*) as tareas_sin_kr
 -- from public.tareas

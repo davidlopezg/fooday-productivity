@@ -65,6 +65,12 @@ export const AYUDA_POR_RUTA: Record<
           "El panel violeta son los WIGs de METAS (qué resultados quieres). El panel fucsia son los WIGs de TAREAS (qué 3 tareas concretas los sostienen). Si los WIGs-metas no avanzan, mira primero las WIGs-tareas.",
         pilar: 2,
       },
+      {
+        titulo: "📅 Panel ‘Tareas con fecha’",
+        cuerpo:
+          "Entre los WIGs-tareas y el Plan de hoy hay un panel ámbar con las tareas pendientes que tienen deadline o fecha_fin, ordenadas de la más urgente a la más lejana (vencidas arriba, luego HOY, luego futuras). Pulsa el ☐ para marcarla hecha sin navegar a /tareas. Si la lista no aparece, es que no tienes tareas pendientes con fecha: date un paseo por /tareas y ponles deadline a las críticas.",
+        pilar: 3,
+      },
     ],
   },
   "/captura": {
@@ -103,6 +109,12 @@ export const AYUDA_POR_RUTA: Record<
         titulo: "Cuándo usarlo",
         cuerpo:
           "Cuando tengas tareas 'huérfanas' (sin meta) o tareas de una meta que aún no has repartido por trimestres. Procesarlas es meterlas en algún resultado_periodo o dejarlas como sueltas a propósito. La regla: este inbox debería estar cerca de cero. Si crece semana tras semana, tienes más trabajo del que tu plan puede ejecutar — replantéate prioridades.",
+        pilar: 2,
+      },
+      {
+        titulo: "✨ Sugerir tareas con IA (pegar email/contexto)",
+        cuerpo:
+          "El botón ‘Sugerir tareas’ lee el texto que pegues (un email, un mensaje, notas mentales) y extrae las acciones concretas que tienes pendientes. Antes de añadir nada al inbox te muestra las propuestas editables: puedes cambiar títulos, descripciones y prioridades, descartar las que no quieras y solo entonces confirmar. La IA no escribe en la BD sin tu OK.",
         pilar: 2,
       },
     ],
@@ -208,6 +220,12 @@ export const AYUDA_POR_RUTA: Record<
         cuerpo:
           "Si tienes más de 3 tareas marcadas como 'crítica', ninguna lo es realmente. Resérvalo para lo que la sociedad rompe si no se hace hoy. El resto son 'altas' o 'medias'.",
         pilar: 3,
+      },
+      {
+        titulo: "✨ Sugerir 3 siguientes acciones con IA",
+        cuerpo:
+          "El botón ‘Sugerir 3 siguientes acciones’ mira TODA tu lista abierta (no completadas — incluye inbox, tareas con meta y tareas sin asignar) y los argumentos de cada una (meta, KR, deadline, prioridad, ámbito, tags, WIG) y propone 3 acciones concretas para mañana. Como en el resto de flujos IA: solo sugiere, tú editas y confirmas.",
+        pilar: 2,
       },
     ],
   },
@@ -555,6 +573,33 @@ export const AYUDA_POR_RUTA: Record<
         titulo: "Metas y OKRs cerrados: la auditoría mensual",
         cuerpo:
           "“Con plan vs sin plan” mide madurez OKR: una meta sin Key Results no se mide, solo se desea. Si el grueso de tus metas está en “sin plan”, el cuello de botella no es de ejecución, es de diseño — vuelve a /metas y materializa los KRs (botón ✨ Generar plan con IA) antes de pedirte más foco.",
+        pilar: 2,
+      },
+    ],
+  },
+  "/matriz": {
+    pilares: [4],
+    items: [
+      {
+        titulo: "Por qué una matriz 2D y no solo prioridad",
+        cuerpo:
+          "Pipeline (/pipeline) ordena las tareas en una dimensión: prioridad (1D). La matriz Eisenhower añade la segunda dimensión: urgencia (cuándo vence). Una tarea puede ser muy urgente pero poco importante (Q3: delegar), o muy importante pero lejos en el tiempo (Q2: planificar). El campo `prioridad` no captura las dos — esta vista sí.",
+      },
+      {
+        titulo: "Cómo se calculan los cuadrantes",
+        cuerpo:
+          "Urgencia = fecha_fin / deadline (objetiva). Importancia = ¿la tarea es WIG? → ¿su meta es WIG? → ¿tiene meta activa? → huérfana. Cuadrante derivado: Q1 hacer YA, Q2 planificar, Q3 delegar, Q4 eliminar. Si la prioridad manual no coincide, verás un puntito violeta junto al título.",
+        pilar: 4,
+      },
+      {
+        titulo: "Arrastra entre cuadrantes",
+        cuerpo:
+          "Cada drop reasigna la `prioridad` de la tarea al valor del cuadrante destino (Q1→critica, Q2→alta, Q3→media, Q4→baja). Si sueltas en el mismo cuadrante, no se hace nada. Es una edición rápida: para cambios finos usa el modal de edición de la tarea.",
+      },
+      {
+        titulo: "IA: sugiere redistribución",
+        cuerpo:
+          "El botón '✨ Sugerir redistribución' analiza todas las tareas activas y propone mover solo las que considera desubicadas. Modal de revisión con checkboxes, override por fila, batch apply. La IA solo sugiere; tú decides.",
         pilar: 2,
       },
     ],

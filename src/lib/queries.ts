@@ -754,18 +754,85 @@ export async function fetchPeriodos(opts?: {
   return (data ?? []) as Periodo[];
 }
 
-/** Resultados_periodo de una meta (o de todas si metaId=null). */
+/** KRs (= resultados_periodo) de una meta (o de todas si metaId=null).
+ *  Migration 0028: la tabla ya NO tiene `periodo_id`. Para obtener los
+ *  periodos de cada KR, usa `fetchKeyResultConPeriodos` o mira la tabla
+ *  `kr_periodos` directamente. */
 export async function fetchResultadosPeriodo(
   metaId?: string,
 ): Promise<ResultadoPeriodo[]> {
   let q = createClient()
     .from("resultados_periodo")
-    .select("id,meta_id,periodo_id,titulo,descripcion,metrica,valor_objetivo,valor_actual,unidad,estado,peso,orden")
+    .select("id,meta_id,titulo,descripcion,metrica,valor_objetivo,valor_actual,unidad,estado,peso,orden")
     .order("orden");
   if (metaId) q = q.eq("meta_id", metaId);
   const { data, error } = await q;
   if (error) throw error;
   return (data ?? []) as ResultadoPeriodo[];
+}
+
+/** Devuelve los periodos asignados a cada KR de una meta (o todos si
+ *  metaId=null). Migration 0028: necesario porque `resultados_periodo`
+ *  ya no tiene `periodo_id` directo.
+ *  Devuelve: Array<{ kr_id, kr_titulo, periodos: Periodo[] }> */
+export async function fetchKeyResultConPeriodos(
+  metaId?: string,
+): Promise<Array<{ kr_id: string; kr_titulo: string; periodos: Periodo[] }>> {
+  const supabase = createClient();
+  const [{ data: krs }, { data: asignaciones }, { data: periodos }] = await Promise.all([
+    metaId
+      ? supabase
+          .from("resultados_periodo")
+          .select("id,titulo")
+          .eq("meta_id", metaId)
+          .order("orden")
+      : supabase
+          .from("resultados_periodo")
+          .select("id,titulo")
+          .order("orden"),
+    supabase
+      .from("kr_periodos")
+      .select("kr_id,periodo_id,orden"),
+    { data: [] as Periodo[] }, // periodos cargados después
+  ]);
+  // Cargar periodos en bloque.
+  const periodoIds = Array.from(
+    new Set(((asignaciones ?? []) as Array<{ periodo_id: string }>).map((a) => a.periodo_id)),
+  );
+  let periodosById: Record<string, Periodo> = {};
+  if (periodoIds.length > 0) {
+    const { data: ps } = await supabase
+      .from("periodos")
+      .select("id,tipo,anio,numero,nombre,fecha_inicio,fecha_fin")
+      .in("id", periodoIds);
+    periodosById = Object.fromEntries(
+      ((ps ?? []) as Periodo[]).map((p) => [p.id, p]),
+    );
+  }
+  // Inicializa todos los KRs con periodos=[], aunque no tengan ninguno.
+  const porKr = new Map<string, { kr_id: string; kr_titulo: string; periodos: Periodo[] }>();
+  for (const k of (krs ?? []) as Array<{ id: string; titulo: string }>) {
+    porKr.set(k.id, { kr_id: k.id, kr_titulo: k.titulo, periodos: [] });
+  }
+  for (const a of (asignaciones ?? []) as Array<{
+    kr_id: string;
+    periodo_id: string;
+    orden: number;
+  }>) {
+    const grupo = porKr.get(a.kr_id);
+    if (!grupo) continue;
+    const p = periodosById[a.periodo_id];
+    if (!p) continue;
+    grupo.periodos.push(p);
+  }
+  // Ordena periodos de cada KR por (anio, numero) — más natural para
+  // vista trimestral Q1→Q4.
+  for (const g of porKr.values()) {
+    g.periodos.sort(
+      (x, y) => x.anio - y.anio || x.numero - y.numero,
+    );
+  }
+  return Array.from(porKr.values());
 }
 
 /** Tareas de un resultado (no se usa en fetchMetaConPlan porque ya las
@@ -819,19 +886,31 @@ export async function fetchTareasSinMeta(): Promise<TareaSinMeta[]> {
   return [...a, ...b];
 }
 
-/** Detalle completo de UNA meta: sus resultados, los periodos de esos
- *  resultados, y las tareas de cada resultado. Devuelve también métricas
- *  agregadas (progreso, total/hechas) ya calculadas en cliente. */
+/** Detalle completo de UNA meta: sus KRs, los periodos de esos KRs
+ *  (1..N cada uno, vía `kr_periodos` — migration 0028), y las tareas de
+ *  cada KR. Devuelve también métricas agregadas (progreso, total/hechas).
+ *
+ *  Migration 0028: la columna `periodo_id` ya no existe en
+ *  `resultados_periodo`; un KR puede tener 1..N periodos vía la tabla
+ *  puente `kr_periodos`. Para mantener la API de UI, seguimos exponiendo
+ *  `periodo` (el "principal", el de menor orden) y añadimos `periodos`
+ *  (array con todos). */
 export async function fetchMetaConPlan(metaId: string): Promise<MetaConPlan | null> {
   const supabase = createClient();
 
-  const [metaRes, resultadosRes, periodosRes, tareasRes] = await Promise.all([
+  const [metaRes, krsRes, krPeriodosRes, periodosRes, tareasRes] = await Promise.all([
     supabase.from("metas").select("*").eq("id", metaId).maybeSingle(),
     supabase
       .from("resultados_periodo")
-      .select("id,meta_id,periodo_id,titulo,descripcion,metrica,valor_objetivo,valor_actual,unidad,estado,peso,orden")
+      .select("id,meta_id,titulo,descripcion,metrica,valor_objetivo,valor_actual,unidad,estado,peso,orden")
       .eq("meta_id", metaId)
       .order("orden"),
+    // Asignaciones N:M KR↔periodo (migration 0028).
+    supabase
+      .from("kr_periodos")
+      .select("kr_id,periodo_id,orden"),
+    // Traemos TODOS los periodos del owner. Es poco (≤16 filas/año) y
+    // evita join complejo desde el cliente.
     supabase
       .from("periodos")
       .select("id,tipo,anio,numero,nombre,fecha_inicio,fecha_fin"),
@@ -845,44 +924,92 @@ export async function fetchMetaConPlan(metaId: string): Promise<MetaConPlan | nu
 
   if (metaRes.error) throw metaRes.error;
   if (!metaRes.data) return null;
-  if (resultadosRes.error) throw resultadosRes.error;
+  if (krsRes.error) throw krsRes.error;
+  if (krPeriodosRes.error) throw krPeriodosRes.error;
   if (periodosRes.error) throw periodosRes.error;
   if (tareasRes.error) throw tareasRes.error;
 
   const periodosById = new Map<string, Periodo>(
     ((periodosRes.data ?? []) as Periodo[]).map((p) => [p.id, p]),
   );
-  // Solo nos interesan las tareas cuyos resultados pertenecen a ESTA meta.
-  const resultadosIds = new Set(
-    ((resultadosRes.data ?? []) as ResultadoPeriodo[]).map((r) => r.id),
-  );
-  const tareas = ordenarSubtareas((tareasRes.data ?? []) as Tarea[]).filter(
-    (t) => t.resultado_periodo_id && resultadosIds.has(t.resultado_periodo_id),
-  );
-  const tareasPorResultado = new Map<string, Tarea[]>();
-  for (const t of tareas) {
-    if (!t.resultado_periodo_id) continue;
-    const arr = tareasPorResultado.get(t.resultado_periodo_id) ?? [];
-    arr.push(t);
-    tareasPorResultado.set(t.resultado_periodo_id, arr);
+
+  // Agrupar los periodos de cada KR (ordenados por kr_periodos.orden).
+  const periodosPorKr = new Map<string, Periodo[]>();
+  for (const a of (krPeriodosRes.data ?? []) as Array<{
+    kr_id: string;
+    periodo_id: string;
+    orden: number;
+  }>) {
+    const p = periodosById.get(a.periodo_id);
+    if (!p) continue;
+    const arr = periodosPorKr.get(a.kr_id) ?? [];
+    arr.push(p);
+    periodosPorKr.set(a.kr_id, arr);
+  }
+  for (const arr of periodosPorKr.values()) {
+    // Ordena por kr_periodos.orden ascendente (el campo `orden` en el
+    // array viene del SELECT pero perdemos esa info tras mapear a
+    // Periodo). Usamos (anio, numero) como criterio estable.
+    arr.sort((x, y) => x.anio - y.anio || x.numero - y.numero);
   }
 
-  const resultados: ResultadoConTareas[] = (
-    (resultadosRes.data ?? []) as ResultadoPeriodo[]
-  )
+  // Solo nos interesan las tareas cuyos KRs pertenecen a ESTA meta.
+  const krsDeMeta = (krsRes.data ?? []) as ResultadoPeriodo[];
+  const krIds = new Set(krsDeMeta.map((r) => r.id));
+  const tareas = ordenarSubtareas((tareasRes.data ?? []) as Tarea[]).filter(
+    (t) => t.resultado_periodo_id && krIds.has(t.resultado_periodo_id),
+  );
+  const tareasPorKr = new Map<string, Tarea[]>();
+  for (const t of tareas) {
+    if (!t.resultado_periodo_id) continue;
+    const arr = tareasPorKr.get(t.resultado_periodo_id) ?? [];
+    arr.push(t);
+    tareasPorKr.set(t.resultado_periodo_id, arr);
+  }
+
+  const resultados: ResultadoConTareas[] = krsDeMeta
     .map((r) => {
-      const periodo = periodosById.get(r.periodo_id);
-      if (!periodo) return null; // periodo borrado → ignoramos el resultado
+      const periodosDelKr = periodosPorKr.get(r.id) ?? [];
+      // periodo principal = el primero por orden (que ya está ordenado
+      // por anio/numero). Si el KR no tiene NINGÚN periodo, fabricamos
+      // un placeholder "sin asignar" para que la UI no rompa — pero la
+      // migración 0028 siempre crea al menos uno en el relleno de datos.
+      const periodo = periodosDelKr[0] ?? null;
+      if (!periodo) {
+        // KR huérfano (sin periodos). En UI lo mostraremos como "sin
+        // trimestre asignado" para que el usuario lo corrija.
+        return {
+          ...r,
+          periodos: [],
+          periodo: {
+            id: "",
+            tipo: "custom",
+            anio: 0,
+            numero: 0,
+            nombre: "sin trimestre",
+            fecha_inicio: "",
+            fecha_fin: "",
+          },
+          tareas: (tareasPorKr.get(r.id) ?? []).slice().sort(
+            (a, b) => +new Date(b.created_at ?? 0) - +new Date(a.created_at ?? 0),
+          ),
+        } as ResultadoConTareas;
+      }
       return {
         ...r,
+        periodos: periodosDelKr,
         periodo,
-        tareas: (tareasPorResultado.get(r.id) ?? []).slice().sort(
+        tareas: (tareasPorKr.get(r.id) ?? []).slice().sort(
           (a, b) => +new Date(b.created_at ?? 0) - +new Date(a.created_at ?? 0),
         ),
       } as ResultadoConTareas;
     })
-    .filter((r): r is ResultadoConTareas => r !== null)
-    .sort((a, b) => a.periodo.anio - b.periodo.anio || a.periodo.numero - b.periodo.numero);
+    // Orden principal por periodo principal; secundarios por orden del KR.
+    .sort((a, b) => {
+      if (a.periodo.anio !== b.periodo.anio) return a.periodo.anio - b.periodo.anio;
+      if (a.periodo.numero !== b.periodo.numero) return a.periodo.numero - b.periodo.numero;
+      return (a.orden ?? 0) - (b.orden ?? 0);
+    });
 
   const total_tareas = tareas.length;
   const tareas_hechas = tareas.filter((t) => t.estado === "hecha").length;
@@ -898,61 +1025,71 @@ export async function fetchMetaConPlan(metaId: string): Promise<MetaConPlan | nu
 }
 
 /** Lista de metas con su progreso agregado (para la página /metas).
- *  Hace un solo lote de queries y calcula en cliente. */
+ *  Hace un solo lote de queries y calcula en cliente.
+ *  Migration 0028: la tabla `resultados_periodo` ya no tiene `periodo_id`;
+ *  construimos esqueletos con `periodo` placeholder para mantener la API. */
 export async function fetchMetasConProgreso(): Promise<MetaConPlan[]> {
   const supabase = createClient();
-  const [metasRes, resultadosRes, tareasRes] = await Promise.all([
+  const [metasRes, krsRes, tareasRes] = await Promise.all([
     supabase.from("metas").select("*").order("codigo", { ascending: true, nullsFirst: false }),
     supabase
       .from("resultados_periodo")
-      .select("id,meta_id,periodo_id,titulo,descripcion,metrica,valor_objetivo,valor_actual,unidad,estado,peso,orden,updated_at"),
+      .select("id,meta_id,periodo_id,titulo,descripcion,metrica,valor_objetivo,valor_actual,unidad,estado,peso,orden"),
     supabase
       .from("tareas")
       .select("id,meta_id,resultado_periodo_id,estado")
       .not("resultado_periodo_id", "is", null),
   ]);
   if (metasRes.error) throw metasRes.error;
-  if (resultadosRes.error) throw resultadosRes.error;
+  if (krsRes.error) throw krsRes.error;
   if (tareasRes.error) throw tareasRes.error;
 
   const metas = (metasRes.data ?? []) as Meta[];
-  const resultados = (resultadosRes.data ?? []) as ResultadoPeriodo[];
+  const krs = (krsRes.data ?? []) as ResultadoPeriodo[];
   const tareas = (tareasRes.data ?? []) as Array<
     Pick<Tarea, "id" | "meta_id" | "resultado_periodo_id" | "estado">
   >;
 
-  const resultadosPorMeta = new Map<string, ResultadoPeriodo[]>();
-  for (const r of resultados) {
-    const arr = resultadosPorMeta.get(r.meta_id) ?? [];
+  const krsPorMeta = new Map<string, ResultadoPeriodo[]>();
+  for (const r of krs) {
+    const arr = krsPorMeta.get(r.meta_id) ?? [];
     arr.push(r);
-    resultadosPorMeta.set(r.meta_id, arr);
+    krsPorMeta.set(r.meta_id, arr);
   }
-  const tareasPorResultado = new Map<string, Array<Pick<Tarea, "estado">>>();
+  const tareasPorKr = new Map<string, Array<Pick<Tarea, "estado">>>();
   for (const t of tareas) {
     if (!t.resultado_periodo_id) continue;
-    const arr = tareasPorResultado.get(t.resultado_periodo_id) ?? [];
+    const arr = tareasPorKr.get(t.resultado_periodo_id) ?? [];
     arr.push(t);
-    tareasPorResultado.set(t.resultado_periodo_id, arr);
+    tareasPorKr.set(t.resultado_periodo_id, arr);
   }
 
   return metas.map((m) => {
-    const resDeMeta = resultadosPorMeta.get(m.id) ?? [];
-    // Construimos ResultadoConTareas "esqueleto" (sin periodo, sin tareas
-    // completas) para poder reutilizar `calcularProgreso`. Como solo
-    // necesitamos las tareas, las rellenamos desde el map.
-    const esqueletos: ResultadoConTareas[] = resDeMeta.map((r) => ({
+    const krsDeMeta = krsPorMeta.get(m.id) ?? [];
+    // Esqueletos con periodo placeholder (la lista /metas no necesita el
+    // trimestre real — solo el progreso ponderado).
+    const esqueletos: ResultadoConTareas[] = krsDeMeta.map((r) => ({
       ...r,
-      periodo: { id: r.periodo_id, tipo: "trimestre", anio: 0, numero: 0, nombre: "", fecha_inicio: "", fecha_fin: "" },
-      tareas: ((tareasPorResultado.get(r.id) ?? []) as unknown as Tarea[]),
+      periodos: [],
+      periodo: {
+        id: "",
+        tipo: "trimestre",
+        anio: 0,
+        numero: 0,
+        nombre: "",
+        fecha_inicio: "",
+        fecha_fin: "",
+      },
+      tareas: ((tareasPorKr.get(r.id) ?? []) as unknown as Tarea[]),
     }));
-    const total_tareas = resDeMeta.reduce(
-      (acc, r) => acc + (tareasPorResultado.get(r.id)?.length ?? 0),
+    const total_tareas = krsDeMeta.reduce(
+      (acc, r) => acc + (tareasPorKr.get(r.id)?.length ?? 0),
       0,
     );
-    const tareas_hechas = resDeMeta.reduce(
+    const tareas_hechas = krsDeMeta.reduce(
       (acc, r) =>
         acc +
-        (tareasPorResultado.get(r.id) ?? []).filter((t) => t.estado === "hecha").length,
+        (tareasPorKr.get(r.id) ?? []).filter((t) => t.estado === "hecha").length,
       0,
     );
     return {
@@ -965,18 +1102,22 @@ export async function fetchMetasConProgreso(): Promise<MetaConPlan[]> {
   });
 }
 
-/** Plan trimestral de un año: los 4 trimestres con TODAS las metas que
- *  tienen resultados en cada trimestre. Útil para la vista Q1-Q4. */
+/** Plan trimestral de un año: los 4 trimestres con TODOS los KRs que
+ *  tienen al menos un periodo dentro de ese año.
+ *  Migration 0028: la relación KR↔periodo pasa por `kr_periodos`.
+ *  Un KR que vive en 2 trimestres aparece en ambos.
+ *  Útil para la vista Q1-Q4. */
 export async function fetchPlanTrimestral(anio: number): Promise<{
   periodos: Periodo[];
-  /** Clave = periodo_id, valor = resultados con su meta y tareas. */
+  /** Clave = periodo_id, valor = KRs con su meta y tareas (un KR puede
+   *  aparecer en varios trimestres si está asignado a varios). */
   porTrimestre: Map<
     string,
     Array<{ meta: Meta; resultado: ResultadoPeriodo; tareas: Tarea[] }>
   >;
 }> {
   const supabase = createClient();
-  // 1) Periodos del año.
+  // 1) Periodos del año (Q1-Q4).
   const { data: periodosData, error: eP } = await supabase
     .from("periodos")
     .select("id,tipo,anio,numero,nombre,fecha_inicio,fecha_fin")
@@ -990,19 +1131,32 @@ export async function fetchPlanTrimestral(anio: number): Promise<{
   }
   const periodoIds = periodos.map((p) => p.id);
 
-  // 2) Resultados de esos periodos + sus metas.
-  const { data: resData, error: eR } = await supabase
-    .from("resultados_periodo")
-    .select("id,meta_id,periodo_id,titulo,descripcion,metrica,valor_objetivo,valor_actual,unidad,estado,peso,orden")
-    .in("periodo_id", periodoIds)
-    .order("orden");
-  if (eR) throw eR;
-  const resultados = (resData ?? []) as ResultadoPeriodo[];
-  if (resultados.length === 0) {
+  // 2) Asignaciones kr_periodos (de los periodos del año) + KRs + metas.
+  // Migration 0028: JOIN por kr_periodos en vez de por resultados_periodo.periodo_id.
+  const { data: asignacionesData, error: eA } = await supabase
+    .from("kr_periodos")
+    .select("kr_id,periodo_id")
+    .in("periodo_id", periodoIds);
+  if (eA) throw eA;
+  const asignaciones = (asignacionesData ?? []) as Array<{
+    kr_id: string;
+    periodo_id: string;
+  }>;
+  if (asignaciones.length === 0) {
     return { periodos, porTrimestre: new Map() };
   }
 
-  const metaIds = Array.from(new Set(resultados.map((r) => r.meta_id)));
+  const krIds = Array.from(new Set(asignaciones.map((a) => a.kr_id)));
+  const { data: krsData, error: eK } = await supabase
+    .from("resultados_periodo")
+    .select("id,meta_id,titulo,descripcion,metrica,valor_objetivo,valor_actual,unidad,estado,peso,orden")
+    .in("id", krIds)
+    .order("orden");
+  if (eK) throw eK;
+  const krs = (krsData ?? []) as ResultadoPeriodo[];
+  const krsById = new Map<string, ResultadoPeriodo>(krs.map((k) => [k.id, k]));
+
+  const metaIds = Array.from(new Set(krs.map((r) => r.meta_id)));
   const { data: metasData, error: eM } = await supabase
     .from("metas")
     .select("*")
@@ -1012,38 +1166,40 @@ export async function fetchPlanTrimestral(anio: number): Promise<{
     ((metasData ?? []) as Meta[]).map((m) => [m.id, m]),
   );
 
-  // 3) Tareas de esos resultados.
-  const resultadoIds = resultados.map((r) => r.id);
+  // 3) Tareas de esos KRs.
   const { data: tareasData, error: eT } = await supabase
     .from("tareas")
     .select("*, subtareas:tareas_subtareas(*)")
-    .in("resultado_periodo_id", resultadoIds)
+    .in("resultado_periodo_id", krIds)
     .order("created_at", { ascending: false });
   if (eT) throw eT;
-  const tareasPorResultado = new Map<string, Tarea[]>();
+  const tareasPorKr = new Map<string, Tarea[]>();
   for (const t of ordenarSubtareas((tareasData ?? []) as Tarea[])) {
     if (!t.resultado_periodo_id) continue;
-    const arr = tareasPorResultado.get(t.resultado_periodo_id) ?? [];
+    const arr = tareasPorKr.get(t.resultado_periodo_id) ?? [];
     arr.push(t);
-    tareasPorResultado.set(t.resultado_periodo_id, arr);
+    tareasPorKr.set(t.resultado_periodo_id, arr);
   }
 
-  // 4) Agrupar por trimestre.
+  // 4) Agrupar por trimestre. Un mismo KR puede aparecer varias veces
+  //    (una por cada trimestre al que está asignado).
   const porTrimestre = new Map<
     string,
     Array<{ meta: Meta; resultado: ResultadoPeriodo; tareas: Tarea[] }>
   >();
   for (const p of periodos) porTrimestre.set(p.id, []);
-  for (const r of resultados) {
+  for (const a of asignaciones) {
+    const r = krsById.get(a.kr_id);
+    if (!r) continue;
     const meta = metasById.get(r.meta_id);
     if (!meta) continue;
-    const arr = porTrimestre.get(r.periodo_id) ?? [];
+    const arr = porTrimestre.get(a.periodo_id) ?? [];
     arr.push({
       meta,
       resultado: r,
-      tareas: tareasPorResultado.get(r.id) ?? [],
+      tareas: tareasPorKr.get(r.id) ?? [],
     });
-    porTrimestre.set(r.periodo_id, arr);
+    porTrimestre.set(a.periodo_id, arr);
   }
   return { periodos, porTrimestre };
 }

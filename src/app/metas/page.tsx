@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { fetchMetasConProgreso } from "@/lib/queries";
-import { archivarMeta, marcarWig } from "@/lib/mutations";
+import { archivarMeta, eliminarMeta, marcarWig } from "@/lib/mutations";
 import { useData } from "@/lib/useData";
 import { useConfig } from "@/lib/configStore";
 import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
@@ -19,6 +19,7 @@ import {
   IconPlus,
   IconSparkles,
   IconTarget,
+  IconTrash,
 } from "@/components/icons";
 
 const ESTADO: Record<string, string> = {
@@ -170,6 +171,8 @@ export default function MetasPage() {
   const [guardandoId, setGuardandoId] = useState<string | null>(null);
   const [errorWig, setErrorWig] = useState<string | null>(null);
   const [editando, setEditando] = useState<MetaConPlan | null>(null);
+  /** ID de la meta que estamos eliminando (spinner del botón papelera). */
+  const [eliminandoId, setEliminandoId] = useState<string | null>(null);
 
   // Sugerencias IA
   const [sugerencias, setSugerencias] = useState<SugerirWigsResultado | null>(null);
@@ -267,6 +270,41 @@ export default function MetasPage() {
       );
     } finally {
       setGuardandoId(null);
+    }
+  }
+
+  async function eliminarMetaCard(mp: MetaConPlan) {
+    const krsCount = mp.resultados.length;
+    const tareasCount = mp.total_tareas;
+    // Estimación de tareas activas (las no hechas): lo que da el campo
+    // derivado mp.total_tareas - mp.tareas_hechas. Las archivadas también
+    // dejarán de tener meta al borrar (el SET NULL es universal), así que
+    // el aviso cubre el total sin distinguir.
+    const tareasActivas = Math.max(0, tareasCount - mp.tareas_hechas);
+    let msg = `¿Eliminar la meta "${mp.meta.titulo}"?`;
+    msg += `\n\nEsta acción NO se puede deshacer. Impacto:`;
+    if (krsCount > 0) {
+      msg += `\n  · ${krsCount} KR${krsCount === 1 ? "" : "s"} quedará${krsCount === 1 ? "á" : "án"} huérfano${krsCount === 1 ? "" : "s"} (siguen vivos, sin meta padre)`;
+    }
+    if (tareasCount > 0) {
+      msg += `\n  · ${tareasCount} tarea${tareasCount === 1 ? "" : "s"} (${tareasActivas} activa${tareasActivas === 1 ? "" : "s"} + ${tareasCount - tareasActivas} hecha${tareasCount - tareasActivas === 1 ? "" : "s"}/archivada${tareasCount - tareasActivas === 1 ? "" : "s"}) quedará${tareasCount === 1 ? "á" : "án"} sin meta asignada`;
+    }
+    if (mp.meta.es_wig) {
+      msg += `\n  · la meta dejará de ser WIG (se libera el slot)`;
+    }
+    if (krsCount === 0 && tareasCount === 0) {
+      msg += `\n  · esta meta no tiene KRs ni tareas, así que el borrado es limpio`;
+    }
+    msg += `\n\n💡 Si solo quieres dejarla de lado pero poder recuperarla, usa el botón Archivar (junto a este).`;
+    if (!confirm(msg)) return;
+    setEliminandoId(mp.meta.id);
+    try {
+      await eliminarMeta(mp.meta.id);
+      await reload();
+    } catch (e) {
+      alert(`No se pudo eliminar: ${e instanceof Error ? e.message : "error desconocido"}`);
+    } finally {
+      setEliminandoId(null);
     }
   }
 
@@ -540,6 +578,28 @@ export default function MetasPage() {
                   aria-label={m.estado === "archivada" ? "Desarchivar meta" : "Archivar meta"}
                 >
                   <IconArchive className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    eliminarMetaCard(mp);
+                  }}
+                  disabled={eliminandoId === m.id}
+                  // Color rojo tenue siempre visible (no opacidad 40%) porque
+                  // es una acción destructiva que el usuario debe poder
+                  // encontrar sin tener que hacer hover. Al hover se
+                  // intensifica y se le añade fondo de aviso.
+                  className="rounded-full p-1.5 text-red-500/70 transition-colors hover:bg-red-500/10 hover:text-red-600 disabled:opacity-50"
+                  title="Eliminar meta (acción irreversible: tareas y KRs se desvinculan)"
+                  aria-label={`Eliminar meta ${m.titulo}`}
+                >
+                  {eliminandoId === m.id ? (
+                    <span className="block h-4 w-4 text-center text-[10px]">…</span>
+                  ) : (
+                    <IconTrash className="h-4 w-4" />
+                  )}
                 </button>
               </div>
 

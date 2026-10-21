@@ -285,7 +285,11 @@ export function TasksTable({
   const proyectoFiltroQS = searchParams.get("proyecto");
   const [pending, startTransition] = useTransition();
   const [q, setQ] = useState("");
-  const [estado, setEstado] = useState("activas");
+  // Si entramos con ?proyecto=X (vista de un proyecto concreto) abrimos
+  // el filtro en "todas" para que las tareas hechas/archivadas de ese
+  // proyecto no desaparezcan — son parte legítima del proyecto y suele
+  // ser el caso común en proyectos ya cerrados o arrastrados.
+  const [estado, setEstado] = useState(proyectoFiltroQS ? "todas" : "activas");
   const [prioridad, setPrioridad] = useState("todas");
   const [capa, setCapa] = useState("todas");
   const [ambito, setAmbito] = useState<FiltroAmbit>("todas");

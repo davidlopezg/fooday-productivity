@@ -124,6 +124,15 @@ export default function ProyectoReport({ proyecto, area, metas, tareas }: Props)
   const tareasActivas = todasTareas.filter(
     (t) => t.estado !== "hecha" && t.estado !== "archivada" && t.estado !== "descartada",
   ).length;
+  // Desglose: cuántas tareas viven DENTRO de KRs (sección 3) vs cuántas
+  // son sueltas en el proyecto (secciones 4 y 5). Si la sección 4 está
+  // vacía pero `tareasEnKRs < totalTareas`, hay un mismatch que vale
+  // la pena explicar en el resumen.
+  const tareasEnKRs = metas.reduce(
+    (acc, mc) => acc + mc.resultados.reduce((a, r) => a + r.tareas.length, 0),
+    0,
+  );
+  const tareasSueltasEnProyecto = totalTareas - tareasEnKRs;
 
   return (
     <article className="proyecto-report">
@@ -147,6 +156,10 @@ export default function ProyectoReport({ proyecto, area, metas, tareas }: Props)
           ({tareasActivas} activas · {tareasHechas} hechas) · {tareasRecurrentes.length}{" "}
           recurrentes
           {area ? ` · Área: ${area.nombre}` : ""}
+        </p>
+        <p className="mt-1 text-[10px] text-muted-foreground">
+          Desglose: {tareasEnKRs} dentro de KRs (sección 3) ·{" "}
+          {tareasSueltasEnProyecto} sueltas sin KR (secciones 4 + 5)
         </p>
       </header>
 
@@ -347,7 +360,7 @@ export default function ProyectoReport({ proyecto, area, metas, tareas }: Props)
       {/* ───── Tareas no recurrentes ───── */}
       <section className="proyecto-report__seccion">
         <h2 className="proyecto-report__h2">
-          3. Tareas ({tareasNoRecurrentes.length})
+          3. Tareas no recurrentes ({tareasNoRecurrentes.length})
         </h2>
         {tareasNoRecurrentes.length === 0 ? (
           <p className="proyecto-report__empty">No hay tareas no recurrentes.</p>

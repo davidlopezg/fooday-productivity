@@ -10,6 +10,7 @@ import type {
   Periodo,
   PlanDiarioTarea,
   PlanGeneradoSimple,
+  Prioridad,
   ResultadoPeriodo,
   Subtarea,
   TareaAdjunto,
@@ -141,6 +142,41 @@ export async function actualizarTarea(datos: TareaCampos) {
   // Sin esto, un UPDATE fallido (RLS, red, columna inexistente) pasaba por
   // bueno y la UI mentia: el dato no se guardaba y nadie se enteraba.
   if (error) throw new Error(`No se pudo actualizar la tarea: ${error.message}`);
+}
+
+/** Aplica cambios de `prioridad` a N tareas en batch. Usado por el botón
+ *  IA de /matriz (SugerirMatrizModal) y por drag & drop entre cuadrantes.
+ *  Cada fila pasa por `actualizarTarea` para mantener el mismo invariante
+ *  (RLS, error handling, sincronización de `completada_at`).
+ *
+ *  Devuelve el reporte {aplicadas, fallidas} para que la UI pueda mostrar
+ *  "7/8 aplicadas" si una falla (RLS, etc.). */
+export async function aplicarPrioridadesTareas(
+  items: Array<{ tareaId: string; prioridad: Prioridad }>,
+): Promise<{
+  aplicadas: number;
+  fallidas: Array<{ tareaId: string; error: string }>;
+}> {
+  if (items.length === 0) return { aplicadas: 0, fallidas: [] };
+
+  const fallidas: Array<{ tareaId: string; error: string }> = [];
+  const resultados = await Promise.allSettled(
+    items.map(async (it) => {
+      await actualizarTarea({ id: it.tareaId, prioridad: it.prioridad });
+      return it.tareaId;
+    }),
+  );
+
+  const aplicadas = resultados.reduce((acc, r, idx) => {
+    if (r.status === "fulfilled") return acc + 1;
+    fallidas.push({
+      tareaId: items[idx].tareaId,
+      error: r.reason instanceof Error ? r.reason.message : String(r.reason),
+    });
+    return acc;
+  }, 0);
+
+  return { aplicadas, fallidas };
 }
 
 export type TareaCreada = {
@@ -1283,7 +1319,7 @@ export async function aplicarPropuestaIA(payload: {
 // ============================================================================
 // Proyectos — CRUD (migration 0012)
 // ============================================================================
-import type { Proyecto, RecurrenciaTipo, TareaComentario } from "@/lib/types";
+import type { Area, Proyecto, RecurrenciaTipo, TareaComentario } from "@/lib/types";
 
 export async function crearProyecto(datos: {
   nombre: string;
@@ -1450,6 +1486,59 @@ export async function archivarProyectoEnCascada(
 export async function eliminarProyecto(id: string): Promise<void> {
   const { error } = await createClient().from("proyectos").delete().eq("id", id);
   if (error) throw new Error(`No se pudo eliminar: ${error.message}`);
+}
+
+// ============================================================================
+// Áreas — CRUD (migration 0001)
+// ============================================================================
+// La tabla `areas` ya tiene `owner_id = auth.uid()` por defecto y la
+// política RLS `own_insert/own_update/own_delete` está activa (migration
+// 0001), así que no necesitamos pasar `owner_id` en los inserts: lo
+// rellena el propio Postgres. `ON DELETE SET NULL` en las FKs hace que
+// proyectos/metas/tareas con esta área pasen a `area_id=null` (huérfanos)
+// si se elimina el área — NO se borra nada del árbol.
+
+export async function crearArea(datos: {
+  nombre: string;
+  color?: string;
+  orden?: number;
+}): Promise<Area> {
+  const supabase = createClient();
+  // Si no nos pasan `orden`, lo colocamos al final (max(orden)+1).
+  let orden = datos.orden;
+  if (orden == null) {
+    const { data: existing } = await supabase
+      .from("areas")
+      .select("orden")
+      .order("orden", { ascending: false })
+      .limit(1);
+    const maxOrden = (existing?.[0]?.orden as number | undefined) ?? -1;
+    orden = maxOrden + 1;
+  }
+  const { data, error } = await supabase
+    .from("areas")
+    .insert({
+      nombre: datos.nombre.trim(),
+      color: datos.color ?? "#64748b",
+      orden,
+    })
+    .select("id,nombre,color,orden")
+    .single();
+  if (error || !data) throw new Error(`No se pudo crear el área: ${error?.message}`);
+  return data as Area;
+}
+
+export async function actualizarArea(id: string, campos: Partial<Omit<Area, "id">>): Promise<void> {
+  const { error } = await createClient()
+    .from("areas")
+    .update(campos)
+    .eq("id", id);
+  if (error) throw new Error(`No se pudo actualizar el área: ${error.message}`);
+}
+
+export async function eliminarArea(id: string): Promise<void> {
+  const { error } = await createClient().from("areas").delete().eq("id", id);
+  if (error) throw new Error(`No se pudo eliminar el área: ${error.message}`);
 }
 
 // ============================================================================
@@ -1828,6 +1917,20 @@ export async function archivarMeta(id: string, archivada = true): Promise<void> 
   });
 }
 
+/** Elimina una meta físicamente. Las FKs del schema 0001 se encargan del
+ *  impacto en cascada:
+ *    - hitos y okrs de esta meta → ON DELETE CASCADE (se borran).
+ *    - tarea_comentarios con meta_id → ON DELETE CASCADE (se borran).
+ *    - resultados_periodo (KRs) → ON DELETE SET NULL (quedan huérfanos).
+ *    - tareas.meta_id → ON DELETE SET NULL (las tareas NO se borran, solo
+ *      se desvinculan de la meta — siguen vivas en /tareas sin asignar).
+ *  Por eso el confirm previo en la UI avisa del conteo esperado antes de
+ *  borrar: para que el usuario no se lleve sorpresas. */
+export async function eliminarMeta(id: string): Promise<void> {
+  const { error } = await createClient().from("metas").delete().eq("id", id);
+  if (error) throw new Error(`No se pudo eliminar la meta: ${error.message}`);
+}
+
 /** Asegura que existen los 4 trimestres del año (idempotente) llamando
  *  a la RPC `ensure_periodos_anio`. Devuelve la lista completa. */
 export async function ensurePeriodosAnio(anio: number): Promise<Periodo[]> {
@@ -1859,11 +1962,30 @@ export async function ensurePeriodosMeses(
   return (data ?? []) as Periodo[];
 }
 
-/** Crea un resultado esperado en (meta, periodo). Falla con UNIQUE
- *  violation si ya existe uno — el caller debería comprobar antes. */
+/** Crea un KR (= resultado_periodo) en una meta y lo asigna a uno o
+ *  varios periodos. Migration 0028: el KR es independiente del periodo;
+ *  la asignación a 1..N periodos se hace en la tabla puente `kr_periodos`.
+ *
+ *  - periodo_id: compat — si se pasa solo este, equivale a
+ *    `periodo_ids: [periodo_id]`.
+ *  - periodo_ids: lista de periodos (puede ser 1..N). Si se omite, se
+ *    usa `periodo_id` (compat). Si ambos están vacíos, el KR queda
+ *    HUÉRFANO (sin periodo) y se mostrará como "sin trimestre" en UI
+ *    hasta que el usuario lo asigne.
+ *
+ *  Ponytail: NO usa transacción explícita. Si falla la creación del KR
+ *  o las inserciones en `kr_periodos`, se lanza error y el caller sabe
+ *  qué pasó. Las dos operaciones son idempotentes por separado (insertar
+ *  un KR con el mismo título puede fallar por UNIQUE si lo decides; las
+ *  filas en `kr_periodos` son `on conflict do nothing`).
+ */
 export async function crearResultadoPeriodo(datos: {
   meta_id: string;
-  periodo_id: string;
+  /** Compat: 1 periodo. Migration 0028. */
+  periodo_id?: string | null;
+  /** Migration 0028: lista de 1..N periodos. Si se omite, se usa
+   *  `periodo_id` (compat). */
+  periodo_ids?: string[] | null;
   titulo: string;
   descripcion?: string | null;
   metrica?: string | null;
@@ -1872,11 +1994,12 @@ export async function crearResultadoPeriodo(datos: {
   peso?: number;
   estado?: ResultadoPeriodo["estado"];
 }): Promise<ResultadoPeriodo> {
-  const { data, error } = await createClient()
+  const supabase = createClient();
+  // Inserta el KR (sin periodo_id — la columna ya no existe).
+  const { data, error } = await supabase
     .from("resultados_periodo")
     .insert({
       meta_id: datos.meta_id,
-      periodo_id: datos.periodo_id,
       titulo: datos.titulo.trim(),
       descripcion: datos.descripcion?.trim() || null,
       metrica: datos.metrica?.trim() || null,
@@ -1886,14 +2009,88 @@ export async function crearResultadoPeriodo(datos: {
       estado: datos.estado ?? "pendiente",
     })
     .select(
-      "id,meta_id,periodo_id,titulo,descripcion,metrica,valor_objetivo,valor_actual,unidad,estado,peso,orden",
+      "id,meta_id,titulo,descripcion,metrica,valor_objetivo,valor_actual,unidad,estado,peso,orden",
     )
     .single();
   if (error || !data)
     throw new Error(
-      `No se pudo crear el resultado: ${error?.message ?? "sin datos"}`,
+      `No se pudo crear el KR: ${error?.message ?? "sin datos"}`,
     );
-  return data as ResultadoPeriodo;
+  const kr = data as ResultadoPeriodo;
+
+  // Resolver la lista final de periodos.
+  const periodos: string[] = Array.from(
+    new Set(
+      [
+        ...((datos.periodo_ids ?? []).filter((x): x is string => !!x)),
+        ...(datos.periodo_id ? [datos.periodo_id] : []),
+      ],
+    ),
+  );
+
+  if (periodos.length > 0) {
+    const filas = periodos.map((pid, idx) => ({
+      kr_id: kr.id,
+      periodo_id: pid,
+      peso: datos.peso ?? 1,
+      orden: idx,
+    }));
+    const { error: eKp } = await supabase
+      .from("kr_periodos")
+      .insert(filas);
+    if (eKp) {
+      // Rollback implícito: borramos el KR recién creado para no dejar
+      // un KR huérfano si la asignación a periodos falla. La política
+      // RLS permite delete.
+      await supabase.from("resultados_periodo").delete().eq("id", kr.id);
+      throw new Error(
+        `No se pudo asignar el KR a sus periodos: ${eKp.message}`,
+      );
+    }
+  }
+  return kr;
+}
+
+/** Asigna un KR existente a uno o varios periodos (idempotente).
+ *  Si la asignación (kr_id, periodo_id) ya existe, no hace nada.
+ *  Si se omite un periodo que ya estaba, lo ELIMINA. */
+export async function asignarKrAPeriodos(
+  krId: string,
+  periodoIds: string[],
+): Promise<void> {
+  const supabase = createClient();
+  // 1) Eliminar asignaciones del KR que NO estén en periodoIds.
+  const desired = new Set(periodoIds.filter((x): x is string => !!x));
+  const { data: existentes, error: eSel } = await supabase
+    .from("kr_periodos")
+    .select("id,periodo_id")
+    .eq("kr_id", krId);
+  if (eSel) throw new Error(`No se pudo leer kr_periodos: ${eSel.message}`);
+  const aBorrar = ((existentes ?? []) as Array<{ id: string; periodo_id: string }>)
+    .filter((e) => !desired.has(e.periodo_id))
+    .map((e) => e.id);
+  if (aBorrar.length > 0) {
+    const { error: eDel } = await supabase
+      .from("kr_periodos")
+      .delete()
+      .in("id", aBorrar);
+    if (eDel)
+      throw new Error(`No se pudieron limpiar asignaciones: ${eDel.message}`);
+  }
+  // 2) Insertar las que faltan (idempotente por unique(kr_id, periodo_id)).
+  const yaAsignados = new Set(
+    ((existentes ?? []) as Array<{ periodo_id: string }>).map((e) => e.periodo_id),
+  );
+  const aInsertar = Array.from(desired)
+    .filter((pid) => !yaAsignados.has(pid))
+    .map((pid, idx) => ({ kr_id: krId, periodo_id: pid, orden: idx }));
+  if (aInsertar.length > 0) {
+    const { error: eIns } = await supabase
+      .from("kr_periodos")
+      .insert(aInsertar);
+    if (eIns)
+      throw new Error(`No se pudieron crear asignaciones: ${eIns.message}`);
+  }
 }
 
 export async function actualizarResultadoPeriodo(

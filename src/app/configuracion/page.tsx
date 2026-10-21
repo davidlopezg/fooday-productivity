@@ -1,10 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useConfig } from "@/lib/configStore";
+import { useEffect, useMemo, useState } from "react";
+import { DEFAULT_PROMPT_PAGOS, useConfig } from "@/lib/configStore";
 import { probarConexion } from "@/lib/plan";
 import { useTheme, type Theme } from "@/lib/themeStore";
-import { IconMoon, IconSun } from "@/components/icons";
+import {
+  IconMoon,
+  IconSparkles,
+  IconSun,
+} from "@/components/icons";
 
 const TEMAS: { value: Theme; label: string; descripcion: string }[] = [
   { value: "system", label: "Sistema", descripcion: "Sigue el ajuste del sistema operativo." },
@@ -25,7 +29,29 @@ export default function ConfiguracionPage() {
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Prompt de pagos (migration 0027). Si está vacío/null en BD, mostramos
+  // el DEFAULT para que el usuario sepa qué hay por defecto; al guardar,
+  // si el campo está vacío, persistimos null (la app usará el DEFAULT).
+  const promptEfectivo = useMemo(
+    () => (data.prompt_pagos ?? "").trim() || DEFAULT_PROMPT_PAGOS,
+    [data.prompt_pagos],
+  );
+  const [promptPagos, setPromptPagos] = useState(promptEfectivo);
+  const [restaurado, setRestaurado] = useState(false);
+
   const tieneKey = !!data.minimax_api_key;
+
+  // Sincroniza el campo cuando se recargan los datos remotos. No
+  // pisamos lo que el usuario está escribiendo en este momento: solo
+  // actualizamos si el remoto cambia mientras el campo está "limpio".
+  useEffect(() => {
+    setBaseUrl(data.base_url);
+    setModel(data.model);
+    setPromptPagos(promptEfectivo);
+    if (!apiKey && data.minimax_api_key) {
+      // No machacamos la key que el usuario está escribiendo
+    }
+  }, [data.base_url, data.model, promptEfectivo]);
 
   // Sincroniza los campos cuando se recargan los datos remotos
   useEffect(() => {
@@ -44,6 +70,9 @@ export default function ConfiguracionPage() {
       base_url: baseUrl.trim() || data.base_url,
       minimax_api_key: apiKey.trim() || data.minimax_api_key,
       model: model.trim() || "Minimax-M3",
+      // Si el textarea está vacío, persistimos null para que la app use
+      // el DEFAULT_PROMPT_PAGOS en runtime (no guardamos un string "").
+      prompt_pagos: promptPagos.trim() || null,
     };
     try {
       await save(saved);
@@ -54,6 +83,13 @@ export default function ConfiguracionPage() {
     } finally {
       setGuardando(false);
     }
+  }
+
+  function restaurarPrompt() {
+    setPromptPagos(DEFAULT_PROMPT_PAGOS);
+    setRestaurado(true);
+    // Quita el banner al cabo de unos segundos.
+    setTimeout(() => setRestaurado(false), 4000);
   }
 
   async function probar() {
@@ -214,6 +250,65 @@ export default function ConfiguracionPage() {
             {guardando ? "Guardando…" : "Guardar"}
           </button>
         </div>
+      </section>
+
+      {/* ================================================================
+          Migration 0027 — Sección "Prompt de pagos (IA)".
+          Prompt editable que consume el botón "Sugerir pagos del próximo
+          mes" de /pagos. Si está vacío, la app usa DEFAULT_PROMPT_PAGOS.
+          ================================================================ */}
+      <section className="rounded-xl border border-border bg-card p-6 space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <IconSparkles className="h-4 w-4 text-violet-500" />
+              <h2 className="text-base font-semibold">Prompt de pagos (IA)</h2>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Prompt que usa el botón <strong className="text-foreground">“Sugerir pagos del próximo mes”</strong> en{" "}
+              <code className="rounded bg-muted px-1 py-0.5">/pagos</code>. Edítalo para
+              cambiar las reglas (snowball, orden por vencimiento, agrupar por proveedor,
+              etc.). Si lo dejas vacío, se usa el ejemplo por defecto.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={restaurarPrompt}
+            className="shrink-0 rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-accent"
+            title="Vuelve al prompt de fábrica (snowball + lunes + ingresos viernes/sábado)"
+          >
+            Restaurar ejemplo
+          </button>
+        </div>
+
+        <textarea
+          rows={14}
+          value={promptPagos}
+          onChange={(e) => setPromptPagos(e.target.value)}
+          className="w-full resize-y rounded-md border border-input bg-background px-3 py-2 font-mono text-xs leading-relaxed outline-none focus:ring-2 focus:ring-ring"
+          placeholder={DEFAULT_PROMPT_PAGOS}
+        />
+        <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+          <span>
+            {promptPagos.trim().length} / {promptPagos.length} chars
+          </span>
+          <span>·</span>
+          <span>
+            ¿Vacío? → la app usará el prompt por defecto en /pagos.
+          </span>
+          {restaurado && (
+            <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-emerald-700 dark:text-emerald-300">
+              Prompt restaurado al de fábrica (pendiente de Guardar)
+            </span>
+          )}
+        </div>
+
+        {!tieneKey && !loading && (
+          <p className="rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-700 dark:text-amber-400">
+            No hay API key configurada. El botón IA de /pagos no funcionará hasta que
+            guardes una clave de MiniMax arriba.
+          </p>
+        )}
       </section>
 
       <section className="rounded-xl border border-dashed border-border bg-muted/30 p-4 text-xs text-muted-foreground space-y-1">

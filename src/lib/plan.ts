@@ -2311,33 +2311,34 @@ export async function aplicarKrsYTareasEnMeta(
     model: string;
   },
   opts: {
-    /** Si true, unidades que ya tengan KR en esta meta se saltan en
-     *  silencio (no crean KR nuevo pero siguen creando tareas en el
-     *  KR existente). Si false, el UNIQUE violation lanza error. */
+    /** Si true, KRs ya existentes (detectados por título normalizado en
+     *  esta meta) se REUTILIZAN en lugar de crear uno nuevo. Sus tareas
+     *  se siguen creando (dedup por título de tarea). Si false, los
+     *  duplicados por título lanzan error. */
     saltarExistentes?: boolean;
     /** Callback por KR procesado, útil para mostrar progreso en UI. */
     onProgress?: (msg: string) => void;
   } = {},
 ): Promise<AplicarKrsResultado> {
-  const { crearResultadoPeriodo, crearTareaConIA, setRecurrencia } = await import(
-    "@/lib/mutations"
-  );
+  const { crearResultadoPeriodo, crearTareaConIA, setRecurrencia, asignarKrAPeriodos } =
+    await import("@/lib/mutations");
   const supabase = (await import("@/lib/supabase/client")).createClient();
 
-  // 1) Traemos los KRs ya existentes de esta meta (solo id + periodo_id
-  //    — lo justo para detectar duplicados por unidad sin cargar más).
+  // 1) Traemos los KRs ya existentes de esta meta (id + titulo) para
+  //    detectar duplicados por TÍTULO (no por periodo — migration 0028).
   const { data: krsPrevios } = await supabase
     .from("resultados_periodo")
-    .select("id,periodo_id")
+    .select("id,titulo")
     .eq("meta_id", metaId);
-  const krPorPeriodo = new Map<string, string>();
-  for (const r of krsPrevios ?? []) krPorPeriodo.set(r.periodo_id, r.id);
+  // Mapa: título normalizado -> id del KR existente en esta meta.
+  const krPorTitulo = new Map<string, string>();
+  for (const r of krsPrevios ?? []) {
+    const tit = String((r as { titulo: string }).titulo).trim().toLowerCase();
+    if (tit) krPorTitulo.set(tit, (r as { id: string }).id);
+  }
 
-  // 1b) Traemos los títulos de tareas ya creadas en esta meta. Sirve
-  //    para deduplicar si reintentamos: si la IA devuelve la misma
-  //    tarea en 2 KRs, o si re-ejecutamos el apply, no la creamos
-  //    dos veces. Usamos título normalizado (trim + lowercase) como
-  //    clave.
+  // 1b) Traemos los títulos de tareas ya creadas en esta meta para
+  //    deduplicar. Idempotencia ante reintentos del LLM.
   const { data: tareasExistentes } = await supabase
     .from("tareas")
     .select("titulo")
@@ -2370,23 +2371,33 @@ export async function aplicarKrsYTareasEnMeta(
     }
 
     let resultadoId: string;
-    const krPrevioId = krPorPeriodo.get(periodo.id);
+    const titNorm = kr.titulo.trim().toLowerCase();
+    const krPrevioId = krPorTitulo.get(titNorm);
     if (krPrevioId) {
       if (!saltarExistentes) {
         throw new Error(
-          `Ya existe un KR para ${clave} en esta meta. ` +
+          `Ya existe un KR con título "${kr.titulo}" en esta meta. ` +
             `Quítalo primero o regenera con saltarExistentes=true.`,
         );
       }
       resultadoId = krPrevioId;
       krsExistentes++;
+      // Si el KR existente no tiene este periodo aún, lo añadimos.
+      try {
+        await asignarKrAPeriodos(resultadoId, [periodo.id]);
+      } catch (e) {
+        console.warn(
+          "[aplicarKrsYTareasEnMeta] no se pudo añadir el periodo al KR existente:",
+          e,
+        );
+      }
       opts.onProgress?.(
-        `${clave}: KR existente — añadiendo tareas al KR actual.`,
+        `KR existente "${kr.titulo}" — añadiendo tareas al KR actual.`,
       );
     } else {
       const r = await crearResultadoPeriodo({
         meta_id: metaId,
-        periodo_id: periodo.id,
+        periodo_ids: [periodo.id],
         titulo: kr.titulo,
         descripcion: kr.descripcion || null,
         metrica: kr.metrica || null,
@@ -2397,20 +2408,21 @@ export async function aplicarKrsYTareasEnMeta(
       });
       resultadoId = r.id;
       krsCreados++;
-      opts.onProgress?.(`${clave}: KR nuevo creado.`);
+      krPorTitulo.set(titNorm, resultadoId); // para que dos KRs del LLM
+      // con el mismo título en la misma meta se agrupen en uno solo.
+      opts.onProgress?.(
+        `${clave}: KR nuevo "${kr.titulo}" creado.`,
+      );
     }
 
     for (const t of kr.tareas) {
-      // Dedupe: si ya existe una tarea con este título exacto en esta
-      // meta, no la creamos de nuevo. Esto protege contra reintentos
-      // del LLM (mismo prompt → mismo resultado) y contra la IA
-      // repitiendo una tarea en 2 KRs distintos.
-      const titNorm = t.titulo.trim().toLowerCase();
-      if (titulosTareas.has(titNorm)) {
+      // Dedupe por título exacto (normalizado) en esta meta.
+      const titNormTarea = t.titulo.trim().toLowerCase();
+      if (titulosTareas.has(titNormTarea)) {
         tareasSaltadasDuplicadas++;
         continue;
       }
-      titulosTareas.add(titNorm);
+      titulosTareas.add(titNormTarea);
       const creada = await crearTareaConIA(
         {
           titulo: t.titulo,

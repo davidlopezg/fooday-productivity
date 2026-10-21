@@ -18,6 +18,7 @@ import {
   IconHistory,
   IconHome,
   IconInbox,
+  IconLayers,
   IconList,
   IconLogout,
   IconMenu,
@@ -42,12 +43,16 @@ const QUICK_ITEMS: NavItem[] = [
 ];
 
 // Bloque 2 — Dirección y Planificación Estratégica
+// Orden: Norte → Áreas → Proyectos → Metas → Agente → Plan trimestral.
+// Las Áreas son las áreas de responsabilidad del modelo GTD/4DX y actúan
+// como agrupación padre de Proyectos. Sin área no hay jerarquía clara.
 const STRATEGY_ITEMS: NavItem[] = [
   { href: "/norte", label: "Norte", Icon: IconCompass },
-  { href: "/agente", label: "Agente", Icon: IconSparkles },
-  { href: "/metas", label: "Metas", Icon: IconTarget },
-  { href: "/metas/plan", label: "Plan trimestral", Icon: IconCalendar },
+  { href: "/areas", label: "Áreas", Icon: IconLayers },
   { href: "/proyectos", label: "Proyectos", Icon: IconFolder },
+  { href: "/metas", label: "Metas", Icon: IconTarget },
+  { href: "/agente", label: "Agente", Icon: IconSparkles },
+  { href: "/metas/plan", label: "Plan trimestral", Icon: IconCalendar },
 ];
 
 // Bloque 3 — Ejecución y Organización
@@ -57,6 +62,7 @@ const EXEC_ITEMS: NavItem[] = [
   { href: "/tareas/inbox", label: "Inbox", Icon: IconInbox },
   { href: "/tareas/pendientes-respuesta", label: "Pendientes respuesta", Icon: IconClock },
   { href: "/pipeline", label: "Prioridad", Icon: IconFlag },
+  { href: "/matriz", label: "Matriz Eisenhower", Icon: IconTarget },
   { href: "/pagos", label: "Pagos", Icon: IconWallet },
   { href: "/plan-diario", label: "Plan diario", Icon: IconSparkles },
   { href: "/plan-diario/historico", label: "Histórico de planes", Icon: IconHistory },

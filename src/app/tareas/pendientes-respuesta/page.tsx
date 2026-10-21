@@ -109,6 +109,42 @@ export default function PendientesRespuestaPage() {
         Todas las tareas
       </Link>
 
+      {/* ===================================================================
+          Banner "Círculo de influencia" — reframe mental antes de la lista.
+          Migration 0026 + convención estoica/Covey. El panel ya tiene la
+          utilidad operativa (qué hacer follow-up); este banner añade la
+          utilidad MENTAL (dejar de preocuparse por lo que no depende de
+          uno). Cero lógica, cero BD — solo un recordatorio.
+         =================================================================== */}
+      <aside
+        role="note"
+        aria-label="Recordatorio: lo que está aquí no depende de ti"
+        className="rounded-2xl border-2 border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 p-5 sm:p-6"
+      >
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-xl">
+            🧘
+          </div>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-base font-semibold text-emerald-900 dark:text-emerald-100 sm:text-lg">
+              No te preocupes de lo que está pendiente de los demás.
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed text-emerald-900/80 dark:text-emerald-100/80">
+              Cada fila de esta lista representa algo que <strong>ya iniciaste</strong>{" "}
+              pero que <strong>no controlas</strong>: la respuesta de alguien,
+              un OK pendiente, una confirmación. Tu única acción posible es el{" "}
+              <em>follow-up</em>. Y si hoy no toca, <strong>déjala aquí</strong>:
+              el panel te la recordará cuando lleve demasiado tiempo esperando.
+            </p>
+            <p className="mt-3 text-[11px] italic text-emerald-900/60 dark:text-emerald-100/60">
+              Covey · <em>Los 7 hábitos de la gente altamente efectiva</em>{" "}
+              — Círculo de influencia vs. círculo de preocupación. Epicteto:{" "}
+              <em>«Preocúpate solo de lo que depende de ti»</em>.
+            </p>
+          </div>
+        </div>
+      </aside>
+
       <header>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
