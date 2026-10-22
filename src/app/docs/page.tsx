@@ -1642,6 +1642,43 @@ export default function DocsPage() {
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-10-28
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">Fix raíz: un proyecto ya no muestra 0 tareas.</strong>{" "}
+              Una tarea puede colgar de <strong className="text-foreground">tres</strong> sitios:{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">tareas.proyecto_id</code> (directa),{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">tareas.meta_id</code> (dentro de una meta) o{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">tareas.resultado_periodo_id</code> (dentro de un KR).{" "}
+              Las tareas que viven <strong className="text-foreground">dentro de un KR de una meta</strong> llevan{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">meta_id</code> pero{" "}
+              <strong className="text-foreground">NO</strong>{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">proyecto_id</code>. Contar o filtrar solo por{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">tareas.proyecto_id</code> devolvía{" "}
+              <strong className="text-foreground">0 tareas</strong> en todos los proyectos cuyas tareas están en los KRs de sus metas (justo lo que pasó en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/escenarios</code>). Se afectados{" "}
+              <strong className="text-foreground">6 sitios</strong>: el estado medido de{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/escenarios</code>, el contador y el PDF de{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/proyectos</code>, el filtro{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">?proyecto=</code> de{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/tareas</code>, y la distribución por proyecto de{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/informes</code>.{" "}
+              <strong className="text-foreground">Fix de raíz, no síntoma por síntoma</strong>: nuevo módulo{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">src/lib/proyectos.ts</code> con{" "}
+              <strong className="text-foreground">la regla en un solo sitio</strong> —{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">proyectoEfectivoDeTarea()</code> /{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">tareasDeProyecto()</code> /{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">tareasPorProyectoEfectivo()</code>. La regla es la que{" "}
+              <strong className="text-foreground">ya usaba</strong> el breadcrumb de{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">TasksTable</code> desde siempre (si la tarea tiene meta, manda el proyecto de la meta; si no, el{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">proyecto_id</code> directo) — ahora es la única implementación y todas las pantallas quedan alineadas.{" "}
+              Test: <code className="rounded bg-muted px-1.5 py-0.5 text-xs">node src/lib/proyectos.test.mjs</code> (11 casos).{" "}
+              <strong className="text-foreground">Sin migración</strong> (es lógica de lectura, no de esquema).{" "}
+              <em className="text-muted-foreground">Sin cambios de metodología ni rituales.</em>
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
               2026-10-27
             </span>
             <span className="text-muted-foreground">

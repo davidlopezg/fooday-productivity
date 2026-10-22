@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 import { localYMD } from "@/lib/semana";
+import { proyectoEfectivoDeTarea } from "@/lib/proyectos";
 import type {
   Area,
   CalendarioBloque,
@@ -609,20 +610,30 @@ export async function fetchProyectos(opts?: { includeArchivados?: boolean }): Pr
 /** Tareas del owner agrupadas por proyecto (id → nº tareas activas). */
 export async function fetchProyectosConConteo(): Promise<Array<Proyecto & { total_tareas: number; tareas_hechas: number }>> {
   const supabase = createClient();
-  const [proyectosRes, tareasRes] = await Promise.all([
+  const [proyectosRes, tareasRes, metasRes] = await Promise.all([
     supabase.from("proyectos").select("id,nombre,color,descripcion,orden,archivado,area_id").order("orden"),
-    supabase.from("tareas").select("proyecto_id,estado").not("proyecto_id", "is", null),
+    supabase.from("tareas").select("meta_id,proyecto_id,estado"),
+    // Metas: para derivar el proyecto EFECTIVO de las tareas que viven
+    // dentro de un KR (esas no llevan `proyecto_id`).
+    supabase.from("metas").select("id,proyecto_id"),
   ]);
   if (proyectosRes.error) throw proyectosRes.error;
   if (tareasRes.error) throw tareasRes.error;
+  if (metasRes.error) throw metasRes.error;
   const proyectos = (proyectosRes.data ?? []) as Proyecto[];
+  const metaPorId = new Map(
+    ((metasRes.data ?? []) as Array<{ id: string; proyecto_id: string | null }>).map(
+      (m) => [m.id, m] as const,
+    ),
+  );
   const conteo = new Map<string, { total: number; hechas: number }>();
   for (const t of tareasRes.data ?? []) {
-    const pid = (t as { proyecto_id: string }).proyecto_id;
+    const tarea = t as { meta_id: string | null; proyecto_id: string | null; estado: string };
+    const pid = proyectoEfectivoDeTarea(tarea, metaPorId);
     if (!pid) continue;
     const c = conteo.get(pid) ?? { total: 0, hechas: 0 };
     c.total++;
-    if ((t as { estado: string }).estado === "hecha") c.hechas++;
+    if (tarea.estado === "hecha") c.hechas++;
     conteo.set(pid, c);
   }
   return proyectos.map((p) => ({

@@ -15,6 +15,7 @@ import {
 } from "@/lib/mutations";
 import { fetchMetas, fetchProyectos, fetchResultadosPeriodo } from "@/lib/queries";
 import { useData } from "@/lib/useData";
+import { proyectoEfectivoDeTarea } from "@/lib/proyectos";
 import {
   IconArchive,
   IconCheck,
@@ -338,7 +339,8 @@ export function TasksTable({
         return false;
       if (prioridad !== "todas" && t.prioridad !== prioridad) return false;
       if (capa !== "todas" && t.capa !== capa) return false;
-      if (proyectoFiltroQS && t.proyecto_id !== proyectoFiltroQS) return false;
+      if (proyectoFiltroQS && proyectoEfectivoDeTarea(t, metaById) !== proyectoFiltroQS)
+        return false;
       if (ambito !== "todas" && t.ambito !== ambito) return false;
       if (
         tagsSel.size > 0 &&
@@ -351,7 +353,7 @@ export function TasksTable({
       }
       return true;
     });
-  }, [tareas, estado, prioridad, capa, q, proyectoFiltroQS, ambito, tagsSel]);
+  }, [tareas, estado, prioridad, capa, q, proyectoFiltroQS, ambito, tagsSel, metaById]);
 
   function toggleTag(t: string) {
     setTagsSel((prev) => {

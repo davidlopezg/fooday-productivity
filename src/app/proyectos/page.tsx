@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { fetchAreas, fetchMetas, fetchProyectosConConteo, fetchTareas } from "@/lib/queries";
 import {
@@ -10,6 +10,7 @@ import {
   eliminarProyecto,
 } from "@/lib/mutations";
 import { cargarDatosProyectoParaReporte } from "@/lib/exportarProyecto";
+import { tareasPorProyectoEfectivo, mapaMetas } from "@/lib/proyectos";
 import { useData } from "@/lib/useData";
 import type { Area, Meta, MetaConPlan, Proyecto, Tarea } from "@/lib/types";
 import { IconArchive, IconFile, IconFolder, IconPencil, IconTarget, IconTrash, IconX } from "@/components/icons";
@@ -131,6 +132,17 @@ export default function ProyectosPage() {
   // por proyecto_id. Migration 0024: metas.proyecto_id nullable; las
   // metas sin proyecto se ignoran aquí (viven solo en /metas).
   const { data: metas } = useData<Meta[]>(fetchMetas, []);
+  // Mapa id → meta: para derivar el proyecto EFECTIVO de cada tarea (las
+  // que viven en un KR no llevan `proyecto_id`).
+  const metaPorId = useMemo(() => mapaMetas(metas ?? []), [metas]);
+
+  // Tareas agrupadas por proyecto EFECTIVO: las directas (proyecto_id) y
+  // las que viven dentro de un KR de una meta del proyecto (esas no
+  // llevan `proyecto_id`, solo `meta_id`).
+  const tareasPorProyecto = useMemo<Map<string, Tarea[]>>(
+    () => tareasPorProyectoEfectivo(tareas ?? [], metaPorId),
+    [tareas, metaPorId],
+  );
 
   const [mostrarForm, setMostrarForm] = useState(false);
   const [nombre, setNombre] = useState("");
@@ -224,15 +236,6 @@ export default function ProyectosPage() {
         </button>
       </div>
     );
-  }
-
-  const tareasPorProyecto = new Map<string, Tarea[]>();
-  for (const t of tareas) {
-    if (t.proyecto_id) {
-      const arr = tareasPorProyecto.get(t.proyecto_id) ?? [];
-      arr.push(t);
-      tareasPorProyecto.set(t.proyecto_id, arr);
-    }
   }
 
   // Agrupar metas por proyecto. Orden estable: por `codigo` ascendente

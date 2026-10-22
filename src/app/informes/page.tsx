@@ -10,6 +10,7 @@ import {
   fetchTareasCompletadas,
 } from "@/lib/queries";
 import { useData } from "@/lib/useData";
+import { proyectoEfectivoDeTarea } from "@/lib/proyectos";
 import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
 import { localYMD } from "@/lib/semana";
 import { IconCheck, IconTarget } from "@/components/icons";
@@ -131,11 +132,16 @@ export default function InformesPage() {
     return r;
   }, [serie]);
 
-  // Distribución por proyecto (solo de las hechas en el rango)
+  // Distribución por proyecto (solo de las hechas en el rango).
+  // Usa el proyecto EFECTIVO: las tareas dentro de un KR pertenecen al
+  // proyecto de su meta, no tienen `proyecto_id` propio.
   const porProyecto = useMemo(() => {
+    const metaPorId = new Map(
+      (metas ?? []).map((mc) => [mc.meta.id, mc.meta] as const),
+    );
     const map = new Map<string | null, number>();
     for (const t of hechasEnRango) {
-      const k = t.proyecto_id ?? null;
+      const k = proyectoEfectivoDeTarea(t, metaPorId);
       map.set(k, (map.get(k) ?? 0) + 1);
     }
     return Array.from(map.entries())
@@ -144,7 +150,7 @@ export default function InformesPage() {
         return { id: pid, nombre: p?.nombre ?? "Sin proyecto", color: p?.color ?? "#94a3b8", n };
       })
       .sort((a, b) => b.n - a.n);
-  }, [hechasEnRango, proyectos]);
+  }, [hechasEnRango, proyectos, metas]);
 
   const loading = l1 || l2 || l3 || l4 || l5;
 

@@ -36,19 +36,29 @@ export async function cargarDatosProyectoParaReporte(
 } | null> {
   const supabase = createClient();
 
-  const [proyectoRes, metasRes, krsRes, krPeriodosRes, periodosRes, tareasRes, areasRes] =
+  // 1) Metas del proyecto PRIMERO: necesitamos sus ids para traerse las
+  //    tareas que viven dentro de sus KRs (esas NO llevan `proyecto_id`).
+  const metasRes = await supabase
+    .from("metas")
+    .select("*")
+    .eq("proyecto_id", proyectoId)
+    .order("codigo", { ascending: true, nullsFirst: false })
+    .order("titulo");
+  if (metasRes.error) throw metasRes.error;
+
+  const metaIds = (metasRes.data ?? []).map((m: { id: string }) => m.id);
+  const filtroTareas =
+    metaIds.length > 0
+      ? `proyecto_id.eq.${proyectoId},meta_id.in.(${metaIds.join(",")})`
+      : `proyecto_id.eq.${proyectoId}`;
+
+  const [proyectoRes, krsRes, krPeriodosRes, periodosRes, tareasRes, areasRes] =
     await Promise.all([
       supabase
         .from("proyectos")
         .select("id,nombre,color,descripcion,orden,archivado,area_id")
         .eq("id", proyectoId)
         .maybeSingle(),
-      supabase
-        .from("metas")
-        .select("*")
-        .eq("proyecto_id", proyectoId)
-        .order("codigo", { ascending: true, nullsFirst: false })
-        .order("titulo"),
       // Migration 0028: KRs sin periodo_id. Cargamos los de las metas
       // de este proyecto (filtramos tras la query; las metas del
       // proyecto son pocas).
@@ -59,24 +69,22 @@ export async function cargarDatosProyectoParaReporte(
         )
         .order("orden"),
       // Asignaciones KR↔periodo (migration 0028).
-      supabase
-        .from("kr_periodos")
-        .select("kr_id,periodo_id,orden"),
+      supabase.from("kr_periodos").select("kr_id,periodo_id,orden"),
       supabase
         .from("periodos")
         .select("id,tipo,anio,numero,nombre,fecha_inicio,fecha_fin"),
-      // Todas las tareas del proyecto, sin filtrar por estado.
+      // Todas las tareas del proyecto (directas + las de los KRs de sus
+      // metas), sin filtrar por estado.
       supabase
         .from("tareas")
         .select("*, subtareas:tareas_subtareas(*)")
-        .eq("proyecto_id", proyectoId)
+        .or(filtroTareas)
         .order("created_at", { ascending: false }),
       supabase.from("areas").select("id,nombre,color,orden"),
     ]);
 
   if (proyectoRes.error) throw proyectoRes.error;
   if (!proyectoRes.data) return null;
-  if (metasRes.error) throw metasRes.error;
   if (krsRes.error) throw krsRes.error;
   if (krPeriodosRes.error) throw krPeriodosRes.error;
   if (periodosRes.error) throw periodosRes.error;
@@ -113,8 +121,8 @@ export async function cargarDatosProyectoParaReporte(
   }
 
   // Filtramos KRs a los de las metas del proyecto.
-  const metaIds = new Set(metas.map((m) => m.id));
-  const krsDelProyecto = krs.filter((r) => metaIds.has(r.meta_id));
+  const metaIdSet = new Set(metas.map((m) => m.id));
+  const krsDelProyecto = krs.filter((r) => metaIdSet.has(r.meta_id));
 
   const krsPorMeta = new Map<string, ResultadoPeriodo[]>();
   for (const r of krsDelProyecto) {

@@ -40,6 +40,7 @@ import {
   estadoDeProyecto,
   haceCuanto,
 } from "@/lib/escenarios/hipotesis";
+import { mapaMetas, tareasDeProyecto } from "@/lib/proyectos";
 import { errorMessage } from "@/lib/errors";
 import { localYMD } from "@/lib/semana";
 import type {
@@ -494,6 +495,11 @@ export default function EscenariosPage() {
     [areas],
   );
 
+  // Mapa id → meta. Necesario para derivar el proyecto EFECTIVO de cada
+  // tarea: las que viven dentro de un KR llevan `meta_id` pero NO
+  // `proyecto_id` (misma regla que el breadcrumb de TasksTable).
+  const metaPorId = useMemo(() => mapaMetas(metas ?? []), [metas]);
+
   async function analizar(proyecto: Proyecto) {
     if (!cfg?.minimax_api_key) {
       setErrorIA("Falta la API key de la IA (Configuración).");
@@ -505,8 +511,12 @@ export default function EscenariosPage() {
       const metasProyecto = (metas ?? []).filter(
         (m) => m.proyecto_id === proyecto.id,
       );
-      const tareasProyecto = (tareas ?? []).filter(
-        (t) => t.proyecto_id === proyecto.id,
+      // Tareas del proyecto: las directas + las que están en los KRs de
+      // sus metas (esas no llevan `proyecto_id`).
+      const tareasProyecto = tareasDeProyecto(
+        tareas ?? [],
+        proyecto.id,
+        metaPorId,
       );
       const resultado = await analizarEscenariosIA(
         cfg.base_url,
@@ -668,7 +678,11 @@ export default function EscenariosPage() {
                     eventos={evs}
                     analisis={ans}
                     metas={(metas ?? []).filter((m) => m.proyecto_id === p.id)}
-                    tareas={(tareas ?? []).filter((t) => t.proyecto_id === p.id)}
+                    tareas={tareasDeProyecto(
+                      tareas ?? [],
+                      p.id,
+                      metaPorId,
+                    )}
                     hoy={hoy}
                     busy={busy === p.id}
                     onAnalizar={() => void analizar(p)}
