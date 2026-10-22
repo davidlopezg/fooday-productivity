@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-require-imports -- Script CommonJS ejecutado con `node`: no se migra a ESM. */
 const fs = require("node:fs");
 const path = require("node:path");
 const { execSync } = require("node:child_process");

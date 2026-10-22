@@ -1642,8 +1642,6 @@ export default function DocsPage() {
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
-<<<<<<< HEAD
-=======
               2026-10-27
             </span>
             <span className="text-muted-foreground">
@@ -1958,7 +1956,6 @@ export default function DocsPage() {
           </li>
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
->>>>>>> 660ccf7 (hipotesis)
               2026-10-13
             </span>
             <span className="text-muted-foreground">

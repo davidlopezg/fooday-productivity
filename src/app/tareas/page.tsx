@@ -16,8 +16,14 @@ import {
 } from "@/lib/iaSugerencias";
 import { TasksTable } from "@/components/TasksTable";
 import { PanelWigTareas } from "@/components/PanelWigTareas";
+import { DedupeModal } from "@/components/DedupeModal";
+import {
+  SugerenciasTareasModal,
+  type SugerenciaEditada,
+} from "@/components/SugerenciasTareasModal";
 import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
-import type { Tarea } from "@/lib/types";
+import { IconSparkles } from "@/components/icons";
+import type { MetaConPlan, Proyecto, Tarea } from "@/lib/types";
 
 export default function TareasPage() {
   const { data: tareas, loading, error, reload } = useData<Tarea[]>(fetchTareas, []);
@@ -27,6 +33,17 @@ export default function TareasPage() {
   // los dos. Así no toco la API interna de TasksTable.
   const [guardandoWigId, setGuardandoWigId] = useState<string | null>(null);
   const [errorWig, setErrorWig] = useState<string | null>(null);
+
+  // Sugerencias IA — 3 siguientes acciones
+  const cfg = useConfig();
+  const metasQ = useData<MetaConPlan[]>(fetchMetasConProgreso, []);
+  const proyectosQ = useData<Proyecto[]>(() => fetchProyectos(), []);
+  const [sugerenciasIA, setSugerenciasIA] = useState<SugerenciaTarea[] | null>(null);
+  const [sugiriendoIA, setSugiriendoIA] = useState(false);
+  const [aplicandoSugIA, setAplicandoSugIA] = useState(false);
+  const [errorSugIA, setErrorSugIA] = useState<string | null>(null);
+  // Modal "Buscar duplicadas" — abierta/cerrada.
+  const [dedupeAbierto, setDedupeAbierto] = useState(false);
 
   // Tareas marcadas como WIG (4DX), ordenadas por wig_orden (1, 2, 3).
   const wigTareas = useMemo(
@@ -225,7 +242,28 @@ export default function TareasPage() {
               {abiertasCount > 0 && !loading && ` (${abiertasCount} abiertas)`}.
             </p>
           </div>
-          <HelpDrawer title="Tareas" items={AYUDA_POR_RUTA["/tareas"]?.items ?? []} />
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={pedirSugerenciasIA}
+              disabled={sugiriendoIA || loading || abiertasCount === 0}
+              className="inline-flex items-center gap-1.5 rounded-md bg-violet-500 px-3 py-2 text-sm font-medium text-white hover:bg-violet-600 disabled:opacity-50"
+              title="Mira TODA la lista abierta (no completadas) y propone 3 siguientes acciones concretas"
+            >
+              <IconSparkles className="h-4 w-4" />
+              {sugiriendoIA ? "Pensando…" : "Sugerir 3 siguientes acciones"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setDedupeAbierto(true)}
+              className="inline-flex items-center gap-1.5 rounded-md border border-violet-500/30 bg-background px-2.5 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-500/10 dark:text-violet-300"
+              title="Detectar tareas con títulos casi iguales (heurística cliente)"
+            >
+              <IconSparkles className="h-3.5 w-3.5" />
+              Buscar duplicadas
+            </button>
+            <HelpDrawer title="Tareas" items={AYUDA_POR_RUTA["/tareas"]?.items ?? []} />
+          </div>
         </div>
       </header>
 

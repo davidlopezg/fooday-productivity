@@ -1,5 +1,6 @@
 #!/usr/bin/env node
- 
+/* eslint-disable @typescript-eslint/no-require-imports -- Script CommonJS ejecutado con `node`: no se migra a ESM. */
+
 /**
  * Build para Capacitor (Android / iOS).
  *
