@@ -11,6 +11,8 @@ import type {
   PlanDiarioTarea,
   PlanGeneradoSimple,
   Prioridad,
+  ProyectoAnalisis,
+  ProyectoEvento,
   ResultadoPeriodo,
   Subtarea,
   TareaAdjunto,
@@ -1481,6 +1483,62 @@ export async function archivarProyectoEnCascada(
   await actualizarProyecto(id, { archivado });
 
   return { metas: metasActualizadas, tareas: tareasActualizadas, krs: krsActualizados };
+}
+
+// ============================================================================
+// Escenarios de proyecto — migration 0029
+// ============================================================================
+
+/** Añade un hecho a la cronología del proyecto (append-only). */
+export async function crearEventoProyecto(datos: {
+  proyecto_id: string;
+  tipo: ProyectoEvento["tipo"];
+  texto: string;
+  ocurrido_en: string;
+}): Promise<ProyectoEvento> {
+  const { data, error } = await createClient()
+    .from("proyecto_eventos")
+    .insert({
+      proyecto_id: datos.proyecto_id,
+      tipo: datos.tipo,
+      texto: datos.texto.trim(),
+      ocurrido_en: datos.ocurrido_en,
+    })
+    .select("id,proyecto_id,tipo,texto,ocurrido_en,created_at")
+    .single();
+  if (error || !data) throw new Error(`No se pudo guardar el evento: ${error?.message}`);
+  return data as ProyectoEvento;
+}
+
+/** Borra un evento de la cronología. */
+export async function eliminarEventoProyecto(id: string): Promise<void> {
+  const { error } = await createClient()
+    .from("proyecto_eventos")
+    .delete()
+    .eq("id", id);
+  if (error) throw new Error(`No se pudo borrar el evento: ${error.message}`);
+}
+
+/** Guarda un análisis de escenarios (histórico). La UI no lo borra:
+ *  el valor está en ver cómo cambia la lectura con los nuevos hechos. */
+export async function guardarAnalisisProyecto(datos: {
+  proyecto_id: string;
+  situacion: string | null;
+  hipotesis: ProyectoAnalisis["hipotesis"];
+  modelo: string | null;
+}): Promise<ProyectoAnalisis> {
+  const { data, error } = await createClient()
+    .from("proyecto_analisis")
+    .insert({
+      proyecto_id: datos.proyecto_id,
+      situacion: datos.situacion,
+      hipotesis: datos.hipotesis,
+      modelo: datos.modelo,
+    })
+    .select("id,proyecto_id,generado_en,situacion,hipotesis,modelo,created_at")
+    .single();
+  if (error || !data) throw new Error(`No se pudo guardar el análisis: ${error?.message}`);
+  return data as ProyectoAnalisis;
 }
 
 export async function eliminarProyecto(id: string): Promise<void> {

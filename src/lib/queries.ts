@@ -17,6 +17,8 @@ import type {
   PlanSemanalTarea,
   PomodoroSesion,
   Proyecto,
+  ProyectoAnalisis,
+  ProyectoEvento,
   ResultadoConTareas,
   ResultadoPeriodo,
   Ritual,
@@ -628,6 +630,39 @@ export async function fetchProyectosConConteo(): Promise<Array<Proyecto & { tota
     total_tareas: conteo.get(p.id)?.total ?? 0,
     tareas_hechas: conteo.get(p.id)?.hechas ?? 0,
   }));
+}
+
+// ============================================================================
+// Escenarios de proyecto — migration 0029
+// ----------------------------------------------------------------------------
+// 3 consultas y el agrupado se hace en el cliente: son pocos datos
+// (5-10 proyectos) y así la UI no hace N+1.
+// ============================================================================
+
+/** Cronología completa de todos los proyectos (eventos). */
+export async function fetchProyectosEventos(): Promise<ProyectoEvento[]> {
+  const { data, error } = await createClient()
+    .from("proyecto_eventos")
+    .select("id,proyecto_id,tipo,texto,ocurrido_en,created_at")
+    .order("ocurrido_en", { ascending: true })
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as ProyectoEvento[];
+}
+
+/** Historial de análisis de escenarios de todos los proyectos (desc). */
+export async function fetchProyectosAnalisis(): Promise<ProyectoAnalisis[]> {
+  const { data, error } = await createClient()
+    .from("proyecto_analisis")
+    .select("id,proyecto_id,generado_en,situacion,hipotesis,modelo,created_at")
+    .order("generado_en", { ascending: false });
+  if (error) throw error;
+  return ((data ?? []) as Array<Omit<ProyectoAnalisis, "hipotesis"> & { hipotesis: unknown }>).map(
+    (a) => ({
+      ...a,
+      hipotesis: Array.isArray(a.hipotesis) ? (a.hipotesis as ProyectoAnalisis["hipotesis"]) : [],
+    }),
+  );
 }
 
 // ============================================================================

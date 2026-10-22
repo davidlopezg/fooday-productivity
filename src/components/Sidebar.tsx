@@ -50,6 +50,7 @@ const STRATEGY_ITEMS: NavItem[] = [
   { href: "/norte", label: "Norte", Icon: IconCompass },
   { href: "/areas", label: "Áreas", Icon: IconLayers },
   { href: "/proyectos", label: "Proyectos", Icon: IconFolder },
+  { href: "/escenarios", label: "Escenarios", Icon: IconTarget },
   { href: "/metas", label: "Metas", Icon: IconTarget },
   { href: "/agente", label: "Agente", Icon: IconSparkles },
   { href: "/metas/plan", label: "Plan trimestral", Icon: IconCalendar },

@@ -856,3 +856,78 @@ export interface InformePlan {
   notas: InformeNota[];
   comida: InformeComida;
 }
+
+// ============================================================================
+// ESCENARIOS DE PROYECTO — migration 0029
+// ----------------------------------------------------------------------------
+// 3 dimensiones separadas a propósito (no se solapan):
+//   · Contexto  = el pasado. Qué pasó. Append-only (`proyecto_eventos`).
+//   · Estado    = el presente MEDIDO. Se calcula de `tareas` en cada render.
+//                 No es una tabla: si fuera una tabla se pudriría.
+//   · Situación = el presente INTERPRETADO. Evento manual de tipo
+//                 'situacion' + la lectura que devuelve la IA.
+// ============================================================================
+
+/** Tipo de evento de la cronología del proyecto. */
+export type TipoEventoProyecto = "contexto" | "estado" | "situacion";
+
+export interface ProyectoEvento {
+  id: string;
+  proyecto_id: string;
+  tipo: TipoEventoProyecto;
+  texto: string;
+  /** YYYY-MM-DD. */
+  ocurrido_en: string;
+  created_at: string;
+}
+
+/**
+ * Categorías del análisis de escenarios.
+ * - riesgo      : lo que puede salir mal y no se está viendo.
+ * - oportunidad : lo que puede salir mejor y no se está viendo.
+ * - punto_ciego : variable que se ignora y podría importar.
+ * - wildcard    : improbable pero de alto impacto.
+ */
+export type CategoriaHipotesis =
+  | "riesgo"
+  | "oportunidad"
+  | "punto_ciego"
+  | "wildcard";
+
+export interface Hipotesis {
+  categoria: CategoriaHipotesis;
+  /** 1 frase: qué puede pasar. */
+  titulo: string;
+  /** 0-100. Dato secundario: la estrategia manda. */
+  probabilidad: number;
+  /** Qué hago en este caso. */
+  estrategia: string;
+  /** Por qué la IA estima esa probabilidad. */
+  justificacion?: string;
+  /** Qué hecho la confirmaría o refutaría. */
+  indicador?: string;
+}
+
+export interface ProyectoAnalisis {
+  id: string;
+  proyecto_id: string;
+  generado_en: string;
+  /** Lectura de la situación (el presente interpretado). */
+  situacion: string | null;
+  hipotesis: Hipotesis[];
+  modelo: string | null;
+  created_at: string;
+}
+
+/** Estado del proyecto: derivado de `tareas` (no se persiste). */
+export interface EstadoProyecto {
+  total: number;
+  hechas: number;
+  abiertas: number;
+  bloqueadas: number;
+  vencidas: number;
+  /** % de avance (0-100). */
+  avance: number;
+  /** Fecha de la última tarea vencida, ISO. */
+  proximoVencimiento: string | null;
+}

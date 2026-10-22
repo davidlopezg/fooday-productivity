@@ -20,6 +20,7 @@
 // ============================================================================
 
 import { useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import {
   DndContext,
   DragOverlay,
@@ -1050,6 +1051,25 @@ export default function SemanaPage() {
           {errorMover}
         </p>
       )}
+
+      {/* Escenarios de proyecto — el pase de "qué va a pasar" del domingo.
+          Un enlace, no un paso más: la pantalla vive en /escenarios y este
+          bloque solo recuerda que existe. */}
+      <Link
+        href="/escenarios"
+        className="flex items-center justify-between gap-3 rounded-xl border border-violet-500/25 bg-gradient-to-r from-violet-500/10 to-indigo-500/10 p-4 transition-colors hover:border-violet-500/50"
+      >
+        <div className="min-w-0">
+          <p className="text-sm font-semibold">Escenarios de proyectos</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Qué ha pasado en cada proyecto, dónde está hoy y qué puede pasar.
+            La IA devuelve los escenarios con su estrategia.
+          </p>
+        </div>
+        <span className="shrink-0 rounded-md border border-violet-500/30 bg-background px-3 py-1.5 text-xs font-medium text-violet-700 dark:text-violet-300">
+          Abrir →
+        </span>
+      </Link>
 
       {/* Pipeline */}
       <DndContext

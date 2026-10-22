@@ -926,6 +926,12 @@ export default function MetodologiaPage() {
               /matriz · Matriz Eisenhower 2D con drag &amp; drop + IA “Sugerir redistribución” — urgencia × importancia calculada en JS, sin migración
             </Link>
           </li>
+          <li>
+            <Link href="/escenarios" className="inline-flex items-center gap-2 font-medium text-foreground underline underline-offset-4">
+              <IconTarget className="h-4 w-4 text-violet-500" />
+              /escenarios · Capa de escenarios de proyecto: contexto (cronología) + estado (medido) + situación (interpretada), y los escenarios con su estrategia generados bajo demanda (migration 0029)
+            </Link>
+          </li>
         </ul>
         <p className="mt-5 text-sm text-muted-foreground">
           🎯 ¿Quieres que configuremos juntos la estructura desglosada de

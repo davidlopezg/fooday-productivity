@@ -197,6 +197,7 @@ const FEATURES: Array<{ ruta: string; proposito: string; docs: string }> = [
   // ── Sistema ──
   { ruta: "/pagos", proposito: "Pagos pendientes: ejecutar tesorería lunes 1ª hora + botón IA “✨ Sugerir pagos” (migration 0027) que analiza los pagos activos y propone programación para los próximos 6 lunes aplicando el prompt editable en /configuracion (snowball por defecto, ingresos viernes/sábado). Modal de revisión estilo SugerirWigs: la IA sugiere, tú marcas qué incluir, botón “Aplicar N marcadas” actualiza solo fecha_pago_programada y estado=programado (no registra pagos parciales). Prompt editable en /configuracion §Prompt de pagos (columna prompt_pagos)", docs: "Apéndice §Bucle de equilibrio · Ritual semanal (lunes estricto) · HelpDrawer" },
   { ruta: "/proyectos", proposito: "Gestión de proyectos con conteo de tareas, listado de metas hijas (migration 0024), archivado en cascada a metas+tareas, confirm con preview de impacto al eliminar, botón Editar (modal ligero con nombre/color/descripción/área), exportación a PDF por proyecto (modal con vista previa + Imprimir a PDF nativo del navegador, sin librerías externas). Al pulsar 'ver' se navega a /tareas?proyecto=X y se abre el filtro en 'todas' (no 'activas') para que las tareas hechas/archivadas del mismo proyecto sean visibles, especialmente en proyectos ya cerrados o arrastrados. Sección ámbar final con metas sin proyecto asignado (huérfanas, patrón simétrico a /areas → proyectos sin área) para que David no las pierda — archivadas ocultas, y cada huérfana trae un botón Eliminar con preview de impacto (las tareas no se borran, solo se desvinculan de la meta gracias a ON DELETE SET NULL)", docs: "HelpDrawer" },
+  { ruta: "/escenarios", proposito: "Escenarios de proyecto: las 3 dimensiones separadas — CONTEXTO (cronología append-only de hechos, tipada como contexto/estado/situación), ESTADO (el presente MEDIDO, calculado de las tareas en cada render, sin tabla que se pudra) y SITUACIÓN (el presente interpretado: nota manual + la lectura de la IA). Botón “✨ Analizar escenarios” que pide a la IA los escenarios del proyecto agrupados por categoría (riesgos / oportunidades / puntos ciegos / wildcard), cada uno con probabilidad (dato secundario), estrategia accionable, justificación e indicador de validación; el más probable sale destacado. Historial de todos los análisis (la lectura cambia con los nuevos hechos). Migration 0029 (proyecto_eventos + proyecto_analisis). Módulo IA: src/lib/escenarios/analizarEscenariosIA.ts (prompt adaptado de fooday-intelligence-core/agents/agente-generador-hipotesis.md)", docs: "Ritual semanal (domingo) · Pilar 2 · HelpDrawer" },
   { ruta: "/configuracion", proposito: "Configuración: API key IA, base URL, modelo, tema", docs: "HelpDrawer" },
 
   // ── Documentación ──
@@ -1380,6 +1381,23 @@ export default function DocsPage() {
                 </td>
               </tr>
               <tr>
+                <td className="px-3 py-2 font-medium">Domingo (tras planificar)</td>
+                <td className="px-3 py-2">
+                  <Link
+                    href="/escenarios"
+                    className="font-mono text-rose-700 dark:text-rose-300 underline-offset-4 hover:underline"
+                  >
+                    /escenarios
+                  </Link>
+                </td>
+                <td className="px-3 py-2 text-muted-foreground">
+                  Un vistazo a los proyectos: qué ha pasado (cronología), dónde
+                  están hoy (estado medido) y qué puede pasar (escenarios con
+                  estrategia). Solo entra en los que te importen: el resto se
+                  puede mirar después o nunca, sin penalización.
+                </td>
+              </tr>
+              <tr>
                 <td className="px-3 py-2 font-medium">Miércoles</td>
                 <td className="px-3 py-2">
                   <Link
@@ -1624,6 +1642,323 @@ export default function DocsPage() {
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+<<<<<<< HEAD
+=======
+              2026-10-27
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">Nueva pantalla /escenarios: contexto, estado, situación e hipótesis por proyecto.</strong>{" "}
+              Capa por encima del ritual (no lo reemplaza) que recoge la idea de
+              “un proyecto es vivo, suceden cosas”. Las 3 dimensiones van
+              <strong className="text-foreground">separadas y sin solaparse</strong>:{" "}
+              <em>Contexto</em> = el pasado (cronología append-only de hechos, cada uno tipado como contexto/estado/situación),{" "}
+              <em>Estado</em> = el presente <strong className="text-foreground">medido</strong> (se calcula de las tareas en cada render: total, hechas, abiertas, bloqueadas, vencidas, % avance y próximo vencimiento — no es una tabla, porque una tabla de estado se pudre),{" "}
+              <em>Situación</em> = el presente <strong className="text-foreground">interpretado</strong> (nota manual + la lectura que devuelve la IA). El botón{' '}
+              <strong className="text-foreground">“✨ Analizar escenarios”</strong> pide a la IA los escenarios del proyecto agrupados por categoría (riesgos / oportunidades / puntos ciegos / wildcard), cada uno con probabilidad (dato secundario), estrategia accionable, justificación e indicador de validación; el más probable sale destacado, y se guarda el <strong className="text-foreground">historial</strong> de todos los análisis (la lectura cambia con los nuevos hechos). El prompt está adaptado de{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">fooday-intelligence-core/agents/agente-generador-hipotesis.md</code>. Nueva migration{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">0029</code> (2 tablas: <code className="rounded bg-muted px-1.5 py-0.5 text-xs">proyecto_eventos</code> y{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">proyecto_analisis</code>), nuevo módulo IA{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">src/lib/escenarios/analizarEscenariosIA.ts</code> y helper compartido de llamada al LLM{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">src/lib/llm.ts</code>. La fricción se mantiene baja:{' '}
+              <strong className="text-foreground">un solo punto de entrada</strong> (la lista de proyectos) y el ritual semanal del domingo enlaza a{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/escenarios</code> desde{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/semana</code> — no añade pasos. Enlace en el sidebar (Estrategia) y fila nueva en el{' '}
+              <strong className="text-foreground">ritual semanal</strong> (domingo, tras planificar).{' '}
+              <strong className="text-foreground">FEATURES actualizado</strong> (fila{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/escenarios</code>).{' '}
+              <em className="text-muted-foreground">Acción manual: ejecutar <code className="rounded bg-muted px-1.5 py-0.5 text-xs">supabase/APLICAR-0029.sql</code> en el SQL Editor para migrar la BD.</em>
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-10-26
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">Proyectos: botón Editar + fix de &ldquo;tabla vacía&rdquo; al pulsar &ldquo;ver&rdquo; + sección &ldquo;metas sin proyecto&rdquo;.</strong>{" "}
+              Tres cambios relacionados con <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/proyectos</code>:
+              <em> (1)</em> cada card de proyecto gana un botón{' '}
+              <strong className="text-foreground">Editar</strong> (icono lápiz) que abre un modal ligero con nombre, color, descripción y área (mismos campos que el formulario de creación, precargados con los valores actuales). Al guardar llama a{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">actualizarProyecto</code> ya existente y recarga la lista. Implementación: nuevo componente{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/components/EditarProyectoModal.tsx</code>.{' '}
+              <em>(2)</em> al pulsar &ldquo;ver&rdquo; (que navega a <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/tareas?proyecto=X</code>) el filtro de estado por defecto era &ldquo;activas&rdquo; y descartaba las tareas hechas/archivadas del proyecto, dejando la tabla vacía en cualquier proyecto ya cerrado o arrastrado en cascada. Fix mínimo: si la URL trae <code className="rounded bg-muted px-1.5 py-0.5 text-xs">?proyecto=X</code>, el filtro se inicializa a &ldquo;todas&rdquo; para que la vista del proyecto sea completa. Sin migración ni cambio en mutaciones (la query de proyecto a tareas ya estaba bien; era solo la preselección de estado en el cliente).{' '}
+              <em>(3)</em> abajo del grid de proyectos aparece ahora una sección ámbar{' '}
+              <strong className="text-foreground">&ldquo;⚠️ N metas sin proyecto&rdquo;</strong> con las metas huérfanas (aquellas con <code className="rounded bg-muted px-1.5 py-0.5 text-xs">proyecto_id = null</code>, permitido por migration 0024). Las metas con estado <code className="rounded bg-muted px-1.5 py-0.5 text-xs">archivada</code> se ocultan (no son accionables y solo contaminarían la vista); si todas las huérfanas están archivadas la sección no se muestra, y si hay mezcla aparece un paréntesis <em>&ldquo;(N archivadas ocultas)&rdquo;</em>. Cada meta huérfana se muestra como chip con su dot de color por estado + link a{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas/detalle?id=…</code>. El patrón es simétrico al que ya tiene <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/areas</code> para los proyectos sin área.{' '}
+              <em>(4)</em> nueva acción <strong className="text-foreground">Eliminar meta</strong> en la card de cada meta en <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas</code> (esquina superior derecha, junto a Editar/WIG/Archivar). El confirm muestra preview del impacto: KRs que quedarán huérfanos + tareas (activas y hechas/archivadas) que se desvincularán + liberación del slot de WIG si lo tenía. Nueva mutación{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">eliminarMeta(id)</code> en{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/lib/mutations.ts</code> que aprovecha el{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">ON DELETE SET NULL</code> de{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">tareas.meta_id</code> y el{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">ON DELETE CASCADE</code> de{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">okrs.meta_id</code> /{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">hitos.meta_id</code> de migration 0001: las tareas <strong>no se borran</strong>, solo se desvinculan; KRs e hitos se borran. Confirm recuerda explícitamente &ldquo;💡 si quieres dejarla de lado pero recuperarla, usa Archivar&rdquo; para que Archivar siga siendo el camino reversible por defecto.{' '}
+              <strong className="text-foreground">FEATURES actualizado</strong>{" "}
+              (fila <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/proyectos</code>).{' '}
+              <em className="text-muted-foreground">Sin cambios de metodología ni rituales. Es una mejora de UX en una pantalla de gestión existente.</em>
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-blue-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-blue-700 dark:text-blue-300 sm:text-sm">
+              2026-10-15
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">Reordenado el menú Estrategia + nueva página /areas.</strong>{" "}
+              Bloque "Estrategia" del sidebar pasa a (en este orden):
+              <strong className="text-foreground"> 1. Norte · 2. Áreas · 3. Proyectos · 4. Metas · 5. Agente · 6. Plan trimestral</strong>.
+              Las áreas son las áreas de responsabilidad (ya existían en BD, tabla{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">areas</code>{" "}
+              migration 0001) y ahora tienen página propia{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/areas</code>{" "}
+              estilo /proyectos con CRUD (crear/editar/eliminar + color) +
+              listado de proyectos hijos por área + sección "⚠️ proyectos sin área"
+              para que David no pierda los huérfanos. Mutaciones nuevas en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">src/lib/mutations.ts</code>:
+              <code className="mx-1 rounded bg-muted px-1.5 py-0.5 text-xs">crearArea()</code>,
+              <code className="mx-1 rounded bg-muted px-1.5 py-0.5 text-xs">eliminarArea()</code>{" "}
+              (el update de nombre/color va inline en la página; podría
+              convertirse en helper dedicado si se reusa). Icono nuevo{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">IconLayers</code>{" "}
+              añadido al final de{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">src/components/icons.tsx</code>.
+              <strong className="text-foreground"> Sin migración nueva</strong>:
+              la tabla <code className="rounded bg-muted px-1.5 py-0.5 text-xs">areas</code> ya
+              tenía políticas RLS (own_insert/own_update/own_delete) y las FKs{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">ON DELETE SET NULL</code>,
+              así que eliminar un área no rompe proyectos (pasan a "Sin área")
+              ni metas ni tareas. FEATURES actualizado (nueva fila /areas bajo
+              "Identidad y horizonte"). Sidebar reordenado (bloque 2).
+              Regla de sincronización AGENTS.md cumplida en esta sesión.
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-blue-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-blue-700 dark:text-blue-300 sm:text-sm">
+              2026-10-15
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">/matriz — vista 2D Eisenhower con drag &amp; drop + IA “Sugerir redistribución”.</strong>{" "}
+              Nueva página <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/matriz</code>{" "}
+              (debajo de “Prioridad” en el sidebar, bloque Ejecución) que
+              distribuye las tareas activas en 4 cuadrantes calculados en
+              JS desde <code className="rounded bg-muted px-1.5 py-0.5 text-xs">fecha_fin</code>{" "}
+              + <code className="rounded bg-muted px-1.5 py-0.5 text-xs">meta.es_wig</code>.
+              <strong className="text-foreground"> Sin migración.</strong> La
+              clasificación (urgencia × importancia → cuadrante) vive en
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">src/lib/tareas/matriz.ts</code>; el
+              grid 2×2 con drag &amp; drop en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">src/components/tareas/MatrizEisenhower.tsx</code>{" "}
+              (<code className="rounded bg-muted px-1.5 py-0.5 text-xs">@dnd-kit/core</code>, ya
+              instalado). El drop reasigna{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">prioridad</code>{" "}
+              según el cuadrante destino (Q1→critica, Q2→alta, Q3→media, Q4→baja).
+              <br />
+              <br />
+              <strong className="text-foreground">Botón IA.</strong>{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">src/lib/tareas/sugerirMatrizIA.ts</code>{" "}
+              (patrón <code className="rounded bg-muted px-1.5 py-0.5 text-xs">sugerirPagosIA</code>;
+              JSON estricto, saneador que valida Q1..Q4).{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">SugerirMatrizModal</code>{" "}
+              con revisión por fila (override del cuadrante), checkbox para
+              excluir y batch apply. Mutación nueva{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">aplicarPrioridadesTareas()</code>{" "}
+              en <code className="rounded bg-muted px-1.5 py-0.5 text-xs">src/lib/mutations.ts</code>{" "}
+              (<code className="rounded bg-muted px-1.5 py-0.5 text-xs">Promise.allSettled</code>,
+              pasa por <code className="rounded bg-muted px-1.5 py-0.5 text-xs">actualizarTarea</code>{" "}
+              para mantener el invariante de RLS).
+              <br />
+              <br />
+              <strong className="text-foreground">UX.</strong>{" "}
+              Filtros “solo WIGs-meta” y “solo con fecha”. HelpDrawer
+              específico. Si la prioridad manual no coincide con el cuadrante
+              calculado, las cards llevan un puntito violeta junto al título.
+              Sincronizado con FEATURES y Aplicación pilar 4.
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-violet-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-violet-700 dark:text-violet-300 sm:text-sm">
+              2026-10-15
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">Botón IA “✨ Sugerir pagos” en /pagos (migration 0027) + prompt editable en /configuracion.</strong>{" "}
+              Nuevo botón en la cabecera de /pagos que llama a la IA con los
+              pagos activos y devuelve sugerencias de programación para los
+              próximos 6 lunes. Modal de revisión (estilo SugerirWigsModal):
+              cada fila muestra el pago actual + fecha sugerida + importe sugerido
+              + motivo + checkbox. El usuario marca qué aplicar y pulsa
+              “Aplicar N marcadas”. La IA <strong className="text-foreground">solo sugiere</strong>;
+              tú decides. Aplica únicamente cambios en
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">fecha_pago_programada</code>{" "}
+              + pone estado <code className="rounded bg-muted px-1.5 py-0.5 text-xs">programado</code>;
+              NO registra pagos parciales (para eso está el flujo normal).
+              <br />
+              <br />
+              <strong className="text-foreground">Prompt editable.</strong>{" "}
+              Nueva columna
+              <code className="mx-1 rounded bg-muted px-1.5 py-0.5 text-xs">prompt_pagos TEXT</code>{" "}
+              en la tabla <code className="rounded bg-muted px-1.5 py-0.5 text-xs">configuracion</code>{" "}
+              (migration 0027). Nueva sección “Prompt de pagos (IA)” en
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/configuracion</code>{" "}
+              con textarea monoespaciado, botón “Restaurar ejemplo” y contador
+              de chars. El prompt por defecto es snowball + ingresos
+              viernes/sábado + anticipar vencimientos al lunes anterior.
+              Si está vacío en BD, la app usa
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">DEFAULT_PROMPT_PAGOS</code>{" "}
+              en runtime (exportado tanto de
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">configStore.tsx</code>{" "}
+              como de
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">sugerirPagosIA.ts</code>;
+              si lo cambias, cambia los dos sitios).
+              <br />
+              <br />
+              <strong className="text-foreground">Implementación.</strong>{" "}
+              Archivos nuevos: <code className="rounded bg-muted px-1.5 py-0.5 text-xs">supabase/migrations/0027_configuracion_prompt_pagos.sql</code>,
+              <code className="mx-1 rounded bg-muted px-1.5 py-0.5 text-xs">src/lib/pagos/sugerirPagosIA.ts</code>{" "}
+              (buildPrompt + sanear + JSON estricto, mismo patrón que
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">motorPriorizacion.ts</code>),
+              <code className="mx-1 rounded bg-muted px-1.5 py-0.5 text-xs">src/components/pagos/SugerirPagosModal.tsx</code>{" "}
+              (revisión + checkboxes + per-row apply + batch apply).
+              Mutación nueva: <code className="rounded bg-muted px-1.5 py-0.5 text-xs">aplicarSugerenciasPagos()</code>{" "}
+              en <code className="rounded bg-muted px-1.5 py-0.5 text-xs">src/lib/pagos/mutations.ts</code>{" "}
+              (<code className="rounded bg-muted px-1.5 py-0.5 text-xs">Promise.allSettled</code> con
+              conteo de aplicadas vs fallidas por RLS).
+              <code className="mx-1 rounded bg-muted px-1.5 py-0.5 text-xs">configStore.tsx</code>{" "}
+              extendido para hacer upsert del <code className="rounded bg-muted px-1.5 py-0.5 text-xs">prompt_pagos</code>{" "}
+              (RLS existente aplica). Actualizado FEATURES (fila
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/pagos</code>),
+              Aplicación en la app (pilar 3 · Tiempo), este changelog y
+              sincronizado con <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metodologia</code>{" "}
+              §Apéndice Bucle de equilibrio.
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-emerald-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-emerald-700 dark:text-emerald-300 sm:text-sm">
+              2026-10-15
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">Banner mental arriba de /tareas/pendientes-respuesta: «No te preocupes de lo que está pendiente de los demás».</strong>{" "}
+              Reframe psicológico (estoico/Covey) sin lógica ni BD: emerald+teal,
+              cita a Covey («círculo de influencia vs preocupación») y Epicteto
+              («preocúpate solo de lo que depende de ti»). Refuerza la regla
+              operativa del panel («el panel debería ser pequeño, tu única acción
+              posible es el follow-up») con la regla mental («si hoy no toca,
+              déjalo aquí — el panel te lo recordará cuando lleve demasiado
+              tiempo esperando»).
+              <br />
+              <br />
+              <strong className="text-foreground">Implementación.</strong>{" "}
+              Un único{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">&lt;aside role=&quot;note&quot;&gt;</code>{" "}
+              encima del título en <code className="rounded bg-muted px-1.5 py-0.5 text-xs">src/app/tareas/pendientes-respuesta/page.tsx</code>.
+              Cero cambio en BD, queries, mutaciones ni estado. Solo JSX + texto.
+              Actualizado Pilar 4 («Pendientes de respuesta: lo que NO depende de
+              ti»), Aplicación en la app (pilar 4), fila del índice de features
+              (FEATURES) y este changelog. Sincronización equivalente en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metodologia</code>{" "}
+              §8.
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-amber-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-amber-700 dark:text-amber-300 sm:text-sm">
+              2026-10-15
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">/Hoy: nuevo panel ‘Tareas con fecha’ entre los WIGs-tareas y el Plan de hoy.</strong>{" "}
+              Panel ámbar que lista las tareas con{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">estado=&apos;pendiente&apos;</code>{" "}
+              que tengan{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">deadline</code> o{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">fecha_fin</code>, ordenadas
+              <strong className="text-foreground"> ascendente</strong> por fecha: las vencidas
+              arriba del todo (badge rojo “retrasada Xd”), después HOY (badge ámbar),
+              después futuras. Cada fila tiene un ☐ para marcar hecha{" "}
+              <strong className="text-foreground">inline</strong> (optimista: la fila se
+              oculta al instante; si falla, revierte y muestra el error). Si hay más de 8,
+              sale un enlace “+N más con fecha en /tareas” al final del panel. Si no hay
+              tareas pendientes con fecha, el panel no se pinta (no contamina la pantalla).
+              <br />
+              <br />
+              <strong className="text-foreground">Implementación.</strong>{" "}
+              Reutiliza el listado{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">data.pendientes</code>{" "}
+              que ya carga <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/</code>{" "}
+              desde <code className="rounded bg-muted px-1.5 py-0.5 text-xs">fetchTareas(&apos;pendiente&apos;)</code>:
+              cero fetch nuevo, cero cambio en queries.ts. Estado local para el check
+              optimista (<code className="rounded bg-muted px-1.5 py-0.5 text-xs">ocultas: Set&lt;string&gt;</code>)
+              + reload del fetch global al confirmar. <strong className="text-foreground">FEATURES actualizado</strong>{" "}
+              (fila <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/</code>, propósito ampliado)
+              y HelpDrawer de <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/</code>{" "}
+              con un item nuevo en el Pilar 3 (Tiempo).
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-violet-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-violet-700 dark:text-violet-300 sm:text-sm">
+              2026-10-14
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">Botones IA puntuales: extraer tareas de un email/contexto (/tareas/inbox) y sugerir 3 siguientes acciones (/tareas).</strong>{" "}
+              Dos botones nuevos que siguen el mismo principio del botón
+              ya existente “Sugerir 3 WIGs” en <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas</code>:
+              la IA <strong className="text-foreground">solo sugiere</strong>,
+              tú editas y confirmas; nunca escribe en la BD sin tu OK.
+              <br />
+              <br />
+              <strong className="text-foreground">(1) /tareas/inbox — “Sugerir tareas con IA”.</strong>{" "}
+              Nuevo panel violeta con un <code className="rounded bg-muted px-1.5 py-0.5 text-xs">textarea</code>{" "}
+              para pegar un email, un mensaje o un contexto. El botón “Sugerir
+              tareas” llama a la IA, que devuelve 1–8 sugerencias de tareas
+              accionables (título, descripción opcional, prioridad, motivo
+              corto y, si encaja, asociación a un proyecto existente).
+              Antes de añadirlas al inbox se muestran en un modal con cada
+              fila editable: checkbox para descartar, input para el título,
+              textarea para la descripción y select para la prioridad. Solo al
+              pulsar “Añadir N tareas” se persisten (vía{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">crearTarea()</code>).
+              Si fallan algunas, las que se crearon se quedan y las que no
+              se reintentan desde el formulario.
+              <br />
+              <br />
+              <strong className="text-foreground">(2) /tareas — “Sugerir 3 siguientes acciones”.</strong>{" "}
+              Nuevo botón en la cabecera, junto al HelpDrawer. Mira{" "}
+              <strong className="text-foreground">TODA</strong> la lista
+              abierta (tareas con{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">estado ≠ &apos;hecha&apos; ∧ &apos;archivada&apos;</code>{" "}
+              — incluye inbox, tareas con meta y tareas sueltas) y los{" "}
+              <strong className="text-foreground">argumentos</strong> de cada
+              una: meta + código, KR, prioridad, deadline, ámbito, tags,
+              si es WIG y días que lleva abierta. Pasa también los WIGs
+              activos (ancla al foco del ciclo) y los proyectos activos (por
+              si la IA quiere sugerir asociación). El prompt pide 3
+              acciones concretas para hoy/mañana, con razón mirando esos
+              argumentos. Mismo modal de revisión que (1) — la IA sugiere,
+              tú editas y confirmas.
+              <br />
+              <br />
+              <strong className="text-foreground">Implementación.</strong>{" "}
+              Nuevo módulo{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/lib/iaSugerencias.ts</code>{" "}
+              con dos funciones puras:{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">sugerirTareasDesdeContextoIA()</code>{" "}
+              y{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">sugerirProximasAccionesIA()</code>.
+              Reutilizan el parser robusto de{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">llm-parser.ts</code>{" "}
+              (sin Zod — coherente con el resto del proyecto) y el helper
+              de timeout de{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">ai-timeout.ts</code>.
+              El provider, modelo y API key se leen de{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">useConfig()</code>{" "}
+              (mismo flujo que el resto de botones IA). Nuevo componente
+              reutilizable{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/components/SugerenciasTareasModal.tsx</code>{" "}
+              que sirve a los dos botones (DRY).{" "}
+              <strong className="text-foreground">FEATURES actualizado</strong>{" "}
+              (filas <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/tareas/inbox</code>{" "}
+              y <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/tareas</code>) y
+              HelpDrawer de ambas rutas con el item correspondiente.
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+>>>>>>> 660ccf7 (hipotesis)
               2026-10-13
             </span>
             <span className="text-muted-foreground">
@@ -2412,6 +2747,7 @@ function AplicacionEnApp({ pilar }: { pilar: 1 | 2 | 3 | 4 | 5 }) {
       "Semáforo verde/amarillo/rojo en planes diarios",
       "Estados de meta (sin_empezar → en_progreso → completada) con feedback visible",
       "Botón IA “Generar plan con IA” en /metas/nueva y EditarMetaModal: filtra KRs por el campo plazo (Q3, Q1-Q3, fin de 2026…) y dentro de cada KR anota las tareas y hábitos necesarios para cumplirlo",
+      "Escenarios de proyecto (/escenarios): cronología + estado medido + lectura de la situación, y los escenarios con su estrategia generados bajo demanda (migration 0029)",
     ],
     3: [
       "Time-blocking con 4 bloques fijos por día (/calendario)",
