@@ -1,4 +1,4 @@
-/* eslint-disable no-console */
+ 
 const fs = require("node:fs");
 const path = require("node:path");
 const { execSync } = require("node:child_process");

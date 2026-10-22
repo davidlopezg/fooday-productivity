@@ -101,7 +101,7 @@ export function EstatusForm({
     e.preventDefault();
     setGuardando(true);
     setError(null);
-    let alive = true;
+    const alive = true;
     try {
       // Los 9 hábitos viven en `habitos` con claves cortas (qigong, caminar,
       // ducha, …) pero las columnas de Supabase son `habito_qigong`,
