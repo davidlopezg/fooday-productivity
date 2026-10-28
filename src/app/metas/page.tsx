@@ -160,7 +160,7 @@ function PanelWig({
 // Página
 // ---------------------------------------------------------------------------
 export default function MetasPage() {
-  const { data: metas, loading, reload } = useData<MetaConPlan[]>(
+  const { data: metas, loading, reload, error } = useData<MetaConPlan[]>(
     fetchMetasConProgreso,
     [],
   );
@@ -443,6 +443,20 @@ export default function MetasPage() {
           </Link>
         </div>
       </header>
+
+      {error && (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-300">
+          <p className="font-medium">No se pudieron cargar las metas.</p>
+          <p className="mt-1 break-words text-xs opacity-90">{error}</p>
+          <button
+            type="button"
+            onClick={reload}
+            className="mt-2 rounded-md border border-red-500/40 px-3 py-1.5 text-xs font-medium hover:bg-red-500/10"
+          >
+            Reintentar
+          </button>
+        </div>
+      )}
 
       {errorWig && (
         <p className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300">

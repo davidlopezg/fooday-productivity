@@ -24,6 +24,7 @@ const TESTS = [
   "src/lib/proyectos.test.mjs",
   "src/lib/configStore.test.mjs",
   "src/lib/perfilIA.test.mjs",
+  "src/lib/schema-queries.test.mjs",
   "src/lib/escenarios/hipotesis.test.mjs",
   "src/lib/pagos/parser-pdf.test.mjs",
 ];

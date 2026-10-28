@@ -1762,6 +1762,52 @@ export default function DocsPage() {
             </span>
             <span className="text-muted-foreground">
               <strong className="text-foreground">
+                Bug: el listado de metas (y 5 rutas más) salía vacío.
+              </strong>{" "}
+              La migration 0028 eliminó la columna{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">resultados_periodo.periodo_id</code>{" "}
+              (ahora vive en la tabla puente{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">kr_periodos</code>), pero{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">fetchMetasConProgreso()</code>{" "}
+              seguía pidiendo esa columna en su{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">.select()</code>
+              . PostgREST devolvía 400 (<em>column does not exist</em>), la función
+              lanzaba y la página se quedaba con <code className="rounded bg-muted px-1.5 py-0.5 text-xs">metas = []</code>{" "}
+              → listado vacío <strong className="text-foreground">sin ningún mensaje
+              de error</strong>. El comentario de la función incluso decía lo
+              contrario (“la tabla ya no tiene{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">periodo_id</code>”)
+              mientras el código la pedía: por eso TypeScript no lo detectaba
+              (el <code className="rounded bg-muted px-1.5 py-0.5 text-xs">.select()</code>{" "}
+              es un string). Arreglado en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">src/lib/queries.ts</code>.
+              El mismo fallo afectaba a{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas</code>,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas/auditoria</code>,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/tareas</code>,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/tareas/inbox</code>,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/informes</code> y el{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">TareaModal</code>{" "}
+              (al editar cualquier tarea) — 7 rutas en total. Además:{" "}
+              <strong className="text-foreground">/metas ahora muestra el error</strong>{" "}
+              si la carga falla (antes se limitaba a pintar “0 metas”, lo que
+              hacía el fallo indistinguible de “no tienes metas”), y se ha añadido
+              el test de regresión{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">src/lib/schema-queries.test.mjs</code>,
+              que lee las migraciones, extrae las columnas eliminadas y verifica
+              que <em>ninguna</em> query del código las pida — así este tipo de
+              fallo (típico de cada migración) no puede volver a colarse
+              silenciosamente. FEATURES y los rituales no cambian: no se ha
+              añadido ni modificado ninguna pantalla, hábito ni regla de
+              metodología, solo se arregla una carga que estaba rota.
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-10-28
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
                 Nueva capa: “🎯 3 KRs de la semana” (migration 0033).
               </strong>{" "}
               Hasta ahora la cascada documentada saltaba de la meta a la tarea: el
