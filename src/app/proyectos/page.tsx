@@ -117,6 +117,37 @@ type ProyectoConConteo = Proyecto & {
   tareas_hechas: number;
 };
 
+/** Barra de progreso fina.
+ *  `color` usa el color del proyecto; si no tiene, se usa el primario. */
+function Barra({
+  valor,
+  color,
+  className = "",
+}: {
+  valor: number;
+  color?: string | null;
+  className?: string;
+}) {
+  const pct = Math.max(0, Math.min(1, valor));
+  return (
+    <div
+      className={`h-1.5 w-full overflow-hidden rounded-full bg-muted ${className}`}
+      role="progressbar"
+      aria-valuenow={Math.round(pct * 100)}
+      aria-valuemin={0}
+      aria-valuemax={100}
+    >
+      <div
+        className={`h-full rounded-full transition-all ${color ? "" : "bg-primary"}`}
+        style={{
+          width: `${pct * 100}%`,
+          backgroundColor: color ?? undefined,
+        }}
+      />
+    </div>
+  );
+}
+
 export default function ProyectosPage() {
   const { data, loading, error, reload } = useData<ProyectoConConteo[]>(
     fetchProyectosConConteo,
@@ -250,6 +281,11 @@ export default function ProyectosPage() {
   const metasHuerfanas: Meta[] = [];
   for (const m of metas) {
     if (m.proyecto_id) {
+      // Las metas archivadas NO se listan aquí: ya no son accionables y
+      // solo contaminarían la vista. Se excluyen también del cálculo del
+      // progreso del proyecto, para que el contador "Metas hijas (N)" y
+      // la barra de progreso siempre hablen de lo mismo.
+      if (m.estado === "archivada") continue;
       const arr = metasPorProyecto.get(m.proyecto_id) ?? [];
       arr.push(m);
       metasPorProyecto.set(m.proyecto_id, arr);
@@ -362,6 +398,14 @@ export default function ProyectosPage() {
               (t) => t.estado !== "hecha" && t.estado !== "archivada",
             );
             const metasDelProyecto = metasPorProyecto.get(p.id) ?? [];
+            // Progreso del proyecto: lo marcan las METAS hijas completadas
+            // (un proyecto es un contenedor de resultados, no de acciones).
+            // Se calcula aquí, sobre la misma lista que se muestra en
+            // "Metas hijas (N)" — así el contador y la barra nunca
+            // discrepan. Las metas archivadas ya están filtradas arriba.
+            const metasCompletadas = metasDelProyecto.filter(
+              (m) => m.estado === "completada",
+            ).length;
             return (
               <li
                 key={p.id}
@@ -399,6 +443,67 @@ export default function ProyectosPage() {
                         </span>
                       )}
                     </div>
+
+                    {/* PROGRESO DEL PROYECTO.
+                        Dos barras porque son dos cosas distintas y
+                        confundirlas es el error clásico:
+
+                        · La barra de METAS es el avance real del proyecto:
+                          un proyecto es un contenedor de RESULTADOS, así
+                          que lo que lo mide es cuántas metas hijas están
+                          completadas. Si no tiene metas, no hay barra (no
+                          hay nada que medir todavía).
+
+                        · La barra de TAREAS es el esfuerzo operativo:
+                          cuántas de sus tareas están cerradas. Sirve para
+                          ver si hay movimiento, no para declarar el
+                          proyecto terminado. */}
+                    {metasDelProyecto.length > 0 && (
+                      <div className="mt-2.5">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-muted-foreground">
+                            Metas completadas
+                          </span>
+                          <span className="font-medium tabular-nums">
+                            {metasCompletadas}/{metasDelProyecto.length}
+                            <span className="ml-1 text-muted-foreground">
+                              (
+                              {Math.round(
+                                (metasCompletadas / metasDelProyecto.length) *
+                                  100,
+                              )}
+                              %)
+                            </span>
+                          </span>
+                        </div>
+                        <Barra
+                          valor={metasCompletadas / metasDelProyecto.length}
+                          color={p.color ?? undefined}
+                          className="mt-1"
+                        />
+                      </div>
+                    )}
+                    {p.total_tareas > 0 && (
+                      <div className="mt-2">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-muted-foreground">Tareas</span>
+                          <span className="font-medium tabular-nums">
+                            {p.tareas_hechas}/{p.total_tareas}
+                            <span className="ml-1 text-muted-foreground">
+                              (
+                              {Math.round(
+                                (p.tareas_hechas / p.total_tareas) * 100,
+                              )}
+                              %)
+                            </span>
+                          </span>
+                        </div>
+                        <Barra
+                          valor={p.tareas_hechas / p.total_tareas}
+                          className="mt-1 [&>div]:bg-muted-foreground/40"
+                        />
+                      </div>
+                    )}
                     {metasDelProyecto.length > 0 && (
                       <div className="mt-3 border-t border-border pt-2">
                         <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">

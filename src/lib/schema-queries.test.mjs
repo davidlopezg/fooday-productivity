@@ -209,24 +209,33 @@ test("fetchMetasConProgreso no pide periodo_id", () => {
     path.join(SRC_DIR, "lib", "queries.ts"),
     "utf8",
   );
-  const inicio = codigo.indexOf("export async function fetchMetasConProgreso");
-  if (inicio === -1) throw new Error("No se encontró fetchMetasConProgreso");
-  // Solo el cuerpo de la función (hasta la siguiente declaración a nivel de
-  // módulo), para no capturar código de la función siguiente.
-  const resto = codigo.slice(inicio + 40);
-  const fin = resto.search(/\nexport (async )?function/);
-  const cuerpo = resto.slice(0, fin === -1 ? 1200 : fin);
-  // Miramos SOLO las listas de campos de los `.select()` — un `periodo_id`
-  // en un comentario o en `resultado_periodo_id` no es el bug.
-  const selects = [...cuerpo.matchAll(/\.select\s*\(\s*["'`]([^"'`]*)["'`]/g)].map(
-    (m) => m[1],
-  );
-  for (const campos of selects) {
-    const lista = campos.split(",").map((c) => c.trim());
-    if (lista.includes("periodo_id")) {
+  const inicioFn = codigo.indexOf("export async function fetchMetasConProgreso");
+  if (inicioFn === -1) throw new Error("No se encontró fetchMetasConProgreso");
+  const resto = codigo.slice(inicioFn + 40);
+  const finFn = resto.search(/\nexport (async )?function/);
+  const cuerpo = resto.slice(0, finFn === -1 ? 2000 : finFn);
+
+  // Se eliminan los comentarios (un comentario con backticks parece un
+  // `.select()`) y luego se busca el patrón real:
+  //   .from("resultados_periodo") ... .select("...periodo_id...")
+  // Importante: el `periodo_id` de `kr_periodos` es OTRA tabla y sí existe.
+  const sinComentarios = cuerpo
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n")
+    .map((l) => l.replace(/\/\/.*$/, ""))
+    .join("\n");
+  const lineas = sinComentarios.split("\n");
+  for (let i = 0; i < lineas.length; i++) {
+    if (!lineas[i].includes('.from("resultados_periodo")')) continue;
+    const ventana = lineas.slice(i, i + 7).join(" ");
+    const m = ventana.match(/\.select\s*\(\s*["'`]([^"'`]*)["'`]/);
+    if (!m) continue;
+    const campos = m[1].split(",").map((c) => c.trim());
+    if (campos.includes("periodo_id")) {
       throw new Error(
-        "fetchMetasConProgreso vuelve a pedir `periodo_id` — PostgREST devolverá 400 " +
-          "y /metas se quedará vacía",
+        "fetchMetasConProgreso vuelve a pedir `periodo_id` de " +
+          "`resultados_periodo` — PostgREST devolverá 400 y /metas se " +
+          "quedará vacía",
       );
     }
   }

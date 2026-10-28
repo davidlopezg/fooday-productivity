@@ -611,21 +611,28 @@ export async function fetchProyectos(opts?: { includeArchivados?: boolean }): Pr
 }
 
 /** Tareas del owner agrupadas por proyecto (id → nº tareas activas). */
-export async function fetchProyectosConConteo(): Promise<Array<Proyecto & { total_tareas: number; tareas_hechas: number }>> {
+export async function fetchProyectosConConteo(): Promise<
+  Array<
+    Proyecto & {
+      total_tareas: number;
+      tareas_hechas: number;
+    }
+  >
+> {
   const supabase = createClient();
   const [proyectosRes, tareasRes, metasRes] = await Promise.all([
     supabase.from("proyectos").select("id,nombre,color,descripcion,orden,archivado,area_id").order("orden"),
     supabase.from("tareas").select("meta_id,proyecto_id,estado"),
     // Metas: para derivar el proyecto EFECTIVO de las tareas que viven
     // dentro de un KR (esas no llevan `proyecto_id`).
-    supabase.from("metas").select("id,proyecto_id"),
+    supabase.from("metas").select("id,proyecto_id,estado"),
   ]);
   if (proyectosRes.error) throw proyectosRes.error;
   if (tareasRes.error) throw tareasRes.error;
   if (metasRes.error) throw metasRes.error;
   const proyectos = (proyectosRes.data ?? []) as Proyecto[];
   const metaPorId = new Map(
-    ((metasRes.data ?? []) as Array<{ id: string; proyecto_id: string | null }>).map(
+    ((metasRes.data ?? []) as Array<{ id: string; proyecto_id: string | null; estado: string }>).map(
       (m) => [m.id, m] as const,
     ),
   );
@@ -1076,7 +1083,14 @@ export async function fetchMetaConPlan(metaId: string): Promise<MetaConPlan | nu
 /** Lista de metas con su progreso agregado (para la página /metas).
  *  Hace un solo lote de queries y calcula en cliente.
  *  Migration 0028: la tabla `resultados_periodo` ya no tiene `periodo_id`;
- *  construimos esqueletos con `periodo` placeholder para mantener la API. */
+ *  construimos esqueletos con `periodo` placeholder para mantener la API.
+ *
+ *  Migration 0033+: además trae los PERIODOS REALES de cada KR (vía
+ *  `kr_periodos`) y el nombre/color del PROYECTO al que pertenece la meta,
+ *  para que la tarjeta de /metas pueda mostrar "de qué proyecto es" y
+ *  "qué KRs tiene" sin abrir el detalle. Antes los periodos venían vacíos
+ *  (placeholder), así que el contador de trimestres de la tarjeta era
+ *  incorrecto. */
 export async function fetchMetasConProgreso(): Promise<MetaConPlan[]> {
   const supabase = createClient();
   const [metasRes, krsRes, tareasRes] = await Promise.all([
@@ -1105,6 +1119,11 @@ export async function fetchMetasConProgreso(): Promise<MetaConPlan[]> {
     arr.push(r);
     krsPorMeta.set(r.meta_id, arr);
   }
+  // Orden estable por `orden` (el orden lógico dentro de la meta). Sin esto
+  // la lista de KRs de la tarjeta de /metas salía en orden de id.
+  for (const arr of krsPorMeta.values()) {
+    arr.sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
+  }
   const tareasPorKr = new Map<string, Array<Pick<Tarea, "estado">>>();
   for (const t of tareas) {
     if (!t.resultado_periodo_id) continue;
@@ -1113,24 +1132,65 @@ export async function fetchMetasConProgreso(): Promise<MetaConPlan[]> {
     tareasPorKr.set(t.resultado_periodo_id, arr);
   }
 
+  // Periodos reales de los KRs (migration 0028: KR ↔ periodo es N:M vía
+  // `kr_periodos`). Sin esto, la tarjeta no puede decir en qué trimestre
+  // cae cada KR.
+  const krIds = krs.map((r) => r.id);
+  const periodosPorKr = new Map<string, Periodo[]>();
+  if (krIds.length > 0) {
+    const { data: asignaciones, error: eAsig } = await supabase
+      .from("kr_periodos")
+      .select("kr_id,periodo_id")
+      .in("kr_id", krIds);
+    if (eAsig) throw eAsig;
+    const periodoIds = Array.from(
+      new Set((asignaciones ?? []).map((a) => a.periodo_id)),
+    );
+    let periodosById = new Map<string, Periodo>();
+    if (periodoIds.length > 0) {
+      const { data: periodos, error: ePer } = await supabase
+        .from("periodos")
+        .select("id,tipo,anio,numero,nombre,fecha_inicio,fecha_fin")
+        .in("id", periodoIds);
+      if (ePer) throw ePer;
+      periodosById = new Map(
+        (periodos ?? []).map((p) => [p.id, p as Periodo]),
+      );
+    }
+    for (const a of asignaciones ?? []) {
+      const p = periodosById.get(a.periodo_id);
+      if (!p) continue;
+      const arr = periodosPorKr.get(a.kr_id) ?? [];
+      arr.push(p);
+      periodosPorKr.set(a.kr_id, arr);
+    }
+    // Orden estable por fecha de inicio.
+    for (const arr of periodosPorKr.values()) {
+      arr.sort((a, b) => a.fecha_inicio.localeCompare(b.fecha_inicio));
+    }
+  }
+
   return metas.map((m) => {
     const krsDeMeta = krsPorMeta.get(m.id) ?? [];
-    // Esqueletos con periodo placeholder (la lista /metas no necesita el
-    // trimestre real — solo el progreso ponderado).
-    const esqueletos: ResultadoConTareas[] = krsDeMeta.map((r) => ({
-      ...r,
-      periodos: [],
-      periodo: {
-        id: "",
-        tipo: "trimestre",
-        anio: 0,
-        numero: 0,
-        nombre: "",
-        fecha_inicio: "",
-        fecha_fin: "",
-      },
-      tareas: ((tareasPorKr.get(r.id) ?? []) as unknown as Tarea[]),
-    }));
+    const esqueletos: ResultadoConTareas[] = krsDeMeta.map((r) => {
+      const periodos = periodosPorKr.get(r.id) ?? [];
+      return {
+        ...r,
+        periodos,
+        // "Principal" = el más próximo por fecha de inicio (mismo criterio
+        // que la vista `kr_con_periodo_principal` de la migration 0028).
+        periodo: periodos[0] ?? {
+          id: "",
+          tipo: "trimestre",
+          anio: 0,
+          numero: 0,
+          nombre: "",
+          fecha_inicio: "",
+          fecha_fin: "",
+        },
+        tareas: ((tareasPorKr.get(r.id) ?? []) as unknown as Tarea[]),
+      };
+    });
     const total_tareas = krsDeMeta.reduce(
       (acc, r) => acc + (tareasPorKr.get(r.id)?.length ?? 0),
       0,

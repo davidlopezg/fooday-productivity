@@ -177,7 +177,7 @@ const FEATURES: Array<{ ruta: string; proposito: string; docs: string }> = [
   { ruta: "/calendario", proposito: "Time-blocking: 4 bloques fijos × 7 días", docs: "Pilar 3 · Rituales §1 (mañana) · HelpDrawer" },
 
   // ── Metas y planificación ──
-  { ruta: "/metas", proposito: "Cards de metas con estado y progreso + botones Archivar/Editar/WIG/Eliminar + IA Sugerir WIGs + filtro Archivadas + EditarMetaModal con botón IA Generar plan. El botón Eliminar muestra preview del impacto (cuántos KRs y tareas quedarán huérfanos) antes de borrar — aprovecha el ON DELETE SET NULL/CASCADE de migration 0001 para que las tareas sigan vivas sin meta", docs: "Pilar 2 · Ritual mensual · HelpDrawer" },
+  { ruta: "/metas", proposito: "Cards de metas con estado y progreso + botones Archivar/Editar/WIG/Eliminar + IA Sugerir WIGs + filtro Archivadas + EditarMetaModal con botón IA Generar plan. Cada tarjeta muestra de qué PROYECTO es (con su color) y los KRs que incluye (con su trimestre de entrega y objetivo, desplegables con “Ver los N KRs”). El botón Eliminar muestra preview del impacto (cuántos KRs y tareas quedarán huérfanos) antes de borrar — aprovecha el ON DELETE SET NULL/CASCADE de migration 0001 para que las tareas sigan vivas sin meta", docs: "Pilar 2 · Ritual mensual · HelpDrawer" },
   { ruta: "/metas/nueva", proposito: "Crear meta con rango real [inicio, fin] + botón IA Generar plan (KRs+tareas+hábitos) que reparte los KRs SOLO dentro del rango. Hard constraint opcional 🔒", docs: "Pilar 2 · HelpDrawer" },
   { ruta: "/metas/agente", proposito: "Agente IA: contexto libre → meta + plan trimestral completo (atajo directo a meta; la entrada unificada es /agente)", docs: "Pilar 2 · HelpDrawer" },
   { ruta: "/agente", proposito: "Agente unificado: clasifica la idea (proyecto/meta/captura) y propone estructura. Bucle de aplicación con 2 pases + árbitro adversarial que verifica que el 100% de las metas hijas se persistan en Supabase antes de redirigir; si hay gap muestra panel con nombres faltantes y motivo del error. Fase 2 automática: tras crear metas+KRs iniciales, genera el plan completo (KRs+tareas+hábitos) por meta con generarPlanMetaIA + aplicarKrsYTareasEnMeta. Pre-bucle: getSession() para evitar fallo de RLS por JWT transitorio + backoff de 50ms entre inserts. Detección de PGRST303 (reloj desincronizado) con banner en AppShell + panel diagnóstico. migration 0024", docs: "Pilar 2 · HelpDrawer" },
@@ -201,7 +201,7 @@ const FEATURES: Array<{ ruta: string; proposito: string; docs: string }> = [
 
   // ── Sistema ──
   { ruta: "/pagos", proposito: "Pagos pendientes: ejecutar tesorería lunes 1ª hora + botón IA “✨ Sugerir pagos” (migration 0027) que analiza los pagos activos y propone programación para los próximos 6 lunes aplicando el prompt editable en /configuracion (snowball por defecto, ingresos viernes/sábado). Modal de revisión estilo SugerirWigs: la IA sugiere, tú marcas qué incluir, botón “Aplicar N marcadas” actualiza solo fecha_pago_programada y estado=programado (no registra pagos parciales). Prompt editable en /configuracion §Prompt de pagos (columna prompt_pagos)", docs: "Apéndice §Bucle de equilibrio · Ritual semanal (lunes estricto) · HelpDrawer" },
-  { ruta: "/proyectos", proposito: "Gestión de proyectos con conteo de tareas, listado de metas hijas (migration 0024), archivado en cascada a metas+tareas, confirm con preview de impacto al eliminar, botón Editar (modal ligero con nombre/color/descripción/área), exportación a PDF por proyecto (modal con vista previa + Imprimir a PDF nativo del navegador, sin librerías externas). Al pulsar 'ver' se navega a /tareas?proyecto=X y se abre el filtro en 'todas' (no 'activas') para que las tareas hechas/archivadas del mismo proyecto sean visibles, especialmente en proyectos ya cerrados o arrastrados. Sección ámbar final con metas sin proyecto asignado (huérfanas, patrón simétrico a /areas → proyectos sin área) para que David no las pierda — archivadas ocultas, y cada huérfana trae un botón Eliminar con preview de impacto (las tareas no se borran, solo se desvinculan de la meta gracias a ON DELETE SET NULL)", docs: "HelpDrawer" },
+  { ruta: "/proyectos", proposito: "Gestión de proyectos con conteo de tareas, DOBLE barra de progreso, listado de metas hijas (migration 0024), archivado en cascada a metas+tareas, confirm con preview de impacto al eliminar, botón Editar (modal ligero con nombre/color/descripción/área), exportación a PDF por proyecto (modal con vista previa + Imprimir a PDF nativo del navegador, sin librerías externas). Las dos barras miden cosas distintas: la de METAS (con el color del proyecto) es el avance real —un proyecto es un contenedor de resultados, así que lo mide cuántas metas hijas están completadas— y la de TAREAS es el esfuerzo operativo. Un proyecto sin metas no muestra la barra de metas (no hay nada que medir todavía). Al pulsar 'ver' se navega a /tareas?proyecto=X y se abre el filtro en 'todas' (no 'activas') para que las tareas hechas/archivadas del mismo proyecto sean visibles, especialmente en proyectos ya cerrados o arrastrados. Sección ámbar final con metas sin proyecto asignado (huérfanas, patrón simétrico a /areas → proyectos sin área) para que David no las pierda — archivadas ocultas, y cada huérfana trae un botón Eliminar con preview de impacto (las tareas no se borran, solo se desvinculan de la meta gracias a ON DELETE SET NULL)", docs: "HelpDrawer" },
   { ruta: "/escenarios", proposito: "Escenarios de proyecto: las 3 dimensiones separadas — CONTEXTO (cronología append-only de hechos, tipada como contexto/estado/situación), ESTADO (el presente MEDIDO, calculado de las tareas en cada render, sin tabla que se pudra) y SITUACIÓN (el presente interpretado: nota manual + la lectura de la IA). Botón “✨ Analizar escenarios” que pide a la IA los escenarios del proyecto agrupados por categoría (riesgos / oportunidades / puntos ciegos / wildcard), cada uno con probabilidad (dato secundario), estrategia accionable, justificación e indicador de validación; el más probable sale destacado. Historial de todos los análisis (la lectura cambia con los nuevos hechos). Migration 0029 (proyecto_eventos + proyecto_analisis). Módulo IA: src/lib/escenarios/analizarEscenariosIA.ts (prompt adaptado de fooday-intelligence-core/agents/agente-generador-hipotesis.md)", docs: "Ritual semanal (domingo) · Pilar 2 · HelpDrawer" },
   { ruta: "/configuracion", proposito: "Configuración: API key IA, base URL, modelo, tema, prompt de pagos editable (migration 0027) y perfil para la IA — quién eres, familia, restricciones y contexto del negocio (migration 0032, antes hardcodeado en los prompts). Campo vacío = se usa el valor por defecto de la app", docs: "Pilar 2 · HelpDrawer" },
 
@@ -1756,6 +1756,90 @@ export default function DocsPage() {
         </header>
 
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-10-28
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
+                Barras de progreso por proyecto (/proyectos).
+              </strong>{" "}
+              Cada proyecto muestra ahora <strong className="text-foreground">
+              dos barras</strong>, porque miden cosas distintas y confundirlas
+              sería el error clásico:{" "}
+              <strong className="text-foreground">la de METAS</strong> (con el
+              color del proyecto) es el{" "}
+              <em>avance real</em> — un proyecto es un contenedor de{" "}
+              <em>resultados</em>, así que lo mide cuántas metas hijas están
+              completadas; y{" "}
+              <strong className="text-foreground">la de TAREAS</strong> es el{" "}
+              <em>esfuerzo operativo</em> — cuántas tareas están cerradas, que
+              sirve para ver si hay movimiento pero no para declarar el
+              proyecto terminado. Si el proyecto no tiene metas, no se muestra
+              la barra de metas (no hay nada que medir todavía). Ambas llevan
+              su contador{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">hechas/total</code>{" "}
+              y su porcentaje. Detalle de coherencia: las metas{" "}
+              <em>archivadas</em> ahora quedan fuera tanto del listado “Metas
+              hijas” como del cálculo del progreso, de modo que el contador y
+              la barra hablan siempre de lo mismo (antes el listado las
+              incluía y el cálculo las excluía: dos fuentes de verdad que
+              podían discrepar).{" "}
+              <strong className="text-foreground">Nota de diseño</strong>: no se
+              han añadido “WIGs de proyecto”. El proyecto ya está dentro del
+              WIG de la meta (una meta{" "}
+              <em>vive dentro</em> de un proyecto), así que un WIG de proyecto
+              sería pedir la misma decisión dos veces y rompería el cap de 3
+              (“energía de foco es un recurso finito”). Lo que sí aporta el
+              proyecto es <em>visibilidad</em> del reparto del foco, y eso lo
+              dan las barras. FEATURES actualizado (fila{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/proyectos</code>)
+              y este changelog. No se cambian pilares, rituales ni reglas de
+              metodología: es una mejora de visibilidad dentro de una pantalla
+              que ya existía.
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-10-28
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
+                Las tarjetas de /metas muestran su proyecto y sus KRs.
+              </strong>{" "}
+              Antes solo se veía el <em>número</em> de KRs de cada meta, sin
+              saber cuáles eran ni de qué proyecto se trataba. Ahora cada
+              tarjeta lleva (a) un chip con el{" "}
+              <strong className="text-foreground">proyecto</strong> al que
+              pertenece la meta, con su color (migration 0024), y (b) un bloque
+              desplegable “Ver los N KRs” con el <strong className="text-foreground">
+              título de cada KR, su trimestre de entrega y su objetivo
+              numérico</strong>. Para poder mostrarlo,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">fetchMetasConProgreso()</code>{" "}
+              ahora trae los <strong className="text-foreground">periodos reales
+              de cada KR</strong> (vía{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">kr_periodos</code>)
+              y los KRs llegan ordenados por su campo{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">orden</code>.
+              De paso se corrige un bug latente: el contador de trimestres de la
+              tarjeta se calculaba sobre un{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">periodo</code>{" "}
+              <em>placeholder</em> (siempre vacío), así que{" "}
+              <strong className="text-foreground">siempre contaba 1
+              trimestre</strong> aunque la meta tuviera KRs repartidos en
+              varios; ahora cuenta los periodos reales, y un KR que vive en
+              Q1 y Q2 cuenta como 2. Detalle de implementación: el bloque de
+              KRs se ha puesto <strong className="text-foreground">
+              fuera del enlace que abre el detalle de la meta</strong> — un{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">&lt;details&gt;</code>{" "}
+              dentro de un <code className="rounded bg-muted px-1.5 py-0.5 text-xs">&lt;a&gt;</code>{" "}
+              es HTML inválido y el click navegaría en vez de desplegar.
+              FEATURES actualizado (fila <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas</code>)
+              y este changelog. No se cambian pilares, rituales ni reglas de
+              metodología: es una mejora de visibilidad dentro de una pantalla
+              que ya existía.
+            </span>
+          </li>
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
               2026-10-28

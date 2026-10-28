@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { fetchMetasConProgreso } from "@/lib/queries";
+import { fetchMetasConProgreso, fetchProyectos } from "@/lib/queries";
 import { archivarMeta, eliminarMeta, marcarWig } from "@/lib/mutations";
 import { useData } from "@/lib/useData";
 import { useConfig } from "@/lib/configStore";
@@ -10,7 +10,7 @@ import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
 import { EditarMetaModal } from "@/components/EditarMetaModal";
 import { SugerirWigsModal } from "@/components/SugerirWigsModal";
 import { sugerirWigsIA, type SugerirWigsResultado } from "@/lib/plan";
-import type { AmbitoMeta, MetaConPlan } from "@/lib/types";
+import type { AmbitoMeta, MetaConPlan, Proyecto } from "@/lib/types";
 import {
   IconArchive,
   IconColumns,
@@ -163,6 +163,13 @@ export default function MetasPage() {
   const { data: metas, loading, reload, error } = useData<MetaConPlan[]>(
     fetchMetasConProgreso,
     [],
+  );
+  // Proyectos: para mostrar de qué proyecto es cada meta (migration 0024).
+  // La meta guarda `proyecto_id`; el nombre y color viven en `proyectos`.
+  const { data: proyectos } = useData<Proyecto[]>(() => fetchProyectos(), []);
+  const proyectosById = useMemo(
+    () => new Map((proyectos ?? []).map((p) => [p.id, p])),
+    [proyectos],
   );
   const cfg = useConfig();
 
@@ -644,20 +651,55 @@ export default function MetasPage() {
                   </p>
                 )}
 
-                {/* Mini-badge: KRs y trimestres que tiene esta meta */}
-                <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                  <span
-                    className="inline-flex items-center gap-1 rounded-full border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-[11px] font-medium text-violet-700 dark:text-violet-300"
-                    title={`${mp.resultados.length} resultados (KRs) repartidos en ${new Set(mp.resultados.map((r) => r.periodo.id)).size} trimestre(s)`}
-                  >
-                    📊 {mp.resultados.length} KR{mp.resultados.length === 1 ? "" : "s"} · {new Set(mp.resultados.map((r) => r.periodo.id)).size} trimestre{new Set(mp.resultados.map((r) => r.periodo.id)).size === 1 ? "" : "s"}
-                  </span>
-                  {m.es_wig && (
-                    <span className="inline-flex items-center gap-0.5 rounded-full bg-violet-500/20 px-2 py-0.5 text-[11px] font-semibold text-violet-700 dark:text-violet-300">
-                      🎯 WIG #{m.wig_orden ?? "?"}
+                {/* Proyecto al que pertenece la meta (migration 0024).
+                    Con su color, como en /metas/detalle. */}
+                {m.proyecto_id && (() => {
+                  const p = proyectosById.get(m.proyecto_id);
+                  return p ? (
+                    <span
+                      className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-2.5 py-0.5 text-[11px] font-medium"
+                      title="Proyecto al que pertenece la meta"
+                    >
+                      <span
+                        className="h-2 w-2 rounded-sm"
+                        style={{ backgroundColor: p.color ?? "#64748b" }}
+                      />
+                      {p.nombre}
                     </span>
-                  )}
-                </div>
+                  ) : null;
+                })()}
+
+                {/* Mini-badge: KRs y trimestres que tiene esta meta.
+                    El conteo de periodos usa TODOS los periodos reales de
+                    cada KR (`periodos`), no solo el principal: un KR que
+                    vive en Q1 y Q2 cuenta como 2 trimestres. */}
+                {(() => {
+                  const periodosUnicos = new Set(
+                    mp.resultados.flatMap((r) =>
+                      r.periodos.length > 0
+                        ? r.periodos.map((p) => p.id)
+                        : r.periodo.id
+                          ? [r.periodo.id]
+                          : [],
+                    ),
+                  );
+                  const nPeriodos = periodosUnicos.size;
+                  return (
+                    <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                      <span
+                        className="inline-flex items-center gap-1 rounded-full border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-[11px] font-medium text-violet-700 dark:text-violet-300"
+                        title={`${mp.resultados.length} resultados (KRs) repartidos en ${nPeriodos} periodo(s)`}
+                      >
+                        📊 {mp.resultados.length} KR{mp.resultados.length === 1 ? "" : "s"} · {nPeriodos} periodo{nPeriodos === 1 ? "" : "s"}
+                      </span>
+                      {m.es_wig && (
+                        <span className="inline-flex items-center gap-0.5 rounded-full bg-violet-500/20 px-2 py-0.5 text-[11px] font-semibold text-violet-700 dark:text-violet-300">
+                          🎯 WIG #{m.wig_orden ?? "?"}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* Badges: ámbito + tags */}
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -696,6 +738,53 @@ export default function MetasPage() {
                 </div>
                 {mp.total_tareas > 0 && <ProgressBar value={mp.progreso} />}
               </Link>
+
+              {/* Los KRs de la meta, con su trimestre de entrega y su
+                  objetivo. Antes solo se veía el NÚMERO de KRs; ahora se ve
+                  QUÉ se está midiendo — que es lo que hace útil la tarjeta.
+
+                  Va FUERA del <Link> a propósito: un <details> dentro de un
+                  <a> es HTML inválido y el click navegaría al detalle en
+                  vez de desplegar la lista. */}
+              {mp.resultados.length > 0 && (
+                <details className="group/krs mt-2">
+                  <summary className="cursor-pointer list-none text-[11px] font-medium text-muted-foreground hover:text-foreground">
+                    <span className="underline-offset-2 group-open/krs:hidden">
+                      Ver los {mp.resultados.length} KR{mp.resultados.length === 1 ? "" : "s"}
+                    </span>
+                    <span className="hidden group-open/krs:inline">Ocultar KRs</span>
+                  </summary>
+                  <ul className="mt-1.5 space-y-1">
+                    {mp.resultados.map((r) => (
+                      <li
+                        key={r.id}
+                        className="flex items-start gap-1.5 text-[11px] leading-snug text-muted-foreground"
+                      >
+                        <span className="mt-0.5 text-violet-500">▪</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="text-foreground/90">{r.titulo}</span>
+                          {(r.periodos.length > 0
+                            ? r.periodos.map((p) => p.nombre).filter(Boolean)
+                            : r.periodo.nombre
+                              ? [r.periodo.nombre]
+                              : []
+                          ).map((nom) => (
+                            <span key={nom} className="ml-1 opacity-70">
+                              · {nom}
+                            </span>
+                          ))}
+                          {r.valor_objetivo != null && (
+                            <span className="ml-1 opacity-70">
+                              · {r.valor_objetivo}
+                              {r.unidad ?? ""}
+                            </span>
+                          )}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
             </article>
           );
         })}
