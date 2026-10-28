@@ -212,8 +212,7 @@ rápida de uso diario.
 
 ## 12. Qué se ha implementado (v1)
 
-**BD** — `supabase/migrations/0029_escenarios_proyecto.sql` (copia manual:
-`supabase/APLICAR-0029.sql`):
+**BD** — `supabase/migrations/0029_escenarios_proyecto.sql`:
 
 - `proyecto_eventos` — cronología append-only: `tipo` ∈ {contexto, estado,
   situacion}, `texto`, `ocurrido_en`.

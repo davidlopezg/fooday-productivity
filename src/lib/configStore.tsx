@@ -9,8 +9,9 @@ import {
   useState,
 } from "react";
 import { createClient } from "@/lib/supabase/client";
+import type { PerfilIA } from "@/lib/perfilIA";
 
-export type Config = {
+export type Config = PerfilIA & {
   base_url: string;
   minimax_api_key: string | null;
   model: string;
@@ -19,46 +20,33 @@ export type Config = {
   prompt_pagos: string | null;
 };
 
-/** Prompt por defecto para el botón IA de /pagos. El mismo literal vive
- *  en `src/lib/pagos/sugerirPagosIA.ts` (DEFAULT_PROMPT_PAGOS) — lo
- *  duplicamos aquí para no crear una dependencia circular
- *  (configStore ← pagos ← ... ← configStore). Si lo cambias, cambia
- *  los dos sitios. */
-export const DEFAULT_PROMPT_PAGOS = `Eres el asistente financiero de David. Tu trabajo es mirar sus pagos activos y proponer cuáles transferir esta semana y cuáles programar para las siguientes.
-
-CONTEXTO DEL NEGOCIO:
-- David factura el viernes y sábado por la noche.
-- Los ingresos llegan a su banco el sábado y el domingo.
-- El lunes es el día natural para hacer pagos porque la caja está fresca.
-- Si la fecha de vencimiento cae en festivo o fin de semana, anticipa al lunes anterior.
-
-REGLAS DE PRIORIDAD:
-1. Primero las deudas más pequeñas (snowball). Empieza por la más barata que esté pendiente para cancelarla y liberar lastre mental cuanto antes.
-2. Intenta pagar un poco más del mínimo en todas las que recomiendes — no dejes ninguna a 0 € salvo que no haya caja.
-3. Si un pago tiene fecha_vencimiento esta semana, tiene prioridad absoluta.
-4. Si vence el día 15 del mes, programa la transferencia el lunes anterior (o el lunes del propio día 15 si cae en lunes).
-5. Agrupa pagos del mismo proveedor si los hay, en un único movimiento.
-6. NUNCA propongas más pagos de los que la caja razonable permita: es preferible 2 hechos que 5 a medias.
-
-SALIDA — JSON estricto con un item por pago que recomiendas Mover de fecha:
-{
-  "sugerencias": [
-    {
-      "pago_id": "<uuid exacto de la lista de pagos>",
-      "fecha_pago_programada": "<YYYY-MM-DD — debe ser uno de los próximos lunes que te paso>",
-      "importe_a_pagar": <número o null si recomiendas pagar el total restante>,
-      "motivo": "<1 frase corta explicando por qué este lunes>"
-    }
-  ]
-}
-
-Si no hay nada que mover (todo ya está bien programado), devuelve { "sugerencias": [] }.`;
+/** Prompt por defecto del botón IA de /pagos.
+ *
+ *  ANTES: este literal estaba DUPLICADO aquí y en
+ *  `src/lib/pagos/sugerirPagosIA.ts`, con un comentario que justificaba la
+ *  copia por "dependencia circular" (configStore ← pagos ← ... ← configStore).
+ *  Esa dependencia no existía: `sugerirPagosIA.ts` no importa `configStore`
+ *  (solo lo menciona en un comentario). La duplicación solo servía para que
+ *  los dos textos se desincronizasen silenciosamente — que es exactamente lo
+ *  que había pasado.
+ *
+ *  Ahora hay UNA sola definición (en sugerirPagosIA.ts, el módulo que la usa)
+ *  y aquí solo se re-exporta para no romper los imports existentes de
+ *  /configuracion y /pagos. */
+export { DEFAULT_PROMPT_PAGOS } from "@/lib/pagos/sugerirPagosIA";
 
 const DEFAULT: Config = {
   base_url: "https://api.minimax.io/v1",
   minimax_api_key: null,
   model: "Minimax-M3",
   prompt_pagos: null, // null = usar DEFAULT_PROMPT_PAGOS (la app lo inyecta en runtime)
+  // Perfil para los prompts de IA (migration 0032). null = la app usa
+  // DEFAULT_PERFIL_IA, que reproduce exactamente los textos que estaban
+  // hardcodeados en los prompts.
+  perfil: null,
+  familia: null,
+  restricciones: null,
+  contexto_negocio: null,
 };
 
 const LS_KEY = "fooday.config.v1";
@@ -79,6 +67,16 @@ function readLS(): Config {
       prompt_pagos:
         typeof parsed.prompt_pagos === "string" && parsed.prompt_pagos.length > 0
           ? parsed.prompt_pagos
+          : null,
+      // Migration 0032. `null` es válido y significa "usa DEFAULT_PERFIL_IA",
+      // así que NO se normalizan aquí a string vacío.
+      perfil: typeof parsed.perfil === "string" ? parsed.perfil : null,
+      familia: typeof parsed.familia === "string" ? parsed.familia : null,
+      restricciones:
+        typeof parsed.restricciones === "string" ? parsed.restricciones : null,
+      contexto_negocio:
+        typeof parsed.contexto_negocio === "string"
+          ? parsed.contexto_negocio
           : null,
     };
   } catch {
@@ -104,7 +102,7 @@ async function fetchRemote(): Promise<Config> {
   }
   const { data, error } = await supabase
     .from("configuracion")
-    .select("base_url,minimax_api_key,model,prompt_pagos")
+    .select("base_url,minimax_api_key,model,prompt_pagos,perfil,familia,restricciones,contexto_negocio")
     .maybeSingle();
   if (error) {
     // Log diagnóstico SIN exponer la API key. Solo registramos campos
@@ -125,6 +123,11 @@ async function fetchRemote(): Promise<Config> {
     minimax_api_key: (data.minimax_api_key as string | null) ?? null,
     model: (data.model as string) || DEFAULT.model,
     prompt_pagos: (data.prompt_pagos as string | null) ?? null,
+    // Migration 0032: null = la app usa DEFAULT_PERFIL_IA.
+    perfil: (data.perfil as string | null) ?? null,
+    familia: (data.familia as string | null) ?? null,
+    restricciones: (data.restricciones as string | null) ?? null,
+    contexto_negocio: (data.contexto_negocio as string | null) ?? null,
   };
 }
 
@@ -217,6 +220,18 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
           next.prompt_pagos !== undefined
             ? next.prompt_pagos
             : data.prompt_pagos,
+        // Migration 0032: `undefined` = no tocar el campo (para que un
+        // guardado parcial no borre el perfil). `null` = borrarlo a propósito.
+        perfil: next.perfil !== undefined ? next.perfil : data.perfil,
+        familia: next.familia !== undefined ? next.familia : data.familia,
+        restricciones:
+          next.restricciones !== undefined
+            ? next.restricciones
+            : data.restricciones,
+        contexto_negocio:
+          next.contexto_negocio !== undefined
+            ? next.contexto_negocio
+            : data.contexto_negocio,
       };
 
       // 1) Actualiza local + localStorage inmediatamente (no bloquea la UI).
@@ -245,6 +260,10 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
               minimax_api_key: merged.minimax_api_key,
               model: merged.model,
               prompt_pagos: merged.prompt_pagos,
+              perfil: merged.perfil,
+              familia: merged.familia,
+              restricciones: merged.restricciones,
+              contexto_negocio: merged.contexto_negocio,
             },
             { onConflict: "user_id" },
           )

@@ -30,6 +30,7 @@ import {
   parsearYValidar,
   type FieldSchema,
 } from "./llm-parser";
+import { bloquePerfil, type PerfilIA } from "./perfilIA";
 
 // ----------------------------------------------------------------------------
 // Tipos públicos
@@ -58,6 +59,8 @@ export type SugerirTareasDesdeContextoOpts = {
   proyectos?: Array<{ id: string; nombre: string }>;
   /** Máximo de sugerencias a pedir a la IA. Por defecto 8. */
   maxSugerencias?: number;
+  /** Perfil del usuario (migration 0032). Si se omite, DEFAULT_PERFIL_IA. */
+  perfil?: PerfilIA | null;
 };
 
 export type SugerirTareasDesdeContextoResultado = {
@@ -92,6 +95,8 @@ export type SugerirProximasAccionesOpts = {
   /** Número de sugerencias a pedir. Por defecto 3 (es el contrato del
    *  botón "Sugerir 3 siguientes acciones"). */
   n?: number;
+  /** Perfil del usuario (migration 0032). Si se omite, DEFAULT_PERFIL_IA. */
+  perfil?: PerfilIA | null;
 };
 
 export type SugerirProximasAccionesResultado = {
@@ -267,7 +272,8 @@ Si asocias una tarea a un proyecto, devuelve \`proyecto_id\` con el id EXACTO de
 
   const max = opts.maxSugerencias ?? 8;
 
-  return `Eres un asistente de productividad para David López (TDAH, trabaja solo, dirige un restaurante + proyectos tech). David te pega texto en bruto: un email, un mensaje, una nota mental… Tu trabajo es extraer de ahí las TAREAS ACCIONABLES que necesita apuntar en su bandeja de entrada.
+  return `Eres un asistente de productividad. ${bloquePerfil(opts.perfil)}
+El usuario te pega texto en bruto: un email, un mensaje, una nota mental… Tu trabajo es extraer de ahí las TAREAS ACCIONABLES que necesita apuntar en su bandeja de entrada.
 
 ==========
 REGLAS DE EXTRACCIÓN (lélelas 2 veces antes de escribir)
@@ -370,7 +376,8 @@ function buildPromptSugerirProximasAcciones(
     })
     .join("\n");
 
-  return `Eres un coach de productividad para David López (TDAH, trabaja solo, dirige un restaurante + proyectos tech). David tiene ${opts.tareasAbiertas.length} tareas abiertas y quiere saber CUÁLES SON LAS ${n} SIGUIENTES ACCIONES CONCRETAS que debería ejecutar.
+  return `Eres un coach de productividad. ${bloquePerfil(opts.perfil)}
+El usuario tiene ${opts.tareasAbiertas.length} tareas abiertas y quiere saber CUÁLES SON LAS ${n} SIGUIENTES ACCIONES CONCRETAS que debería ejecutar.
 
 ==========
 FILOSOFÍA

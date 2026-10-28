@@ -76,6 +76,11 @@ const PILARES: Pilar[] = [
         cuerpo:
           "Una meta sin plazo se diluye. Desde la migración 0025, /metas/nueva pide dos fechas reales (no texto libre): inicio (cuándo puedes empezar) y límite (deadline). La IA reparte los KRs SOLO dentro de ese rango como meses sueltos — una meta de 2 semanas cabe en un mes; una de 8 meses usa 8. Si el inicio cae en mitad de año (ej. mayo), Q1/Q2 quedan vacíos. Si el límite está marcado 🔒 HARD CONSTRAINT, la IA no puede planificar nada después. Razón: forzar 4 trimestres lineales sesga el plan cuando las metas son de tamaños muy distintos. Un KR es un resultado medible (no una acción): 'dormir 6h/noche' lo es; 'apagar el móvil a las 23h' es la tarea dentro de él.",
       },
+      {
+        titulo: "El KR de la semana: dónde pones horas, no cuándo se entrega",
+        cuerpo:
+          "Un KR se mide en un trimestre o mes (su compromiso de entrega). Además, cada domingo eliges 3 KRs para la semana: en qué resultados medibles vas a poner horas AHORA. Son dos ejes distintos y complementarios — el trimestre no se sustituye. Sin este paso, la cascada saltaba de la meta a la tarea y la semana se planificaba sin mirar tus metas. Solo entra en el foco un KR cuya entrega está en marcha: lo caducado y lo prematuro quedan fuera solos. La IA elige por riesgo real (los que van por debajo del ritmo y tienen menos días restantes), pero tú confirmas.",
+      },
     ],
   },
   {
@@ -179,10 +184,10 @@ const FEATURES: Array<{ ruta: string; proposito: string; docs: string }> = [
   { ruta: "/metas/auditoria", proposito: "Auditoría de metas: qué les falta (área, proyecto, fecha objetivo, contexto, KRs). migration 0024", docs: "Pilar 2 · HelpDrawer" },
   { ruta: "/metas/detalle", proposito: "Detalle de una meta con sus KRs (uno o varios por trimestre/mes) + tareas por KR + botones Editar/✨ Generar plan con IA (KRs+tareas+hábitos, respeta KRs existentes por título) + Archivar + WIG + asignar tareas del inbox. Migration 0028: ya no hay UNIQUE por (meta, trimestre) — puedes tener N KRs en el mismo trimestre.", docs: "Pilar 2 · HelpDrawer" },
   { ruta: "/metas/plan", proposito: "Plan trimestral con scorecard de KRs + proyección", docs: "Pilar 2 · Ritual semanal (domingo) · Ritual mensual · HelpDrawer" },
-  { ruta: "/plan-diario", proposito: "Estado emocional + plan diario generado por IA", docs: "Rituales §1 (mañana) · HelpDrawer" },
+  { ruta: "/plan-diario", proposito: "Estado emocional + plan diario generado por IA. El prompt recibe los KRs en foco de la semana (migration 0033) y ancla los bloques del día a esos resultados medibles; si no hay foco elegido, el día se planifica igual por compromiso y deadline (el foco semanal nunca bloquea el día)", docs: "Rituales §1 (mañana) · HelpDrawer" },
   { ruta: "/plan-diario/detalle", proposito: "Detalle de un plan con notas e informe", docs: "Sub-ruta de /plan-diario" },
   { ruta: "/plan-diario/historico", proposito: "Histórico de planes (7/30/90/365/todo)", docs: "Sub-ruta de /plan-diario" },
-  { ruta: "/semana", proposito: "Pipeline semanal con drag & drop + IA 3 críticas/día", docs: "Ritual semanal (domingo noche) · HelpDrawer" },
+  { ruta: "/semana", proposito: "Pipeline semanal con drag & drop + IA 3 críticas/día + PANEL DE FOCO SEMANAL DE KRs (máx 3, migration 0033): los resultados medibles en los que pones horas esta semana, con scorecard y ✨ Sugerir 3 KRs por IA. El trimestre NO se sustituye (sigue diciendo cuándo se entrega); la semana dice dónde pones el esfuerzo. Solo entran KRs con entrega en marcha (regla de contención, aplicada en BD). La propuesta IA de tareas ahora prioriza las ancladas a los KRs en foco", docs: "Ritual semanal (domingo noche) · HelpDrawer" },
   { ruta: "/pipeline", proposito: "Kanban por prioridad + motor IA de priorización", docs: "Ritual semanal (miércoles) · HelpDrawer" },
   { ruta: "/matriz", proposito: "Matriz Eisenhower 2D (urgencia × importancia) de tareas activas. Drag & drop entre cuadrantes (dnd-kit/core) + botón IA “✨ Sugerir redistribución” que propone mover las tareas desubicadas al cuadrante correcto (módulo IA en src/lib/tareas/sugerirMatrizIA.ts). Sin migración: la clasificación se calcula en cada render desde fecha_fin + meta.es_wig; aplicar cambios solo escribe `prioridad`. Filtros: solo WIGs-meta / solo con fecha. Complemento visual de /pipeline (1D) — la matriz es 2D", docs: "Pilar 4 · HelpDrawer" },
 
@@ -198,7 +203,7 @@ const FEATURES: Array<{ ruta: string; proposito: string; docs: string }> = [
   { ruta: "/pagos", proposito: "Pagos pendientes: ejecutar tesorería lunes 1ª hora + botón IA “✨ Sugerir pagos” (migration 0027) que analiza los pagos activos y propone programación para los próximos 6 lunes aplicando el prompt editable en /configuracion (snowball por defecto, ingresos viernes/sábado). Modal de revisión estilo SugerirWigs: la IA sugiere, tú marcas qué incluir, botón “Aplicar N marcadas” actualiza solo fecha_pago_programada y estado=programado (no registra pagos parciales). Prompt editable en /configuracion §Prompt de pagos (columna prompt_pagos)", docs: "Apéndice §Bucle de equilibrio · Ritual semanal (lunes estricto) · HelpDrawer" },
   { ruta: "/proyectos", proposito: "Gestión de proyectos con conteo de tareas, listado de metas hijas (migration 0024), archivado en cascada a metas+tareas, confirm con preview de impacto al eliminar, botón Editar (modal ligero con nombre/color/descripción/área), exportación a PDF por proyecto (modal con vista previa + Imprimir a PDF nativo del navegador, sin librerías externas). Al pulsar 'ver' se navega a /tareas?proyecto=X y se abre el filtro en 'todas' (no 'activas') para que las tareas hechas/archivadas del mismo proyecto sean visibles, especialmente en proyectos ya cerrados o arrastrados. Sección ámbar final con metas sin proyecto asignado (huérfanas, patrón simétrico a /areas → proyectos sin área) para que David no las pierda — archivadas ocultas, y cada huérfana trae un botón Eliminar con preview de impacto (las tareas no se borran, solo se desvinculan de la meta gracias a ON DELETE SET NULL)", docs: "HelpDrawer" },
   { ruta: "/escenarios", proposito: "Escenarios de proyecto: las 3 dimensiones separadas — CONTEXTO (cronología append-only de hechos, tipada como contexto/estado/situación), ESTADO (el presente MEDIDO, calculado de las tareas en cada render, sin tabla que se pudra) y SITUACIÓN (el presente interpretado: nota manual + la lectura de la IA). Botón “✨ Analizar escenarios” que pide a la IA los escenarios del proyecto agrupados por categoría (riesgos / oportunidades / puntos ciegos / wildcard), cada uno con probabilidad (dato secundario), estrategia accionable, justificación e indicador de validación; el más probable sale destacado. Historial de todos los análisis (la lectura cambia con los nuevos hechos). Migration 0029 (proyecto_eventos + proyecto_analisis). Módulo IA: src/lib/escenarios/analizarEscenariosIA.ts (prompt adaptado de fooday-intelligence-core/agents/agente-generador-hipotesis.md)", docs: "Ritual semanal (domingo) · Pilar 2 · HelpDrawer" },
-  { ruta: "/configuracion", proposito: "Configuración: API key IA, base URL, modelo, tema", docs: "HelpDrawer" },
+  { ruta: "/configuracion", proposito: "Configuración: API key IA, base URL, modelo, tema, prompt de pagos editable (migration 0027) y perfil para la IA — quién eres, familia, restricciones y contexto del negocio (migration 0032, antes hardcodeado en los prompts). Campo vacío = se usa el valor por defecto de la app", docs: "Pilar 2 · HelpDrawer" },
 
   // ── Documentación ──
   { ruta: "/docs", proposito: "Esta página: pilares + rituales + apéndices + índice", docs: "(auto-referencial)" },
@@ -637,6 +642,100 @@ export default function DocsPage() {
           <AplicacionEnApp pilar={p.num} />
         </section>
       ))}
+
+      <section className="rounded-2xl border-2 border-sky-500/30 bg-gradient-to-br from-sky-500/5 to-violet-500/5 p-6 sm:p-8">
+        <header>
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-sky-700 dark:text-sky-300">
+            Complemento · El flujo del foco
+          </div>
+          <h2 className="mt-1 text-2xl font-bold tracking-tight">
+            Del quarterly al daily: tres niveles, un selector cada uno
+          </h2>
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+            La app no te pide &quot;haz todo&quot;. Te pide{" "}
+            <strong>una decisión por nivel</strong>, y cada decisión hace más
+            fácil la siguiente. Así
+            no acabas con 40 tareas en la agenda:{" "}
+            <strong className="text-foreground">
+              el trimestre dice QUÉ, la semana dice DÓNDE, el día dice QUÉ
+              HACES AHORA
+            </strong>
+            .
+          </p>
+        </header>
+
+        <ol className="mt-6 space-y-3">
+          <li className="flex flex-wrap items-center gap-3 rounded-lg border border-violet-500/30 bg-background/70 p-4">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-500/20 text-sm font-bold text-violet-700 dark:text-violet-300">
+              1
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold">
+                🎯 3 metas WIG —{" "}
+                <span className="font-normal text-muted-foreground">
+                  el ciclo. Se revisan cada mes.
+                </span>
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Las 3 metas a las que dedicas atención desproporcionada.{" "}
+                <span className="font-mono">/metas</span> · ✨ Sugerir 3 WIGs
+              </p>
+            </div>
+          </li>
+          <li className="flex flex-wrap items-center gap-3 rounded-lg border border-sky-500/30 bg-background/70 p-4">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky-500/20 text-sm font-bold text-sky-700 dark:text-sky-300">
+              2
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold">
+                🎯 3 KRs de la semana —{" "}
+                <span className="font-normal text-muted-foreground">
+                  la semana. Se renueva cada domingo.
+                </span>
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                En qué <em>resultados medibles</em> pones horas ahora.{" "}
+                <span className="font-mono">/semana</span> · ✨ Sugerir 3 KRs
+                (la IA elige por riesgo: los que van por debajo del ritmo y
+                tienen menos días restantes)
+              </p>
+            </div>
+          </li>
+          <li className="flex flex-wrap items-center gap-3 rounded-lg border border-fuchsia-500/30 bg-background/70 p-4">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-fuchsia-500/20 text-sm font-bold text-fuchsia-700 dark:text-fuchsia-300">
+              3
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold">
+                🎯 3 tareas del día —{" "}
+                <span className="font-normal text-muted-foreground">
+                  el día. Se eligen cada mañana.
+                </span>
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Qué haces hoy, siempre empujando los KRs de la semana.{" "}
+                <span className="font-mono">/semana</span> +{" "}
+                <span className="font-mono">/plan-diario</span>
+              </p>
+            </div>
+          </li>
+        </ol>
+
+        <div className="mt-5 rounded-lg border border-border bg-background/60 p-4">
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            <strong className="text-foreground">
+              ¿Y los trimestres? No se sustituyen.
+            </strong>{" "}
+            Son otro eje, perpendicular: el trimestre dice{" "}
+            <em>cuándo se entrega</em> un KR, la semana dice{" "}
+            <em>en qué estás trabajando ahora</em>. Por eso un KR solo entra
+            en el foco semanal si su entrega está en marcha — así lo caducado
+            y lo prematuro no te distraen. Si no eliges foco semanal, el día se
+            planifica igual por compromiso y deadline:{" "}
+            <strong className="text-foreground">nunca te bloquea</strong>.
+          </p>
+        </div>
+      </section>
 
       <section className="rounded-2xl border-2 border-violet-500/30 bg-gradient-to-br from-violet-500/5 to-fuchsia-500/5 p-6 sm:p-8">
         <header>
@@ -1352,8 +1451,25 @@ export default function DocsPage() {
                   </Link>
                 </td>
                 <td className="px-3 py-2 text-muted-foreground">
-                  Planificar la semana entrante: arrastrar y soltar tareas,
-                  registrar estado emocional. Es la base de todo lo demás.
+                  <p>
+                    Planificar la semana entrante:{" "}
+                    <strong className="text-foreground">
+                      primero elige los 3 KRs de la semana
+                    </strong>{" "}
+                    (panel azul arriba del pipeline), luego arrastra las tareas
+                    a los días. Es la base de todo lo demás.
+                  </p>
+                  <p className="mt-1.5 text-xs">
+                    🎯 Los KRs en foco son la capa intermedia: el trimestre dice{" "}
+                    <em>cuándo se entrega</em>, la semana dice{" "}
+                    <em>dónde pones horas</em>. Solo entran KRs cuya entrega
+                    está en marcha. Usa{" "}
+                    <span className="font-medium text-foreground">
+                      ✨ Sugerir 3 KRs
+                    </span>{" "}
+                    y la IA elige por riesgo real (los que van por debajo del
+                    ritmo y tienen menos días restantes).
+                  </p>
                 </td>
               </tr>
               <tr>
@@ -1645,6 +1761,162 @@ export default function DocsPage() {
               2026-10-28
             </span>
             <span className="text-muted-foreground">
+              <strong className="text-foreground">
+                Nueva capa: “🎯 3 KRs de la semana” (migration 0033).
+              </strong>{" "}
+              Hasta ahora la cascada documentada saltaba de la meta a la tarea: el
+              KR se medía en trimestres pero <em>nada</em> decía en qué KRs
+              ponías horas esta semana, y la planificación semanal filtraba por{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">prioridad = &apos;critica&apos;</code>{" "}
+              (un corte ciego que ignoraba metas y KRs). Se añade la capa
+              intermedia, que es <strong className="text-foreground">ortogonal al
+              trimestre, no sustitutiva</strong>:{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">kr_periodos</code>{" "}
+              sigue siendo la ventana de MEDICIÓN (“cuándo se entrega”) y{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">kr_foco_semanal</code>{" "}
+              es la de EJECUCIÓN (“dónde pongo horas”). Consecuencias: (a) el cap
+              de 3 es <em>por semana</em>, así que el foco rota solo cada semana; (b)
+              la <strong className="text-foreground">regla de contención</strong>{" "}
+              (un KR solo entra si alguno de sus periodos contiene la semana
+              actual) la aplica la RPC{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">toggle_kr_foco_semanal</code>{" "}
+              en BD — lo caducado y lo prematuro quedan fuera solos; (c) la IA
+              elige por <strong className="text-foreground">riesgo real</strong>{" "}
+              (los KRs que van por debajo del ritmo esperado y tienen menos días
+              restantes), con cobertura suave (no más de 2 de la misma meta) y
+              siempre con confirmación humana; (d) la propuesta IA de tareas de{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/semana</code>{" "}
+              ahora prioriza las ancladas al foco y el prompt de{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/plan-diario</code>{" "}
+              recibe los KRs de la semana para anclar los bloques del día. Si no
+              hay foco elegido, el día se planifica igual por compromiso y
+              deadline: el foco semanal <em>nunca</em> bloquea.{" "}
+              <strong className="text-foreground">Documentación actualizada en
+              la misma sesión</strong> (AGENTS.md): este registro, el índice{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">FEATURES</code>{" "}
+              (filas <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/semana</code> y{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/plan-diario</code>),{" "}
+              el Pilar 2 (nuevo punto “El KR de la semana”), el bloque visual
+              “Del quarterly al daily: tres niveles, un selector cada uno”, el
+              ritual semanal del domingo, y en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metodologia</code>{" "}
+              la §3 (de “dos capas de WIGs” a tres, con el detalle de los dos
+              ejes temporales), el §7 (diagrama de 6 → 7 capas, nueva capa “KRs en
+              foco de la semana”) y el §8 (ejemplo completo). Archivos nuevos:{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">src/components/PanelFocoKRs.tsx</code>{" "}
+              y{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">src/lib/sugerirKRsSemanaIA.ts</code>
+              .
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-10-29
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">El perfil del usuario sale de los prompts (migration 0032).</strong>{" "}
+              El contexto personal (“David”, familia “María y Abril (5 años)”, restricciones
+              alimentarias, TDAH/cervicales, negocio del restaurante) estaba escrito{" "}
+              <strong className="text-foreground">dentro de las plantillas de prompt</strong> de{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">plan.ts</code>,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">planSimple.ts</code>,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">iaSugerencias.ts</code>,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">sugerirMatrizIA.ts</code>,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">sugerirPagosIA.ts</code> y{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">analizarEscenariosIA.ts</code> —134 ocurrencias. Eso obligaba a tocar el código para cambiarlo y{" "}
+              <strong className="text-foreground">no había forma de testear qué se le manda a la IA</strong>. Ahora vive en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">configuracion.perfil / familia / restricciones / contexto_negocio</code>{" "}
+              (columnas nuevas, RLS ya existente), es editable en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/configuracion</code> y se inyecta con{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">bloquePerfil()</code>{" "}
+              (<code className="rounded bg-muted px-1.5 py-0.5 text-xs">src/lib/perfilIA.ts</code>).{" "}
+              <strong className="text-foreground">Cero cambios de comportamiento</strong>:{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">DEFAULT_PERFIL_IA</code> contiene
+              literalmente los textos que estaban hardcodeados, y campo vacío = default, así que
+              quien no toque nada recibe prompts idénticos a los de antes (fijado con tests).{" "}
+              De paso se{" "}
+              <strong className="text-foreground">elimina una duplicación real</strong>:{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">DEFAULT_PROMPT_PAGOS</code> estaba
+              copiado en <code className="rounded bg-muted px-1.5 py-0.5 text-xs">configStore.tsx</code> y en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">sugerirPagosIA.ts</code> (el comentario
+              lo justificaba por una “dependencia circular” que no existía; ya se habían desincronizado).{" "}
+              <strong className="text-foreground">FEATURES actualizado</strong> (fila{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/configuracion</code>).
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-10-29
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">Ya hay tests que se ejecutan (y CI que los ejecuta).</strong>{" "}
+              Existían 7 ficheros <code className="rounded bg-muted px-1.5 py-0.5 text-xs">*.test.mjs</code> pero{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">package.json</code> no tenía script{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">test</code>: nadie los corría nunca, y 3 de
+              los 7 no(arrancaban (importaban <code className="rounded bg-muted px-1.5 py-0.5 text-xs">./plan.ts</code>, que usa el
+              alias <code className="rounded bg-muted px-1.5 py-0.5 text-xs">@/…</code> y parameter properties que el
+              type-stripping de Node no soporta). Arreglado sin dependencias nuevas:{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">scripts/test-alias.mjs</code> resuelve{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">@/…</code> y las rutas relativas sin
+              extensión, y <code className="rounded bg-muted px-1.5 py-0.5 text-xs">scripts/run-tests.mjs</code> agrega
+              un único veredicto. Nuevo <code className="rounded bg-muted px-1.5 py-0.5 text-xs">npm test</code> (8
+              ficheros, 106 aserciones) y{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">npm run typecheck</code>, ambos en el
+              workflow <code className="rounded bg-muted px-1.5 py-0.5 text-xs">.github/workflows/test.yml</code>.
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-10-29
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">Fuera 4 tablas muertas (migration 0030).</strong>{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">public.okrs</code>,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">public.key_results</code>,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">public.hitos</code> y{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">public.planes_semanales</code>{" "}
+              se crearon en <code className="rounded bg-muted px-1.5 py-0.5 text-xs">0001_init.sql</code> y las
+              sustituyeron <code className="rounded bg-muted px-1.5 py-0.5 text-xs">resultados_periodo</code> (0015/0028) y{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">plan_semanal_tareas</code> (0009). Tenían{" "}
+              <strong className="text-foreground">0 referencias en el código</strong>. Eran la causa de que el
+              esquema tuviera{" "}
+              <strong className="text-foreground">tres modelos de KR simultáneos</strong>{" "}
+              (<code className="rounded bg-muted px-1.5 py-0.5 text-xs">okrs</code> /{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">key_results</code> /{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">resultados_periodo</code>). La migración es
+              idempotente y verificada replayando la cadena completa contra Postgres.
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-10-29
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">Fuera el segundo sistema de migraciones.</strong>{" "}
+              Había 9 ficheros <code className="rounded bg-muted px-1.5 py-0.5 text-xs">supabase/APLICAR-*.sql</code>{" "}
+              para pegar a mano en el SQL Editor, que duplicaban migraciones ya versionadas y se habían
+              desincronizado. Antes de borrarlos se verificó sentencia por sentencia que no había SQL
+              único,{" "}
+              <strong className="text-foreground">salvo en APLICAR-0024</strong>: el KR “Alimentación consciente” de
+              M8101 y 9 tareas <code className="rounded bg-muted px-1.5 py-0.5 text-xs">N8101-*</code> con sus vínculos
+              KR no existían en ningún otro sitio. Se rescató como{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">0031_seed_m8101_kr_y_tareas.sql</code>{" "}
+              (verificado 1:1, 25 sentencias) para no perder datos. También se{" "}
+              <strong className="text-foreground">corregió un bug real de documentación</strong>:{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">eliminarMeta()</code> documentaba que los KRs
+              quedaban huérfanos (SET NULL) cuando la FK real es{" "}
+              <strong className="text-foreground">ON DELETE CASCADE</strong> — borrarla elimina los KRs. Los
+              números duplicados 0027/0028 <strong className="text-foreground">no se renumeran</strong> a propósito
+              (rompería el tracking de{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">supabase_migrations</code> en producción); queda
+              documentado en <code className="rounded bg-muted px-1.5 py-0.5 text-xs">supabase/migrations/README.md</code>.
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-10-28
+            </span>
+            <span className="text-muted-foreground">
               <strong className="text-foreground">Fix raíz: un proyecto ya no muestra 0 tareas.</strong>{" "}
               Una tarea puede colgar de <strong className="text-foreground">tres</strong> sitios:{" "}
               <code className="rounded bg-muted px-1.5 py-0.5 text-xs">tareas.proyecto_id</code> (directa),{" "}
@@ -1701,7 +1973,7 @@ export default function DocsPage() {
               <strong className="text-foreground">ritual semanal</strong> (domingo, tras planificar).{' '}
               <strong className="text-foreground">FEATURES actualizado</strong> (fila{' '}
               <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/escenarios</code>).{' '}
-              <em className="text-muted-foreground">Acción manual: ejecutar <code className="rounded bg-muted px-1.5 py-0.5 text-xs">supabase/APLICAR-0029.sql</code> en el SQL Editor para migrar la BD.</em>
+              <em className="text-muted-foreground">Migración ya versionada: <code className="rounded bg-muted px-1.5 py-0.5 text-xs">supabase/migrations/0029_escenarios_proyecto.sql</code> (se aplica con <code className="rounded bg-muted px-1.5 py-0.5 text-xs">npx supabase db push</code>).</em>
             </span>
           </li>
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
@@ -2751,9 +3023,10 @@ export default function DocsPage() {
               <code className="rounded bg-muted px-1.5 py-0.5 text-xs">001b_seed_metas_2026_kr.sql</code>{" "}
               (sustituye al 001 legacy, que queda documentado como
               pre-0028). <strong className="text-foreground">Acción manual</strong>:{" "}
-              ejecutar{" "}
-              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">supabase/APLICAR-0028.sql</code>{" "}
-              en el SQL Editor para migrar la BD.
+              <strong className="text-foreground">ninguna</strong> — la migración ya está
+              versionada en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">supabase/migrations/0028_kr_separado_de_trimestre.sql</code>{" "}
+              y se aplica con <code className="rounded bg-muted px-1.5 py-0.5 text-xs">npx supabase db push</code>.
             </span>
           </li>
         </ul>
@@ -2782,6 +3055,7 @@ function AplicacionEnApp({ pilar }: { pilar: 1 | 2 | 3 | 4 | 5 }) {
       "Estados de meta (sin_empezar → en_progreso → completada) con feedback visible",
       "Botón IA “Generar plan con IA” en /metas/nueva y EditarMetaModal: filtra KRs por el campo plazo (Q3, Q1-Q3, fin de 2026…) y dentro de cada KR anota las tareas y hábitos necesarios para cumplirlo",
       "Escenarios de proyecto (/escenarios): cronología + estado medido + lectura de la situación, y los escenarios con su estrategia generados bajo demanda (migration 0029)",
+      "Panel “🎯 3 KRs de la semana” en /semana (migration 0033): la capa intermedia entre la meta y la tarea. ✨ Sugerir 3 KRs por IA elige por riesgo real (los que van por debajo del ritmo y tienen menos días restantes). Solo entran KRs con entrega en marcha (regla de contención en BD). El trimestre sigue mandando en la entrega; la semana manda en el esfuerzo",
     ],
     3: [
       "Time-blocking con 4 bloques fijos por día (/calendario)",

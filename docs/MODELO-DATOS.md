@@ -35,6 +35,7 @@ Capturas (inbox / vaciar-cabeza)
 
 | Tabla | Función | Clave natural (idempotencia) |
 |:---|:---|:---|
+| `configuracion` | Ajustes por usuario: `base_url`, `minimax_api_key`, `model`, `prompt_pagos` y el **perfil para la IA** (`perfil`, `familia`, `restricciones`, `contexto_negocio`, migration 0032). Las 4 columnas del perfil son `null` = la app usa `DEFAULT_PERFIL_IA`. | `user_id` |
 | `areas` | Ámbitos (Familia, Finanzas, Salud, Sol de Nit…) | `owner_id + nombre` |
 | `propositos` | Propósito (el "por qué") | — |
 | `valores` | Valores personales | — |
@@ -44,12 +45,12 @@ Capturas (inbox / vaciar-cabeza)
 | `kr_periodos` | Asignación N:M KR↔periodo. Migration 0028. | `kr_id + periodo_id` |
 | `periodos` | Trimestres / meses / rangos custom. | `owner_id + tipo + anio + numero` |
 | `proyectos` | Proyectos (área_id, hijos de area). | `owner_id + nombre` |
-| `okrs` | **LEGACY** (migration 0001, nunca usado por la app). | — |
-| `key_results` | **LEGACY** (migration 0001, nunca usado por la app). | — |
-| `hitos` | **LEGACY** (migration 0001, nunca usado por la app). | — |
+| `okrs` | **ELIMINADA** en migration 0030 (0001; nunca la usó la app; sustituida por `resultados_periodo`). | — |
+| `key_results` | **ELIMINADA** en migration 0030 (0001; nunca la usó la app). | — |
+| `hitos` | **ELIMINADA** en migration 0030 (0001; nunca la usó la app). | — |
 | `rituales` | Qué toca cada día de la semana | `owner_id + dia + hora + descripcion` |
 | `tareas` | Tareas | `owner_id + codigo` |
-| `planes_semanales` | Plan de cada semana ISO | `owner_id + anio + semana_iso` |
+| `planes_semanales` | **ELIMINADA** en migration 0030. La cabecera de semana vive en `plan_semanal_tareas` (0009). | — |
 | `planes_diarios` | Plan de cada día | `owner_id + fecha` |
 | `plan_diario_tareas` | Tareas del día (R1/R2/micro) | — |
 | `capturas` | Inbox sin procesar | — |

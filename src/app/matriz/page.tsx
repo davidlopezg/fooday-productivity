@@ -254,6 +254,8 @@ export default function MatrizPage() {
           tareas: tareasParaIA,
           fecha: localYMD(hoy),
           diaSemana: diaSemanaES(hoy),
+          // Migration 0032: perfil desde `configuracion`.
+          perfil: cfg,
         },
       );
       setSugResultado(res);

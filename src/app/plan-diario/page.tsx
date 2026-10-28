@@ -6,6 +6,7 @@ import {
   fetchTareas,
   fetchHistorialEmocional,
   fetchPlanSemanal,
+  fetchKRsFocoSemanal,
 } from "@/lib/queries";
 import {
   upsertTareaPorTitulo,
@@ -21,6 +22,7 @@ import { generarPlanSimple } from "@/lib/planSimple";
 import type { EstadoEmocional } from "@/lib/plan";
 import { getCurrentISOWeek, BLOQUE_HORARIO, localYMD } from "@/lib/semana";
 import type {
+  KrFocoConDetalle,
   PlanDiario,
   PlanGeneradoSimple,
   PlanSemanalTarea,
@@ -114,6 +116,19 @@ export default function PlanDiarioPage() {
         semana_iso: currentWeek.semana_iso,
       }),
     [],
+  );
+
+  // KRs en foco de la semana (migration 0033). La capa intermedia: el
+  // planificador diario ancla el día a estos resultados medibles. Si no
+  // hay foco elegido, el día se planifica igual (degradación correcta).
+  const focoKRsQ = useData<KrFocoConDetalle[]>(
+    () =>
+      fetchKRsFocoSemanal(
+        currentWeek.anio,
+        currentWeek.semana_iso,
+      ),
+    [],
+    [currentWeek.anio, currentWeek.semana_iso],
   );
 
   // Tareas que /semana marcó para HOY (intersección plan_semanal_tareas × tareas pendientes).
@@ -275,6 +290,27 @@ export default function PlanDiarioPage() {
           tareasProgramadasHoy,
           tareasLibres: tareasLibresConId,
           historial: historialQ.data,
+          // Migration 0033: los KRs en foco de la semana son la capa
+          // intermedia. El planificador los usa para anclar el día.
+          krsFoco: (focoKRsQ.data ?? []).map((f) => ({
+            kr_id: f.kr.id,
+            titulo: f.kr.titulo,
+            meta_titulo: f.meta.titulo,
+            periodo: f.periodos[0]?.nombre ?? null,
+            dias_restantes: f.periodos[0]
+              ? Math.max(
+                  0,
+                  Math.ceil(
+                    (new Date(f.periodos[0].fecha_fin + "T00:00:00").getTime() -
+                      Date.now()) /
+                      86_400_000,
+                  ),
+                )
+              : undefined,
+          })),
+          // Migration 0032: el perfil va en la tabla `configuracion`, no
+          // hardcodeado en el prompt.
+          perfil: config.data,
         },
       );
 

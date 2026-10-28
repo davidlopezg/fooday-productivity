@@ -6,6 +6,8 @@
     "dev": "next dev",
     "build": "next build && node scripts/write-version.js",
     "preview": "npx serve out",
+    "test": "node scripts/run-tests.mjs",
+    "typecheck": "tsc --noEmit",
     "lint": "eslint",
     "etl": "python scripts/etl/import_from_core.py",
     "db:push": "npx supabase db push",

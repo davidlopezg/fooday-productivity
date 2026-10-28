@@ -229,6 +229,68 @@ export interface MetaConPlan {
   progreso: number;
 }
 
+// ============================================================================
+// Foco semanal de KRs — migration 0033
+// ----------------------------------------------------------------------------
+// EJE ORTOGONAL a la ventana de medición (`periodos` + `kr_periodos`):
+//   · `periodos`      → VENTANA DE MEDICIÓN  (trimestre/mes: "se entrega aquí")
+//   · `kr_foco_semanal`→ VENTANA DE EJECUCIÓN  (semana ISO: "trabajo en esto")
+// Regla de contención: un KR solo entra en el foco semanal si alguno de
+// sus periodos contiene la semana actual (la RPC lo aplica en BD).
+// ============================================================================
+
+/** Fila persistida en `kr_foco_semanal` (migration 0033). */
+export interface KrFocoSemanal {
+  id: string;
+  owner_id?: string;
+  anio: number;
+  semana_iso: number;
+  kr_id: string;
+  /** Posición en el panel de foco de la semana (1-3). */
+  orden: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/** Un KR del foco semanal, enriquecido con su meta, su periodo vigente
+ *  y sus tareas. Es lo que se pinta en el panel "3 KRs de la semana". */
+export interface KrFocoConDetalle {
+  foco: KrFocoSemanal;
+  kr: ResultadoPeriodo;
+  meta: Meta;
+  /** Periodos del KR que contienen la semana actual (1..N). */
+  periodos: Periodo[];
+  /** Tareas que apuntan a este KR. */
+  tareas: Tarea[];
+  /** Progreso 0..1 calculado desde las tareas hechas del KR. */
+  progreso: number;
+  /** Nº de tareas hechas del KR. */
+  tareas_hechas: number;
+}
+
+/** Candidato a entrar en el foco semanal: un KR de una meta WIG cuyo
+ *  periodo contiene la semana actual. Incluye el scorecard (progreso
+ *  esperado vs real) para que la IA elija por RIESGO real, no por
+ *  suposición. */
+export interface KrCandidatoSemana {
+  kr: ResultadoPeriodo;
+  meta: Meta;
+  /** Periodos del KR que contienen la semana actual. */
+  periodos: Periodo[];
+  /** Tareas del KR. */
+  tareas: Tarea[];
+  /** Progreso 0..1 (tareas hechas / total). */
+  progreso: number;
+  /** Progreso esperado según los días transcurridos del periodo. 0..1. */
+  progreso_esperado: number;
+  /** Diferencia en puntos porcentuales (progreso - esperado). */
+  diferencia: number;
+  /** "por_debajo" | "en_linea" | "por_encima" | "sin_datos". */
+  estado: "por_debajo" | "en_linea" | "por_encima" | "sin_datos";
+  /** Días que faltan para el final del periodo más próximo. */
+  dias_restantes: number;
+}
+
 /** Solo las tareas sin meta asignada — la "bandeja de entrada" del plan. */
 export interface TareaSinMeta {
   tarea: Tarea;

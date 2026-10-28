@@ -1969,21 +1969,51 @@ export async function marcarTareaWig(tareaId: string, esWig: boolean): Promise<b
   return data === true;
 }
 
+/** Marca/desmarca un KR como FOCO DE LA SEMANA (migration 0033).
+ *
+ *  Capa intermedia entre los WIGs de metas (ciclo) y las tareas (día).
+ *  El cap de 3 es POR SEMANA y lo aplica la RPC `toggle_kr_foco_semanal`,
+ *  que además aplica la REGLA DE CONTENCIÓN: el KR solo puede entrar si
+ *  alguno de sus periodos contiene la semana actual.
+ *
+ *  Devuelve `true` si se aplicó, `false` si ya había 3 KRs en foco esta
+ *  semana o si el KR está fuera de ventana. */
+export async function marcarKrFocoSemanal(
+  krId: string,
+  anio: number,
+  semana_iso: number,
+  esFoco: boolean,
+): Promise<boolean> {
+  const { data, error } = await createClient().rpc("toggle_kr_foco_semanal", {
+    p_kr_id: krId,
+    p_anio: anio,
+    p_semana_iso: semana_iso,
+    p_es_wig: esFoco,
+  });
+  if (error) throw new Error(`No se pudo actualizar el foco semanal: ${error.message}`);
+  return data === true;
+}
+
 export async function archivarMeta(id: string, archivada = true): Promise<void> {
   await actualizarMeta(id, {
     estado: archivada ? "archivada" : "sin_empezar",
   });
 }
 
-/** Elimina una meta físicamente. Las FKs del schema 0001 se encargan del
- *  impacto en cascada:
- *    - hitos y okrs de esta meta → ON DELETE CASCADE (se borran).
- *    - tarea_comentarios con meta_id → ON DELETE CASCADE (se borran).
- *    - resultados_periodo (KRs) → ON DELETE SET NULL (quedan huérfanos).
- *    - tareas.meta_id → ON DELETE SET NULL (las tareas NO se borran, solo
- *      se desvinculan de la meta — siguen vivas en /tareas sin asignar).
+/** Elimina una meta físicamente. Lo que ocurre con las filas que la apuntan
+ *  lo definen las FKs reales del schema (verificadas contra las migraciones,
+ *  NO copiar de aquí sin comprobar `information_schema`):
+ *    - resultados_periodo (KRs) → `references public.metas(id) on delete
+ *      cascade` (0015:73) → se BORRAN junto con la meta.
+ *    - tareas.meta_id → ON DELETE SET NULL (0001) → las tareas NO se borran,
+ *      solo se desvinculan; siguen vivas en /tareas sin asignar.
+ *    - tareas.resultado_periodo_id → ON DELETE SET NULL → quedan sin KR.
+ *    - tarea_comentarios con meta_id → ON DELETE CASCADE.
  *  Por eso el confirm previo en la UI avisa del conteo esperado antes de
- *  borrar: para que el usuario no se lleve sorpresas. */
+ *  borrar: para que el usuario no se lleve sorpresas.
+ *
+ *  NOTA (migration 0030): antes esta lista mencionaba `hitos` y `okrs`, que
+ *  se eliminaron por estar muertas. `key_results` y `planes_semanales` también. */
 export async function eliminarMeta(id: string): Promise<void> {
   const { error } = await createClient().from("metas").delete().eq("id", id);
   if (error) throw new Error(`No se pudo eliminar la meta: ${error.message}`);

@@ -24,6 +24,7 @@ import type {
 } from "@/lib/types";
 import type { EstadoEmocional } from "@/lib/plan";
 import { calcularTimeoutIA, mensajeTimeoutIA } from "@/lib/ai-timeout";
+import { bloquePerfil, type PerfilIA } from "@/lib/perfilIA";
 
 export type GenerarPlanSimpleOpts = {
   /** Estado emocional estructurado (los 5 selects que coinciden con Dashboard emocional). */
@@ -40,6 +41,24 @@ export type GenerarPlanSimpleOpts = {
   tareasLibres: Tarea[];
   /** Últimos N planes del usuario (para que la IA calcule tendencia) */
   historial: PlanDiario[];
+  /**
+   * KRs en foco de la semana actual (migration 0033). Es la capa
+   * intermedia: la IA debe ANCLAR el día a estos resultados medibles
+   * cuando hay alguno. Si viene vacío, el día se planifica por
+   * compromiso y deadline (degradación correcta, nunca bloquea).
+   */
+  krsFoco?: Array<{
+    kr_id: string;
+    titulo: string;
+    meta_titulo: string;
+    periodo?: string | null;
+    dias_restantes?: number;
+  }>;
+  /**
+   * Perfil del usuario para el bloque de contexto del prompt (migration
+   * 0032). Si se omite, se usa DEFAULT_PERFIL_IA.
+   */
+  perfil?: PerfilIA | null;
 };
 
 export type LlamadaIA = {
@@ -103,11 +122,32 @@ function buildPrompt(opts: GenerarPlanSimpleOpts): string {
         .join("\n")
     : "(sin histórico)";
 
+  // KRs en foco de la semana (migration 0033). Si hay, el día se ancla a
+  // ellos: son los resultados medibles que David se ha comprometido a
+  // mover esta semana. Si no hay, el día se planifica igual (por
+  // compromiso y deadline) — el foco semanal NUNCA bloquea el día.
+  const krsFoco = opts.krsFoco ?? [];
+  const bloqueKrsFoco =
+    krsFoco.length > 0
+      ? `============================================================
+KRs EN FOCO ESTA SEMANA (la capa intermedia — migration 0033)
+============================================================
+David se ha comprometido a mover ESTOS ${krsFoco.length} resultados medibles esta semana:
+${krsFoco
+  .map(
+    (k) =>
+      `- [kr_id=${k.kr_id}] ${k.titulo} (meta: ${k.meta_titulo}${k.periodo ? ` · entrega: ${k.periodo}` : ""}${k.dias_restantes ? ` · quedan ${k.dias_restantes} días` : ""})`,
+  )
+  .join("\n")}
+
+Cuando asignes tareas a los bloques, PREFIERE las que empujan estos KRs
+(las que sus subtareas sostienen) y dilo en la RESUMEN. El día no es solo
+"lo que hay en la lista": es lo que mueve un resultado.`
+      : "";
+
   return `Eres el planificador diario de David. Analizas su estado emocional, decides qué puede asumir hoy y le propones un plan ejecutable.
 
-PERFIL DE DAVID:
-- Familia: María y Abril (5 años).
-- Restricciones alimentarias: 🚫 SIN avena, SIN cilantro, SIN quinoa, SIN tofu.
+${bloquePerfil(opts.perfil)}
 - Prioridades: familia > negocio > sí-mismo.
 - Tiene base de datos de tareas pendientes. Las candidatas están listadas abajo.
 
@@ -137,6 +177,8 @@ ${reflexion.trim()}
 HISTÓRICO RECIENTE (últimos ${historial.length} planes)
 ============================================================
 ${hist}
+
+${bloqueKrsFoco}
 
 ============================================================
 TAREAS PROGRAMADAS PARA HOY (vienen de /semana, drag&drop)

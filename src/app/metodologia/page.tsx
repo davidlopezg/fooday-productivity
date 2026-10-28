@@ -97,14 +97,19 @@ const WIG_PUNTOS: Punto[] = [
       "La energía de foco es un recurso finito (~4h/día de trabajo profundo sostenible). Multiplicarla entre 10 WIGs equivale a no tener ninguno. La app lo hace cumplir por la base de datos: índice único (owner_id, wig_orden) + RPC `toggle_meta_wig` que rechaza el 4º.",
   },
   {
-    titulo: "El diseño de dos capas de WIGs (novedad de esta app)",
+    titulo: "El diseño de tres capas de foco (novedad de esta app)",
     cuerpo:
-      "La mayoría de herramientas mezclan 'meta' y 'tarea' en una sola lista. Esta app separa dos planos: (a) WIGs de METAS (qué resultados quieres, máx 3) y (b) WIGs de TAREAS (qué 3 tareas concretas los sostienen). Son dos caps independientes de 3 — uno sin el otro no funciona.",
+      "La mayoría de herramientas mezclan 'meta' y 'tarea' en una sola lista. Esta app separa tres planos: (a) WIGs de METAS (qué resultados quieres, máx 3), (b) KRs de la SEMANA (en qué resultados medibles pones horas ahora, máx 3) y (c) WIGs de TAREAS (qué 3 tareas concretas los sostienen). Son caps independientes de 3 — uno sin el otro no funciona.",
   },
   {
     titulo: "Dónde se ven y cómo se marcan en la app",
     cuerpo:
-      "Cada capa tiene su panel violeta/fucsia con contador N/3: el de METAS vive arriba de /metas (con botón “Sugerir 3 WIGs” por IA); el de TAREAS vive arriba de /tareas y también en / (sección “Tareas Enormemente Importantes”, debajo del panel de metas). En ambos casos, el botón 🎯 dentro de cada tarjeta/fila asciende a WIG y la RPC toggle_*_wig rechaza el 4º para mantener el cap.",
+      "Cada capa tiene su panel con contador N/3: el de METAS vive arriba de /metas (con botón “Sugerir 3 WIGs” por IA); el de KRs SEMANALES vive en /semana (con botón “✨ Sugerir 3 KRs” por IA, el ritual del domingo); el de TAREAS vive arriba de /tareas y también en / (sección “Tareas Enormemente Importantes”). En todos los casos el cap lo impone la base de datos: las RPC toggle_meta_wig / toggle_kr_foco_semanal / toggle_tarea_wig rechazan el 4º.",
+  },
+  {
+    titulo: "El KR de la semana: dos ejes de tiempo, no uno",
+    cuerpo:
+      "Un KR se mide en trimestres o meses (su COMPROMISO de entrega: “este resultado está listo antes de Q3”). Además, desde la migration 0033, cada KR puede estar en el FOCO de una semana concreta (tu ESFUERZO: “esta semana pongo horas aquí”). Son dos ejes ortogonales: el trimestre no se sustituye, se complementan. Solo entra en el foco semanal un KR cuyo periodo de entrega contiene la semana actual — así lo caducado y lo prematuro se quedan fuera solos.",
   },
 ];
 
@@ -440,7 +445,24 @@ export default function MetodologiaPage() {
               <li className="flex gap-2">
                 <span className="text-fuchsia-500">·</span>
                 <span>
-                  UI: panel violeta (WIGs-meta) + panel fucsia (WIGs-tarea) en{" "}
+                  <strong className="text-foreground">Tabla <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">kr_foco_semanal</code> (migration 0033) — la capa intermedia.</strong>{" "}
+                  Es la ventana de EJECUCIÓN: qué KRs mueves esta semana. Un KR puede estar en varias semanas (si su entrega dura 3 semanas, aparece 3 veces) y el cap de 3 es <strong>por semana</strong>, así que el foco rota solo cada semana. La RPC{" "}
+                  <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">toggle_kr_foco_semanal</code>{" "}
+                  aplica el cap <em>y</em> la regla de contención: un KR solo entra si alguno de sus periodos contiene la semana actual. No se toca <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">periodos</code> ni <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">kr_periodos</code>: el trimestre sigue mandando en la entrega, la semana en el esfuerzo.
+                </span>
+              </li>
+              <li className="flex gap-2">
+                <span className="text-fuchsia-500">·</span>
+                <span>
+                  UI: panel violeta (WIGs-meta) en{" "}
+                  <Link href="/metas" className="font-medium text-foreground underline underline-offset-4">
+                    /metas
+                  </Link>
+                  , panel azul (KRs de la semana) en{" "}
+                  <Link href="/semana" className="font-medium text-foreground underline underline-offset-4">
+                    /semana
+                  </Link>{" "}
+                  y panel fucsia (WIGs-tarea) en{" "}
                   <Link href="/" className="font-medium text-foreground underline underline-offset-4">
                     Hoy
                   </Link>
@@ -671,31 +693,38 @@ export default function MetodologiaPage() {
           Del "por qué" al "qué hago ahora"
         </h2>
         <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-          Las 6 capas de la app, de arriba (propósito) a abajo (acción física).
+          Las 7 capas de la app, de arriba (propósito) a abajo (acción física).
           Cada capa alimenta a la siguiente; nada se pierde al bajar, se enfoca.
         </p>
 
         <div className="mt-6 overflow-hidden rounded-lg border border-border bg-background font-mono text-xs">
           <Capa
-            num="6"
+            num="7"
             nombre="Norte"
             color="slate"
             desc="Propósito · Valores · Visión (BHAG)"
             ruta="/norte"
           />
           <Capa
-            num="5"
+            num="6"
             nombre="Áreas + Metas (Lag) + OKRs + KRs + Hitos"
             color="violet"
             desc="Resultados a 6-12 meses. Sin Lead Measures no avanzan."
             ruta="/metas"
           />
           <Capa
-            num="4"
+            num="5"
             nombre="WIGs-meta (1-3)"
             color="violet"
             desc="Subconjunto de metas con foco desproporcionado. Enforced por DB."
             ruta="/metas"
+          />
+          <Capa
+            num="4"
+            nombre="KRs en foco de la semana (1-3)"
+            color="sky"
+            desc="Eje ORTOGONAL: el trimestre dice cuándo se entrega; la semana dice dónde pongo horas."
+            ruta="/semana"
           />
           <Capa
             num="3"
@@ -740,24 +769,39 @@ export default function MetodologiaPage() {
           Meta: "Escribir un libro técnico"
         </h2>
         <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-          Cómo se vería esta meta mapeada a las 6 capas del sistema:
+          Cómo se vería esta meta mapeada a las 7 capas del sistema:
         </p>
 
         <div className="mt-5 space-y-3">
           <EjemploCapa
-            capa="Capa 6 · Norte"
+            capa="Capa 7 · Norte"
             contenido='"Convertirme en referente técnico de mi nicho en 10 años" (Visión).'
             color="slate"
           />
           <EjemploCapa
-            capa="Capa 5 · Meta (Lag)"
+            capa="Capa 6 · Meta (Lag)"
             contenido='Título: "Escribir un libro técnico". Plazo: 6 meses. Estado: en_progreso. KRs: 10 capítulos, 5 beta-readers, 200 páginas.'
             color="violet"
           />
           <EjemploCapa
-            capa="Capa 4 · WIG-meta"
+            capa="Capa 5 · WIG-meta"
             contenido='es_wig = true, wig_orden = 1 (la única meta WIG este trimestre).'
             color="violet"
+          />
+          <EjemploCapa
+            capa="Capa 4 · KRs en foco de la semana"
+            contenido={
+              <>
+                Esta semana enfoco: <strong>KR &quot;10 capítulos&quot;</strong> (Q2, quedan 12 días).
+                <br />
+                <span className="text-muted-foreground">
+                  El trimestre (Q2) dice <em>cuándo se entrega</em>; el foco semanal dice{" "}
+                  <em>en qué estás trabajando ahora</em>. Sin esto, el salto documentado
+                  era meta → tarea y la semana se planificaba sin mirar tus metas.
+                </span>
+              </>
+            }
+            color="sky"
           />
           <EjemploCapa
             capa="Capa 3 · WIGs-tarea + repositorio"
@@ -787,7 +831,7 @@ export default function MetodologiaPage() {
         </div>
 
         <p className="mt-5 text-sm leading-relaxed text-muted-foreground">
-          Tu mente solo ve la capa 1 cuando ejecutas. Las otras 5 existen en
+          Tu mente solo ve la capa 1 cuando ejecutas. Las otras 6 existen en
           Supabase y te dan la confianza de que "el plan completo está
           guardado". Eso es lo que desactiva el efecto Zeigarnik.
         </p>
@@ -1022,7 +1066,7 @@ function Capa({
 }: {
   num: string;
   nombre: string;
-  color: "slate" | "violet" | "fuchsia" | "emerald" | "amber";
+  color: "slate" | "violet" | "fuchsia" | "emerald" | "amber" | "sky";
   desc: string;
   ruta: string;
   ultima?: boolean;
@@ -1033,6 +1077,7 @@ function Capa({
     fuchsia: "border-l-fuchsia-500",
     emerald: "border-l-emerald-500",
     amber: "border-l-amber-500",
+    sky: "border-l-sky-500",
   };
   const numMap: Record<typeof color, string> = {
     slate: "bg-slate-500/20 text-slate-700 dark:text-slate-300",
@@ -1040,6 +1085,7 @@ function Capa({
     fuchsia: "bg-fuchsia-500/20 text-fuchsia-700 dark:text-fuchsia-300",
     emerald: "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300",
     amber: "bg-amber-500/20 text-amber-700 dark:text-amber-300",
+    sky: "bg-sky-500/20 text-sky-700 dark:text-sky-300",
   };
   return (
     <div
@@ -1073,7 +1119,7 @@ function EjemploCapa({
 }: {
   capa: string;
   contenido: React.ReactNode;
-  color: "slate" | "violet" | "fuchsia" | "emerald" | "amber";
+  color: "slate" | "violet" | "fuchsia" | "emerald" | "amber" | "sky";
 }) {
   const tagClass: Record<typeof color, string> = {
     slate: "border-slate-500/30 bg-slate-500/5 text-slate-700 dark:text-slate-300",
@@ -1081,6 +1127,7 @@ function EjemploCapa({
     fuchsia: "border-fuchsia-500/30 bg-fuchsia-500/5 text-fuchsia-700 dark:text-fuchsia-300",
     emerald: "border-emerald-500/30 bg-emerald-500/5 text-emerald-700 dark:text-emerald-300",
     amber: "border-amber-500/30 bg-amber-500/5 text-amber-700 dark:text-amber-300",
+    sky: "border-sky-500/30 bg-sky-500/5 text-sky-700 dark:text-sky-300",
   };
   return (
     <div className={`rounded-lg border ${tagClass[color]} p-3`}>

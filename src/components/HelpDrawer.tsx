@@ -503,9 +503,38 @@ export const AYUDA_POR_RUTA: Record<
       },
     ],
   },
+  "/semana": {
+    pilares: [2, 3],
+    items: [
+      {
+        titulo: "🎯 Los 3 KRs de la semana: la capa que faltaba",
+        cuerpo:
+          "Antes el salto documentado era meta → tarea: el trimestre te decía QUÉ medir, pero nada te decía en qué KRs poner horas AHORA, y la semana se planificaba por 'prioridad crítica' sin mirar tus metas. Este panel (máx 3) es esa capa intermedia. ✨ Sugerir 3 KRs deja que la IA elija por riesgo real: los KRs que van por debajo del ritmo esperado y tienen menos días restantes. Tú confirmas.",
+        pilar: 2,
+      },
+      {
+        titulo: "El trimestre no se sustituye: son dos ejes",
+        cuerpo:
+          "El trimestre dice CUÁNDO SE ENTREGA un KR (su compromiso). La semana dice DÓNDE PONGO HORAS (tu esfuerzo). Por eso solo entran en el foco KRs cuya entrega está en marcha: lo caducado y lo prematuro quedan fuera solos. Y si no eliges foco, el día se planifica igual por compromiso y deadline — nunca te bloquea.",
+        pilar: 2,
+      },
+      {
+        titulo: "El orden del ritual del domingo",
+        cuerpo:
+          "1) Elige los 3 KRs de la semana (aquí arriba). 2) Arrastra las tareas a los días — la propuesta IA ya prioriza las ancladas a esos KRs. 3) En /plan-diario, el plan del día se ancla a los mismos KRs. Si te saltas el paso 1, la semana se vuelve una lista de tareas sin detrás.",
+        pilar: 3,
+      },
+    ],
+  },
   "/plan-diario": {
     pilares: [1, 3, 5],
     items: [
+      {
+        titulo: "El día se ancla a los KRs de la semana",
+        cuerpo:
+          "Si esta semana elegiste 3 KRs en /semana, el planificador los recibe y prefiere las tareas que empujan esos resultados medibles. Si no hay foco elegido, el día se planifica por compromiso y deadline — funciona, pero no empuja tus metas.",
+        pilar: 2,
+      },
       {
         titulo: "El estado emocional NO es opcional",
         cuerpo:

@@ -15,6 +15,7 @@
 // ============================================================================
 
 import { calcularTimeoutIA, mensajeTimeoutIA } from "@/lib/ai-timeout";
+import { bloquePerfil, type PerfilIA } from "@/lib/perfilIA";
 import type { Cuadrante, ClasificacionMatriz } from "@/lib/tareas/matriz";
 
 // ----------------------------------------------------------------------------
@@ -42,6 +43,8 @@ export type SugerirMatrizOpts = {
   fecha: string;
   /** Día de la semana en español. */
   diaSemana: string;
+  /** Perfil del usuario (migration 0032). Si se omite, DEFAULT_PERFIL_IA. */
+  perfil?: PerfilIA | null;
 };
 
 export type SugerirMatrizItem = {
@@ -224,7 +227,8 @@ function buildPrompt(opts: SugerirMatrizOpts): string {
         .join("\n")
     : "(sin tareas activas)";
 
-  return `Eres el asistente de productividad de David. Tu trabajo es revisar la lista de sus tareas activas y proponer para cada una el cuadrante correcto de la matriz de Eisenhower.
+  return `Eres el asistente de productividad. ${bloquePerfil(opts.perfil)}
+Tu trabajo es revisar la lista de sus tareas activas y proponer para cada una el cuadrante correcto de la matriz de Eisenhower.
 
 MATRIZ DE EISENHOWER:
 - Q1 — Hacer YA:    urgente (vencida/hoy) + importante (WIG-meta, WIG-tarea, meta activa)

@@ -14,6 +14,7 @@
 
 import type { InformePlan, PlanDiario, Tarea, Subtarea } from "@/lib/types";
 import { calcularTimeoutIA, mensajeTimeoutIA } from "@/lib/ai-timeout";
+import { bloquePerfil, type PerfilIA } from "./perfilIA";
 import { extraerJSON } from "./llm-parser";
 
 export type EstadoEmocional = {
@@ -57,6 +58,12 @@ export type GenerarPlanOpts = {
   historial?: PlanDiario[];
   /** Fecha en formato YYYY-MM-DD */
   fecha: string;
+  /**
+   * Perfil del usuario para el bloque de contexto del prompt (migration
+   * 0032). Si se omite, `bloquePerfil` usa DEFAULT_PERFIL_IA — los mismos
+   * textos que estaban hardcodeados antes de sacarlos de aquí.
+   */
+  perfil?: PerfilIA | null;
 };
 
 export type RedactarOpts = {
@@ -119,9 +126,7 @@ function buildPrompt(opts: GenerarPlanOpts): string {
   2. ⚙️ PLANIFICADOR OPERATIVO (clasificación de tareas, día optimizado, recomendación estratégica)
   3. 🥗 NUTRICIÓN (plato base + menú familiar + lista compra)
 
-PERFIL DEL USUARIO:
-- David. Familia: María y Abril (5 años).
-- Restricciones alimentarias activas: 🚫 SIN avena, SIN cilantro, SIN quinoa, SIN tofu.
+${bloquePerfil(opts.perfil)}
 - Cocina batch los domingos con hardware: Mambo > Vaporera > Freidora aire > Plancha > Roner.
 - Prioridades estratégicas: familia > negocio > sí-mismo.
 

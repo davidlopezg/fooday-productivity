@@ -43,6 +43,8 @@ import {
 } from "@/components/icons";
 import { useData } from "@/lib/useData";
 import {
+  fetchKRsCandidatosSemana,
+  fetchKRsFocoSemanal,
   fetchPlanSemanal,
   fetchTareas,
   fetchTareasCriticasActivas,
@@ -50,9 +52,14 @@ import {
 import {
   aplicarPropuestaIA,
   asignarTareaADia,
+  marcarKrFocoSemanal,
   quitarTareaDeSemana,
 } from "@/lib/mutations";
 import { CrearModal, EditarModal } from "@/components/TareaModal";
+import { PanelFocoKRs } from "@/components/PanelFocoKRs";
+import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
+import { useConfig } from "@/lib/configStore";
+import { sugerirKRsSemanaIA, type KrSugerido } from "@/lib/sugerirKRsSemanaIA";
 import {
   BLOQUES_FIJOS,
   DIAS_IA,
@@ -67,7 +74,13 @@ import {
   type BloqueFijo,
   type DiaSemana,
 } from "@/lib/semana";
-import type { PlanSemanalTarea, Prioridad, Tarea } from "@/lib/types";
+import type {
+  KrCandidatoSemana,
+  KrFocoConDetalle,
+  PlanSemanalTarea,
+  Prioridad,
+  Tarea,
+} from "@/lib/types";
 
 const ACTIVAS: ReadonlyArray<Tarea["estado"]> = [
   "pendiente",
@@ -732,6 +745,89 @@ export default function SemanaPage() {
     [],
   );
 
+  // ── Foco semanal de KRs (migration 0033) ──────────────────────────────
+  // La capa intermedia: qué KRs (resultados medibles) se mueven esta semana.
+  // El trimestre NO se sustituye: dice cuándo se entrega; esto dice dónde
+  // pongo horas. Regla de contención: solo KRs con periodo que cubre la
+  // semana (la RPC lo aplica en BD).
+  const {
+    data: focoKRs,
+    reload: reloadFocoKRs,
+  } = useData<KrFocoConDetalle[]>(
+    () => fetchKRsFocoSemanal(semana.anio, semana.semana_iso),
+    [],
+    [semana.anio, semana.semana_iso],
+  );
+
+  const {
+    data: candidatosKRs,
+    reload: reloadCandidatosKRs,
+  } = useData<KrCandidatoSemana[]>(
+    () => fetchKRsCandidatosSemana(semana.anio, semana.semana_iso),
+    [],
+    [semana.anio, semana.semana_iso],
+  );
+
+  const cfg = useConfig();
+  const [krGuardandoId, setKrGuardandoId] = useState<string | null>(null);
+  const [krSugerencia, setKrSugerencia] = useState<KrSugerido[] | null>(null);
+  const [krSugerenciaLoading, setKrSugerenciaLoading] = useState(false);
+  const [krSugerenciaError, setKrSugerenciaError] = useState<string | null>(null);
+
+  async function aplicarKrFoco(krId: string, esFoco: boolean) {
+    setKrGuardandoId(krId);
+    setKrSugerenciaError(null);
+    try {
+      const ok = await marcarKrFocoSemanal(
+        krId,
+        semana.anio,
+        semana.semana_iso,
+        esFoco,
+      );
+      if (!ok && esFoco) {
+        setKrSugerenciaError(
+          "No se pudo añadir: ya hay 3 KRs en foco esta semana o el KR está fuera de ventana (su entrega no cae en esta semana).",
+        );
+      }
+      await Promise.all([reloadFocoKRs(), reloadCandidatosKRs()]);
+    } catch (e) {
+      setKrSugerenciaError(
+        e instanceof Error ? e.message : "No se pudo actualizar el foco semanal",
+      );
+    } finally {
+      setKrGuardandoId(null);
+    }
+  }
+
+  async function pedirSugerenciaKRs() {
+    if (!cfg.data.minimax_api_key) {
+      setKrSugerenciaError("Configura la clave de IA en /configuracion primero.");
+      return;
+    }
+    setKrSugerenciaLoading(true);
+    setKrSugerenciaError(null);
+    setKrSugerencia(null);
+    try {
+      const res = await sugerirKRsSemanaIA(
+        cfg.data.base_url,
+        cfg.data.minimax_api_key,
+        cfg.data.model,
+        {
+          candidatos: candidatosKRs ?? [],
+          n: 3,
+          contextoSemana: `Semana ISO ${semana.semana_iso} de ${semana.anio}`,
+        },
+      );
+      setKrSugerencia(res.sugerencias);
+    } catch (e) {
+      setKrSugerenciaError(
+        e instanceof Error ? e.message : "La IA no pudo sugerir KRs.",
+      );
+    } finally {
+      setKrSugerenciaLoading(false);
+    }
+  }
+
   // Modales y popovers
   const [editando, setEditando] = useState<Tarea | null>(null);
   const [creandoParaDia, setCreandoParaDia] = useState<DiaSemana | null>(null);
@@ -913,6 +1009,21 @@ export default function SemanaPage() {
         (t) => !tareasAsignadasIds.has(t.id),
       );
 
+      // 1-bis) ANCLAJE AL FOCO SEMANAL (migration 0033).
+      // Antes el pool era solo "prioridad = crítica", un corte ciego que
+      // ignoraba por completo tus metas y KRs: se planificaba trabajo
+      // que no empujaba ninguna WIG. Ahora, si hay KRs en foco esta
+      // semana, las tareas que apuntan a ellos van PRIMERO. Si no hay
+      // foco elegido, se degrada al comportamiento anterior (deadline).
+      const krIdsFoco = new Set((focoKRs ?? []).map((f) => f.kr.id));
+      const tareasEnFoco = pool.filter(
+        (t) => t.resultado_periodo_id && krIdsFoco.has(t.resultado_periodo_id),
+      );
+      const restoPool = pool.filter(
+        (t) => !(t.resultado_periodo_id && krIdsFoco.has(t.resultado_periodo_id)),
+      );
+      const ancladas = krIdsFoco.size > 0;
+
       // 2) Huecos por día (3 - ya asignadas en días IA)
       const huecosPorDia = new Map<DiaSemana, number>();
       for (const d of DIAS_IA) {
@@ -920,15 +1031,17 @@ export default function SemanaPage() {
         huecosPorDia.set(d, Math.max(0, TAREAS_POR_DIA_IA - ya));
       }
 
-      // 3) Construimos la propuesta: round-robin por día hasta llenar huecos,
-      //    tomando del pool en orden de deadline ascendente.
-      const sorted = pool.slice().sort((a, b) => {
+      // 3) Construimos la propuesta: round-robin por día hasta llenar huecos.
+      //    Orden: primero las ancladas al foco (por deadline), después el
+      //    resto (también por deadline).
+      const porDeadline = (a: Tarea, b: Tarea) => {
         const da = a.deadline ?? "";
         const db = b.deadline ?? "";
         if (da && !db) return -1;
         if (!da && db) return 1;
         return da.localeCompare(db);
-      });
+      };
+      const sorted = [...tareasEnFoco.sort(porDeadline), ...restoPool.sort(porDeadline)];
 
       const prop: Partial<Record<DiaSemana, string[]>> = {};
       for (const d of DIAS_IA) prop[d] = [];
@@ -959,11 +1072,14 @@ export default function SemanaPage() {
             ? "No hay tareas críticas activas pendientes."
             : "Todas las críticas ya están asignadas a esta semana.";
       } else {
-        const conDeadline = sorted
-          .slice(0, total)
-          .map((t) => t.deadline)
-          .filter(Boolean);
-        resumen = `He repartido ${total} tarea(s) crítica(s) en ${DIAS_IA.map(nombreDia).join(", ")} priorizando por deadline${conDeadline.length > 0 ? " (la más próxima: " + conDeadline[0] + ")" : ""}. Esta propuesta AÑADE a lo que ya hay; no pisa nada.`;
+      const conDeadline = sorted
+        .slice(0, total)
+        .map((t) => t.deadline)
+        .filter(Boolean);
+        const ancla = ancladas
+          ? ` Priorizado por tus ${krIdsFoco.size} KRs en foco de esta semana.`
+          : "";
+        resumen = `He repartido ${total} tarea(s) en ${DIAS_IA.map(nombreDia).join(", ")}${ancla}${conDeadline.length > 0 ? " (deadline más próximo: " + conDeadline[0] + ")" : ""}. Esta propuesta AÑADE a lo que ya hay; no pisa nada.`;
       }
 
       setPropuesta(prop);
@@ -1037,6 +1153,7 @@ export default function SemanaPage() {
           >
             Hoy
           </button>
+          <HelpDrawer title="Semana" items={AYUDA_POR_RUTA["/semana"]?.items ?? []} />
         </div>
       </header>
 
@@ -1070,6 +1187,26 @@ export default function SemanaPage() {
           Abrir →
         </span>
       </Link>
+
+      {/* Foco semanal de KRs — la capa intermedia (migration 0033).
+          Va ANTES del pipeline porque los KRs en foco son los que
+          justifican qué tareas se planifican esta semana. El trimestre
+          sigue mandando en la entrega; aquí manda el esfuerzo. */}
+      <PanelFocoKRs
+        foco={focoKRs ?? []}
+        candidatos={candidatosKRs ?? []}
+        guardandoKrId={krGuardandoId}
+        sugerencia={krSugerencia}
+        sugerenciaLoading={krSugerenciaLoading}
+        sugerenciaError={krSugerenciaError}
+        onPedirSugerencia={pedirSugerenciaKRs}
+        onCancelarSugerencia={() => {
+          setKrSugerencia(null);
+          setKrSugerenciaError(null);
+        }}
+        onAplicar={(krId) => aplicarKrFoco(krId, true)}
+        onQuitar={(krId) => aplicarKrFoco(krId, false)}
+      />
 
       {/* Pipeline */}
       <DndContext

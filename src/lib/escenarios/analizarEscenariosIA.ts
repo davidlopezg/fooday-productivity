@@ -22,6 +22,7 @@
 import { llamarLLM } from "@/lib/llm";
 import { parsearYValidar, type FieldSchema } from "@/lib/llm-parser";
 import { sanearHipotesis } from "./hipotesis";
+import { bloquePerfil, type PerfilIA } from "@/lib/perfilIA";
 import type { EstadoProyecto, Hipotesis } from "@/lib/types";
 
 // ----------------------------------------------------------------------------
@@ -60,6 +61,8 @@ export type AnalizarEscenariosOpts = {
   /** Estado medido (se calcula en la UI desde `tareas`). */
   estado: EstadoProyecto;
   metas: MetaProyectoIA[];
+  /** Perfil del usuario (migration 0032). Si se omite, DEFAULT_PERFIL_IA. */
+  perfil?: PerfilIA | null;
   /** Tareas abiertas relevantes (ya recortadas por la UI). */
   tareas: TareaProyectoIA[];
   /** YYYY-MM-DD */
@@ -110,7 +113,7 @@ export const ESQUEMA_ESCENARIOS: FieldSchema = {
 // Prompt
 // ----------------------------------------------------------------------------
 
-const SYSTEM = `Eres el analista de escenarios de David. Lees la cronología de un
+const SYSTEM = `Eres el analista de escenarios. Lees la cronología de un
 proyecto, entiendes su situación actual y devuelves los escenarios que puede
 tomar, cada uno con la estrategia concreta a seguir.
 
@@ -176,7 +179,9 @@ export function buildPrompt(opts: AnalizarEscenariosOpts): string {
         .join("\n")
     : "(sin tareas relevantes)";
 
-  return `PROYECTO: ${proyecto.nombre}
+  return `${bloquePerfil(opts.perfil)}
+
+PROYECTO: ${proyecto.nombre}
 ÁREA: ${proyecto.area ?? "(sin área)"}
 DESCRIPCIÓN: ${proyecto.descripcion ?? "(sin descripción)"}
 HOY: ${hoy}

@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
-import { localYMD } from "@/lib/semana";
+import { localYMD, isoWeekToMonday } from "@/lib/semana";
 import { proyectoEfectivoDeTarea } from "@/lib/proyectos";
 import type {
   Area,
@@ -7,6 +7,9 @@ import type {
   CalendarioBloqueConTarea,
   Captura,
   EstatusConComidas,
+  KrCandidatoSemana,
+  KrFocoConDetalle,
+  KrFocoSemanal,
   Meta,
   MetaConPlan,
   Periodo,
@@ -1431,4 +1434,253 @@ export async function limpiarBloque(opts: {
     .eq("fecha", opts.fecha)
     .eq("numero_bloque", opts.numeroBloque);
   if (error) throw error;
+}
+
+// ============================================================================
+// FOCO SEMANAL DE KRs — migration 0033
+// ----------------------------------------------------------------------------
+// Eje ortogonal a la ventana de medición (`periodos`): aquí el tiempo es la
+// SEMANA ISO y la pregunta es "en qué KRs pongo horas esta semana".
+//
+// Regla de contención (aplicada por la RPC `toggle_kr_foco_semanal`):
+// un KR solo entra en el foco si ALGUNO de sus periodos contiene la semana
+// actual. Aquí la replicamos para PODER MOSTRAR candidatos.
+// ============================================================================
+
+/** Rango [lunes, domingo] de una semana ISO, como "YYYY-MM-DD". */
+export function rangoSemanaISO(anio: number, semana_iso: number): [string, string] {
+  const monday = isoWeekToMonday(anio, semana_iso);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  return [localYMD(monday), localYMD(sunday)];
+}
+
+/** ¿Este periodo contiene la semana (lunes..domingo) dada? */
+function periodoCubreSemana(
+  periodo: Pick<Periodo, "fecha_inicio" | "fecha_fin">,
+  inicio: string,
+  fin: string,
+): boolean {
+  return periodo.fecha_inicio <= fin && periodo.fecha_fin >= inicio;
+}
+
+/** Progreso esperado de un KR según los días transcurridos de su periodo
+ *  (misma fórmula que el scorecard de /metas/plan, reutilizada aquí). */
+function progresoEsperado(periodo: Periodo, hoy = new Date()): number {
+  const inicio = new Date(periodo.fecha_inicio + "T00:00:00");
+  const fin = new Date(periodo.fecha_fin + "T00:00:00");
+  const diasTotales = Math.max(1, (fin.getTime() - inicio.getTime()) / 86_400_000);
+  const diasTrans = Math.max(
+    0,
+    Math.min(diasTotales, (hoy.getTime() - inicio.getTime()) / 86_400_000),
+  );
+  return diasTrans / diasTotales;
+}
+
+/** Días que faltan para el final del periodo (0 si ya venció). */
+function diasRestantes(periodo: Periodo, hoy = new Date()): number {
+  const fin = new Date(periodo.fecha_fin + "T00:00:00");
+  return Math.max(0, Math.ceil((fin.getTime() - hoy.getTime()) / 86_400_000));
+}
+
+/** KRs en el foco de una semana concreta, con su meta, sus periodos y sus
+ *  tareas. Array vacío si la semana no tiene foco elegido. */
+export async function fetchKRsFocoSemanal(
+  anio: number,
+  semana_iso: number,
+): Promise<KrFocoConDetalle[]> {
+  const supabase = createClient();
+  const { data: focos, error: eF } = await supabase
+    .from("kr_foco_semanal")
+    .select("id,owner_id,anio,semana_iso,kr_id,orden,created_at,updated_at")
+    .eq("anio", anio)
+    .eq("semana_iso", semana_iso)
+    .order("orden");
+  if (eF) throw eF;
+  if (!focos || focos.length === 0) return [];
+
+  const krIds = Array.from(new Set(focos.map((f) => f.kr_id)));
+
+  const [{ data: krs }, { data: asignaciones }, { data: periodos }, { data: tareas }] =
+    await Promise.all([
+      supabase
+        .from("resultados_periodo")
+        .select(
+          "id,meta_id,titulo,descripcion,metrica,valor_objetivo,valor_actual,unidad,estado,peso,orden",
+        )
+        .in("id", krIds),
+      supabase.from("kr_periodos").select("kr_id,periodo_id").in("kr_id", krIds),
+      supabase.from("periodos").select("id,tipo,anio,numero,nombre,fecha_inicio,fecha_fin"),
+      supabase
+        .from("tareas")
+        .select("*, subtareas:tareas_subtareas(*)")
+        .in("resultado_periodo_id", krIds),
+    ]);
+
+  const krsById = new Map((krs ?? []).map((k) => [k.id, k as ResultadoPeriodo]));
+  const periodosById = new Map((periodos ?? []).map((p) => [p.id, p as Periodo]));
+
+  // Periodos por KR (un KR puede vivir en varios).
+  const periodosPorKr = new Map<string, Periodo[]>();
+  for (const a of asignaciones ?? []) {
+    const p = periodosById.get(a.periodo_id);
+    if (!p) continue;
+    const arr = periodosPorKr.get(a.kr_id) ?? [];
+    arr.push(p);
+    periodosPorKr.set(a.kr_id, arr);
+  }
+
+  // Tareas por KR.
+  const tareasPorKr = new Map<string, Tarea[]>();
+  for (const t of ordenarSubtareas((tareas ?? []) as Tarea[])) {
+    if (!t.resultado_periodo_id) continue;
+    const arr = tareasPorKr.get(t.resultado_periodo_id) ?? [];
+    arr.push(t);
+    tareasPorKr.set(t.resultado_periodo_id, arr);
+  }
+
+  // Metas de los KRs en foco.
+  const metaIds = Array.from(
+    new Set((krs ?? []).map((k) => (k as ResultadoPeriodo).meta_id)),
+  );
+  const { data: metas } = await supabase.from("metas").select("*").in("id", metaIds);
+  const metasById = new Map((metas ?? []).map((m) => [m.id, m as Meta]));
+
+  const out: KrFocoConDetalle[] = [];
+  for (const f of focos) {
+    const kr = krsById.get(f.kr_id);
+    if (!kr) continue;
+    const meta = metasById.get(kr.meta_id);
+    if (!meta) continue;
+    const tks = tareasPorKr.get(kr.id) ?? [];
+    const hechas = tks.filter((t) => t.estado === "hecha").length;
+    out.push({
+      foco: f as KrFocoSemanal,
+      kr,
+      meta,
+      periodos: (periodosPorKr.get(kr.id) ?? []).sort((a, b) =>
+        a.fecha_inicio.localeCompare(b.fecha_inicio),
+      ),
+      tareas: tks,
+      tareas_hechas: hechas,
+      progreso: tks.length === 0 ? 0 : hechas / tks.length,
+    });
+  }
+  return out;
+}
+
+/** Candidatos a entrar en el foco semanal: KRs de las metas WIG cuyo
+ *  periodo contiene la semana actual. Viene con el scorecard para que la
+ *  IA elija por riesgo real (los que van por debajo del ritmo). */
+export async function fetchKRsCandidatosSemana(
+  anio: number,
+  semana_iso: number,
+): Promise<KrCandidatoSemana[]> {
+  const supabase = createClient();
+  const [inicio, fin] = rangoSemanaISO(anio, semana_iso);
+
+  // 1. Metas WIG (el foco del ciclo, capa de arriba).
+  const { data: metasWig, error: eM } = await supabase
+    .from("metas")
+    .select("*")
+    .eq("es_wig", true)
+    .neq("estado", "archivada")
+    .order("wig_orden");
+  if (eM) throw eM;
+  if (!metasWig || metasWig.length === 0) return [];
+
+  const metaIds = metasWig.map((m) => m.id);
+
+  // 2. KRs de esas metas.
+  const { data: krs } = await supabase
+    .from("resultados_periodo")
+    .select(
+      "id,meta_id,titulo,descripcion,metrica,valor_objetivo,valor_actual,unidad,estado,peso,orden",
+    )
+    .in("meta_id", metaIds);
+  const krsList = (krs ?? []) as ResultadoPeriodo[];
+  if (krsList.length === 0) return [];
+  const krIds = krsList.map((k) => k.id);
+
+  // 3. Periodos de esos KRs + tareas.
+  const [{ data: asignaciones }, { data: periodos }, { data: tareas }] = await Promise.all([
+    supabase.from("kr_periodos").select("kr_id,periodo_id").in("kr_id", krIds),
+    supabase.from("periodos").select("id,tipo,anio,numero,nombre,fecha_inicio,fecha_fin"),
+    supabase
+      .from("tareas")
+      .select("*, subtareas:tareas_subtareas(*)")
+      .in("resultado_periodo_id", krIds),
+  ]);
+
+  const periodosById = new Map((periodos ?? []).map((p) => [p.id, p as Periodo]));
+  const periodosPorKr = new Map<string, Periodo[]>();
+  for (const a of asignaciones ?? []) {
+    const p = periodosById.get(a.periodo_id);
+    if (!p) continue;
+    const arr = periodosPorKr.get(a.kr_id) ?? [];
+    arr.push(p);
+    periodosPorKr.set(a.kr_id, arr);
+  }
+
+  const tareasPorKr = new Map<string, Tarea[]>();
+  for (const t of ordenarSubtareas((tareas ?? []) as Tarea[])) {
+    if (!t.resultado_periodo_id) continue;
+    const arr = tareasPorKr.get(t.resultado_periodo_id) ?? [];
+    arr.push(t);
+    tareasPorKr.set(t.resultado_periodo_id, arr);
+  }
+
+  const metasById = new Map((metasWig ?? []).map((m) => [m.id, m as Meta]));
+
+  const out: KrCandidatoSemana[] = [];
+  for (const kr of krsList) {
+    const meta = metasById.get(kr.meta_id);
+    if (!meta) continue;
+    // REGLA DE CONTENCIÓN: solo los KRs con un periodo que cubre la semana.
+    const propios = (periodosPorKr.get(kr.id) ?? []).filter((p) =>
+      periodoCubreSemana(p, inicio, fin),
+    );
+    if (propios.length === 0) continue;
+
+    const tks = tareasPorKr.get(kr.id) ?? [];
+    const hechas = tks.filter((t) => t.estado === "hecha").length;
+    const prog = tks.length === 0 ? 0 : hechas / tks.length;
+
+    // El scorecard usa el periodo más próximo (el que antes vence).
+    const referencia = [...propios].sort((a, b) =>
+      a.fecha_fin.localeCompare(b.fecha_fin),
+    )[0];
+    const esp = progresoEsperado(referencia);
+    const dif = prog - esp;
+    const estado =
+      prog < esp - 0.1 ? "por_debajo" : prog > esp + 0.1 ? "por_encima" : "en_linea";
+
+    out.push({
+      kr,
+      meta,
+      periodos: propios,
+      tareas: tks,
+      progreso: prog,
+      progreso_esperado: esp,
+      diferencia: Math.round(dif * 100),
+      estado,
+      dias_restantes: diasRestantes(referencia),
+    });
+  }
+  return out;
+}
+
+/** IDs de los KRs en el foco semanal (para filtrar pools de tareas). */
+export async function fetchIdsKRsFocoSemanal(
+  anio: number,
+  semana_iso: number,
+): Promise<string[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("kr_foco_semanal")
+    .select("kr_id")
+    .eq("anio", anio)
+    .eq("semana_iso", semana_iso);
+  if (error) throw error;
+  return Array.from(new Set((data ?? []).map((f) => f.kr_id)));
 }

@@ -549,6 +549,8 @@ export default function EscenariosPage() {
               deadline: t.deadline,
             })),
           hoy,
+          // Migration 0032: perfil desde `configuracion`.
+          perfil: cfg,
         },
       );
 

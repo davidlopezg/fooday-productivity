@@ -19,6 +19,7 @@
 // ============================================================================
 
 import { calcularTimeoutIA, mensajeTimeoutIA } from "@/lib/ai-timeout";
+import { bloquePerfil, type PerfilIA } from "@/lib/perfilIA";
 import type { PagoConUrgencia } from "@/lib/pagos/types";
 
 // ============================================================================
@@ -40,6 +41,8 @@ export type SugerirPagosOpts = {
   /** Lista de los próximos 6 lunes como YYYY-MM-DD. Lo calcula el caller
    *  con la misma helper que /pagos usa para `proximoLunesISO`. */
   proximosLunes: string[];
+  /** Perfil del usuario (migration 0032). Si se omite, DEFAULT_PERFIL_IA. */
+  perfil?: PerfilIA | null;
 };
 
 export type SugerirPagoItem = {
@@ -189,11 +192,11 @@ function saneadorComun(s: string): string {
 /** Prompt por defecto — el que se muestra si el usuario todavía no ha
  *  personalizado `prompt_pagos` en /configuracion. Se exporta para que
  *  la UI pueda ofrecer "Restaurar ejemplo por defecto". */
-export const DEFAULT_PROMPT_PAGOS = `Eres el asistente financiero de David. Tu trabajo es mirar sus pagos activos y proponer cuáles transferir esta semana y cuáles programar para las siguientes.
+export const DEFAULT_PROMPT_PAGOS = `Eres el asistente financiero del usuario. Tu trabajo es mirar sus pagos activos y proponer cuáles transferir esta semana y cuáles programar para las siguientes.
 
 CONTEXTO DEL NEGOCIO:
-- David factura el viernes y sábado por la noche.
-- Los ingresos llegan a su banco el sábado y el domingo.
+- Factura el viernes y sábado por la noche.
+- Los ingresos llegan al banco el sábado y el domingo.
 - El lunes es el día natural para hacer pagos porque la caja está fresca.
 - Si la fecha de vencimiento cae en festivo o fin de semana, anticipa al lunes anterior.
 
@@ -244,8 +247,14 @@ function buildPrompt(opts: SugerirPagosOpts): string {
       : "  (no hay próximos lunes calculados)";
 
   const promptBase = (promptUsuario ?? "").trim() || DEFAULT_PROMPT_PAGOS;
+  // Si el usuario NO tiene prompt propio, le anteponemos su perfil para que
+  // la IA sepa a qué se refiere (negocio, restricciones). Si trae prompt
+  // propio, se respeta tal cual y no se le inyecta nada.
+  const promptFinal = (promptUsuario ?? "").trim()
+    ? promptBase
+    : `${bloquePerfil(opts.perfil)}\n\n${promptBase}`.trim();
 
-  return `${promptBase}
+  return `${promptFinal}
 
 ============================================================
 CONTEXTO TEMPORAL

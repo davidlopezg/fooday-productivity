@@ -231,6 +231,8 @@ export function PagosLista() {
         fecha: localYMD(hoy),
         diaSemana: diaSemanaES(hoy),
         proximosLunes: lunesIA,
+        // Migration 0032: perfil desde `configuracion`.
+        perfil: cfg,
       });
       setSugResultado(res);
     } catch (e) {

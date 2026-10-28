@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { DEFAULT_PROMPT_PAGOS, useConfig } from "@/lib/configStore";
+import { DEFAULT_PERFIL_IA } from "@/lib/perfilIA";
 import { probarConexion } from "@/lib/plan";
 import { useTheme, type Theme } from "@/lib/themeStore";
 import {
@@ -39,6 +40,20 @@ export default function ConfiguracionPage() {
   const [promptPagos, setPromptPagos] = useState(promptEfectivo);
   const [restaurado, setRestaurado] = useState(false);
 
+  // Perfil para los prompts de IA (migration 0032). Antes esto estaba
+  // escrito dentro de los prompts de `plan.ts`/`iaSugerencias.ts`; ahora
+  // es editable aquí y viaja en la tabla `configuracion`.
+  // Un campo vacío se persiste como null → la app usa DEFAULT_PERFIL_IA.
+  const [perfil, setPerfil] = useState(data.perfil ?? "");
+  const [familia, setFamilia] = useState(data.familia ?? "");
+  const [restricciones, setRestricciones] = useState(data.restricciones ?? "");
+  const [contextoNegocio, setContextoNegocio] = useState(
+    data.contexto_negocio ?? "",
+  );
+
+  /** Placeholder seguro para los textareas del perfil (React exige string). */
+  const ph = (v: string | null | undefined) => v ?? "";
+
   const tieneKey = !!data.minimax_api_key;
 
   // Sincroniza el campo cuando se recargan los datos remotos. No
@@ -73,6 +88,11 @@ export default function ConfiguracionPage() {
       // Si el textarea está vacío, persistimos null para que la app use
       // el DEFAULT_PROMPT_PAGOS en runtime (no guardamos un string "").
       prompt_pagos: promptPagos.trim() || null,
+      // Migration 0032: perfil de IA. Vacío → null → DEFAULT_PERFIL_IA.
+      perfil: perfil.trim() || null,
+      familia: familia.trim() || null,
+      restricciones: restricciones.trim() || null,
+      contexto_negocio: contextoNegocio.trim() || null,
     };
     try {
       await save(saved);
@@ -309,6 +329,76 @@ export default function ConfiguracionPage() {
             guardes una clave de MiniMax arriba.
           </p>
         )}
+      </section>
+
+      {/* ================================================================
+          Migration 0032 — Sección "Perfil para la IA".
+          Hasta la 0032, el perfil ("David", familia, restricciones,
+          TDAH, negocio) estaba escrito DENTRO de las plantillas de prompt
+          en plan.ts / planSimple.ts / iaSugerencias.ts. Cambiarlo obligaba
+          a tocar el código. Ahora vive en `configuracion` y se inyecta en
+          todos los prompts vía `bloquePerfil()` (src/lib/perfilIA.ts).
+
+          Campos vacíos = null en BD = se usa DEFAULT_PERFIL_IA, que
+          reproduce exactamente los textos que estaban hardcodeados.
+          ================================================================ */}
+      <section className="rounded-xl border border-border bg-card p-6 space-y-4">
+        <div className="flex items-center gap-2">
+          <IconSparkles className="h-4 w-4 text-violet-500" />
+          <h2 className="text-base font-semibold">Perfil para la IA</h2>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Contexto que la IA recibe en cada llamada (plan diario, sugerencias de
+          tareas, matriz, escenarios, pagos). Déjalo vacío para usar el perfil por
+          defecto de la app.
+        </p>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="space-y-1.5">
+            <span className="text-xs font-medium">Quién eres</span>
+            <textarea
+              rows={3}
+              value={perfil}
+              onChange={(e) => setPerfil(e.target.value)}
+              className="w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-xs leading-relaxed outline-none focus:ring-2 focus:ring-ring"
+              placeholder={ph(DEFAULT_PERFIL_IA.perfil)}
+            />
+          </label>
+          <label className="space-y-1.5">
+            <span className="text-xs font-medium">Familia</span>
+            <textarea
+              rows={3}
+              value={familia}
+              onChange={(e) => setFamilia(e.target.value)}
+              className="w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-xs leading-relaxed outline-none focus:ring-2 focus:ring-ring"
+              placeholder={ph(DEFAULT_PERFIL_IA.familia)}
+            />
+          </label>
+          <label className="space-y-1.5">
+            <span className="text-xs font-medium">Restricciones</span>
+            <textarea
+              rows={3}
+              value={restricciones}
+              onChange={(e) => setRestricciones(e.target.value)}
+              className="w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-xs leading-relaxed outline-none focus:ring-2 focus:ring-ring"
+              placeholder={ph(DEFAULT_PERFIL_IA.restricciones)}
+            />
+          </label>
+          <label className="space-y-1.5">
+            <span className="text-xs font-medium">Negocio</span>
+            <textarea
+              rows={3}
+              value={contextoNegocio}
+              onChange={(e) => setContextoNegocio(e.target.value)}
+              className="w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-xs leading-relaxed outline-none focus:ring-2 focus:ring-ring"
+              placeholder={ph(DEFAULT_PERFIL_IA.contexto_negocio)}
+            />
+          </label>
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          Campo vacío → la app usa su perfil por defecto (idéntico al que estaba
+          escrito en el código antes de la migration 0032).
+        </p>
       </section>
 
       <section className="rounded-xl border border-dashed border-border bg-muted/30 p-4 text-xs text-muted-foreground space-y-1">

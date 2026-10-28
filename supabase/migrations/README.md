@@ -1,0 +1,44 @@
+-- ============================================================================
+-- ESTADO DEL HISTORIAL DE MIGRACIONES (leer antes de añadir una nueva)
+-- ============================================================================
+--
+-- ⚠️  HAY NÚMEROS DUPLICADOS, Y ES A PROPÓSITO (no los "arregles")
+--
+--     0027_configuracion_prompt_pagos.sql
+--     0027_pomodoro_tarea_id_nullable.sql
+--     0028_kr_separado_de_trimestre.sql
+--     0028_metas_fecha_cierre.sql
+--
+--     ¿POR QUÉ NO SE RENUMERAN?
+--     El Supabase CLI guarda las migraciones ya aplicadas en la tabla
+--     `supabase_migrations.schema_migrations`, indexada por el NOMBRE del
+--     fichero. Si se renombra `0028_metas_fecha_cierre.sql` a otra cosa, el
+--     CLI lo ve como una migración nueva e intenta aplicarla de nuevo (y si
+--     no fuera idempotente, rompería). Renombrar es una operación que solo
+--     es segura si NUNCA se ha hecho `db push` a la BD real — y esta BD sí
+--     está en producción. Arriesgar la BD por un número feo no vale la pena.
+--
+--     En la práctica NO causes daño: `ls supabase/migrations/*.sql | sort`
+--     ordena por nombre, así que el orden de aplicación es determinista y
+--     cada migración es idempotente (`if not exists`, `drop ... if exists`),
+--     de modo que el solapamiento de números es inocuo.
+--
+-- QUÉ HACER CON LAS NUEVAS
+--     · A partir de 0030 el número vuelve a ser único y correlativo.
+--       Sigue el siguiente número libre; si lo pillas ocupado, usa 0032, 0033…
+--       (nunca reutilices un número que ya exista).
+--     · Nada de ficheros sueltos tipo `APLICAR-XXXX.sql` en `supabase/`
+--       (ver el registro de cambios al final):todo va en `migrations/` con
+--       número. Existían 9 y duplicaban migraciones ya versionadas; el
+--       único que tenía contenido propio (los datos de M8101) se rescuó
+--       como `0031_seed_m8101_kr_y_tareas.sql` antes de borrarlos.
+--
+-- REGLAS DE ORO AL ESCRIBIR UNA MIGRACIÓN
+--     1. SIEMPRE idempotente: `create table if not exists`,
+--        `add column if not exists`, `drop ... if exists`,
+--        `create or replace function`.
+--     2. `psql -v ON_ERROR_STOP=1` para que un error a media migration
+--        se detenga (nunca sigas después de un ERROR).
+--     3. No borres columnas/tablas de las que aún hable el código de `src/`.
+--        Compruébalo con grep antes de escribir `drop table`.
+-- ============================================================================

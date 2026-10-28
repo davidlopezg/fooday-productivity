@@ -78,6 +78,33 @@ npm run dev
 | `/norte` | **Norte** | Propósito, valores, visión |
 | `/docs` | **Metodología** | Los 5 pilares (Deep Work, Metas, Tiempo, Hábitos, Descanso) |
 
+### No listadas (existen y funcionan)
+
+| Ruta | Qué hace |
+|:---|:---|
+| `/metas/{nueva,detalle,plan,agente,auditoria}` | Alta de metas, detalle con KRs, plan trimestral, agente, auditoría |
+| `/tareas/{inbox,completadas,pendientes-respuesta}` | Triaje, histórico y panel de "esperando respuesta" |
+| `/plan-diario/{detalle,historico}` | Informe del día e histórico de planes |
+| `/estatus/{nuevo,editar,ver}` | Entradas de estatus diario |
+| `/escenarios` | Análisis de escenarios por proyecto |
+| `/dashboard-emocional` | Tendencias de estado emocional |
+| `/agente` | Entrada unificada: la IA clasifica (proyecto / meta / captura) |
+| `/metodologia` | Arquitectura de WIGs / GTD |
+| `/configuracion` | API key, modelo, tema, prompt de pagos y **perfil para la IA** |
+
+## 🧪 Tests
+
+```bash
+npm test         # 8 ficheros, ~106 aserciones. Sin dependencias extra.
+npm run typecheck # tsc --noEmit
+```
+
+Los tests usan un harness propio (sin framework) y ejecutan el código real de
+`src/` directamente: `scripts/test-alias.mjs` resuelve el alias `@/…` y las
+rutas relativas sin extensión que Next/Webpack resuelven en build pero Node no.
+Ambos comandos corren en CI (`.github/workflows/test.yml`) en cada push a
+`main` y en cada PR.
+
 ---
 
 ## 📚 Documentación
@@ -95,8 +122,23 @@ npm run dev
 
 - El navegador usa **solo la `anon` key** + **Row Level Security (RLS)**.
 - La `service_role` **nunca** va al cliente; solo en scripts de migración.
-- Cada tabla tiene RLS `owner_id = auth.uid()`. Cada usuario ve solo lo suyo.
-- **Este proyecto NO almacena** finanzas, salud, legal ni datos familiares sensibles.
+- Cada tabla de datos tiene RLS `owner_id = auth.uid()`. Cada usuario ve solo lo suyo.
+
+### ⚠️ Dos avisos honestos sobre el estado de seguridad
+
+1. **La API key de la IA viaja al navegador.** La app es un export estático
+   (`output: "export"`), sin servidor, así que las llamadas al LLM se hacen
+   desde el cliente con `Authorization: Bearer <key>` y la key además se
+   guarda en `localStorage` y en la tabla `configuracion`. **No es un
+   secreto**: cualquiera con DevTools puede leerla. Arreglarlo requiere mover
+   las llamadas a una Edge Function de Supabase (imposible mientras el
+   despliegue sea estático puro).
+2. **Este proyecto SÍ almacena datos financieros.** El README decía lo
+   contrario. Existe el schema `pagos` con 4 tablas (`pagos`, `recurrentes`,
+   `movimientos`, `adjuntos`): importes, proveedores, vencimientos, métodos de
+   pago, pagos parciales y facturas PDF. También datos de salud (hábitos,
+   peso/IMC, estado emocional) y familiares. Todo con RLS por `owner_id`, pero
+   es información sensible y conviene no exponer la app a terceros.
 
 ---
 

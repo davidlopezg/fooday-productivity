@@ -25,23 +25,32 @@
 // de campos. No es un JSON Schema completo.
 // ============================================================================
 
+// NOTA: los campos se declaran explícitamente (en vez de usar parameter
+// properties `public readonly x` en el constructor) para que el fichero se
+// pueda ejecutar con el type-stripping nativo de Node (`node --experimental-
+// strip-types` / por defecto en Node 22.6+). El modo strip-only no soporta
+// parameter properties. Comportamiento idéntico.
 export class LLMParseError extends Error {
-  constructor(
-    message: string,
-    public readonly content: string,
-    public readonly cause?: unknown,
-  ) {
+  readonly content: string;
+  override readonly cause?: unknown;
+
+  constructor(message: string, content: string, cause?: unknown) {
     super(message);
+    this.content = content;
+    this.cause = cause;
     this.name = "LLMParseError";
   }
 }
 
 export class LLMSchemaError extends Error {
+  readonly issues: Array<{ path: string; expected: string; got: string }>;
+
   constructor(
     message: string,
-    public readonly issues: Array<{ path: string; expected: string; got: string }>,
+    issues: Array<{ path: string; expected: string; got: string }>,
   ) {
     super(message);
+    this.issues = issues;
     this.name = "LLMSchemaError";
   }
 }

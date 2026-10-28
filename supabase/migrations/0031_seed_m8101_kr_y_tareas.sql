@@ -1,35 +1,28 @@
 -- ============================================================================
--- APLICAR-0024.sql
+-- 0031_seed_m8101_kr_y_tareas.sql
 --
--- M8101 · SALUD · "todo lo necesario para conseguirla"
+-- PROVENIENCIA: este SQL vivia SOLO en `supabase/APLICAR-0024.sql`, un
+-- fichero suelto fuera de `migrations/` que habia que pegar a mano en el
+-- SQL Editor. Contenia datos que NO estaban en ningun sitio mas (el KR
+-- "Alimentacion consciente (calidad y registro)" de M8101 y las tareas
+-- N8101-* con sus vinculos KR). Al limpiar los ficheros `APLICAR-*` -- que
+-- duplicaban migraciones ya versionadas -- este contenido se habria
+-- perdido, asi que queda aqui como migracion numerada.
 --
--- Cierra los 3 huecos detectados en el seed original:
---   1) Hay 7 tareas huérfanas (meta_id sí, resultado_periodo_id no) → las
---      vinculamos al KR correcto de su trimestre.
---   2) 3 KRs no tienen ninguna tarea concreta asignada → añadimos las
---      mínimas para que el scorecard mida algo.
---   3) Falta un KR en Q3 ("Alimentación consciente") que sostiene el Q4
---      "IMC saludable" — los 3 huérfanas de comidas rápidas / frutas /
---      diario pertenecen a ese KR, así que lo creamos.
+-- QUE HACE (todo idempotente):
+--   1. Crea el KR "Alimentacion consciente" en Q3 de M8101, que sostenia el
+--      "IMC saludable" de Q4.
+--   2. Vincula 7 tareas huerfanas (meta_id si, resultado_periodo_id no) al
+--      KR correcto. Solo actua si `resultado_periodo_id IS NULL`, asi que
+--      NUNCA pisa una re-asignacion manual.
+--   3. Anade las tareas que faltaban para que cada KR tenga palancas
+--      concretas. Codigos con prefijo 'N8101-Q' -> `on conflict do nothing`.
 --
--- Diseño:
---   - Todo es idempotente (re-ejecutable sin romper nada).
---   - Los UPDATE de huérfanos solo actúan si `resultado_periodo_id IS NULL`
---     (no pisamos re-asignaciones manuales del usuario).
---   - Los INSERT usan el patrón `on conflict (owner_id, codigo) do update`
---     del seed (codigo = clave idempotente).
---
--- Pegar en Supabase → SQL Editor → Run.
+-- ES SEED, NO ESQUEMA: son datos de una meta concreta (M8101 = SALUD 2026).
+--   En una BD donde no exista la meta, el bloque hace `raise notice` y sale
+--   limpiamente (guard v_meta_id / v_periodo_id).
 -- ============================================================================
 
-
--- ----------------------------------------------------------------------------
--- 1. Crear el KR faltante "Alimentación consciente" en Q3 (si no existe).
---    Migration 0028: el INSERT a `resultados_periodo` ya no incluye
---    `periodo_id`; la asignación al trimestre se hace en `kr_periodos`.
---    Idempotencia: el SELECT comprueba si ya existe un KR con ese título
---    en la meta (si existe, no se duplica).
--- ----------------------------------------------------------------------------
 do $$
 declare
   v_meta_id uuid;
@@ -359,28 +352,3 @@ select
 from public.metas m
 where m.codigo = 'M8101' and m.owner_id = public.current_owner_id()
 on conflict (owner_id, codigo) do nothing;
-
-
--- ----------------------------------------------------------------------------
--- 4. VERIFICACIÓN — ejecutar tras el script. Debe dar 0 huérfanas y mostrar
---    el conteo de tareas por KR.
--- ----------------------------------------------------------------------------
--- select
---   m.codigo as meta,
---   p.nombre as trimestre,
---   kr.titulo as kr,
---   count(t.id) as total_tareas,
---   count(t.id) filter (where t.estado = 'hecha') as hechas
--- from public.metas m
--- join public.resultados_periodo kr on kr.meta_id = m.id
--- join public.kr_periodos kp on kp.kr_id = kr.id
--- join public.periodos p on p.id = kp.periodo_id
--- left join public.tareas t on t.resultado_periodo_id = kr.id
--- where m.codigo = 'M8101'
--- group by m.codigo, p.nombre, kr.titulo, p.numero, kr.orden
--- order by p.numero, kr.orden;
---
--- select count(*) as tareas_sin_kr
--- from public.tareas
--- where meta_id = (select id from public.metas where codigo = 'M8101')
---   and resultado_periodo_id is null;

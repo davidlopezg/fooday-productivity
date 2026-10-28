@@ -1,0 +1,28 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          # Node >= 22.6 por el type-stripping nativo de `.ts`: los tests
+          # importan el código de la app directamente (src/lib/plan.ts etc.)
+          # sin transpilar. `scripts/test-alias.mjs` necesita además
+          # `module.registerHooks` (Node >= 22.15).
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Tests
+        run: npm test
+
+      - name: Typecheck
+        run: npm run typecheck

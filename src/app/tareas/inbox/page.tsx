@@ -96,6 +96,8 @@ export default function InboxPage() {
           contexto: contextoIA,
           proyectos: proyectosActivos.map((p) => ({ id: p.id, nombre: p.nombre })),
           maxSugerencias: 8,
+          // Migration 0032: perfil desde `configuracion`.
+          perfil: cfg.data,
         },
       );
       setSugerenciasIA(res.sugerencias);
