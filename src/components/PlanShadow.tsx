@@ -28,21 +28,22 @@ import { useMemo } from "react";
 import {
   ETIQUETA_REGLA,
   TONO_REGLA,
+  agruparDescartables,
   type PropuestaShadow,
 } from "@/lib/recuperacion/shadow";
 import type { TareaSeleccionada } from "@/lib/recuperacion/seleccion";
 import { IconAlertTriangle, IconCheck, IconSparkles } from "@/components/icons";
 
-const SEM_LABEL: Record<string, string> = {
-  verde: "carga completa",
-  amarillo: "carga media",
-  rojo: "carga mínima",
+const NIVEL_LABEL: Record<string, string> = {
+  alta: "carga completa",
+  media: "carga media",
+  minima: "carga mínima",
 };
 
-const SEM_TONO: Record<string, string> = {
-  verde: "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-  amarillo: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
-  rojo: "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300",
+const NIVEL_TONO: Record<string, string> = {
+  alta: "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+  media: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+  minima: "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300",
 };
 
 /** Tarea de la propuesta con su chip de regla, su motivo y su tiempo. */
@@ -98,21 +99,51 @@ function TareaPropuesta({
 }
 
 /** Aviso de riesgo (pago vencido o próximo). Se muestra SIEMPRE. */
-function Aviso({ texto, nivel }: { texto: string; nivel: number }) {
+function Aviso({
+  texto,
+  nivel,
+  detalle,
+}: {
+  texto: string;
+  nivel: number;
+  detalle?: string[];
+}) {
   return (
     <li
-      className={`flex items-start gap-2 rounded-lg border p-3 text-sm ${
+      className={`rounded-lg border p-3 ${
         nivel === 0
           ? "border-red-500/30 bg-red-500/5"
-          : "border-amber-500/30 bg-amber-500/5"
+          : nivel === 1
+            ? "border-amber-500/30 bg-amber-500/5"
+            : "border-border bg-muted/30"
       }`}
     >
-      <IconAlertTriangle
-        className={`mt-0.5 h-4 w-4 shrink-0 ${
-          nivel === 0 ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400"
-        }`}
-      />
-      <span className="leading-relaxed">{texto}</span>
+      <div className="flex items-start gap-2 text-sm">
+        <IconAlertTriangle
+          className={`mt-0.5 h-4 w-4 shrink-0 ${
+            nivel === 0
+              ? "text-red-600 dark:text-red-400"
+              : nivel === 1
+                ? "text-amber-600 dark:text-amber-400"
+                : "text-muted-foreground"
+          }`}
+        />
+        <span className="leading-relaxed">{texto}</span>
+      </div>
+      {detalle && detalle.length > 0 && (
+        <details className="mt-2 pl-6">
+          <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
+            Ver los {detalle.length} pagos uno a uno
+          </summary>
+          <ul className="mt-1.5 space-y-1">
+            {detalle.map((d, i) => (
+              <li key={i} className="text-xs leading-relaxed text-muted-foreground">
+                · {d}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
     </li>
   );
 }
@@ -131,6 +162,14 @@ export function PlanShadow({
     const set = new Set(propuesta?.comparacion.coincide ?? []);
     return set;
   }, [propuesta]);
+
+  // Las descartables agrupadas por categoría (hábitos / con fecha / sin
+  // objetivo / otras). El useMemo va ANTES de los returns tempranos: los
+  // hooks deben ejecutarse siempre en el mismo orden.
+  const grupos = useMemo(
+    () => agruparDescartables(propuesta?.resultado.descartables ?? []),
+    [propuesta?.resultado.descartables],
+  );
 
   if (cargando) {
     return (
@@ -155,7 +194,7 @@ export function PlanShadow({
 
   if (!propuesta) return null;
 
-  const { resultado, capacidad, origenCapacidad, comparacion, resumen } = propuesta;
+  const { resultado, nivel, origenCapacidad, comparacion, resumen } = propuesta;
   const nada = resultado.plan.length === 0 && resultado.avisos.length === 0;
 
   return (
@@ -168,9 +207,9 @@ export function PlanShadow({
             Modo sombra · propuesta
           </span>
           <span
-            className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${SEM_TONO[capacidad]}`}
+            className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${NIVEL_TONO[nivel]}`}
           >
-            {SEM_LABEL[capacidad]}
+            {NIVEL_LABEL[nivel]}
           </span>
           {origenCapacidad === "estimado" && (
             <span className="rounded-full border border-border bg-muted px-2.5 py-1 text-[11px] text-muted-foreground">
@@ -226,7 +265,12 @@ export function PlanShadow({
               </h3>
               <ul className="space-y-2">
                 {resultado.avisos.map((a, i) => (
-                  <Aviso key={`${a.tipo}-${i}`} texto={a.texto} nivel={a.nivel} />
+                  <Aviso
+                    key={`${a.tipo}-${i}`}
+                    texto={a.texto}
+                    nivel={a.nivel}
+                    detalle={a.detalle}
+                  />
                 ))}
               </ul>
             </div>
@@ -297,30 +341,34 @@ export function PlanShadow({
           )}
 
           {/* ── Lo que NO entra hoy (para la revisión semanal) ── */}
-          {resultado.descartables.length > 0 && (
+          {grupos.length > 0 && (
             <details className="rounded-lg border border-border bg-background/60 p-3">
               <summary className="cursor-pointer text-sm font-medium text-muted-foreground">
                 💤 {resultado.descartables.length} tarea
                 {resultado.descartables.length === 1 ? "" : "s"} que hoy no
-                entrarían ({resultado.descartables.length} en total)
+                entrarían
               </summary>
-              <ul className="mt-2 space-y-1.5">
-                {resultado.descartables.map((d) => (
-                  <li
-                    key={d.tarea.id}
-                    className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground"
-                  >
-                    <span className="mt-0.5">·</span>
-                    <span>
-                      <span className="font-medium text-foreground">
-                        {d.tarea.titulo}
-                      </span>
-                      {" — "}
-                      {d.motivo}
-                    </span>
-                  </li>
+              <div className="mt-2 space-y-3">
+                {grupos.map((g) => (
+                  <div key={g.clave}>
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      {g.titulo} · {g.tareas.length}
+                    </p>
+                    <ul className="mt-1 space-y-1">
+                      {g.tareas.map((d) => (
+                        <li
+                          key={d.tarea.id}
+                          className="text-xs leading-relaxed text-muted-foreground"
+                        >
+                          · <span className="font-medium text-foreground">
+                            {d.tarea.titulo}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 ))}
-              </ul>
+              </div>
               <p className="mt-2 text-[11px] text-muted-foreground">
                 No se descartan: solo se apartan del día. La revisión semanal
                 propondrá qué hacer con ellas (mantener, programar, aplazar,

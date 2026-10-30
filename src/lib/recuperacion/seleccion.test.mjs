@@ -31,9 +31,12 @@ import {
   detectarImporte,
   formatearImporte,
   esImportante,
+  nivelDeCapacidad,
   MAX_SECUNDARIAS,
   TAG_INGRESOS,
   MINUTOS_MANTENIMIENTO,
+  MINUTOS_MINIMOS_ESTIMACION,
+  DIAS_AVISO_INDIVIDUAL,
 } from "./seleccion.ts";
 
 let pass = 0;
@@ -628,7 +631,7 @@ test("seleccionarPlan: capacidad verde → 1 principal + 2 secundarias", () => {
     capacidad: "verde",
     hoy: HOY,
   });
-  eq(MAX_SECUNDARIAS.verde, 2);
+  eq(MAX_SECUNDARIAS.alta, 2);
   eq(r.secundarias.length, 2);
   eq(r.plan.length, 3);
 });
@@ -768,6 +771,176 @@ test("seleccionarPlan: lo que no entra aparece en `descartables`", () => {
   eq(r.plan.length, 0);
   eq(r.descartables.length, 1);
   eq(r.descartables[0].tarea.titulo, "Mejorar algo más adelante");
+});
+
+console.log("\n── BUGS CORREGIDOS (reportados con datos reales) ──");
+
+test("BUG 1: `esfuerzo` = '1' NO se interpreta como 1 minuto", () => {
+  // Caso real: "He recibido una factura... que tengo que programar el
+  // pago" con esfuerzo="1" (no son minutos). Decir "1 min" era MENTIRA.
+  eq(minutosEstimados(tarea({ esfuerzo: "1" })), null);
+  eq(minutosEstimados(tarea({ esfuerzo: "2" })), null);
+  eq(minutosEstimados(tarea({ esfuerzo: "3" })), null);
+  eq(minutosEstimados(tarea({ esfuerzo: "4" })), null);
+});
+
+test("BUG 1: un tiempo real SÍ se lee (≥5 o con unidad explícita)", () => {
+  eq(minutosEstimados(tarea({ esfuerzo: "30" })), 30);
+  eq(minutosEstimados(tarea({ esfuerzo: "45 min" })), 45);
+  eq(minutosEstimados(tarea({ esfuerzo: "5" })), 5);
+  // Con la unidad explícita, un número pequeño SÍ es un tiempo.
+  eq(minutosEstimados(tarea({ esfuerzo: "3 min" })), 3);
+  eq(minutosEstimados(tarea({ esfuerzo: "2h" })), 120);
+  eq(MINUTOS_MINIMOS_ESTIMACION, 5);
+});
+
+test("BUG 2: los pagos vencidos hace mucho NO se muestran uno a uno", () => {
+  // Caso real: TGSS 480 € × 3, Sabadell 577,85 € × 3, todos de hace 60-95
+  // días. Son PAGOS DISTINTOS (no se fusionan), pero el ruido se agrupa.
+  const p = (id, imp, venc) =>
+    pago({ id, proveedor: "TGSS", concepto: "Cuota", importe_total: imp, fecha_vencimiento: venc });
+  const r = seleccionarPlan({
+    tareas: [],
+    metas: new Map(),
+    pagos: [p("p1", 480, "2025-10-01"), p("p2", 480, "2025-10-01"), p("p3", 480, "2025-10-01")],
+    capacidad: "verde",
+    hoy: HOY,
+  });
+  // Un solo aviso agrupado (no 3 líneas).
+  eq(r.avisos.length, 1);
+  ok(r.avisos[0].texto.includes("3 pago(s)"), r.avisos[0].texto);
+  // Pero el desglose los lista TODOS: no se pierde ninguno.
+  eq(r.avisos[0].detalle.length, 3);
+});
+
+test("BUG 2: un pago vencido hace poco SÍ se muestra individual", () => {
+  const r = seleccionarPlan({
+    tareas: [],
+    metas: new Map(),
+    pagos: [pago({ fecha_vencimiento: "2026-01-12", importe_total: 500 })],
+    capacidad: "verde",
+    hoy: HOY,
+  });
+  eq(r.avisos.length, 1);
+  eq(r.avisos[0].nivel, 0);
+  eq(r.avisos[0].detalle, undefined, "no debe estar agrupado");
+});
+
+test("BUG 2: el aviso agrupado lleva el TOTAL pendiente", () => {
+  const r = seleccionarPlan({
+    tareas: [],
+    metas: new Map(),
+    pagos: [
+      pago({ proveedor: "A", fecha_vencimiento: "2025-10-01", importe_total: 100 }),
+      pago({ proveedor: "B", fecha_vencimiento: "2025-11-01", importe_total: 250 }),
+    ],
+    capacidad: "verde",
+    hoy: HOY,
+  });
+  ok(r.avisos[0].texto.includes("350,00"), r.avisos[0].texto);
+});
+
+test("BUG 3: el motivo dice QUÉ-SE-COINCIDIÓ de verdad", () => {
+  // Antes decía siempre "concepto coincidente" aunque hubiera coincidido
+  // el importe (la señal más fuerte).
+  const p = pago({ proveedor: "Teresa", concepto: "Suministros", importe_total: 350 });
+  const t = tarea({ titulo: "He recibido una factura de suministros 350,00" });
+  const r = seleccionarPlan({
+    tareas: [t],
+    metas: new Map(),
+    pagos: [p],
+    capacidad: "verde",
+    hoy: HOY,
+  });
+  ok(r.principal.motivo.detalle.includes("importe coincidente"), r.principal.motivo.detalle);
+  ok(!r.principal.motivo.detalle.includes("concepto coincidente"), r.principal.motivo.detalle);
+});
+
+test("BUG 4: una tarea importante VENCIDA entra en el plan (no solo aviso)", () => {
+  const m = meta({});
+  const r = seleccionarPlan({
+    tareas: [
+      tarea({
+        titulo: "Ejecutar el control del hito de Intrum",
+        meta_id: m.id,
+        fecha_fin: "2026-01-10",
+      }),
+    ],
+    metas: mapaMetas([m]),
+    pagos: [],
+    capacidad: "media",
+    hoy: HOY,
+  });
+  eq(r.principal.tarea.titulo, "Ejecutar el control del hito de Intrum");
+  // Con meta y fecha vencida, la regla que gana es "compromiso inamovible"
+  // (tiene fecha dura + señal de peso). Lo importante es que ENTRE en el
+  // plan: antes sólo salía como aviso.
+  ok(
+    ["compromiso_inamovible", "riesgo_operativo"].includes(r.principal.motivo.regla),
+    r.principal.motivo.regla,
+  );
+  ok(r.principal.motivo.motivo.includes("vencida"), r.principal.motivo.motivo);
+  // Y no se queda en "descartable".
+  eq(r.descartables.length, 0);
+});
+
+test("BUG 5: entre pagos vencidos, gana el de MAYOR importe", () => {
+  const p1 = pago({ proveedor: "Teresa", concepto: "Suministros", importe_total: 350 });
+  const p2 = pago({ proveedor: "AEAT", concepto: "Impuesto", importe_total: 700 });
+  const r = seleccionarPlan({
+    tareas: [
+      tarea({ titulo: "Factura de suministros 350,00" }),
+      tarea({ titulo: "Impuesto 700,00" }),
+    ],
+    metas: new Map(),
+    pagos: [p1, p2],
+    capacidad: "verde",
+    hoy: HOY,
+  });
+  eq(r.principal.tarea.titulo, "Impuesto 700,00");
+  eq(r.principal.motivo.importePendiente, 700);
+});
+
+test("BUG 6: 'todo me arrastra' → carga MEDIA (no mínima: no es fatiga)", () => {
+  // Antes: "Sí, todo me arrastra" → rojo → 0 secundarias. El sistema se
+  // quedaba con 1 tarea, que es demasiado severo.
+  eq(nivelDeCapacidad({ despertar: "Con energía", rueda: "Sí, todo me arrastra" }), "media");
+  eq(nivelDeCapacidad({ despertar: "Agotado", rueda: "Sí, todo me arrastra" }), "minima");
+  eq(nivelDeCapacidad({ despertar: "Cansado pero estable" }), "media");
+  eq(nivelDeCapacidad({ despertar: "Con energía" }), "alta");
+  eq(nivelDeCapacidad({ semaforo: "rojo" }), "minima");
+  eq(nivelDeCapacidad({ semaforo: "amarillo" }), "media");
+  eq(nivelDeCapacidad({ semaforo: "verde" }), "alta");
+});
+
+test("BUG 6: con carga media hay 1 principal + 1 secundaria", () => {
+  const m = meta({});
+  const tareas = [tarea({ meta_id: m.id })];
+  for (let i = 0; i < 3; i++) tareas.push(tarea({ meta_id: m.id }));
+  const r = seleccionarPlan({
+    tareas,
+    metas: mapaMetas([m]),
+    pagos: [],
+    capacidad: "amarillo",
+    hoy: HOY,
+  });
+  eq(r.secundarias.length, 1);
+  eq(r.plan.length, 2);
+});
+
+test("BUG: el estado crudo no se confunde con el efectivo (pagos de meses)", () => {
+  // Un pago con estado='pendiente' pero fecha pasada se ve VENCIDO en
+  // /pagos (v_pagos.estado_efectivo). El motor debe verlo igual.
+  const p = pago({
+    estado: "pendiente",
+    estado_efectivo: "vencido",
+    fecha_vencimiento: "2025-10-01",
+    importe_total: 300,
+  });
+  const r = detectarRiesgosFinancieros([p], HOY);
+  eq(r.length, 1);
+  eq(r[0].nivel, 0);
+  ok(r[0].antiguedad > DIAS_AVISO_INDIVIDUAL, "debe detectarse como antiguo");
 });
 
 // ----------------------------------------------------------------------------

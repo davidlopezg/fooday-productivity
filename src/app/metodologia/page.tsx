@@ -315,12 +315,17 @@ const CRITERIO_SELECCION: Punto[] = [
   {
     titulo: "La capacidad ajusta la carga, NO silencia los riesgos",
     cuerpo:
-      "El semáforo emocional que ya existe (verde / amarillo / rojo) decide cuántas tareas caben: verde = 1 principal + 2 secundarias + mantenimiento; amarillo = 1 principal + 1 secundaria; rojo = solo 1 principal. Pero un pago vencido NO desaparece por estar en rojo: sigue apareciendo como AVISO. Ajustar la carga y ocultar un riesgo son cosas distintas, y la segunda es exactamente lo que el sistema debe evitar.",
+      "El semáforo emocional que ya existe (verde / amarillo / rojo) se traduce a un NIVEL DE CARGA más fino (alta / media / mínima), y el corte es deliberadamente menos severo: “Sí, todo me arrastra” es saturación (hagamos menos cosas), no fatiga (no puedo más), así que da carga MEDIA, no mínima. El corte severo queda para “Agotado” y para un semáforo rojo ya guardado. Con carga alta entran 1 principal + 2 secundarias; con media, 1 + 1; con mínima, sólo la principal. Pero un pago vencido NO desaparece por estar en carga mínima: sigue apareciendo como AVISO. Ajustar la carga y ocultar un riesgo son cosas distintas, y la segunda es exactamente lo que el sistema debe evitar.",
   },
   {
-    titulo: "El tiempo estimado se toma de donde es fiable",
+    titulo: "Los pagos vencidos se agrupan, pero NO se fusionan",
     cuerpo:
-      "De `tareas_subtareas.tiempo_estimado_min` (numérico, ya persistido, y la primera subtarea PENDIENTE es la próxima acción = el tiempo real de trabajo). NO de `tareas.esfuerzo`, que es texto libre y por tanto no es un dato: se usa solo como último recurso si parece un número.",
+      "Tres TGSS de 480 € son tres obligaciones distintas y el usuario tiene que ver cuántas son y cuánto pesan: nunca se fusionan ni se descartan. Lo que se agrupa es el RUIDO: los vencidos hace más de 30 días se muestran como un resumen con el total, y al desplegarlo salen uno a uno. Los que vencen esta semana se muestran siempre en individual, porque son los que exigen una decisión hoy. Y el estado que se mira es el EFECTIVO (el que ve el usuario en /pagos), no el crudo de la tabla: si no, los pagos vencidos hace meses pasarían por 'pendientes'.",
+  },
+  {
+    titulo: "El tiempo estimado sólo se dice si es fiable",
+    cuerpo:
+      "De `tareas_subtareas.tiempo_estimado_min` (numérico, ya persistido, y la primera subtarea PENDIENTE es la próxima acción = el tiempo real de trabajo). NO de `tareas.esfuerzo`, que es texto libre: en los datos reales aparecía un “1” en una factura que no eran minutos, y el motor lo leía como “1 minuto”. Un número suelto menor de 5, o sin unidad explícita, NO se interpreta como tiempo: es preferible decir “sin estimar” que mentir con un número.",
   },
   {
     titulo: "La relación pago ↔ tarea se resuelve por texto (y con cautela)",

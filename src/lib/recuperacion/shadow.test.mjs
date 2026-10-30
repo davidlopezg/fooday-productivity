@@ -17,6 +17,7 @@ import {
   compararConPlan,
   calcularPropuestaShadow,
   construirResumen,
+  agruparDescartables,
 } from "./shadow.ts";
 
 let pass = 0;
@@ -150,50 +151,60 @@ console.log("\n── derivarCapacidad ──");
 test("el semáforo del plan manda sobre todo lo demás", () => {
   eq(
     derivarCapacidad({ semaforo: "rojo", estado: { despertar: "Con energía" } }),
-    { capacidad: "rojo", origen: "plan" },
+    { capacidad: "rojo", nivel: "minima", origen: "plan" },
   );
   eq(derivarCapacidad({ semaforo: "verde" }).origen, "plan");
+  eq(derivarCapacidad({ semaforo: "verde" }).nivel, "alta");
 });
 
-test("sin plan, 'Agotado' → rojo (estimado)", () => {
+test("sin plan, 'Agotado' → carga mínima (estimado)", () => {
   eq(derivarCapacidad({ semaforo: null, estado: { despertar: "Agotado" } }), {
     capacidad: "rojo",
+    nivel: "minima",
     origen: "estimado",
   });
 });
 
-test("sin plan, 'todo me arrastra' → rojo (estimado)", () => {
+test("sin plan, 'todo me arrastra' → carga MEDIA (no mínima)", () => {
+  // "Todo me arrastra" es saturación, no fatiga. Con el corte 1:1 se
+  // quedaba con 1 sola tarea, demasiado severo.
   eq(
-    derivarCapacidad({ estado: { rueda: "Sí, todo me arrastra" } }).capacidad,
-    "rojo",
+    derivarCapacidad({ estado: { despertar: "Con energía", rueda: "Sí, todo me arrastra" } })
+      .nivel,
+    "media",
   );
 });
 
-test("sin plan, 'Cansado pero estable' → amarillo (estimado)", () => {
+test("sin plan, 'Cansado pero estable' → media (estimado)", () => {
   eq(
-    derivarCapacidad({ estado: { despertar: "Cansado pero estable" } }).capacidad,
-    "amarillo",
+    derivarCapacidad({ estado: { despertar: "Cansado pero estable" } }).nivel,
+    "media",
   );
 });
 
-test("sin plan, necesidad 'Contención' → amarillo (estimado)", () => {
+test("sin plan, necesidad 'Contención' → media (estimado)", () => {
   eq(
     derivarCapacidad({ estado: { despertar: "Con energía", necesidad: "Contención" } })
-      .capacidad,
-    "amarillo",
+      .nivel,
+    "media",
   );
 });
 
-test("sin plan, 'Con energía' → verde (estimado)", () => {
+test("sin plan, 'Con energía' → carga completa (estimado)", () => {
   eq(derivarCapacidad({ estado: { despertar: "Con energía" } }), {
     capacidad: "verde",
+    nivel: "alta",
     origen: "estimado",
   });
 });
 
-test("sin datos → amarillo por defecto (NUNCA verde: llenaría el día)", () => {
-  eq(derivarCapacidad({}), { capacidad: "amarillo", origen: "por_defecto" });
-  eq(derivarCapacidad({ semaforo: null, estado: null }).capacidad, "amarillo");
+test("sin datos → carga MEDIA por defecto (NUNCA alta: llenaría el día)", () => {
+  eq(derivarCapacidad({}), {
+    capacidad: "amarillo",
+    nivel: "media",
+    origen: "por_defecto",
+  });
+  eq(derivarCapacidad({ semaforo: null, estado: null }).nivel, "media");
 });
 
 console.log("\n── compararConPlan ──");
@@ -331,9 +342,30 @@ test("el resumen distingue la carga", () => {
     mantenimiento: null,
     bienestar: null,
   };
-  ok(construirResumen(fake, "rojo").includes("carga mínima"));
-  ok(construirResumen(fake, "amarillo").includes("carga media"));
-  ok(construirResumen(fake, "verde").includes("carga completa"));
+  ok(construirResumen(fake, "minima").includes("carga mínima"));
+  ok(construirResumen(fake, "media").includes("carga media"));
+  ok(construirResumen(fake, "alta").includes("carga completa"));
+});
+
+console.log("\n── agruparDescartables ──");
+
+test("agrupa las descartables por categoría (hábitos / con fecha / sin objetivo)", () => {
+  const g = agruparDescartables([
+    // Hábitos: recurrente y personal sin fecha → no son trabajo.
+    { tarea: { id: "1", titulo: "Hábito", recurrencia_tipo: "semanal" }, motivo: "x", regla: "mejora_no_urgente" },
+    { tarea: { id: "1b", titulo: "Caminar", ambito: "personal" }, motivo: "x", regla: "mejora_no_urgente" },
+    // Con fecha → puede seguir viva.
+    { tarea: { id: "2", titulo: "Cita médica", ambito: "personal", fecha_fin: "2026-02-01" }, motivo: "x", regla: "mejora_no_urgente" },
+    // Profesional sin meta → trabajo huérfano.
+    { tarea: { id: "3", titulo: "Sin meta", ambito: "profesional" }, motivo: "x", regla: "mejora_no_urgente" },
+  ]);
+  const porClave = {};
+  for (const x of g) porClave[x.clave] = x.tareas.length;
+  eq(porClave.habitos, 2);
+  eq(porClave.con_fecha, 1);
+  eq(porClave.sin_objetivo, 1);
+  // Y NO se pierde ninguna: la suma es el total.
+  eq(g.reduce((acc, x) => acc + x.tareas.length, 0), 4);
 });
 
 // ----------------------------------------------------------------------------

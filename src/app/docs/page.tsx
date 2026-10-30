@@ -1762,6 +1762,71 @@ export default function DocsPage() {
             </span>
             <span className="text-muted-foreground">
               <strong className="text-foreground">
+                7 correcciones al motor de selección tras verlo con datos
+                reales.
+              </strong>{" "}
+              El Modo sombra se probó contra las tareas y pagos reales: el
+              criterio acierta en lo importante (la tarea principal propuesta
+              fue la correcta: la factura de suministros que enlaza con un
+              pago vencido de 350 €), pero la primera versión tenía siete
+              defectos. <strong className="text-foreground">1) “1 min”
+              inventado</strong>:{" "}
+              <code className="rounded bg-muted px-1.5 py-1 text-xs">tareas.esfuerzo</code>{" "}
+              es texto libre y a veces contiene un “1” que no son minutos (un
+              nº de factura). Decir “1 min” era mentira, así que ahora el
+              tiempo estimado sólo se acepta si hay subtareas con
+              <code className="rounded bg-muted px-1.5 py-1 text-xs">tiempo_estimado_min</code>{" "}
+              o si el texto menciona la unidad; si no, dice “sin estimar”.
+              <strong className="text-foreground">2) Pagos vencidos
+              ahogando los urgentes</strong>: 15 avisos, de “hace 95 días” a
+              “hace 7 días”, todos igual de visibles. Ahora los vencidos hace
+              más de 30 días se muestran como un resumen con el total, y al
+              desplegarlo salen{" "}
+              <em>uno a uno</em> — porque son obligaciones distintas (tres
+              TGSS de 480 € son tres pagos) y no se fusiona ni se descarta
+              ninguno.{" "}
+              <strong className="text-foreground">3) Etiqueta del motivo
+              incorrecta</strong>: decía siempre “concepto coincidente”
+              aunque lo que hubiera coincidido fuera el importe (la señal más
+              fuerte).{" "}
+              <strong className="text-foreground">4) El estado real del pago
+              no se miraba</strong>: el motor leía{" "}
+              <code className="rounded bg-muted px-1.5 py-1 text-xs">estado</code>{" "}
+              (crudo) en vez de{" "}
+              <code className="rounded bg-muted px-1.5 py-1 text-xs">estado_efectivo</code>{" "}
+              (calculado por la vista), que es lo que ve el usuario en
+              /pagos. Por eso los pagos vencidos hace meses parecían
+              “pendientes”.{" "}
+              <strong className="text-foreground">5) No se elegía el peor
+              pago</strong>: entre dos deudas vencidas ahora gana la de{" "}
+              <em>mayor importe</em>, no la primera que aparece.{" "}
+              <strong className="text-foreground">6) La carga era demasiado
+              severa</strong>: “Sí, todo me arrastra” se traducía a carga
+              mínima y el sistema se quedaba con{" "}
+              <em>una sola tarea</em>. Pero arrastrar no es estar agotado:
+              ahora hay tres niveles de carga (alta / media / mínima) y el
+              corte severo queda reservado para “Agotado” y para un semáforo
+              rojo ya guardado.{" "}
+              <strong className="text-foreground">7) 47 descartables
+              idénticos</strong>: ahora se agrupan por categoría (hábitos y
+              recordatorios / tareas con fecha / trabajo sin objetivo / otras)
+              y se muestran sus títulos, que es la información valiosa; no se
+              pierde ninguna. También se documenta que una tarea importante
+              ya vencida{" "}
+              <em>entra</em> en el plan (antes sólo salía como aviso:
+              avisar de algo que no vas a hacer es contradecirse). Cubierto
+              por 79 tests (61 del motor + 18 del Modo sombra), con un
+              bloque dedicado a cada bug corregido. FEATURES y este
+              changelog actualizados. No se cambian pilares ni rituales: son
+              correcciones de criterio dentro de una vista que ya existía.
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-01-14
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
                 Modo sombra en /plan-diario: “¿Qué propondría el sistema?” (Fase
                 3 del Modo Recuperación).
               </strong>{" "}

@@ -465,3 +465,47 @@ Eso es todo. No hay que cambiar nada de lo que haces.
 El botón está en `/plan-diario`. Si no lo ves: el modo sombra **no** ha
 tocado la home `/` (esa es la Fase 4). Es un botón pequeño, arriba del todo
 de la página, justo encima del formulario de estado emocional.
+
+---
+
+## 16. CORRECCIONES tras la prueba con datos reales
+
+El Modo sombra se probó contra las tareas y pagos reales del usuario. **El criterio acertó en lo importante**: la tarea principal propuesta fue la correcta (la factura de suministros que enlaza con un pago vencido de 350 €), y el matching por texto funcionó con datos de verdad.
+
+Pero la primera versión tenía **7 defectos**, todos corregidos y cubiertos con tests:
+
+### Los 7 bugs
+
+| # | Bug | Corrección |
+|---|---|---|
+| 1 | **"1 min" inventado** — `esfuerzo` es texto libre y contenía un "1" (nº de factura) que se leía como 1 minuto | El tiempo solo se acepta de subtareas, o del texto si menciona la unidad. Un número suelto <5 sin unidad → "sin estimar". Mentir es peor que callar |
+| 2 | **15 avisos de pago, todos igual de visibles** (de "hace 95 días" a "hace 7 días") | Los vencidos hace >30 días se agrupan en un resumen con el total; al desplegar salen **uno a uno**. Los que vencen esta semana, siempre en individual |
+| 3 | **"concepto coincidente" cuando lo que coincidió fue el importe** | La etiqueta dice qué señal coincidió de verdad |
+| 4 | **El motor leía `estado` en vez de `estado_efectivo`** — los pagos vencidos hace meses parecían "pendientes" | Se lee el estado efectivo (el que ve el usuario en /pagos) |
+| 5 | **No se elegía el peor pago** — ganaba el primero que aparecía | Entre deudas vencidas gana la de **mayor importe** |
+| 6 | **"Todo me arrastra" → carga mínima → 1 sola tarea** | Tres niveles de carga (alta/media/mínima). Arrastrar ≠ estar agotado: el corte severo queda para "Agotado" |
+| 7 | **47 descartables con el motivo idéntico** | Agrupadas por categoría (hábitos / con fecha / trabajo sin objetivo / otras), mostrando sus títulos. No se pierde ninguna |
+
+**Corrección de diseño adicional**: una tarea importante ya vencida **entra** en el plan (antes solo salía como aviso — avisar de algo que no vas a hacer es contradecirse).
+
+### Nota importante sobre los pagos (corrección del usuario)
+
+El usuario avisó: *"los TGSS 480 son pagos distintos... la lista de pagos es correcta como está"*.
+
+**Por eso NO se fusionan pagos.** La agrupación es SOLO de presentación (un resumen que se despliega en la lista completa). Ni un pago se descarta, ni se suma con otro, ni se cuenta dos veces. Los datos quedan intactos.
+
+### Verificación
+
+```
+npm test          → ✅ 11 ficheros (61 del motor + 18 del shadow = 79 tests)
+npm run typecheck → ✅
+npx eslint        → ✅ limpio en los archivos nuevos (los 127 de docs/metodologia son preexistentes)
+npx next build    → ✅ Compiled successfully
+```
+
+Cada bug tiene su propio test con el caso real (el "1 min" de la factura, los tres TGSS, el AEAT de 700 € vs el de 350 €).
+
+### Lo que falta para la Fase 4
+- El **primer paso concreto** por tarea (lo redactará la IA sobre la decisión ya tomada).
+- El **botón "Aplicar"** → persiste en `plan_diario_tareas`.
+- La **reescritura de la home `/`** con el Modo Recuperación y el Pomodoro reusando el store global.

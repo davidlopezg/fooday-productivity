@@ -41,7 +41,11 @@ import type { Pago } from "@/lib/pagos/types";
 // ============================================================================
 
 /** Capacidad del usuario para hoy. Mapea 1:1 con el semáforo emocional
- *  que ya existe (`planes_diarios.semaforo`: verde | amarillo | rojo). */
+ *  que ya existe (`planes_diarios.semaforo`: verde | amarillo | rojo).
+ *
+ *  La carga real la decide `nivelDeCapacidad()`, que es más fino que el
+ *  semáforo (ver la nota de allí). Este tipo sigue siendo la entrada: lo
+ *  que llega de la app es el semáforo. */
 export type Capacidad = "verde" | "amarillo" | "rojo";
 
 /** Categoría de la regla que selecciona una tarea. El orden IMPORTA: es el orden
@@ -67,6 +71,9 @@ export type MotivoSeleccion = {
   detalle?: string;
   /** id del pago relacionado, si lo hay. */
   pagoId?: string;
+  /** Importe pendiente del pago relacionado (si lo hay). Permite ordenar
+   *  las tareas de riesgo financiero: primero la más cara. */
+  importePendiente?: number;
 };
 
 /** Una tarea del plan, con su motivo. */
@@ -84,8 +91,15 @@ export type AvisoRiesgo = {
   texto: string;
   pagoId?: string;
   tareaId?: string;
-  /** Urgencia: 0 = vencida, 1 = ≤7 días, 2 = ≤30 días. */
+  /** Urgencia: 0 = vencida, 1 = ≤7 días, 2 = ≤30 días / agrupado. */
   nivel: 0 | 1 | 2;
+  /**
+   * Desglose de un aviso AGRUPADO (una línea por pago). El aviso agrupado
+   * es un resumen ("12 pagos · 4.523 €"), pero al desplegarlo salen TODOS
+   * los pagos uno a uno: son obligaciones distintas y hay que ver cuántas
+   * son y cuánto pesan.
+   */
+  detalle?: string[];
 };
 
 /** Tarea que NO entra hoy y sobre la que la revisión semanal debería actuar. */
@@ -127,6 +141,93 @@ export const DIAS_RIESGO_OPERATIVO = 7;
 export const DIAS_PAGO_PROXIMO = 7;
 
 /**
+ * Días hasta la fecha = "pago en el horizonte" (aviso informativo).
+ *
+ * A PARTIR DE AQUÍ el aviso se agrupa: un pago vencido hace 3 meses es real
+ * (NO se descarta ni se fusiona con otro), pero no puede gritar igual que
+ * uno que vence mañana. El aviso agrupado SÍ lista cada uno por separado
+ * cuando se despliega: son obligaciones distintas y el usuario tiene que ver
+ * cuántas son. Lo que se agrupa es el RUIDO, no los datos.
+ */
+export const DIAS_PAGO_HORIZONTE = 30;
+
+/**
+ * Antigüedad máxima (en días) de un pago vencido para que siga apareciendo
+ * como aviso INDIVIDUAL. Pasado esto, se cuenta en el resumen de acumulado
+ * (que también lo lista al desplegarlo).
+ */
+export const DIAS_AVISO_INDIVIDUAL = 30;
+
+/**
+ * Capacidad: niveles de carga. El corte es deliberadamente menos severo
+ * que el semáforo emocional:
+ *
+ *   · "Agotado" / "Totalmente sobrepasado" → ROJO (carga mínima: 1 principal)
+ *   · "Sí, todo me arrastra" / "Cansado pero estable" / "Ansioso" → AMARILLO
+ *     (1 principal + 1 secundaria). "Todo me arrastra" NO es "no puedo hacer
+ *     nada": es "hagamos menos cosas". El rojo se reserva para la fatiga real.
+ *   · "Con energía" → VERDE (1 principal + 2 secundarias)
+ */
+export type NivelCapacidad = "alta" | "media" | "minima";
+
+/** Cuántas secundarias caben por nivel de carga. */
+export const MAX_SECUNDARIAS_POR_NIVEL: Record<NivelCapacidad, number> = {
+  alta: 2,
+  media: 1,
+  minima: 0,
+};
+
+/**
+ * Traduce el semáforo emocional a un NIVEL DE CARGA.
+ *
+ * POR QUÉ NO ES 1:1 CON EL SEMÁFORO. El semáforo tiene tres valores, pero
+ * la carga que se puede sostener es una escala más fina, y sobre todo el
+ * corte tiene que ser menos severo:
+ *
+ *   · "Todo me arrastra" NO es lo mismo que "Agotado". Una es saturación
+ *     (hagamos menos cosas); la otra es fatiga (no puedo más). Con el corte
+ *     1:1, "todo me arrastra" quitaba las secundarias y el sistema se
+ *     quedaba con UNA tarea, que es demasiado severo y además inútil: el
+ *     usuario ve que el sistema no propone nada y deja de mirar.
+ *   · El rojo se reserva para "Agotado" / "Totalmente sobrepasado" y para
+ *     un semáforo rojo ya guardado.
+ */
+export function nivelDeCapacidad(args: {
+  /** Semáforo del plan guardado (si existe). */
+  semaforo?: string | null;
+  /** Estado emocional de hoy. */
+  despertar?: string | null;
+  rueda?: string | null;
+  necesidad?: string | null;
+}): NivelCapacidad {
+  const sem = args.semaforo;
+  if (sem === "rojo") return "minima";
+  if (sem === "verde") return "alta";
+  if (sem === "amarillo") return "media";
+
+  const despertar = (args.despertar ?? "").trim();
+  const rueda = (args.rueda ?? "").trim();
+  const necesidad = (args.necesidad ?? "").trim();
+
+  if (despertar === "Agotado" || rueda === "Totalmente sobrepasado") {
+    return "minima";
+  }
+  if (
+    despertar === "Cansado pero estable" ||
+    despertar === "Ansioso" ||
+    rueda === "Sí, todo me arrastra" ||
+    necesidad === "Contención"
+  ) {
+    return "media";
+  }
+  if (despertar === "Con energía") return "alta";
+
+  // Sin información: carga media. Asumir "alta" llenaría el día sin que
+  // nadie lo haya pedido.
+  return "media";
+}
+
+/**
  * Días hasta la fecha a partir de los cuales una tarea se considera
  * "programada" (trabajo con fecha, no una gestión "de paso").
  *
@@ -136,15 +237,23 @@ export const DIAS_PAGO_PROXIMO = 7;
  */
 export const DIAS_PROGRAMADO = 60;
 
-/** Días hasta la fecha = "pago en el horizonte" (aviso informativo). */
-export const DIAS_PAGO_HORIZONTE = 30;
-
 /** Etiqueta explícita que marca una tarea como generadora de ingresos.
  *  Sin este tag NO se prioriza por ingresos: no se inventan ingresos. */
 export const TAG_INGRESOS = "ingresos";
 
-/** Umbral de minutos para considerar una tarea "mantenimiento" (corta). */
+/**
+ * Umbral de minutos para considerar una tarea "mantenimiento" (corta).
+ */
 export const MINUTOS_MANTENIMIENTO = 15;
+
+/**
+ * Mínimo de minutos para que un número suelto en `esfuerzo` se considere un
+ * tiempo. `esfuerzo` es TEXTO LIBRE y a veces contiene un "1" que no son
+ * minutos (un nº de factura, "1 factura", "1 pago"). Por debajo de este
+ * umbral, y sin el texto "min"/"h", NO se interpreta como tiempo: es
+ * preferible decir "sin estimar" que mentir diciendo "1 min".
+ */
+export const MINUTOS_MINIMOS_ESTIMACION = 5;
 
 /**
  * Umbral de minutos para considerar una tarea "mantenimiento" aunque tenga
@@ -153,11 +262,11 @@ export const MINUTOS_MANTENIMIENTO = 15;
  */
 export const MINUTOS_GESTION = 45;
 
-/** Cuántas secundarias caben por capacidad. */
-export const MAX_SECUNDARIAS: Record<Capacidad, number> = {
-  verde: 2,
-  amarillo: 1,
-  rojo: 0,
+/** Cuántas secundarias caben por nivel de carga (ver `nivelDeCapacidad`). */
+export const MAX_SECUNDARIAS: Record<NivelCapacidad, number> = {
+  alta: 2,
+  media: 1,
+  minima: 0,
 };
 
 // ============================================================================
@@ -205,7 +314,16 @@ export function textoVencimiento(dias: number | null): string {
  *
  *  Regla: la primera subtarea PENDIENTE es la próxima acción → su tiempo es
  *  el tiempo de trabajo real (no la suma de todo el proyecto). Si no hay
- *  subtareas, se cae a `esfuerzo` SOLO si parece un número ("30", "45 min").
+ *  subtareas, se cae a `esfuerzo` SOLO si parece un tiempo.
+ *
+ *  CUIDADO con `esfuerzo`: es TEXTO LIBRE y no siempre son minutos. En los
+ *  datos reales aparecía "1" en tareas como "He recibido una factura... que
+ *  tengo que programar el pago", y el motor lo leía como "1 minuto" — un
+ *  tiempo absurdo que además era MENTIRA. Por eso el fallback sólo acepta:
+ *   · un número ≥ MINUTOS_MINIMOS_ESTIMACION (5), o
+ *   · un texto que mencione explícitamente la unidad ("30 min", "2h").
+ *  En cualquier otro caso se devuelve null: es preferible decir "sin
+ *  estimar" que inventar un número.
  */
 export function minutosEstimados(tarea: Tarea): number | null {
   const subtareas = tarea.subtareas ?? [];
@@ -215,10 +333,27 @@ export function minutosEstimados(tarea: Tarea): number | null {
     .filter((s) => !s.hecho && s.tiempo_estimado_min)
     .reduce((acc, s) => acc + (s.tiempo_estimado_min ?? 0), 0);
   if (suma > 0) return suma;
+
   const crud = (tarea.esfuerzo ?? "").trim().toLowerCase();
+  if (!crud) return null;
+
   const num = parseInt(crud.replace(/[^0-9]/g, ""), 10);
-  if (Number.isFinite(num) && num > 0 && num <= 480) return num;
-  return null;
+  if (!Number.isFinite(num) || num <= 0) return null;
+  if (num > 480) return null;
+
+  // ¿El texto habla de HORAS o de MINUTOS? Se busca la unidad más
+  // específica y se normaliza a minutos. "2h", "2 horas", "1h30" → horas.
+  const horas = /\d\s*(h|hs|hora|horas)\b/.test(crud) || /\b\d+\s*h\b/.test(crud);
+  const minutos = /\d\s*(min|mins|minuto|minutos)\b/.test(crud);
+
+  if (horas) return num * 60;
+  if (minutos) return num;
+
+  // Sin unidad explícita: sólo se acepta un número grande. "1", "2", "3" o
+  // "4" sueltos NO son minutos (en los datos reales eran nº de factura o
+  // similar): es preferible devolver null (sin estimar) antes que mentir.
+  if (num < MINUTOS_MINIMOS_ESTIMACION) return null;
+  return num;
 }
 
 // ============================================================================
@@ -298,13 +433,26 @@ export type RiesgoFinanciero = {
   dias: number;
   nivel: 0 | 1 | 2;
   texto: string;
+  /**
+   * Antigüedad en días del vencimiento (solo si ya venció). 0 si aún no ha
+   * vencido. Sirve para separar "vence esta semana" de "lleva 3 meses
+   * vencido".
+   */
+  antiguedad: number;
 };
 
 /**
  * Detecta riesgos financieros a partir de `pagos`.
  *
- * Sólo mira obligaciones ACTIVAS (estado != pagado/anulado) con saldo
- * pendiente > 0. NO inventa importes ni fechas: usa los de la BD.
+ * Sólo mira obligaciones ACTIVAS con saldo pendiente > 0. NO inventa
+ * importes ni fechas: usa los de la BD.
+ *
+ * IMPORTANTE — el estado que se mira es `estado_efectivo` (calculado por la
+ * vista `pagos.v_pagos`), NO `estado` (crudo). La diferencia importa: un
+ * pago con `estado = 'pendiente'` cuya fecha ya pasó se ve como VENCIDO en
+ * la app (es lo que hace `/pagos`), y el motor tiene que verlo igual. Si se
+ * usara el estado crudo, los pagos vencidos hace meses aparecerían como
+ * "pendientes" y no se detectarían como riesgo.
  *
  * Niveles:
  *   0 = vencido
@@ -317,7 +465,10 @@ export function detectarRiesgosFinancieros(
 ): RiesgoFinanciero[] {
   const out: RiesgoFinanciero[] = [];
   for (const pago of pagos) {
-    if (pago.estado === "pagado" || pago.estado === "anulado") continue;
+    // `estado_efectivo` es el que ve el usuario en /pagos. Si el pago viene
+    // de la vista, es el calculado; si viene de la tabla cruda, lo derivamos.
+    const estado = (pago as { estado_efectivo?: string }).estado_efectivo ?? pago.estado;
+    if (estado === "pagado" || estado === "anulado") continue;
     const pendiente = (pago.importe_total ?? 0) - (pago.importe_pagado ?? 0);
     if (pendiente <= 0.005) continue;
 
@@ -340,7 +491,7 @@ export function detectarRiesgosFinancieros(
           ? `${etiqueta}: ${formatearImporte(pendiente)} vence en ${dias} día(s)`
           : `${etiqueta}: ${formatearImporte(pendiente)} vence en ${dias} días`;
 
-    out.push({ pago, dias, nivel, texto });
+    out.push({ pago, dias, nivel, texto, antiguedad: dias < 0 ? Math.abs(dias) : 0 });
   }
   // Primero lo más urgente.
   out.sort((a, b) => {
@@ -461,8 +612,15 @@ export type SeleccionarPlanArgs = {
   metas: Map<string, Meta>;
   /** Pagos activos (para el motor financiero y el matching). */
   pagos: Pago[];
-  /** Capacidad del usuario hoy. */
+  /** Capacidad del usuario hoy (semáforo). */
   capacidad: Capacidad;
+  /**
+   * Nivel de carga efectivo. Si se omite, se deriva del semáforo con
+   * `nivelDeCapacidad()` (que es MÁS FINO que el semáforo: "todo me
+   * arrastra" → media, no mínima). Pasarlo explícitamente permite que quien
+   * llama (el modo sombra) lo calcule con el estado emocional.
+   */
+  nivel?: NivelCapacidad;
   /** Fecha de hoy en formato YYYY-MM-DD (local). */
   hoy: string;
 };
@@ -482,6 +640,16 @@ function esExcluible(tarea: Tarea): boolean {
 /** Calcula el plan del día de forma determinista y explicable. */
 export function seleccionarPlan(args: SeleccionarPlanArgs): ResultadoSeleccion {
   const { tareas, metas, pagos, capacidad, hoy } = args;
+  // El nivel efectivo manda sobre el semáforo bruto: el corte se hace por
+  // carga real, no por la etiqueta del semáforo.
+  const nivel: NivelCapacidad =
+    args.nivel ??
+    nivelDeCapacidad({
+      semaforo: capacidad,
+      despertar: undefined,
+      rueda: undefined,
+      necesidad: undefined,
+    });
 
   // ── 0. Filtro de candidatas ────────────────────────────────────────────
   const candidatas = tareas.filter((t) => !esExcluible(t));
@@ -492,14 +660,45 @@ export function seleccionarPlan(args: SeleccionarPlanArgs): ResultadoSeleccion {
   const pagosPorTarea = indexarPagosPorTarea(pagosActivos, candidatas);
 
   // ── Avisos (riesgos que la capacidad NO puede silenciar) ──────────────
+  // Un pago vencido hace 3 meses sigue siendo real y NO se fusiona con
+  // otro: cada línea es una obligación distinta (tres TGSS de 480 € son tres
+  // pagos). Lo que se agrupa es el RUIDO, no los datos: los vencidos hace
+  // más de 30 días se muestran como un resumen con el total, y al
+  // desplegarlo salen uno a uno.
   const avisos: AvisoRiesgo[] = [];
+  const vencidosAntiguos: RiesgoFinanciero[] = [];
   for (const r of riesgos) {
     if (r.nivel === 2) continue; // el horizonte de 30 días es informativo
+    if (r.nivel === 0 && r.antiguedad > DIAS_AVISO_INDIVIDUAL) {
+      vencidosAntiguos.push(r);
+      continue;
+    }
     avisos.push({
       tipo: r.nivel === 0 ? "pago_vencido" : "pago_proximo",
       texto: r.texto,
       pagoId: r.pago.id,
       nivel: r.nivel,
+    });
+  }
+
+  // El resumen del acumulado: un aviso, con el total y el desglose al
+  // desplegarlo. Sin esto, 12 pagos de hace meses ahogan los 2 que vencen
+  // esta semana.
+  if (vencidosAntiguos.length > 0) {
+    const total = vencidosAntiguos.reduce(
+      (acc, r) => acc + (r.pago.importe_total ?? 0) - (r.pago.importe_pagado ?? 0),
+      0,
+    );
+    avisos.push({
+      tipo: "pago_vencido",
+      texto: `${vencidosAntiguos.length} pago(s) vencidos hace más de ${DIAS_AVISO_INDIVIDUAL} días · ${formatearImporte(total)} pendientes en total`,
+      nivel: 2,
+      detalle: vencidosAntiguos.map(
+        (r) =>
+          `${r.pago.proveedor || r.pago.concepto}: ${formatearImporte(
+            (r.pago.importe_total ?? 0) - (r.pago.importe_pagado ?? 0),
+          )} · vencido hace ${r.antiguedad} días`,
+      ),
     });
   }
 
@@ -557,9 +756,12 @@ export function seleccionarPlan(args: SeleccionarPlanArgs): ResultadoSeleccion {
       const { pago, senal } = c.pagoVinculado;
       const pendiente = (pago.importe_total ?? 0) - (pago.importe_pagado ?? 0);
       const diasPago = diasHasta(pago.fecha_vencimiento, hoy);
-      const detalle = `${formatearImporte(pendiente)} · ${
-        senal === "importe" ? "importe coincidente" : "concepto coincidente"
-      }`;
+      // La etiqueta dice QUÉ-SE-COINCIDIÓ de verdad. Antes decía siempre
+      // "concepto coincidente" aunque lo que hubiera coincidido fuera el
+      // importe (que es la señal más fuerte).
+      const senalTexto =
+        senal === "importe" ? "importe coincidente" : "concepto coincidente";
+      const detalle = `${formatearImporte(pendiente)} · ${senalTexto}`;
       return {
         regla: "riesgo_financiero",
         motivo:
@@ -569,6 +771,9 @@ export function seleccionarPlan(args: SeleccionarPlanArgs): ResultadoSeleccion {
         diasHastaVencer: c.dias,
         detalle,
         pagoId: pago.id,
+        /** Importe pendiente del pago: sirve para ORDENAR las tareas de
+         *  riesgo financiero (la más cara va primero). */
+        importePendiente: pendiente,
       };
     }
 
@@ -586,10 +791,17 @@ export function seleccionarPlan(args: SeleccionarPlanArgs): ResultadoSeleccion {
     }
 
     // 3. Riesgo operativo: importante y vence pronto (o ya venció).
+    //    Una tarea IMPORTANTE que ya venció entra SIEMPRE: si el sistema
+    //    detecta que está vencida y a la vez la aparta del plan, se
+    //    contradice (avisar de algo que no vas a hacer). Estar vencida es
+    //    la razón de más para hacerla hoy, no menos.
     if (c.importante && c.dias != null && c.dias <= DIAS_RIESGO_OPERATIVO) {
       return {
         regla: "riesgo_operativo",
-        motivo: `Es importante y ${textoVencimiento(c.dias)}`,
+        motivo:
+          c.dias < 0
+            ? `Es importante y ${textoVencimiento(c.dias)}`
+            : `Es importante y ${textoVencimiento(c.dias)}`,
         diasHastaVencer: c.dias,
       };
     }
@@ -695,6 +907,11 @@ export function seleccionarPlan(args: SeleccionarPlanArgs): ResultadoSeleccion {
     const ra = ordenRegla[a.motivo.regla];
     const rb = ordenRegla[b.motivo.regla];
     if (ra !== rb) return ra - rb;
+    // Dentro del riesgo financiero, la más CARA va primero: entre un pago
+    // de 350 € y otro de 700 € vencidos, el que más duele es el de 700 €.
+    const ia = a.motivo.importePendiente ?? 0;
+    const ib = b.motivo.importePendiente ?? 0;
+    if (ia !== ib) return ib - ia;
     const da = a.motivo.diasHastaVencer ?? 9999;
     const db = b.motivo.diasHastaVencer ?? 9999;
     if (da !== db) return da - db;
@@ -719,12 +936,12 @@ export function seleccionarPlan(args: SeleccionarPlanArgs): ResultadoSeleccion {
 
   // 2. El MANTENIMIENTO se aparta igualmente: es un hueco propio de la
   //    pantalla ("una gestión pequeña"), no una secundaria más. Solo entra si
-  //    la capacidad no está en rojo.
+  //    la carga no es mínima.
   const candidatasMantenimiento = seleccionadas.filter(
     (s) => s.motivo.regla === "mantenimiento",
   );
   const mantenimiento =
-    capacidad !== "rojo" ? (candidatasMantenimiento[0] ?? null) : null;
+    nivel !== "minima" ? (candidatasMantenimiento[0] ?? null) : null;
 
   // 3. Las que quedan son candidatas a principal/secundarias. Se EXCLUYEN
   //    las ya asignadas a mantenimiento para que ninguna tarea aparezca dos
@@ -738,7 +955,7 @@ export function seleccionarPlan(args: SeleccionarPlanArgs): ResultadoSeleccion {
   );
 
   const principal = deTrabajo[0] ?? null;
-  const maxSec = MAX_SECUNDARIAS[capacidad];
+  const maxSec = MAX_SECUNDARIAS[nivel];
   const secundarias = deTrabajo.slice(1, 1 + maxSec);
 
   // ── Plan final ─────────────────────────────────────────────────────────
