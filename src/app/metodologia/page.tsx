@@ -272,6 +272,69 @@ const PENDIENTES_RESPUESTA: Punto[] = [
 ];
 
 // ============================================================================
+// SECCIÓN 9 — El criterio de selección (qué entra HOY y por qué)
+// ============================================================================
+// FASE 1 DEL MODO RECUPERACIÓN. Este módulo NO es una pantalla todavía:
+// es el CRITERIO de selección que la alimentará. Vive en
+// `src/lib/recuperacion/seleccion.ts`.
+//
+// POR QUÉ EXISTE
+//   La app tenía dos motores de priorización, ambos por IA y ambos cajas
+//   negras: `motorPriorizacion.ts` elegía 1 tarea, `planSimple.ts` generaba el
+//   plan del día. Ninguno te decía POR QUÉ ganó una tarea, y no podías
+//   reproducir el criterio ni auditarlo. Este motor es el contrapeso:
+//   reglas deterministas, explicables y testeables.
+//
+// LA REGLA DE ORO
+//   Deterministas primero, IA después. La IA redacta el motivo y el primer
+//   paso; NO decide qué tareas entran. Y el motivo siempre es TEXTO PLANO
+//   ("vence mañana", "hay un pago vencido relacionado"), nunca una
+//   puntuación opaca.
+// ============================================================================
+const CRITERIO_SELECCION: Punto[] = [
+  {
+    titulo: "El orden de decisión (de más a menos peso)",
+    cuerpo:
+      "1) RIESGO FINANCIERO: tarea vinculada a un pago vencido o próximo. Va POR DELANTE del resto a propósito: una deuda vencida tiene consecuencias más graves que cualquier otro compromiso, aunque la otra tarea tenga la fecha más restrictiva. 2) COMPROMISO INAMOVIBLE: fecha dura + señal de peso (WIG, meta o capa). 3) RIESGO OPERATIVO: importante y vence en ≤7 días. 4) INGRESOS: solo con el tag explícito 'ingresos' — nunca se infieren. 5) IMPORTANTE NO URGENTE: meta activa o WIG sin urgencia de fecha. 6) MANTENIMIENTO: gestión acotada (≤15 min, o ≤45 min si no tiene fecha próxima). 7) BIENESTAR: ámbito personal — va a su propia sección y NO se descarta. 8) Lo que no encaja en ninguna: candidata a descartar, aplazar o delegar en la revisión semanal.",
+  },
+  {
+    titulo: "Mantenimiento ≠ «tarea corta»",
+    cuerpo:
+      "El hueco de mantenimiento es para una gestión acotada: revisar facturas, contestar un aviso, actualizar un dato. Se recognize por ser corta Y por no aprieta: si tiene fecha próxima, es trabajo programado y va como secundaria, aunque dure 20 minutos. Y si tiene más de 45 minutos, ya no es una gestión: es trabajo de verdad. El orden importa, porque una gestión de 30 minutos con meta no es «avance en el objetivo»: ocuparía el sitio de una tarea grande con el mismo valor operativo.",
+  },
+  {
+    titulo: "El bienestar no es una tarea más: es tiempo protegido",
+    cuerpo:
+      "Las tareas de ámbito personal (caminar, estar con la familia, descansar) NO compiten por el sitio de la tarea principal ni se leen como otra tarea del plan: van a su propia sección, con su propio motivo. Y en ningún caso caen en la lista de descartables — el brief es explícito en que ese tiempo no debe contar automáticamente como improductivo. Ajustar la carga de trabajo y proteger el tiempo de descanso son cosas distintas.",
+  },
+  {
+    titulo: "Qué NO entra nunca en el plan",
+    cuerpo:
+      "Las tareas en estado hecha, descartada, archivada o bloqueada (ya no sonInventory activo). Las marcadas con el flag ⏳ 'pendiente de respuesta' (esperar no es actuar: su próximo paso depende de otro). Y las recurrentes, porque un hábito no es una 'tarea del día': los hábitos viven en /estatus, no en el plan de ejecución.",
+  },
+  {
+    titulo: "La capacidad ajusta la carga, NO silencia los riesgos",
+    cuerpo:
+      "El semáforo emocional que ya existe (verde / amarillo / rojo) decide cuántas tareas caben: verde = 1 principal + 2 secundarias + mantenimiento; amarillo = 1 principal + 1 secundaria; rojo = solo 1 principal. Pero un pago vencido NO desaparece por estar en rojo: sigue apareciendo como AVISO. Ajustar la carga y ocultar un riesgo son cosas distintas, y la segunda es exactamente lo que el sistema debe evitar.",
+  },
+  {
+    titulo: "El tiempo estimado se toma de donde es fiable",
+    cuerpo:
+      "De `tareas_subtareas.tiempo_estimado_min` (numérico, ya persistido, y la primera subtarea PENDIENTE es la próxima acción = el tiempo real de trabajo). NO de `tareas.esfuerzo`, que es texto libre y por tanto no es un dato: se usa solo como último recurso si parece un número.",
+  },
+  {
+    titulo: "La relación pago ↔ tarea se resuelve por texto (y con cautela)",
+    cuerpo:
+      "No existe FK entre `pagos.pagos` y `public.tareas` (son schemas separados). La única relación posible hoy es textual: el importe pendiente del pago aparece en el título o la descripción de la tarea, o coincide una palabra significativa del proveedor o del concepto. Se exige UNA sola señal para no generar falsos positivos, y el motivo siempre dice cuál fue ('importe coincidente' / 'concepto coincidente'). Un vínculo duro exigiría una tabla puente: es una decisión pendiente, no una limitación aceptada.",
+  },
+  {
+    titulo: "Sin IA para decidir QUÉ; con IA para explicar CÓMO",
+    cuerpo:
+      "El módulo es una función pura: sin efectos secundarios, sin llamadas a la API y sin escrituras en la BD. Eso permite (a) testearlo sin coste, (b) generar la propuesta en modo 'shadow' —verla sin que se escriba nada— antes de activarla, y (c) cambiar el criterio sin tocar la interfaz. La IA entra después: redacta el motivo en lenguaje natural y propone el primer paso concreto.",
+  },
+];
+
+// ============================================================================
 // Componente
 // ============================================================================
 export default function MetodologiaPage() {
@@ -916,6 +979,67 @@ export default function MetodologiaPage() {
                 · <strong className="text-foreground">Sidebar</strong>: nueva
                 entrada “Pendientes respuesta” (icono reloj) en el bloque
                 Ejecución.
+              </li>
+            </ul>
+          </div>
+        }
+      />
+
+      {/* ================================================================
+          9. CRITERIO DE SELECCIÓN (Motor determinista)
+         ================================================================ */}
+      <Seccion
+        emoji="🎯"
+        tag="GTD · Next Action Automática"
+        tagColor="sky"
+        titulo="Qué entra HOY y por qué: el criterio de selección"
+        puntos={CRITERIO_SELECCION}
+        extra={
+          <div className="rounded-lg border border-sky-500/20 bg-sky-500/5 p-4">
+            <h3 className="text-sm font-semibold text-sky-700 dark:text-sky-300">
+              Cómo se materializa en la app
+            </h3>
+            <ul className="mt-3 space-y-1.5 text-sm text-muted-foreground">
+              <li>
+                · <strong className="text-foreground">Código</strong>:{" "}
+                <code className="rounded bg-muted px-1 py-0.5 text-xs">
+                  src/lib/recuperacion/seleccion.ts
+                </code>{" "}
+                — función pura{" "}
+                <code className="rounded bg-muted px-1 py-0.5 text-xs">
+                  seleccionarPlan()
+                </code>{" "}
+                que devuelve principal, secundarias, mantenimiento, avisos y
+                descartables, cada tarea con su motivo en texto plano.
+              </li>
+              <li>
+                · <strong className="text-foreground">Tests</strong>:{" "}
+                <code className="rounded bg-muted px-1 py-0.5 text-xs">
+                  src/lib/recuperacion/seleccion.test.mjs
+                </code>{" "}
+                (50 casos, incluidos en{" "}
+                <code className="rounded bg-muted px-1 py-0.5 text-xs">
+                  npm test
+                </code>
+                ). Verifican el orden de las reglas, la adaptación a la
+                capacidad, que los riesgos no se silencian, que el matching no
+                genera falsos positivos y que el motor es determinista y no
+                muta la entrada.
+              </li>
+              <li>
+                · <strong className="text-foreground">Datos</strong>: solo
+                lectura de{" "}
+                <code className="rounded bg-muted px-1 py-0.5 text-xs">tareas</code>,{" "}
+                <code className="rounded bg-muted px-1 py-0.5 text-xs">metas</code>{" "}
+                y{" "}
+                <code className="rounded bg-muted px-1 py-0.5 text-xs">pagos</code>. Sin
+                campos nuevos, sin tablas nuevas, sin migración.
+              </li>
+              <li>
+                · <strong className="text-foreground">Estado</strong>: este es
+                el <em>criterio</em>, todavía no la pantalla. La interfaz del
+                Modo Recuperación se construirá encima de este módulo, sin
+                duplicar la lógica de selección.
               </li>
             </ul>
           </div>

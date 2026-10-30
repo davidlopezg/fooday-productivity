@@ -1758,6 +1758,80 @@ export default function DocsPage() {
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-01-14
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
+                Motor determinista de selección del día (Fase 1 del Modo
+                Recuperación).
+              </strong>{" "}
+              Nuevo módulo puro{" "}
+              <code className="rounded bg-muted px-1.5 py-1 text-xs">src/lib/recuperacion/seleccion.ts</code>{" "}
+              que decide <strong className="text-foreground">qué tareas entran
+              hoy y por qué</strong>, sin IA y sin tocar la base de datos. No
+              es una pantalla todavía: es el criterio de selección que la
+              alimentará. Sus reglas, por orden de peso:{" "}
+              <strong className="text-foreground">1) riesgo financiero</strong>{" "}
+              (tarea vinculada a un pago vencido o próximo —{" "}
+              <em>por delante del resto, porque una deuda vencida tiene
+              consecuencias más graves que cualquier otro compromiso</em>),{" "}
+              <strong className="text-foreground">2) compromiso inamovible</strong>{" "}
+              (fecha dura + WIG/meta/capa),{" "}
+              <strong className="text-foreground">3) riesgo operativo</strong>{" "}
+              (importante y vence pronto),{" "}
+              <strong className="text-foreground">4) ingresos</strong> (solo
+              con el tag explícito{" "}
+              <code className="rounded bg-muted px-1.5 py-1 text-xs">ingresos</code>{" "}
+              — nunca se infieren),{" "}
+              <strong className="text-foreground">5) importante no urgente</strong>,{" "}
+              <strong className="text-foreground">6) mantenimiento</strong>{" "}
+              (gestión acotada: ≤15 min o ≤45 min sin fecha próxima) y{" "}
+              <strong className="text-foreground">7) bienestar</strong>{" "}
+              (ámbito personal: va a su propia sección y <em>no</em> se
+              descarta — el tiempo de descanso no es tiempo improductivo); lo
+              que no entra por ninguna de las ocho reglas queda como{" "}
+              <strong className="text-foreground">candidata a descartar,
+              aplazar o delegar</strong> en la revisión semanal. Cada
+              selección lleva su{" "}
+              <strong className="text-foreground">motivo en texto plano</strong>{" "}
+              (“vence mañana”, “hay un pago vencido relacionado”), nunca una
+              puntuación opaca. La{" "}
+              <strong className="text-foreground">capacidad del usuario
+              ajusta la carga, no silencia los riesgos</strong>: con el
+              semáforo en rojo el plan se queda en una tarea principal, pero un
+              pago vencido sigue apareciendo como aviso. Ajustar la carga y
+              ocultar un riesgo son cosas distintas, y la segunda es
+              exactamente lo que el sistema debe evitar. Detalles de
+              implementación: el tiempo estimado se toma de{" "}
+              <code className="rounded bg-muted px-1.5 py-1 text-xs">tareas_subtareas.tiempo_estimado_min</code>{" "}
+              (numérico y ya persistido) y no de{" "}
+              <code className="rounded bg-muted px-1.5 py-1 text-xs">tareas.esfuerzo</code>{" "}
+              (texto libre, no fiable); la relación pago↔tarea se resuelve por
+              texto porque <em>no existe FK entre</em>{" "}
+              <code className="rounded bg-muted px-1.5 py-1 text-xs">pagos.pagos</code>{" "}
+              y{" "}
+              <code className="rounded bg-muted px-1.5 py-1 text-xs">public.tareas</code>{" "}
+              (importe coincidente o proveedor/concepto coincidente), y solo
+              se exige <em>una</em> señal para no generar falsos positivos; las
+              recurrentes se excluyen del plan porque son hábitos, no tareas
+              del día. Cubierto por 50 tests en{" "}
+              <code className="rounded bg-muted px-1.5 py-1 text-xs">seleccion.test.mjs</code>{" "}
+              (incluidos el runner general y la suite completa), entre ellos
+              el invariante de que <em>ninguna tarea aparece dos veces</em> en
+              el plan.{" "}
+              <strong className="text-foreground">Nota de diseño</strong>: no
+              se han añadido campos de prioridad nuevos (nada de P1–P5) ni
+              tablas nuevas: todo se deriva de{" "}
+              <code className="rounded bg-muted px-1.5 py-1 text-xs">tareas</code>,{" "}
+              <code className="rounded bg-muted px-1.5 py-1 text-xs">metas</code>{" "}
+              y{" "}
+              <code className="rounded bg-muted px-1.5 py-1 text-xs">pagos</code>.{" "}
+              FEATURES y este changelog actualizados. No se cambian pilares ni
+              rituales: esta fase no introduce ninguna pantalla nueva.
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
               2026-10-28
             </span>
             <span className="text-muted-foreground">
