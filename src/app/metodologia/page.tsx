@@ -1036,10 +1036,25 @@ export default function MetodologiaPage() {
                 campos nuevos, sin tablas nuevas, sin migración.
               </li>
               <li>
-                · <strong className="text-foreground">Estado</strong>: este es
-                el <em>criterio</em>, todavía no la pantalla. La interfaz del
-                Modo Recuperación se construirá encima de este módulo, sin
-                duplicar la lógica de selección.
+                · <strong className="text-foreground">Estado</strong>: el
+                <em>criterio</em> ya tiene su Modo sombra: el botón{" "}
+                <strong className="text-foreground">“¿Qué propondría el
+                sistema?”</strong>{" "}
+                en{" "}
+                <Link
+                  href="/plan-diario"
+                  className="font-medium text-foreground underline underline-offset-4"
+                >
+                  /plan-diario
+                </Link>{" "}
+                pinta la propuesta{" "}
+                <strong className="text-foreground">sin escribir nada en la
+                base de datos</strong>{" "}
+                —ni estados, ni fechas, ni descartes— y la compara con el
+                plan que ya tienes. Es la fase de observación: ver si el
+                criterio acierta antes de que automatice. El motor es el
+                mismo, así que lo que ves hoy es exactamente lo que se
+                guardará cuando se active.
               </li>
             </ul>
           </div>

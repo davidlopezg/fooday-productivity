@@ -547,6 +547,18 @@ export const AYUDA_POR_RUTA: Record<
           "La auditoría del Estatus Diario te recordará cada noche si hiciste más de 3 críticas. Si pasa, la planificación de mañana debe bajar a la mitad. La sostenibilidad gana a la heroicidad.",
         pilar: 3,
       },
+      {
+        titulo: "“¿Qué propondría el sistema?” — Modo sombra",
+        cuerpo:
+          "Es un botón que abre la propuesta del motor de selección: qué tarea sería la principal, cuáles las secundarias, cuál el mantenimiento y qué riesgos hay, todo con el motivo por escrito (“vence mañana”, “hay un pago vencido relacionado”). NO escribe nada: no cambia estados, ni fechas, ni descarta tareas. Es una fase de observación para comprobar si el criterio acierta antes de que automatice. Y como la selección es determinista (sin IA, sin caja negra), lo que ves hoy es exactamente lo mismo que verás mañana con los mismos datos.",
+        pilar: 4,
+      },
+      {
+        titulo: "Por qué el sistema no te esconde los riesgos",
+        cuerpo:
+          "La carga del día se adapta a tu estado (verde = plan completo, amarillo = menos, rojo = solo lo imprescindible), pero un pago vencido o una tarea vencida siguen apareciendo aunque estés en rojo. Bajar la carga y ocultar un problema son cosas distintas: la primera te cuida, la segunda te deja a medias.",
+        pilar: 5,
+      },
     ],
   },
   "/estatus": {

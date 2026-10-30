@@ -184,7 +184,7 @@ const FEATURES: Array<{ ruta: string; proposito: string; docs: string }> = [
   { ruta: "/metas/auditoria", proposito: "Auditoría de metas: qué les falta (área, proyecto, fecha objetivo, contexto, KRs). migration 0024", docs: "Pilar 2 · HelpDrawer" },
   { ruta: "/metas/detalle", proposito: "Detalle de una meta con sus KRs (uno o varios por trimestre/mes) + tareas por KR + botones Editar/✨ Generar plan con IA (KRs+tareas+hábitos, respeta KRs existentes por título) + Archivar + WIG + asignar tareas del inbox. Migration 0028: ya no hay UNIQUE por (meta, trimestre) — puedes tener N KRs en el mismo trimestre.", docs: "Pilar 2 · HelpDrawer" },
   { ruta: "/metas/plan", proposito: "Plan trimestral con scorecard de KRs + proyección", docs: "Pilar 2 · Ritual semanal (domingo) · Ritual mensual · HelpDrawer" },
-  { ruta: "/plan-diario", proposito: "Estado emocional + plan diario generado por IA. El prompt recibe los KRs en foco de la semana (migration 0033) y ancla los bloques del día a esos resultados medibles; si no hay foco elegido, el día se planifica igual por compromiso y deadline (el foco semanal nunca bloquea el día)", docs: "Rituales §1 (mañana) · HelpDrawer" },
+  { ruta: "/plan-diario", proposito: "Estado emocional + plan diario generado por IA. El prompt recibe los KRs en foco de la semana (migration 0033) y ancla los bloques del día a esos resultados medibles; si no hay foco elegido, el día se planifica igual por compromiso y deadline (el foco semanal nunca bloquea el día). BOTÓN “¿Qué propondría el sistema?” (Modo sombra, Fase 3 del Modo Recuperación): muestra la propuesta del motor DETERMINISTA de selección —1 tarea principal + hasta 2 secundarias + mantenimiento + tiempo personal + avisos de riesgo— con el motivo en texto plano de cada una y comparada con tu plan actual. NO escribe nada en la BD: es de observación", docs: "Rituales §1 (mañana) · HelpDrawer" },
   { ruta: "/plan-diario/detalle", proposito: "Detalle de un plan con notas e informe", docs: "Sub-ruta de /plan-diario" },
   { ruta: "/plan-diario/historico", proposito: "Histórico de planes (7/30/90/365/todo)", docs: "Sub-ruta de /plan-diario" },
   { ruta: "/semana", proposito: "Pipeline semanal con drag & drop + IA 3 críticas/día + PANEL DE FOCO SEMANAL DE KRs (máx 3, migration 0033): los resultados medibles en los que pones horas esta semana, con scorecard y ✨ Sugerir 3 KRs por IA. El trimestre NO se sustituye (sigue diciendo cuándo se entrega); la semana dice dónde pones el esfuerzo. Solo entran KRs con entrega en marcha (regla de contención, aplicada en BD). La propuesta IA de tareas ahora prioriza las ancladas a los KRs en foco", docs: "Ritual semanal (domingo noche) · HelpDrawer" },
@@ -1756,6 +1756,59 @@ export default function DocsPage() {
         </header>
 
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-01-14
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
+                Modo sombra en /plan-diario: “¿Qué propondría el sistema?” (Fase
+                3 del Modo Recuperación).
+              </strong>{" "}
+              Nuevo botón en{" "}
+              <code className="rounded bg-muted px-1.5 py-1 text-xs">
+                /plan-diario
+              </code>{" "}
+              que muestra la propuesta del motor de selección determinista{" "}
+              <strong className="text-foreground">sin escribir nada en la base
+              de datos</strong>. Muestra 1 tarea principal, hasta 2 secundarias,
+              un mantenimiento opcional, el tiempo personal protegido y los
+              avisos de riesgo, cada una con{" "}
+              <strong className="text-foreground">el motivo en texto plano</strong>{" "}
+              (“vence mañana”, “hay un pago vencido relacionado”), y además{" "}
+              <strong className="text-foreground">la compara con el plan que ya
+              tienes hoy</strong> (cuántas coinciden, cuántas sugiere el sistema
+              y cuáles son solo tuyas). Detalles de implementación: la
+              capacidad se deriva del semáforo que la app ya calcula
+              (<code className="rounded bg-muted px-1.5 py-1 text-xs">verde/amarillo/rojo</code>)
+              y, si aún no hay plan, se estima desde los 5 selects del estado
+              emocional —{" "}
+              <strong className="text-foreground">nunca por defecto en
+              verde</strong>, porque eso llenaría el día; un pago vencido
+              aparece como aviso{" "}
+              <strong className="text-foreground">aunque la carga esté
+              mínima</strong> (ajustar la carga y ocultar un riesgo son cosas
+              distintas); y las tareas recurrentes quedan fuera porque son
+              hábitos, no tareas del día.{" "}
+              <strong className="text-foreground">Por qué en sombra</strong>:{" "}
+              un sistema automático que elige mal genera más problemas que
+              tener que decidir a mano. Esta fase es de observación: la
+              propuesta se recalcula al entrar,{" "}
+              <em>no toca estados, ni fechas, ni descarta nada</em>, y el
+              motor es el mismo que usará la fase siguiente, así que lo que
+              ves hoy es exactamente lo que se guardará mañana. Cubierto por 17
+              tests en{" "}
+              <code className="rounded bg-muted px-1.5 py-1 text-xs">
+                src/lib/recuperacion/shadow.test.mjs
+              </code>
+              . FEATURES actualizado (fila{" "}
+              <code className="rounded bg-muted px-1.5 py-1 text-xs">
+                /plan-diario
+              </code>
+              ) y este changelog. No se cambian pilares ni rituales: es una
+              vista nueva dentro de una pantalla que ya existía.
+            </span>
+          </li>
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
               2026-01-14

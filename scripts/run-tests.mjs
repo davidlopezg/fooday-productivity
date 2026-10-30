@@ -28,6 +28,7 @@ const TESTS = [
   "src/lib/escenarios/hipotesis.test.mjs",
   "src/lib/pagos/parser-pdf.test.mjs",
   "src/lib/recuperacion/seleccion.test.mjs",
+  "src/lib/recuperacion/shadow.test.mjs",
 ];
 
 // Los tests importan código .ts de la app → necesita type-stripping nativo.

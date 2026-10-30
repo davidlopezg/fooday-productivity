@@ -388,3 +388,80 @@ npx next build --webpack → ✅ Compiled successfully
 El motor financiero ya está integrado en el motor de selección (riesgos, avisos, matching). La Fase 2 real que queda es **enriquecer el cruce pago↔tarea** (p. ej. matching por nº de factura si aparece en `pagos.notas`), y la Fase 3 es pintar el resultado en `/plan-diario` como propuesta sin escribir nada — que, gracias a que el motor es puro, es el mismo código con un flag.
 
 **El paso crítico es el shadow mode**: antes de que el sistema escriba un plan, hay que ver durante unos días qué selecciona y por qué. Si el motor elige mal, un sistema automático genera más problemas que decidir a mano.
+
+---
+
+## 15. FASE 3 IMPLEMENTADA — Modo sombra
+
+### Archivos creados
+| Archivo | Qué es |
+|---|---|
+| `src/lib/recuperacion/shadow.ts` | Une datos → calcula la propuesta → la compara con el plan actual. Deriva la capacidad del semáforo existente. Sin escrituras |
+| `src/lib/recuperacion/shadow.test.mjs` | 17 tests |
+| `src/components/PlanShadow.tsx` | Componente de UI del panel (solo lectura) |
+
+### Archivos modificados
+| Archivo | Cambio |
+|---|---|
+| `src/app/plan-diario/page.tsx` | Botón toggle + panel. Carga metas, pagos y el plan de hoy para el cálculo |
+| `src/app/docs/page.tsx` | FEATURES (fila `/plan-diario`) + changelog 2026-01-14 |
+| `src/app/metodologia/page.tsx` | Sección 9 actualizada: el criterio ya tiene su Modo sombra |
+| `src/components/HelpDrawer.tsx` | 2 entradas nuevas en la ayuda de `/plan-diario` |
+| `scripts/run-tests.mjs` | 11 ficheros de test |
+
+### Migraciones
+**Ninguna.** Sigue sin haber ninguna.
+
+### Verificación
+```
+npm test          → ✅ 11 ficheros (50 del motor + 17 del shadow)
+npm run typecheck → ✅
+npx eslint        → ✅
+npx next build    → ✅ Compiled successfully
+```
+Verificación adicional en runtime: se sirvió el build estático (`out/`) y se
+comprobó que el chunk de `/plan-diario` contiene el componente compilado
+(`"¿Qué propondría el sistema?"`, `"Modo sombra"`, `"Riesgo financiero"`,
+`"tiempo protegido"`).
+
+### Cómo se usa (lo que tienes que hacer)
+1. Abre **/plan-diario** (el icono del calendario en la barra lateral, o
+   `/plan-diario`).
+2. Pulsa el botón **"¿Qué propondría el sistema?"** (justo encima de
+   "Parte 1 — Captura").
+3. Se abre el panel con la propuesta: principal, secundarias, mantenimiento,
+   tiempo personal y avisos de riesgo, cada uno con su motivo.
+4. Compara con tu plan actual (el panel te dice cuántas coinciden).
+5. **Cierra el panel y sigue usando la app como hasta ahora.**
+
+Eso es todo. No hay que cambiar nada de lo que haces.
+
+### Decisiones de diseño tomadas en esta fase
+
+- **El botón está apagado por defecto.** No quiero que se abra solo y te
+  añada ruido visual a una pantalla que ya era densa. Lo abres tú cuando
+  quieres mirar.
+- **La capacidad sale del semáforo que ya tienes.** Si hoy no has generado
+  plan, se estima desde los 5 selects del estado emocional. **Nunca verde por
+  defecto**: si no hay información, se asume carga media, porque asumir verde
+  llenaría el día sin que lo hayas pedido.
+- **Los riesgos no dependen de la capacidad.** Un pago vencido se muestra
+  aunque estés en rojo.
+- **El panel se recalcula al entrar**, sin caché: si cambias una tarea, la
+  ves al instante.
+- **No hay botón de "aplicar".** Deliberadamente: esta fase es de
+  observación. Añadir un "aplicar" ahora invitaría a activarlo antes de
+  haberlo validado.
+
+### Lo que sigue (Fase 4, cuando el shadow te convenza)
+- Botón "Aplicar esta propuesta" → persiste en `plan_diario_tareas` (el
+  motor no cambia: solo cambia el destino del resultado).
+- La pantalla del Modo Recuperación como home `/` (reescritura), con el
+  Pomodoro reusando el store global (`PomodoroProvider` + `PomodoroWidget`),
+  sin duplicar el temporizador.
+- Botón ⚡ Pomodoro por tarea, copiando el patrón de `TareaModal`.
+
+### Nota sobre "dónde mirar"
+El botón está en `/plan-diario`. Si no lo ves: el modo sombra **no** ha
+tocado la home `/` (esa es la Fase 4). Es un botón pequeño, arriba del todo
+de la página, justo encima del formulario de estado emocional.

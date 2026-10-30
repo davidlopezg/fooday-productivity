@@ -1,13 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   fetchTareas,
   fetchHistorialEmocional,
   fetchPlanSemanal,
   fetchKRsFocoSemanal,
+  fetchMetas,
+  fetchPlanHoy,
 } from "@/lib/queries";
+import { fetchPagosConUrgencia } from "@/lib/pagos/queries";
 import {
   upsertTareaPorTitulo,
   guardarPlanDiarioSimple,
@@ -21,13 +24,17 @@ import { useConfig } from "@/lib/configStore";
 import { generarPlanSimple } from "@/lib/planSimple";
 import type { EstadoEmocional } from "@/lib/plan";
 import { getCurrentISOWeek, BLOQUE_HORARIO, localYMD } from "@/lib/semana";
+import { calcularPropuestaShadow, type PropuestaShadow } from "@/lib/recuperacion/shadow";
+import { PlanShadow } from "@/components/PlanShadow";
 import type {
   KrFocoConDetalle,
+  Meta,
   PlanDiario,
   PlanGeneradoSimple,
   PlanSemanalTarea,
   Tarea,
 } from "@/lib/types";
+import type { Pago } from "@/lib/pagos/types";
 
 // ----------------------------------------------------------------------------
 // Constantes UI
@@ -168,6 +175,43 @@ export default function PlanDiarioPage() {
   const [generando, setGenerando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [planLocal, setPlanLocal] = useState<PlanLocal | null>(null);
+
+  // ── MODO SOMBRA (Fase 3 del Modo Recuperación) ──────────────────────
+  // Sólo LEE y PROPONE. No escribe nada en la BD: ni estados, ni fechas,
+  // ni descartes. La propuesta se recalcula en cada render a partir de los
+  // datos actuales, así que si cambias una tarea, la ves al instante.
+  const [shadowActivo, setShadowActivo] = useState(false);
+  const [shadow, setShadow] = useState<PropuestaShadow | null>(null);
+  const [shadowError, setShadowError] = useState<string | null>(null);
+
+  const metasQ = useData<Meta[]>(() => fetchMetas(), []);
+  const pagosQ = useData<Pago[]>(() => fetchPagosConUrgencia(), []);
+  const planHoyQ = useData(() => fetchPlanHoy(), null);
+
+  const calcularShadow = useCallback(() => {
+    try {
+      setShadowError(null);
+      const propuesta = calcularPropuestaShadow({
+        tareas: tareasQ.data,
+        metas: metasQ.data,
+        pagos: pagosQ.data,
+        planActual: planHoyQ.data,
+        estado,
+        hoy: HOY(),
+      });
+      setShadow(propuesta);
+    } catch (e) {
+      console.error("[plan-diario] shadow falló:", e);
+      setShadowError(e instanceof Error ? e.message : String(e));
+    }
+  }, [tareasQ.data, metasQ.data, pagosQ.data, planHoyQ.data, estado]);
+
+  // Recalcular cuando cambian los datos o el estado emocional (sólo si el
+  // shadow está abierto: si no, no gastamos CPU en calcularlo).
+  useEffect(() => {
+    if (!shadowActivo) return;
+    calcularShadow();
+  }, [shadowActivo, calcularShadow]);
 
   // ── Notas del día ──
   const [notasEstado, setNotasEstado] = useState<
@@ -479,6 +523,34 @@ export default function PlanDiarioPage() {
           </Link>
           .
         </div>
+      )}
+
+      {/* =========================================================================
+          MODO SOMBRA — la propuesta del sistema, sin escribir nada.
+          Toggle manual: por defecto está apagado para noDistraer. Cuando
+          se abre, sólo LEE y PROPONE (ninguna escritura en la BD).
+      ========================================================================= */}
+      <div>
+        <button
+          onClick={() => setShadowActivo((v) => !v)}
+          className={`inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
+            shadowActivo
+              ? "border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-300"
+              : "border-border text-muted-foreground hover:bg-muted"
+          }`}
+          aria-expanded={shadowActivo}
+        >
+          <IconSparkles className="h-3.5 w-3.5" />
+          {shadowActivo ? "Ocultar propuesta" : "¿Qué propondría el sistema?"}
+        </button>
+      </div>
+
+      {shadowActivo && (
+        <PlanShadow
+          propuesta={shadow}
+          cargando={tareasQ.loading || metasQ.loading || pagosQ.loading}
+          error={shadowError}
+        />
       )}
 
       {/* =========================================================================
@@ -1102,7 +1174,7 @@ function SemaforoDot({ semaforo }: { semaforo: "verde" | "amarillo" | "rojo" }) 
   return <span className={`h-2 w-2 rounded-full ${color}`} aria-hidden />;
 }
 
-import { IconBolt } from "@/components/icons";
+import { IconBolt, IconSparkles } from "@/components/icons";
 import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
 
 function fechaToLargaLocal(fecha: string): string {
