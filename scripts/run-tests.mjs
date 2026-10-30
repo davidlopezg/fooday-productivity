@@ -29,7 +29,8 @@ const TESTS = [
   "src/lib/pagos/parser-pdf.test.mjs",
   "src/lib/recuperacion/seleccion.test.mjs",
   "src/lib/recuperacion/shadow.test.mjs",
-];
+  "src/lib/recuperacion/revision.test.mjs",
+]
 
 // Los tests importan código .ts de la app → necesita type-stripping nativo.
 // `scripts/test-alias.mjs` aporta además la resolución de `@/` y de rutas

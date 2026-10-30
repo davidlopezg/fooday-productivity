@@ -323,6 +323,16 @@ const CRITERIO_SELECCION: Punto[] = [
       "Tres TGSS de 480 € son tres obligaciones distintas y el usuario tiene que ver cuántas son y cuánto pesan: nunca se fusionan ni se descartan. Lo que se agrupa es el RUIDO: los vencidos hace más de 30 días se muestran como un resumen con el total, y al desplegarlo salen uno a uno. Los que vencen esta semana se muestran siempre en individual, porque son los que exigen una decisión hoy. Y el estado que se mira es el EFECTIVO (el que ve el usuario en /pagos), no el crudo de la tabla: si no, los pagos vencidos hace meses pasarían por 'pendientes'.",
   },
   {
+    titulo: "Una obligación, un hueco (y la más cara primero)",
+    cuerpo:
+      "Si una tarea enlaza con varios pagos (una fianza de 700 € y otra de 1.000 €, por ejemplo), el sistema elige el de MAYOR IMPORTE PENDIENTE, no el primero que aparece. Y una misma obligación no puede ocupar dos huecos del plan: si la principal ya es “atender la fianza”, la secundaria no vuelve a ser “atender la fianza”. Sin esto, la pantalla decía dos veces “este es el riesgo que debes atender” y la segunda no era una segunda cosa que hacer, sino la misma otra vez.",
+  },
+  {
+    titulo: "El estado del pago va DENTRO del motivo, nunca inventado",
+    cuerpo:
+      "El motivo dice la verdad: “vence en 20 días”, “vence hoy”, “vencido hace 30 días”, con el importe pendiente y qué señal coincidió (importe o proveedor/concepto). Un aviso falso es PEOR que no avisar: si el sistema llama “vencido” a un pago que vence en tres semanas, deja de ser creíble para todo lo demás. Por eso el estado se lee del pago efectivo (el que ve el usuario en /pagos) y se escribe tal cual.",
+  },
+  {
     titulo: "El tiempo estimado sólo se dice si es fiable",
     cuerpo:
       "De `tareas_subtareas.tiempo_estimado_min` (numérico, ya persistido, y la primera subtarea PENDIENTE es la próxima acción = el tiempo real de trabajo). NO de `tareas.esfuerzo`, que es texto libre: en los datos reales aparecía un “1” en una factura que no eran minutos, y el motor lo leía como “1 minuto”. Un número suelto menor de 5, o sin unidad explícita, NO se interpreta como tiempo: es preferible decir “sin estimar” que mentir con un número.",

@@ -356,7 +356,7 @@ test("indexarPagosPorTarea: indexa solo las tareas con match", () => {
   const p = pago({ proveedor: "Sabadell", concepto: "Comisión", importe_total: 25 });
   const t1 = tarea({ titulo: "Sabadell comisión 25" });
   const t2 = tarea({ titulo: "Otra cosa" });
-  const idx = indexarPagosPorTarea([p], [t1, t2]);
+  const idx = indexarPagosPorTarea([p], [t1, t2], HOY);
   eq(idx.size, 1);
   ok(idx.has(t1.id), "t1 debería estar indexada");
   ok(!idx.has(t2.id), "t2 no debería estar indexada");
@@ -941,6 +941,100 @@ test("BUG: el estado crudo no se confunde con el efectivo (pagos de meses)", () 
   eq(r.length, 1);
   eq(r[0].nivel, 0);
   ok(r[0].antiguedad > DIAS_AVISO_INDIVIDUAL, "debe detectarse como antiguo");
+});
+
+console.log("\n── BUGS 8-10 (segunda ronda, datos reales) ──");
+
+test("BUG 8: entre varios pagos de la MISMA tarea gana el de mayor importe", () => {
+  // Caso real: una tarea de fianza enlaza con dos pagos (700 € y 1.000 €)
+  // por la palabra "fianza". El sistema debe señalar el de 1.000 €.
+  const p700 = pago({ id: "p700", proveedor: "Intrum", concepto: "Fianza", importe_total: 700, fecha_vencimiento: "2025-10-01" });
+  const p1000 = pago({ id: "p1000", proveedor: "Intrum", concepto: "Fianza", importe_total: 1000, fecha_vencimiento: "2025-10-01" });
+  const idx = indexarPagosPorTarea([p700, p1000], [tarea({ id: "t1", titulo: "Liberar la fianza" })], HOY);
+  eq(idx.get("t1").pago.id, "p1000");
+  eq(idx.get("t1").pago.importe_total, 1000);
+});
+
+test("BUG 8: el match FUERTE (importe) sigue ganando al débil (proveedor)", () => {
+  const pDebil = pago({ id: "pd", proveedor: "Intrum", concepto: "Fianza", importe_total: 700, fecha_vencimiento: "2025-10-01" });
+  const pFuerte = pago({ id: "pf", proveedor: "Intrum", concepto: "Fianza", importe_total: 350, fecha_vencimiento: "2025-10-01" });
+  const idx = indexarPagosPorTarea(
+    [pDebil, pFuerte],
+    [tarea({ id: "t1", titulo: "Liberar la fianza 350,00" })],
+    HOY,
+  );
+  eq(idx.get("t1").pago.id, "pf");
+  eq(idx.get("t1").senal, "importe");
+});
+
+test("BUG 9: el texto NO dice 'vencido' si el pago vence en 20 días", () => {
+  // Mentir con el estado del pago es peor que no avisar: el usuario ya
+  // avisó de que no quiere alertas falsas.
+  const p = pago({ proveedor: "Intrum", concepto: "Fianza", importe_total: 700, fecha_vencimiento: "2026-01-30" });
+  const r = seleccionarPlan({
+    tareas: [tarea({ titulo: "Liberar la fianza" })],
+    metas: new Map(),
+    pagos: [p],
+    capacidad: "verde",
+    hoy: HOY,
+  });
+  ok(!r.principal.motivo.motivo.includes("vencido"), r.principal.motivo.motivo);
+  ok(r.principal.motivo.motivo.includes("vence pronto"), r.principal.motivo.motivo);
+  ok(r.principal.motivo.detalle.includes("vence en"), r.principal.motivo.detalle);
+});
+
+test("BUG 9: el detalle dice de verdad QUÉ coincidió", () => {
+  const p = pago({ proveedor: "Intrum", concepto: "Fianza", importe_total: 700, fecha_vencimiento: "2025-10-01" });
+  const r = seleccionarPlan({
+    tareas: [tarea({ titulo: "Liberar la fianza" })],
+    metas: new Map(),
+    pagos: [p],
+    capacidad: "verde",
+    hoy: HOY,
+  });
+  ok(r.principal.motivo.detalle.includes("proveedor o concepto coincidente"), r.principal.motivo.detalle);
+  // Y el detalle lleva también el estado real del pago.
+  ok(r.principal.motivo.detalle.includes("vencido hace"), r.principal.motivo.detalle);
+  // No dice la etiqueta antigua "concepto coincidente ·" suelta.
+  ok(!r.principal.motivo.detalle.includes("· concepto coincidente"), r.principal.motivo.detalle);
+});
+
+test("BUG 10: DOS tareas no pueden ocupar el plan con el MISMO pago", () => {
+  // Caso real: la principal y la secundaria decían las dos
+  // "700,00 € · concepto coincidente" — la misma obligación, dos veces.
+  const p = pago({ proveedor: "Intrum", concepto: "Fianza", importe_total: 700, fecha_vencimiento: "2025-10-01" });
+  const m = meta({});
+  const r = seleccionarPlan({
+    tareas: [
+      tarea({ titulo: "Redactar escrito sobre la fianza", meta_id: m.id }),
+      tarea({ titulo: "Preparar plantilla sobre la fianza", meta_id: m.id }),
+      tarea({ titulo: "Otra cosa con la fianza", meta_id: m.id }),
+    ],
+    metas: mapaMetas([m]),
+    pagos: [p],
+    capacidad: "alta",
+    hoy: HOY,
+  });
+  const pagosUsados = r.plan.map((s) => s.motivo.pagoId).filter(Boolean);
+  eq(new Set(pagosUsados).size, pagosUsados.length, "no hay pagos repetidos en el plan");
+});
+
+test("BUG 10: si el único pago posible está en la principal, la secundaria es otra", () => {
+  const p = pago({ proveedor: "Intrum", concepto: "Fianza", importe_total: 700, fecha_vencimiento: "2025-10-01" });
+  const m = meta({});
+  const r = seleccionarPlan({
+    tareas: [
+      tarea({ titulo: "Redactar escrito sobre la fianza", meta_id: m.id }),
+      tarea({ titulo: "Preparar plantilla sobre la fianza", meta_id: m.id }),
+      tarea({ titulo: "Revisar el correo del banco", meta_id: m.id }),
+    ],
+    metas: mapaMetas([m]),
+    pagos: [p],
+    capacidad: "alta",
+    hoy: HOY,
+  });
+  eq(r.principal.motivo.pagoId, p.id);
+  eq(r.secundarias[0].motivo.pagoId, undefined, "la secundaria NO repite el pago");
 });
 
 // ----------------------------------------------------------------------------

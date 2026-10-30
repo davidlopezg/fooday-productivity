@@ -8,6 +8,8 @@ import { useData } from "@/lib/useData";
 import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
 import { PagosWidget } from "@/components/pagos/PagosWidget";
 import { PagosNotificaciones } from "@/components/pagos/PagosNotificaciones";
+import { PlanRecuperacion } from "@/components/PlanRecuperacion";
+import { usePropuestaRecuperacion } from "@/lib/recuperacion/usePropuestaRecuperacion";
 import { IconCalendar, IconTarget } from "@/components/icons";
 import type { AmbitoTarea, PlanDiario, PlanDiarioTarea, Tarea } from "@/lib/types";
 
@@ -70,6 +72,15 @@ type Data = {
 };
 
 export default function HoyPage() {
+  // ── Modo Recuperación (Fases 4, 5, 6): la propuesta ejecutable. ──
+  // Se carga siempre en la home `/`: es el corazón del sistema.
+  const {
+    propuesta,
+    cargando: propCargando,
+    error: propError,
+    recargar: propRecargar,
+  } = usePropuestaRecuperacion(true);
+
   const { data, loading, reload } = useData<Data>(async () => {
     const [plan, contadores, pendientes, wigs, wigTareas] = await Promise.all([
       fetchPlanHoy(),
@@ -295,6 +306,18 @@ export default function HoyPage() {
           </ul>
         </section>
       )}
+
+      {/* ── Modo Recuperación: lo que el sistema propone hoy, con su porque,
+              su primer paso y su pomodoro. Es la home. ── */}
+      <PlanRecuperacion
+        propuesta={propuesta}
+        cargando={propCargando}
+        error={propError}
+        onCambio={() => {
+          void propRecargar();
+          void reload();
+        }}
+      />
 
       {/* Tareas con fecha — ordenadas por deadline ascendente.
           Lo más urgente arriba (vencidas primero, luego HOY, luego futuras). */}

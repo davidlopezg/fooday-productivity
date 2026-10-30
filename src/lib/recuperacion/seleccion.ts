@@ -342,11 +342,21 @@ export function minutosEstimados(tarea: Tarea): number | null {
   if (num > 480) return null;
 
   // ¿El texto habla de HORAS o de MINUTOS? Se busca la unidad más
-  // específica y se normaliza a minutos. "2h", "2 horas", "1h30" → horas.
+  // específica y se normaliza a minutos. "2h", "2 horas" → horas.
   const horas = /\d\s*(h|hs|hora|horas)\b/.test(crud) || /\b\d+\s*h\b/.test(crud);
   const minutos = /\d\s*(min|mins|minuto|minutos)\b/.test(crud);
 
-  if (horas) return num * 60;
+  if (horas) {
+    // "1h30" / "1 h 30" → 90 min, no 130. Se separa la parte de horas de
+    // la de minutos.
+    const mHoras = crud.match(/(\d+)\s*(h|hs|hora|horas)\s*(\d+)?/);
+    if (mHoras) {
+      const h = parseInt(mHoras[1], 10);
+      const m = mHoras[3] ? parseInt(mHoras[3], 10) : 0;
+      return h * 60 + m;
+    }
+    return num * 60;
+  }
   if (minutos) return num;
 
   // Sin unidad explícita: sólo se acepta un número grande. "1", "2", "3" o
@@ -566,6 +576,7 @@ export function relacionarPagoConTarea(
 export function indexarPagosPorTarea(
   pagos: Pago[],
   tareas: Tarea[],
+  hoy: string,
 ): Map<string, { pago: Pago; fuerte: boolean; senal: "importe" | "proveedor" }> {
   const idx = new Map<
     string,
@@ -575,11 +586,33 @@ export function indexarPagosPorTarea(
     for (const tarea of tareas) {
       const r = relacionarPagoConTarea(pago, tarea);
       if (!r.senal) continue;
+      const pendiente = (pago.importe_total ?? 0) - (pago.importe_pagado ?? 0);
       const previo = idx.get(tarea.id);
-      // Gana el match fuerte; si empatan, el de mayor nivel de urgencia.
+      // Desempate (en este orden):
+      //   1. El match fuerte (importe + proveedor) gana al débil.
+      //   2. Entre iguales, gana el de MAYOR IMPORTE PENDIENTE: si una
+      //      tarea enlaza con un pago de 700 € y otro de 1.000 €, el
+      //      sistema debe señalar el de 1.000 €.
+      //   3. A igualdad, el más urgente.
       if (!previo) {
         idx.set(tarea.id, { pago, fuerte: r.fuerte, senal: r.senal });
-      } else if (r.fuerte && !previo.fuerte) {
+        continue;
+      }
+      const pendientePrevio =
+        (previo.pago.importe_total ?? 0) - (previo.pago.importe_pagado ?? 0);
+      const urgentePrevio = diasHasta(previo.pago.fecha_vencimiento, hoy);
+      const urgente = diasHasta(pago.fecha_vencimiento, hoy);
+
+      const ganaElNuevo =
+        (r.fuerte && !previo.fuerte) ||
+        (r.fuerte === previo.fuerte &&
+          (pendiente > pendientePrevio ||
+            (pendiente === pendientePrevio &&
+              urgente != null &&
+              urgentePrevio != null &&
+              urgente < urgentePrevio)));
+
+      if (ganaElNuevo) {
         idx.set(tarea.id, { pago, fuerte: r.fuerte, senal: r.senal });
       }
     }
@@ -623,6 +656,20 @@ export type SeleccionarPlanArgs = {
   nivel?: NivelCapacidad;
   /** Fecha de hoy en formato YYYY-MM-DD (local). */
   hoy: string;
+  /**
+   * Tareas que el usuario ha apartado: `{ ids: Set<string> }`.
+   *
+   * Es el resultado del feedback (Fase 6): si el usuario dijo "hoy no" y la
+   * pospuso hasta el 12, el motor no debe volver a proponerla antes del 12.
+   * Se pasa como dato (no se consulta la BD dentro del motor) para que el
+   * motor siga siendo PURO y determinista.
+   */
+  apartadas?: {
+    /** Ids de tareas que no se pueden proponer (bloqueadas). */
+    ids?: Set<string>;
+    /** Tarea → fecha hasta la que está pospuesta. */
+    hasta?: Map<string, string>;
+  };
 };
 
 /** Estados en los que una tarea NO es candidata a entrar en el plan. */
@@ -652,12 +699,21 @@ export function seleccionarPlan(args: SeleccionarPlanArgs): ResultadoSeleccion {
     });
 
   // ── 0. Filtro de candidatas ────────────────────────────────────────────
-  const candidatas = tareas.filter((t) => !esExcluible(t));
+  const apartadas = args.apartadas ?? {};
+  const candidatas = tareas.filter((t) => {
+    if (esExcluible(t)) return false;
+    // Apartada explícitamente por el usuario (feedback de la Fase 6).
+    if (apartadas.ids?.has(t.id)) return false;
+    // Pospuesta hasta una fecha: si aún no ha llegado, no se propone.
+    const hasta = apartadas.hasta?.get(t.id);
+    if (hasta && hasta > hoy) return false;
+    return true;
+  });
 
   // ── Motor financiero ───────────────────────────────────────────────────
   const riesgos = detectarRiesgosFinancieros(pagos, hoy);
   const pagosActivos = riesgos.map((r) => r.pago);
-  const pagosPorTarea = indexarPagosPorTarea(pagosActivos, candidatas);
+  const pagosPorTarea = indexarPagosPorTarea(pagosActivos, candidatas, hoy);
 
   // ── Avisos (riesgos que la capacidad NO puede silenciar) ──────────────
   // Un pago vencido hace 3 meses sigue siendo real y NO se fusiona con
@@ -759,15 +815,35 @@ export function seleccionarPlan(args: SeleccionarPlanArgs): ResultadoSeleccion {
       // La etiqueta dice QUÉ-SE-COINCIDIÓ de verdad. Antes decía siempre
       // "concepto coincidente" aunque lo que hubiera coincidido fuera el
       // importe (que es la señal más fuerte).
+      //   "importe"    → el importe pendiente aparece en el texto.
+      //   "proveedor"  → coincide una palabra del proveedor/conCEPTO.
+      // En ambos casos se añade el estado del pago, que es lo que de verdad
+      // importa: un pago VENCIDO de 700 € no es lo mismo que uno que vence
+      // en 30 días, aunque el importe sea el mismo.
       const senalTexto =
-        senal === "importe" ? "importe coincidente" : "concepto coincidente";
-      const detalle = `${formatearImporte(pendiente)} · ${senalTexto}`;
+        senal === "importe" ? "importe coincidente" : "proveedor o concepto coincidente";
+      // El estado del pago va DENTRO del texto: decir "pago vencido" cuando
+      // en realidad vence en 20 días es mentir, y el usuario ya avisó de
+      // que no quiere que el sistema le alerte de algo que no está en
+      // riesgo. Con `estado_efectivo` = pagado/anulado el pago ni siquiera
+      // llega aqui.
+      const estadoPago =
+        diasPago == null
+          ? "sin fecha de vencimiento"
+          : diasPago < 0
+            ? `vencido hace ${Math.abs(diasPago)} día(s)`
+            : diasPago === 0
+              ? "vence hoy"
+              : `vence en ${diasPago} día(s)`;
+      const detalle = `${formatearImporte(pendiente)} · ${senalTexto} · ${estadoPago}`;
       return {
         regla: "riesgo_financiero",
         motivo:
           diasPago != null && diasPago < 0
             ? `Hay un pago vencido relacionado (${formatearImporte(pendiente)})`
-            : `Hay un pago próximo a vencer relacionado (${formatearImporte(pendiente)})`,
+            : diasPago != null && diasPago <= DIAS_PAGO_HORIZONTE
+              ? `Hay un pago que vence pronto relacionado (${formatearImporte(pendiente)})`
+              : `Hay un pago pendiente relacionado (${formatearImporte(pendiente)})`,
         diasHastaVencer: c.dias,
         detalle,
         pagoId: pago.id,
@@ -956,7 +1032,28 @@ export function seleccionarPlan(args: SeleccionarPlanArgs): ResultadoSeleccion {
 
   const principal = deTrabajo[0] ?? null;
   const maxSec = MAX_SECUNDARIAS[nivel];
-  const secundarias = deTrabajo.slice(1, 1 + maxSec);
+
+  // INVARIANTE: una misma obligacion (pago) no puede ocupar dos huecos
+  // del plan. Si la principal y la secundaria apuntan al mismo pago
+  // vencido, la pantalla diria dos veces "este es el riesgo que debes
+  // atender" — y encima la secundaria no seria una segunda cosa que
+  // hacer, sino la MISMA otra vez. Cuando pasa, la segunda se busca entre
+  // las candidatas que NO comparten pago con la principal.
+  const pagoDePrincipal = principal?.motivo.pagoId;
+  const secundariasSinRepetir: TareaSeleccionada[] = [];
+  for (const s of deTrabajo.slice(1)) {
+    if (secundariasSinRepetir.length >= maxSec) break;
+    const pagoId = s.motivo.pagoId;
+    if (pagoId && pagoId === pagoDePrincipal) continue;
+    if (
+      pagoId &&
+      secundariasSinRepetir.some((x) => x.motivo.pagoId === pagoId)
+    ) {
+      continue;
+    }
+    secundariasSinRepetir.push(s);
+  }
+  const secundarias = secundariasSinRepetir;
 
   // ── Plan final ─────────────────────────────────────────────────────────
   const plan = [

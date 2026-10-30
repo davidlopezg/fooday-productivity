@@ -1814,9 +1814,36 @@ export default function DocsPage() {
               pierde ninguna. También se documenta que una tarea importante
               ya vencida{" "}
               <em>entra</em> en el plan (antes sólo salía como aviso:
-              avisar de algo que no vas a hacer es contradecirse). Cubierto
-              por 79 tests (61 del motor + 18 del Modo sombra), con un
-              bloque dedicado a cada bug corregido. FEATURES y este
+              avisar de algo que no vas a hacer es contradecirse).{" "}
+              <strong className="text-foreground">
+                Segunda ronda: 3 correcciones más tras una segunda prueba con
+                datos reales
+              </strong>
+              .{" "}
+              <strong className="text-foreground">8) La misma obligación
+              ocupaba dos huecos</strong>: si una tarea enlaza con dos
+              pagos (p. ej. una fianza de 700 € y otra de 1.000 €), el
+              índice elegía el primero que encontraba, no el más caro, y la
+              tarea secundaria podía repetir la misma deuda que la
+              principal. Ahora gana el de{" "}
+              <em>mayor importe pendiente</em> y{" "}
+              <strong className="text-foreground">nada repite pago</strong>{" "}
+              en el plan: una obligación, un hueco.{" "}
+              <strong className="text-foreground">9) El motivo decía
+              “vencido” cuando el pago no lo estaba</strong>: la tarea
+              enlazaba con un pago que vence dentro de 20 días y el motivo
+              lo llamaba “pago vencido”. Un aviso falso es peor que no
+              avisar, así que el estado real del pago va{" "}
+              <em>dentro</em> del texto (“vence en 20 días”, “vence hoy”,
+              “vencido hace N días”), no fuera.{" "}
+              <strong className="text-foreground">10) Etiqueta del
+              matching imprecisa</strong>: decía “concepto coincidente”
+              cuando lo que coincidía era el proveedor (o ambos), y no
+              decía{" "}
+              <em>cuál</em> de los dos signals había coincidido. Ahora:
+              “importe coincidente” o “proveedor o concepto coincidente”.
+              Cubierto por 85 tests (67 del motor + 18 del Modo sombra), con
+              un bloque dedicado a cada bug corregido. FEATURES y este
               changelog actualizados. No se cambian pilares ni rituales: son
               correcciones de criterio dentro de una vista que ya existía.
             </span>
