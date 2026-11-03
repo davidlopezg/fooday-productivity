@@ -9,6 +9,7 @@ import { useConfig } from "@/lib/configStore";
 import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
 import { EditarMetaModal } from "@/components/EditarMetaModal";
 import { SugerirWigsModal } from "@/components/SugerirWigsModal";
+import { PanelWigMetas } from "@/components/PanelWigMetas";
 import { sugerirWigsIA, type SugerirWigsResultado } from "@/lib/plan";
 import type { AmbitoMeta, MetaConPlan, Proyecto } from "@/lib/types";
 import {
@@ -51,110 +52,6 @@ const AMBITO_LABEL: Record<AmbitoMeta, string> = {
 };
 
 type Filtro = "todas" | AmbitoMeta | "archivadas";
-
-function ProgressBar({ value }: { value: number }) {
-  const pct = Math.max(0, Math.min(1, value));
-  const pctTxt = Math.round(pct * 100);
-  const color =
-    pct < 0.3 ? "bg-red-500" : pct < 0.7 ? "bg-amber-500" : "bg-emerald-500";
-  return (
-    <div className="mt-3">
-      <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-        <span>Progreso</span>
-        <span className="font-medium tabular-nums">{pctTxt}%</span>
-      </div>
-      <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-muted">
-        <div
-          className={`h-full rounded-full transition-all ${color}`}
-          style={{ width: `${pctTxt}%` }}
-        />
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Panel WIG — las 1-3 metas enormemente importantes (4DX)
-// ---------------------------------------------------------------------------
-function PanelWig({
-  wigs,
-  onQuitar,
-  guardandoId,
-}: {
-  wigs: MetaConPlan[];
-  onQuitar: (id: string) => void;
-  guardandoId: string | null;
-}) {
-  return (
-    <section className="rounded-2xl border-2 border-violet-500/40 bg-gradient-to-br from-violet-500/10 to-fuchsia-500/5 p-5">
-      <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="flex items-center gap-2 text-lg font-bold tracking-tight">
-            <IconTarget className="h-5 w-5 text-violet-500" />
-            WIGs — OKR foco (máx 3)
-          </h2>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Las 3 metas a las que dedicas energía desproporcionada este ciclo.
-            El resto de metas siguen activas pero sin foco — “OKR” describe la
-            fila completa (meta + KRs + tareas); “WIG” es el subconjunto
-            donde concentras la energía.
-          </p>
-        </div>
-        <span className="rounded-full bg-violet-500/20 px-3 py-1 text-xs font-semibold tabular-nums text-violet-700 dark:text-violet-300">
-          {wigs.length} / 3
-        </span>
-      </header>
-
-      {wigs.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-violet-500/30 bg-background/60 p-4 text-sm text-muted-foreground">
-          <p>
-            Todavía no has marcado ningún WIG. Pulsa la{" "}
-            <span className="font-medium text-foreground">diana 🎯</span> en
-            una meta de abajo para ascenderla a Enormemente Importante.
-          </p>
-          <p className="mt-2 text-xs">
-            Empieza por 1. Cuando la sostengas, añade la segunda. No pases de 3
-            aunque te sientas capaz — el punto es la concentración, no la
-            ambición.
-          </p>
-        </div>
-      ) : (
-        <ul className="space-y-2">
-          {wigs.map((w) => (
-            <li
-              key={w.meta.id}
-              className="flex items-center gap-3 rounded-lg border border-violet-500/30 bg-background/80 px-3 py-2.5"
-            >
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-500/20 text-sm font-bold text-violet-700 dark:text-violet-300">
-                {w.meta.wig_orden ?? "?"}
-              </span>
-              <Link
-                href={`/metas/detalle?id=${w.meta.id}`}
-                className="min-w-0 flex-1 truncate text-sm font-medium hover:underline"
-              >
-                {w.meta.titulo}
-              </Link>
-              {w.total_tareas > 0 && (
-                <span className="hidden shrink-0 text-[11px] tabular-nums text-muted-foreground sm:inline">
-                  {w.tareas_hechas}/{w.total_tareas}
-                </span>
-              )}
-              <button
-                type="button"
-                onClick={() => onQuitar(w.meta.id)}
-                disabled={guardandoId === w.meta.id}
-                className="shrink-0 rounded-md px-2 py-1 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50"
-                title="Quitar de WIG"
-              >
-                {guardandoId === w.meta.id ? "…" : "Quitar"}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Página
@@ -472,7 +369,11 @@ export default function MetasPage() {
       )}
 
       {/* Panel WIG — siempre arriba, antes del listado */}
-      <PanelWig wigs={wigs} onQuitar={(id) => toggleWig(metas.find((m) => m.meta.id === id)!)} guardandoId={guardandoId} />
+      <PanelWigMetas
+        wigs={wigs}
+        onQuitar={(id) => toggleWig(metas.find((m) => m.meta.id === id)!)}
+        guardandoId={guardandoId}
+      />
 
       {/* Filtro por ámbito */}
       <div className="flex flex-wrap items-center gap-1 rounded-md border border-border bg-card p-1 text-xs">
@@ -538,278 +439,514 @@ export default function MetasPage() {
         </div>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      {/* ==================================================================
+          LISTADO — TABLA (escritorio) + filas compactas (móvil)
+
+          POR QUÉ TABLA Y NO TARJETAS (petición de David: "más operativo")
+          Las tarjetas obligaban a hacer scroll para comparar 15 metas: cada
+          una ocupaba media pantalla y solo se veían 4 a la vez. En tabla,
+          las 15 metas caben de un vistazo y se comparan por COLUMNA (estado,
+          proyecto, KRs, progreso). Es la vista de gestión; el detalle
+         Following sigue en /metas/detalle.
+          ================================================================== */}
+      <div className="hidden overflow-x-auto rounded-xl border border-border bg-card md:block">
+        <table className="w-full min-w-[920px] text-sm">
+          <thead>
+            <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+              <th className="w-9 px-2 py-2.5" title="WIG (foco)">
+                <span className="sr-only">WIG</span>
+              </th>
+              <th className="px-3 py-2.5 font-medium">Meta</th>
+              <th className="px-3 py-2.5 font-medium">Estado</th>
+              <th className="px-3 py-2.5 font-medium">Ámbito</th>
+              <th className="px-3 py-2.5 font-medium">Proyecto</th>
+              <th className="px-3 py-2.5 font-medium">KRs (resultados)</th>
+              <th className="px-3 py-2.5 font-medium">Progreso</th>
+              <th className="px-3 py-2.5 font-medium">Plazo</th>
+              <th className="px-3 py-2.5 text-right font-medium">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtradas.map((mp) => {
+              const m = mp.meta;
+              const proyecto = m.proyecto_id
+                ? proyectosById.get(m.proyecto_id)
+                : null;
+              const periodosUnicos = new Set(
+                mp.resultados.flatMap((r) =>
+                  r.periodos.length > 0
+                    ? r.periodos.map((p) => p.id)
+                    : r.periodo.id
+                      ? [r.periodo.id]
+                      : [],
+                ),
+              );
+              return (
+                <tr
+                  key={m.id}
+                  className={`group border-b border-border/60 last:border-0 hover:bg-accent/40 ${
+                    m.es_wig ? "bg-violet-500/[0.04]" : ""
+                  }`}
+                >
+                  {/* ── WIG (toggle) ── */}
+                  <td className="px-2 py-2.5 align-top">
+                    <button
+                      type="button"
+                      onClick={() => toggleWig(mp)}
+                      disabled={guardandoId === m.id}
+                      className={`rounded-full p-1 transition-colors disabled:opacity-50 ${
+                        m.es_wig
+                          ? "bg-violet-500/20 text-violet-600 dark:text-violet-400"
+                          : "text-muted-foreground/40 hover:bg-accent hover:text-muted-foreground"
+                      }`}
+                      title={
+                        m.es_wig
+                          ? `Quitar de Enormemente Importantes (WIG #${m.wig_orden ?? "?"})`
+                          : "Marcar como WIG"
+                      }
+                      aria-label={m.es_wig ? "Quitar de WIG" : "Marcar como WIG"}
+                      aria-pressed={m.es_wig}
+                    >
+                      {guardandoId === m.id ? (
+                        <span className="block h-4 w-4 text-center text-[10px]">…</span>
+                      ) : (
+                        <IconTarget className="h-4 w-4" />
+                      )}
+                    </button>
+                  </td>
+
+                  {/* ── Meta (código, título, descripción, tags) ── */}
+                  <td className="max-w-[300px] px-3 py-2.5 align-top">
+                    <Link href={`/metas/detalle?id=${m.id}`} className="block">
+                      <div className="flex flex-wrap items-baseline gap-x-2">
+                        <span className="text-[11px] font-medium text-muted-foreground">
+                          {m.codigo ?? "—"}
+                        </span>
+                        {m.es_wig && (
+                          <span className="text-[10px] font-semibold text-violet-600 dark:text-violet-400">
+                            🎯 WIG #{m.wig_orden ?? "?"}
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-0.5 font-medium leading-snug group-hover:underline">
+                        {m.titulo}
+                      </div>
+                      {m.descripcion && (
+                        <div className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-muted-foreground">
+                          {m.descripcion}
+                        </div>
+                      )}
+                      {m.tags?.length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {m.tags.map((t) => (
+                            <span
+                              key={t}
+                              className="rounded-full border border-border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                            >
+                              #{t}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </Link>
+                  </td>
+
+                  {/* ── Estado ── */}
+                  <td className="px-3 py-2.5 align-top">
+                    <span
+                      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+                        ESTADO[m.estado] ?? ESTADO.sin_empezar
+                      }`}
+                    >
+                      <span
+                        className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full align-middle ${
+                          ESTADO_DOT[m.estado] ?? ESTADO_DOT.sin_empezar
+                        }`}
+                      />
+                      {m.estado.replace("_", " ")}
+                    </span>
+                  </td>
+
+                  {/* ── Ámbito ── */}
+                  <td className="px-3 py-2.5 align-top">
+                    {m.ambito ? (
+                      <span
+                        className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${
+                          AMBITO_BADGE[m.ambito]
+                        }`}
+                      >
+                        {AMBITO_LABEL[m.ambito]}
+                      </span>
+                    ) : (
+                      <span className="text-[11px] text-muted-foreground/60">
+                        —
+                      </span>
+                    )}
+                  </td>
+
+                  {/* ── Proyecto ── */}
+                  <td className="px-3 py-2.5 align-top">
+                    {proyecto ? (
+                      <span
+                        className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] font-medium"
+                        title="Proyecto al que pertenece la meta"
+                      >
+                        <span
+                          className="h-2 w-2 rounded-sm"
+                          style={{ backgroundColor: proyecto.color ?? "#64748b" }}
+                        />
+                        {proyecto.nombre}
+                      </span>
+                    ) : (
+                      <span className="text-[11px] text-muted-foreground/60">
+                        —
+                      </span>
+                    )}
+                  </td>
+
+                  {/* ── KRs (resultados) ── */}
+                  <td className="max-w-[260px] px-3 py-2.5 align-top">
+                    {mp.resultados.length === 0 ? (
+                      <span className="text-[11px] text-muted-foreground/60">
+                        sin KR
+                      </span>
+                    ) : (
+                      <>
+                        <ul className="space-y-0.5">
+                          {mp.resultados.slice(0, 4).map((r) => {
+                            const periodos = (
+                              r.periodos.length > 0
+                                ? r.periodos
+                                : r.periodo.id
+                                  ? [r.periodo]
+                                  : []
+                            )
+                              .map((p) => p.nombre)
+                              .filter(Boolean)
+                              .join(" · ");
+                            return (
+                              <li
+                                key={r.id}
+                                className="flex items-baseline gap-1 text-[11px] leading-snug"
+                              >
+                                <span className="text-violet-500">▪</span>
+                                <span className="min-w-0 truncate text-foreground/90">
+                                  {r.titulo}
+                                </span>
+                                {periodos && (
+                                  <span className="shrink-0 text-muted-foreground/70">
+                                    {periodos}
+                                  </span>
+                                )}
+                                {r.valor_objetivo != null && (
+                                  <span className="shrink-0 tabular-nums text-muted-foreground/70">
+                                    {r.valor_actual ?? 0}/{r.valor_objetivo}
+                                    {r.unidad ?? ""}
+                                  </span>
+                                )}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                        {mp.resultados.length > 4 && (
+                          <p className="mt-0.5 text-[10px] text-muted-foreground/70">
+                            +{mp.resultados.length - 4} KR
+                            {mp.resultados.length - 4 === 1 ? "" : "s"} ·{" "}
+                            {periodosUnicos.size} periodo
+                            {periodosUnicos.size === 1 ? "" : "s"}
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </td>
+
+                  {/* ── Progreso ── */}
+                  <td className="px-3 py-2.5 align-top">
+                    <div className="flex items-center gap-2">
+                      <div className="h-1.5 w-14 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className={`h-full rounded-full ${
+                            mp.progreso < 0.3
+                              ? "bg-red-500"
+                              : mp.progreso < 0.7
+                                ? "bg-amber-500"
+                                : "bg-emerald-500"
+                          }`}
+                          style={{ width: `${Math.round(mp.progreso * 100)}%` }}
+                        />
+                      </div>
+                      <span className="text-[11px] font-medium tabular-nums">
+                        {Math.round(mp.progreso * 100)}%
+                      </span>
+                    </div>
+                    <span className="text-[10px] tabular-nums text-muted-foreground">
+                      {mp.tareas_hechas}/{mp.total_tareas} tareas
+                    </span>
+                  </td>
+
+                  {/* ── Plazo / fecha objetivo ── */}
+                  <td className="px-3 py-2.5 align-top text-[11px]">
+                    {m.fecha_objetivo ? (
+                      <span className="tabular-nums">
+                        {m.fecha_objetivo}
+                        {m.fecha_fin_bloqueada && (
+                          <span title="Fecha crítica: no se puede mover">
+                            {" "}
+                            🔒
+                          </span>
+                        )}
+                      </span>
+                    ) : m.plazo ? (
+                      <span className="text-muted-foreground">{m.plazo}</span>
+                    ) : (
+                      <span className="text-muted-foreground/60">—</span>
+                    )}
+                  </td>
+
+                  {/* ── Acciones ── */}
+                  <td className="px-3 py-2.5 text-right align-top">
+                    <div className="flex items-center justify-end gap-0.5">
+                      <button
+                        type="button"
+                        onClick={() => setEditando(mp)}
+                        className="rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                        title="Editar meta"
+                        aria-label={`Editar ${m.titulo}`}
+                      >
+                        <IconPencil className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => archivarMetaCard(mp)}
+                        disabled={guardandoId === m.id}
+                        className="rounded-full p-1.5 text-muted-foreground/40 transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
+                        title={
+                          m.estado === "archivada"
+                            ? "Desarchivar meta"
+                            : "Archivar meta"
+                        }
+                        aria-label={
+                          m.estado === "archivada"
+                            ? "Desarchivar meta"
+                            : "Archivar meta"
+                        }
+                      >
+                        <IconArchive className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => eliminarMetaCard(mp)}
+                        disabled={eliminandoId === m.id}
+                        className="rounded-full p-1.5 text-red-500/70 transition-colors hover:bg-red-500/10 hover:text-red-600 disabled:opacity-50"
+                        title="Eliminar meta (acción irreversible: tareas y KRs se desvinculan)"
+                        aria-label={`Eliminar ${m.titulo}`}
+                      >
+                        {eliminandoId === m.id ? (
+                          <span className="block h-4 w-4 text-center text-[10px]">
+                            …
+                          </span>
+                        ) : (
+                          <IconTrash className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* ── Móvil: filas compactas (la tabla de 920px obligaría a scroll) ── */}
+      <ul className="space-y-2 md:hidden">
         {filtradas.map((mp) => {
           const m = mp.meta;
+          const proyecto = m.proyecto_id
+            ? proyectosById.get(m.proyecto_id)
+            : null;
           return (
-            <article
+            <li
               key={m.id}
-              className={`group relative rounded-xl border bg-card p-5 transition-shadow hover:shadow-md ${
+              className={`rounded-xl border bg-card p-3 ${
                 m.es_wig ? "border-violet-500/40" : "border-border"
               }`}
             >
-              {/* Botones esquina superior derecha: Editar (lápiz) + WIG (diana) + Archivar */}
-              <div className="absolute right-3 top-3 z-10 flex items-center gap-1">
+              <div className="flex items-start gap-2">
                 <button
                   type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setEditando(mp);
-                  }}
-                  className="rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                  title="Editar meta"
-                  aria-label="Editar meta"
-                >
-                  <IconPencil className="h-4 w-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    toggleWig(mp);
-                  }}
+                  onClick={() => toggleWig(mp)}
                   disabled={guardandoId === m.id}
-                  className={`rounded-full p-1.5 transition-colors disabled:opacity-50 ${
+                  className={`shrink-0 rounded-full p-1 transition-colors disabled:opacity-50 ${
                     m.es_wig
                       ? "bg-violet-500/20 text-violet-600 dark:text-violet-400"
-                      : "text-muted-foreground/40 hover:bg-accent hover:text-muted-foreground"
+                      : "text-muted-foreground/40 hover:bg-accent"
                   }`}
-                  title={m.es_wig ? "Quitar de Enormemente Importantes" : "Marcar como WIG"}
+                  title={m.es_wig ? "Quitar de WIG" : "Marcar como WIG"}
                   aria-label={m.es_wig ? "Quitar de WIG" : "Marcar como WIG"}
                   aria-pressed={m.es_wig}
                 >
                   {guardandoId === m.id ? (
-                    <span className="block h-4 w-4 text-center text-[10px]">…</span>
+                    <span className="block text-center text-[10px]">…</span>
                   ) : (
                     <IconTarget className="h-4 w-4" />
                   )}
                 </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    archivarMetaCard(mp);
-                  }}
-                  disabled={guardandoId === m.id}
-                  className="rounded-full p-1.5 text-muted-foreground/40 transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
-                  title={m.estado === "archivada" ? "Desarchivar meta" : "Archivar meta"}
-                  aria-label={m.estado === "archivada" ? "Desarchivar meta" : "Archivar meta"}
-                >
-                  <IconArchive className="h-4 w-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    eliminarMetaCard(mp);
-                  }}
-                  disabled={eliminandoId === m.id}
-                  // Color rojo tenue siempre visible (no opacidad 40%) porque
-                  // es una acción destructiva que el usuario debe poder
-                  // encontrar sin tener que hacer hover. Al hover se
-                  // intensifica y se le añade fondo de aviso.
-                  className="rounded-full p-1.5 text-red-500/70 transition-colors hover:bg-red-500/10 hover:text-red-600 disabled:opacity-50"
-                  title="Eliminar meta (acción irreversible: tareas y KRs se desvinculan)"
-                  aria-label={`Eliminar meta ${m.titulo}`}
-                >
-                  {eliminandoId === m.id ? (
-                    <span className="block h-4 w-4 text-center text-[10px]">…</span>
-                  ) : (
-                    <IconTrash className="h-4 w-4" />
+                <Link href={`/metas/detalle?id=${m.id}`} className="min-w-0 flex-1">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-[11px] text-muted-foreground">
+                      {m.codigo ?? "—"}
+                    </span>
+                    {m.es_wig && (
+                      <span className="text-[10px] font-semibold text-violet-600">
+                        🎯 WIG #{m.wig_orden ?? "?"}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-sm font-medium leading-snug">{m.titulo}</div>
+                  {m.descripcion && (
+                    <div className="mt-0.5 line-clamp-2 text-[11px] text-muted-foreground">
+                      {m.descripcion}
+                    </div>
                   )}
-                </button>
+                </Link>
+                <div className="flex shrink-0 items-center gap-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setEditando(mp)}
+                    className="rounded-full p-1.5 text-muted-foreground hover:bg-accent"
+                    title="Editar meta"
+                    aria-label={`Editar ${m.titulo}`}
+                  >
+                    <IconPencil className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => archivarMetaCard(mp)}
+                    disabled={guardandoId === m.id}
+                    className="rounded-full p-1.5 text-muted-foreground/50 hover:bg-accent disabled:opacity-50"
+                    title="Archivar meta"
+                    aria-label="Archivar meta"
+                  >
+                    <IconArchive className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => eliminarMetaCard(mp)}
+                    disabled={eliminandoId === m.id}
+                    className="rounded-full p-1.5 text-red-500/70 hover:bg-red-500/10 disabled:opacity-50"
+                    title="Eliminar meta"
+                    aria-label={`Eliminar ${m.titulo}`}
+                  >
+                    <IconTrash className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </div>
 
-              <Link href={`/metas/detalle?id=${m.id}`} className="block">
-                <div className="flex items-start justify-between gap-3 pr-24">
-                  <span className="text-xs font-medium text-muted-foreground">
-                    {m.codigo ?? "—"}
-                  </span>
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <span
+                  className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${
+                    ESTADO[m.estado] ?? ESTADO.sin_empezar
+                  }`}
+                >
+                  {m.estado.replace("_", " ")}
+                </span>
+                {m.ambito && (
                   <span
-                    className={`rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${
-                      ESTADO[m.estado] ?? ESTADO.sin_empezar
+                    className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${
+                      AMBITO_BADGE[m.ambito]
                     }`}
                   >
-                    <span
-                      className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full align-middle ${
-                        ESTADO_DOT[m.estado] ?? ESTADO_DOT.sin_empezar
-                      }`}
-                    />
-                    {m.estado.replace("_", " ")}
+                    {AMBITO_LABEL[m.ambito]}
                   </span>
-                </div>
-                <h2 className="mt-3 font-semibold tracking-tight group-hover:underline">
-                  {m.titulo}
-                </h2>
-                {m.descripcion && (
-                  <p className="mt-1 line-clamp-3 text-sm leading-relaxed text-muted-foreground">
-                    {m.descripcion}
-                  </p>
                 )}
-
-                {/* Proyecto al que pertenece la meta (migration 0024).
-                    Con su color, como en /metas/detalle. */}
-                {m.proyecto_id && (() => {
-                  const p = proyectosById.get(m.proyecto_id);
-                  return p ? (
+                {proyecto && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-2 py-0.5 text-[10px]">
                     <span
-                      className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-2.5 py-0.5 text-[11px] font-medium"
-                      title="Proyecto al que pertenece la meta"
-                    >
-                      <span
-                        className="h-2 w-2 rounded-sm"
-                        style={{ backgroundColor: p.color ?? "#64748b" }}
-                      />
-                      {p.nombre}
-                    </span>
-                  ) : null;
-                })()}
+                      className="h-2 w-2 rounded-sm"
+                      style={{ backgroundColor: proyecto.color ?? "#64748b" }}
+                    />
+                    {proyecto.nombre}
+                  </span>
+                )}
+                {(m.tags ?? []).map((t) => (
+                  <span
+                    key={t}
+                    className="rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] text-muted-foreground"
+                  >
+                    #{t}
+                  </span>
+                ))}
+                <span className="ml-auto text-[10px] tabular-nums text-muted-foreground">
+                  {mp.tareas_hechas}/{mp.total_tareas} ·{" "}
+                  {Math.round(mp.progreso * 100)}%
+                </span>
+              </div>
 
-                {/* Mini-badge: KRs y trimestres que tiene esta meta.
-                    El conteo de periodos usa TODOS los periodos reales de
-                    cada KR (`periodos`), no solo el principal: un KR que
-                    vive en Q1 y Q2 cuenta como 2 trimestres. */}
-                {(() => {
-                  const periodosUnicos = new Set(
-                    mp.resultados.flatMap((r) =>
-                      r.periodos.length > 0
-                        ? r.periodos.map((p) => p.id)
-                        : r.periodo.id
-                          ? [r.periodo.id]
-                          : [],
-                    ),
-                  );
-                  const nPeriodos = periodosUnicos.size;
-                  return (
-                    <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                      <span
-                        className="inline-flex items-center gap-1 rounded-full border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-[11px] font-medium text-violet-700 dark:text-violet-300"
-                        title={`${mp.resultados.length} resultados (KRs) repartidos en ${nPeriodos} periodo(s)`}
-                      >
-                        📊 {mp.resultados.length} KR{mp.resultados.length === 1 ? "" : "s"} · {nPeriodos} periodo{nPeriodos === 1 ? "" : "s"}
-                      </span>
-                      {m.es_wig && (
-                        <span className="inline-flex items-center gap-0.5 rounded-full bg-violet-500/20 px-2 py-0.5 text-[11px] font-semibold text-violet-700 dark:text-violet-300">
-                          🎯 WIG #{m.wig_orden ?? "?"}
-                        </span>
-                      )}
-                    </div>
-                  );
-                })()}
-
-                {/* Badges: ámbito + tags */}
-                <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                  {m.ambito && (
-                    <span
-                      className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${
-                        AMBITO_BADGE[m.ambito]
-                      }`}
-                    >
-                      {AMBITO_LABEL[m.ambito]}
-                    </span>
-                  )}
-                  {m.tags?.map((t) => (
-                    <span
-                      key={t}
-                      className="rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] text-muted-foreground"
-                    >
-                      #{t}
-                    </span>
-                  ))}
-                  {!m.ambito && m.tags.length === 0 && (
-                    <span className="text-[10px] text-muted-foreground/60">
-                      sin clasificar
-                    </span>
-                  )}
-                </div>
-
-                <div className="mt-3 flex flex-wrap gap-3 text-xs text-muted-foreground">
-                  {m.rice != null && <span>RICE {m.rice}</span>}
-                  {m.plazo && <span>· {m.plazo}</span>}
-                  {mp.total_tareas > 0 && (
-                    <span>
-                      · {mp.tareas_hechas}/{mp.total_tareas} tareas
-                    </span>
-                  )}
-                </div>
-                {mp.total_tareas > 0 && <ProgressBar value={mp.progreso} />}
-              </Link>
-
-              {/* Los KRs de la meta, con su trimestre de entrega y su
-                  objetivo. Antes solo se veía el NÚMERO de KRs; ahora se ve
-                  QUÉ se está midiendo — que es lo que hace útil la tarjeta.
-
-                  Va FUERA del <Link> a propósito: un <details> dentro de un
-                  <a> es HTML inválido y el click navegaría al detalle en
-                  vez de desplegar la lista. */}
               {mp.resultados.length > 0 && (
-                <details className="group/krs mt-2">
-                  <summary className="cursor-pointer list-none text-[11px] font-medium text-muted-foreground hover:text-foreground">
-                    <span className="underline-offset-2 group-open/krs:hidden">
-                      Ver los {mp.resultados.length} KR{mp.resultados.length === 1 ? "" : "s"}
-                    </span>
-                    <span className="hidden group-open/krs:inline">Ocultar KRs</span>
-                  </summary>
-                  <ul className="mt-1.5 space-y-1">
-                    {mp.resultados.map((r) => (
+                <ul className="mt-2 space-y-0.5 border-t border-border pt-2">
+                  {mp.resultados.slice(0, 4).map((r) => {
+                    const periodos = (
+                      r.periodos.length > 0
+                        ? r.periodos
+                        : r.periodo.id
+                          ? [r.periodo]
+                          : []
+                    )
+                      .map((p) => p.nombre)
+                      .filter(Boolean)
+                      .join(" · ");
+                    return (
                       <li
                         key={r.id}
-                        className="flex items-start gap-1.5 text-[11px] leading-snug text-muted-foreground"
+                        className="flex flex-wrap items-baseline gap-x-1 text-[11px] leading-snug text-muted-foreground"
                       >
-                        <span className="mt-0.5 text-violet-500">▪</span>
-                        <span className="min-w-0 flex-1">
-                          <span className="text-foreground/90">{r.titulo}</span>
-                          {(r.periodos.length > 0
-                            ? r.periodos.map((p) => p.nombre).filter(Boolean)
-                            : r.periodo.nombre
-                              ? [r.periodo.nombre]
-                              : []
-                          ).map((nom) => (
-                            <span key={nom} className="ml-1 opacity-70">
-                              · {nom}
-                            </span>
-                          ))}
-                          {r.valor_objetivo != null && (
-                            <span className="ml-1 opacity-70">
-                              · {r.valor_objetivo}
-                              {r.unidad ?? ""}
-                            </span>
-                          )}
-                        </span>
+                        <span className="text-violet-500">▪</span>
+                        <span className="text-foreground/90">{r.titulo}</span>
+                        {periodos && <span>· {periodos}</span>}
+                        {r.valor_objetivo != null && (
+                          <span>
+                            · {r.valor_actual ?? 0}/{r.valor_objetivo}
+                            {r.unidad ?? ""}
+                          </span>
+                        )}
                       </li>
-                    ))}
-                  </ul>
-                </details>
+                    );
+                  })}
+                  {mp.resultados.length > 4 && (
+                    <li className="text-[10px] text-muted-foreground/70">
+                      +{mp.resultados.length - 4} KR
+                      {mp.resultados.length - 4 === 1 ? "" : "s"}
+                    </li>
+                  )}
+                </ul>
               )}
-            </article>
+            </li>
           );
         })}
-        {!loading && metas.length === 0 && (
-          <div className="col-span-full rounded-xl border border-dashed border-border bg-muted/30 p-8 text-center">
-            <p className="text-sm text-muted-foreground">
-              Aún no tienes metas. Crea la primera con{" "}
-              <Link
-                href="/metas/nueva"
-                className="font-medium text-foreground underline underline-offset-4"
-              >
-                Nueva meta
-              </Link>
-              .
-            </p>
-          </div>
-        )}
-        {!loading && metas.length > 0 && filtradas.length === 0 && (
-          <div className="col-span-full rounded-xl border border-dashed border-border bg-muted/30 p-6 text-center text-sm text-muted-foreground">
-            {tagsSel.size > 0
-              ? `No hay metas con los tags seleccionados${filtro !== "todas" ? ` en el ámbito ${filtro}` : ""}.`
-              : `No hay metas en este ámbito.`}
-          </div>
-        )}
-      </div>
+      </ul>
+
+      {!loading && metas.length === 0 && (
+        <div className="rounded-xl border border-dashed border-border bg-muted/30 p-8 text-center">
+          <p className="text-sm text-muted-foreground">
+            Aún no tienes metas. Crea la primera con{" "}
+            <Link
+              href="/metas/nueva"
+              className="font-medium text-foreground underline underline-offset-4"
+            >
+              Nueva meta
+            </Link>
+            .
+          </p>
+        </div>
+      )}
+      {!loading && metas.length > 0 && filtradas.length === 0 && (
+        <div className="rounded-xl border border-dashed border-border bg-muted/30 p-6 text-center text-sm text-muted-foreground">
+          {tagsSel.size > 0
+            ? `No hay metas con los tags seleccionados${filtro !== "todas" ? ` en el ámbito ${filtro}` : ""}.`
+            : `No hay metas en este ámbito.`}
+        </div>
+      )}
 
       {editando && (
         <EditarMetaModal

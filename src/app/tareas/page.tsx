@@ -1,13 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   fetchAdjuntosCount,
+  fetchKRsFocoSemanal,
   fetchMetasConProgreso,
   fetchProyectos,
   fetchTareas,
 } from "@/lib/queries";
-import { crearTarea, marcarTareaWig } from "@/lib/mutations";
+import { getCurrentISOWeek } from "@/lib/semana";
+import { crearTarea, marcarTareaWig, marcarWig } from "@/lib/mutations";
 import { useData } from "@/lib/useData";
 import { useConfig } from "@/lib/configStore";
 import {
@@ -16,6 +18,8 @@ import {
 } from "@/lib/iaSugerencias";
 import { TasksTable } from "@/components/TasksTable";
 import { PanelWigTareas } from "@/components/PanelWigTareas";
+import { PanelWigMetas } from "@/components/PanelWigMetas";
+import { PanelFocoSemanaKRs } from "@/components/PanelFocoSemanaKRs";
 import { DedupeModal } from "@/components/DedupeModal";
 import {
   SugerenciasTareasModal,
@@ -23,7 +27,7 @@ import {
 } from "@/components/SugerenciasTareasModal";
 import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
 import { IconSparkles } from "@/components/icons";
-import type { MetaConPlan, Proyecto, Tarea } from "@/lib/types";
+import type { KrFocoConDetalle, MetaConPlan, Proyecto, Tarea } from "@/lib/types";
 
 export default function TareasPage() {
   const { data: tareas, loading, error, reload } = useData<Tarea[]>(fetchTareas, []);
@@ -32,6 +36,7 @@ export default function TareasPage() {
   // ambos llaman a la misma RPC, y `reload()` tras cada toggle sincroniza
   // los dos. Así no toco la API interna de TasksTable.
   const [guardandoWigId, setGuardandoWigId] = useState<string | null>(null);
+  const [guardandoWigMetaId, setGuardandoWigMetaId] = useState<string | null>(null);
   const [errorWig, setErrorWig] = useState<string | null>(null);
 
   // Sugerencias IA — 3 siguientes acciones
@@ -54,6 +59,35 @@ export default function TareasPage() {
     [tareas],
   );
 
+  /** Los WIGs de META (capa de resultados) — se muestran encima de la
+   *  tabla para ver, mientras ejecutas, en qué resultado estás poniendo
+   *  horas (no solo qué tarea). */
+  const wigMetas = useMemo(
+    () =>
+      (metasQ.data ?? [])
+        .filter((m) => m.meta.es_wig)
+        .sort((a, b) => (a.meta.wig_orden ?? 9) - (b.meta.wig_orden ?? 9)),
+    [metasQ.data],
+  );
+
+  /** KRs en el foco de la semana actual (capa intermedia meta → tarea). */
+  const [focoKRsSemana, setFocoKRsSemana] = useState<KrFocoConDetalle[]>([]);
+  useEffect(() => {
+    const semana = getCurrentISOWeek();
+    let vivo = true;
+    void (async () => {
+      try {
+        const focos = await fetchKRsFocoSemanal(semana.anio, semana.semana_iso);
+        if (vivo) setFocoKRsSemana(focos);
+      } catch (e) {
+        console.warn("[Tareas] no se pudo cargar el foco semanal de KRs:", e);
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [metasQ.data]);
+
   async function quitarWig(id: string) {
     setErrorWig(null);
     setGuardandoWigId(id);
@@ -70,6 +104,21 @@ export default function TareasPage() {
       setErrorWig(e instanceof Error ? e.message : "No se pudo actualizar");
     } finally {
       setGuardandoWigId(null);
+    }
+  }
+
+  /** Quita una META del panel de WIGs (el toggle de meta, no el de tarea). */
+  async function quitarWigMeta(metaId: string) {
+    setErrorWig(null);
+    setGuardandoWigMetaId(metaId);
+    try {
+      const ok = await marcarWig(metaId, false);
+      if (!ok) setErrorWig("No se pudo quitar el WIG de la meta.");
+      else await metasQ.reload();
+    } catch (e) {
+      setErrorWig(e instanceof Error ? e.message : "No se pudo actualizar");
+    } finally {
+      setGuardandoWigMetaId(null);
     }
   }
 
@@ -274,6 +323,23 @@ export default function TareasPage() {
           onChanged={reload}
         />
       )}
+
+      {/* Capa de FOCO (resultados): los WIGs de meta con sus KRs. Está
+          ENCIMA de la tabla de tareas para que, mientras ejecutas, veas
+          en qué resultado medible estás poniendo horas (y no solo qué
+          tarea). Es la misma vista que hay en /metas y en la home. */}
+      <PanelWigMetas
+        wigs={wigMetas}
+        onQuitar={quitarWigMeta}
+        guardandoId={guardandoWigMetaId}
+      />
+
+      {/* Capa intermedia: los KRs en foco de la semana (los resultados en
+          los que pones horas AHORA). Mismo panel que la home. */}
+      <PanelFocoSemanaKRs
+        focos={focoKRsSemana}
+        descripcion="Los resultados medibles en los que pones horas esta semana — el eslabón entre tus WIGs de meta y las tareas que los sostienen."
+      />
 
       {/* Panel WIG — siempre arriba, antes de la tabla. Mismo patrón que
           el PanelWig de /metas: lista las 1-3 tareas foco del ciclo. */}

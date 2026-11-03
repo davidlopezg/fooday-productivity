@@ -1509,6 +1509,69 @@ export default function DocsPage() {
             </span>
             <span className="text-muted-foreground">
               <strong className="text-foreground">
+                /metas pasa de tarjetas a TABLA, y /tareas muestra la cascada
+                de foco encima de la tabla.
+              </strong>{" "}
+              Dos cambios de{" "}
+              <strong className="text-foreground">diseño</strong> pedidos por
+              David, los dos con la misma intención:{" "}
+              <em>más operativo</em>. (1){" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                /metas
+              </code>{" "}
+              era un mosaico de tarjetas: cada meta ocupaba media pantalla, así
+              que con 15 metas solo veías 4 a la vez y comparar era
+              imposible. Ahora es{" "}
+              <strong className="text-foreground">una tabla</strong>: una fila
+              por meta con columnas Meta (código, título, descripción, tags) ·
+              Estado · Ámbito · Proyecto (con su color) · KRs (con su periodo
+              de entrega y el valor actual frente al objetivo) · Progreso
+              (barra + % + tareas hechas/total) · Plazo (fecha objetivo, con
+              🔒 si es crítica) · Acciones (🎯 WIG, editar, archivar,
+              eliminar). Se comparan 15 metas de un vistazo y por COLUMNA; en
+              móvil pasa a filas compactas (misma estrategia que la tabla de
+              /tareas). El botón Eliminar sigue mostrando el preview de
+              impacto antes de borrar. (2){" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                /tareas
+              </code>{" "}
+              tenía la tabla de tareas y el panel de WIGs-tarea, pero no las
+              capas de arriba: ahora,{" "}
+              <strong className="text-foreground">
+                encima de la tabla se ve la cascada completa
+              </strong>
+              , igual que en la home — WIGs de META con sus KRs (violeta) →
+              KRs en foco de la semana (celeste) → WIGs de TAREAS (fucsia).
+              Está así porque al ejecutar hay que saber en qué{" "}
+              <em>resultado medible</em> se está poniendo el esfuerzo, no solo
+              qué tarea: los tres eslabones (meta → KR → tarea) tienen que
+              estar a la vista a la vez. Para no duplicar markup, el panel de
+              KRs del foco semanal se extrajo a{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                src/components/PanelFocoSemanaKRs.tsx
+              </code>{" "}
+              (lo usan la home y /tareas) y el de WIGs de meta + KRs a{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                src/components/PanelWigMetas.tsx
+              </code>{" "}
+              (lo usan /metas y /tareas). FEATURES actualizadas (filas{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                /metas
+              </code>{" "}
+              y{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                /tareas
+              </code>
+              ). No cambian los pilares, los rituales ni el modelo de datos:
+              cambia cómo se ve y se lee la misma información.
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-11-03
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
                 Los KRs por fin tienen su tabla global, y la home muestra las
                 TRES capas de WIG.
               </strong>{" "}
