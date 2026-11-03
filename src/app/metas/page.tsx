@@ -10,6 +10,7 @@ import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
 import { EditarMetaModal } from "@/components/EditarMetaModal";
 import { SugerirWigsModal } from "@/components/SugerirWigsModal";
 import { PanelWigMetas } from "@/components/PanelWigMetas";
+import { IconSearch } from "@/components/icons";
 import { sugerirWigsIA, type SugerirWigsResultado } from "@/lib/plan";
 import type { AmbitoMeta, MetaConPlan, Proyecto } from "@/lib/types";
 import {
@@ -72,6 +73,11 @@ export default function MetasPage() {
 
   const [filtro, setFiltro] = useState<Filtro>("todas");
   const [tagsSel, setTagsSel] = useState<Set<string>>(new Set());
+  /** Texto del buscador de la tabla (título, código, descripción, tags,
+   *  KRs y proyecto). */
+  const [q, setQ] = useState("");
+  /** Filtro por proyecto: "" = todos, "sin" = sin proyecto, o un id. */
+  const [proyectoSel, setProyectoSel] = useState<string>("");
   const [guardandoId, setGuardandoId] = useState<string | null>(null);
   const [errorWig, setErrorWig] = useState<string | null>(null);
   const [editando, setEditando] = useState<MetaConPlan | null>(null);
@@ -117,8 +123,40 @@ export default function MetasPage() {
         (m.meta.tags ?? []).some((t) => tagsSel.has(t)),
       );
     }
+    // Filtro por proyecto ("" = todos, "sin" = metas sin proyecto).
+    if (proyectoSel) {
+      res = res.filter((m) =>
+        proyectoSel === "sin"
+          ? !m.meta.proyecto_id
+          : m.meta.proyecto_id === proyectoSel,
+      );
+    }
+    // Buscador de texto: mira en TODO lo que identifica a una meta.
+    const texto = q.trim().toLowerCase();
+    if (texto) {
+      const palabras = texto.split(/\s+/).filter(Boolean);
+      res = res.filter((m) => {
+        const proyecto = m.meta.proyecto_id
+          ? proyectosById.get(m.meta.proyecto_id)?.nombre ?? ""
+          : "";
+        const heno = [
+          m.meta.titulo,
+          m.meta.codigo ?? "",
+          m.meta.descripcion ?? "",
+          m.meta.plazo ?? "",
+          proyecto,
+          ...(m.meta.tags ?? []),
+          ...m.resultados.map((r) => r.titulo),
+        ]
+          .join(" ")
+          .toLowerCase();
+        // Todas las palabras tienen que aparecer (AND): "sol meta" acota
+        // más que "sol o meta".
+        return palabras.every((p) => heno.includes(p));
+      });
+    }
     return res;
-  }, [metas, filtro, tagsSel]);
+  }, [metas, filtro, tagsSel, proyectoSel, q, proyectosById]);
 
   function toggleTag(t: string) {
     setTagsSel((prev) => {
@@ -374,6 +412,50 @@ export default function MetasPage() {
         onQuitar={(id) => toggleWig(metas.find((m) => m.meta.id === id)!)}
         guardandoId={guardandoId}
       />
+
+      {/* Buscador + filtro por proyecto. En una tabla de 15+ metas esto
+          es lo que hace que se pueda encontrar una sin recorrerla a ojo. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[220px] flex-1">
+          <IconSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Buscar meta… (título, código, descripción, tags, KRs)"
+            className="h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+          />
+        </div>
+        <select
+          value={proyectoSel}
+          onChange={(e) => setProyectoSel(e.target.value)}
+          className="h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+          title="Filtrar por proyecto"
+        >
+          <option value="">Todos los proyectos</option>
+          <option value="sin">Sin proyecto</option>
+          {proyectos.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.nombre}
+              {p.archivado ? " (archivado)" : ""}
+            </option>
+          ))}
+        </select>
+        {(q.trim() || proyectoSel) && (
+          <button
+            type="button"
+            onClick={() => {
+              setQ("");
+              setProyectoSel("");
+            }}
+            className="h-9 rounded-md border border-border bg-card px-3 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
+          >
+            limpiar
+          </button>
+        )}
+        <span className="text-xs tabular-nums text-muted-foreground">
+          {filtradas.length} de {metas.length}
+        </span>
+      </div>
 
       {/* Filtro por ámbito */}
       <div className="flex flex-wrap items-center gap-1 rounded-md border border-border bg-card p-1 text-xs">
@@ -944,7 +1026,9 @@ export default function MetasPage() {
         <div className="rounded-xl border border-dashed border-border bg-muted/30 p-6 text-center text-sm text-muted-foreground">
           {tagsSel.size > 0
             ? `No hay metas con los tags seleccionados${filtro !== "todas" ? ` en el ámbito ${filtro}` : ""}.`
-            : `No hay metas en este ámbito.`}
+            : q.trim() || proyectoSel
+              ? "Ninguna meta coincide con la búsqueda o el filtro de proyecto."
+              : `No hay metas en este ámbito.`}
         </div>
       )}
 

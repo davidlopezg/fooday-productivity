@@ -1509,6 +1509,37 @@ export default function DocsPage() {
             </span>
             <span className="text-muted-foreground">
               <strong className="text-foreground">
+                /metas: buscador de texto y filtro por proyecto.
+              </strong>{" "}
+              La tabla de metas ya se leía de un vistazo, pero con 15+ filas
+              hacia falta poder{" "}
+              <strong className="text-foreground">encontrar</strong> una sin
+              recorrerla a ojo. Ahora, encima de la tabla:{" "}
+              <strong className="text-foreground">buscador</strong> (mira en
+              título, código, descripción, tags, títulos de KR y nombre de
+              proyecto; varias palabras = AND, así que “sol meta” acota más
+              que “sol o meta”) y{" "}
+              <strong className="text-foreground">
+                filtro por proyecto
+              </strong>{" "}
+              (incluye “Sin proyecto”, que es donde caen las metas huérfanas
+              que la sección ámbar de /proyectos avisa de que se están
+              perdiendo). Con contador “N de M” para ver que el filtro está
+              actuando. Los filtros se combinan con los de antes (ámbito y
+              tags) y hay un botón “limpiar”. FEATURES actualizada (fila{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                /metas
+              </code>
+              ). No cambia ni el modelo de datos ni la metodología: es
+              lectura, no escritura.
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-11-03
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
                 /metas pasa de tarjetas a TABLA, y /tareas muestra la cascada
                 de foco encima de la tabla.
               </strong>{" "}
