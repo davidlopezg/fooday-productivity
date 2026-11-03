@@ -45,6 +45,10 @@ export type MensajeChat = {
   contenido: string;
   refs: RefEntidad[];
   created_at: string;
+  /** NO se guarda en la BD: solo en el estado local. Cuánto tardó la
+   *  IA en responder (para que el usuario vea si el cuello de botella es
+   *  el modelo o la red). */
+  ms?: number;
 };
 
 /** Historial de conversaciones, más reciente primero. */

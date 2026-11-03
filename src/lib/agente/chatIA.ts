@@ -20,7 +20,7 @@
 //   texto crudo tal cual (no se pierde la respuesta).
 // ============================================================================
 
-import { llamarLLM } from "@/lib/llm";
+import { llamarLLMStream } from "@/lib/llm";
 import { parsearYValidar } from "@/lib/llm-parser";
 import { bloquePerfil } from "@/lib/perfilIA";
 import type { PerfilIA } from "@/lib/perfilIA";
@@ -28,7 +28,7 @@ import type { PerfilIA } from "@/lib/perfilIA";
 // `import()` diferido, el chunk hay que descargarlo por la red en el
 // primer mensaje, y si esa descarga falla (móvil con mala conexión) el
 // chat peta con un "Failed to fetch" sin llegar a llamar a la IA.
-import { manualMetodo } from "@/lib/agente/manual";
+import { esPreguntaDeMetodo, manualCompacto, manualMetodo } from "@/lib/agente/manual";
 import type { RefEntidad } from "@/lib/agente/chatStore";
 import type { EntidadSnapshot } from "@/lib/agente/contexto";
 
@@ -45,6 +45,10 @@ export type ResultadoChat = {
   respuesta: string;
   /** Entidades citadas, ya validadas contra el catálogo. */
   refs: RefEntidad[];
+  /** Milisegundos que tardó la llamada a la IA (para diagnóstico y UI). */
+  ms: number;
+  /** Qué manual se mandó (completo = pregunta de método). */
+  nivelManual: "completo" | "compacto";
 };
 
 const SYSTEM_PROMPT_BASE = `Eres el agente de productividad del usuario. Tienes acceso a dos cosas:
@@ -70,12 +74,19 @@ REGLAS
  * genérico de la IA) y se cachea en memoria: se calcula una vez por
  * sesión, no en cada mensaje.
  */
-let systemPromptCache: string | null = null;
-export function systemPrompt(): string {
-  if (systemPromptCache === null) {
-    systemPromptCache = `${SYSTEM_PROMPT_BASE}\n\n${manualMetodo()}`;
-  }
-  return systemPromptCache;
+/**
+ * System prompt completo: las reglas + el manual del método.
+ *
+ * El manual va SIEMPRE (es el conocimiento que el agente necesita para no
+ * recomendar con el criterio genérico de la IA), pero en dos niveles:
+ *   · preguntas de MÉTODO → manual completo (~36 KB),
+ *   · preguntas de DATOS → manual compacto (~13 KB).
+ * Mandar los 36 KB en cada mensaje convertía el chat en una llamada de
+ * ~15k tokens (y la IA tarda: es un modelo de razonamiento).
+ */
+export function systemPrompt(nivel: "completo" | "compacto"): string {
+  const base = nivel === "completo" ? manualMetodo() : manualCompacto();
+  return `${SYSTEM_PROMPT_BASE}\n\n${base}`;
 }
 
 const ESQUEMA_RESPUESTA = {
@@ -134,6 +145,8 @@ export async function responderAgente(
     historial: Turno[];
     pregunta: string;
     perfil?: PerfilIA | null;
+    /** Se llama con el texto de la respuesta mientras llega (streaming). */
+    onToken?: (texto: string) => void;
   },
 ): Promise<ResultadoChat> {
   const prompt = construirPrompt({
@@ -143,13 +156,28 @@ export async function responderAgente(
     perfil: opts.perfil,
   });
 
-  const crudo = await llamarLLM(
+  const nivel = esPreguntaDeMetodo(opts.pregunta) ? "completo" : "compacto";
+  const t0 = Date.now();
+  // Streaming: el texto llega a trozos y se muestra al momento. La IA es
+  // lenta (es un modelo de razonamiento) y sin esto el usuario solo ve un
+  // spinner durante medio minuto.
+  const extractor = extractorDeRespuesta();
+  const crudo = await llamarLLMStream(
     cfg.base_url,
     cfg.minimax_api_key,
     cfg.model,
-    systemPrompt(),
+    systemPrompt(nivel),
     prompt,
-    { temperature: 0.3 },
+    {
+      temperature: 0.3,
+      onToken: (fragmento) => {
+        opts.onToken?.(extractor.push(fragmento));
+      },
+    },
+  );
+  const ms = Date.now() - t0;
+  console.info(
+    `[agente/chatIA] ${ms}ms · manual:${nivel} · prompt:${systemPrompt(nivel).length + prompt.length} chars`,
   );
 
   // El modelo debe devolver {"respuesta": "..."}. Si no es JSON válido,
@@ -163,7 +191,70 @@ export async function responderAgente(
     texto = crudo;
   }
 
-  return extraerRefs(texto, opts.catalogo);
+  return { ...extraerRefs(texto, opts.catalogo), ms, nivelManual: nivel };
+}
+
+/**
+ * Extrae el valor de la clave "respuesta" de un JSON que llega A TROZOS
+ * (streaming). El modelo devuelve {"respuesta": "..."} y en streaming
+ * llegan pedazos: hay que ir sacando el texto interior para poderlo
+ * pintar mientras se genera.
+ *
+ * Devuelve el texto interior acumulado hasta ahora.
+ */
+export function extractorDeRespuesta() {
+  let buf = "";
+  let out = "";
+  let i = 0;
+  let enClave = false;
+  let terminado = false;
+
+  return {
+    push(fragmento: string): string {
+      if (terminado) return out;
+      buf += fragmento;
+
+      if (!enClave) {
+        const m = /"respuesta"\s*:\s*"/.exec(buf);
+        if (!m) return out;
+        i = m.index + m[0].length;
+        enClave = true;
+      }
+
+      while (i < buf.length) {
+        const ch = buf[i];
+        if (ch === "\\") {
+          const nxt = buf[i + 1];
+          if (nxt === undefined) break; // escape partido: esperamos más
+          if (nxt === "u") {
+            if (buf.length < i + 6) break; // \uXXXX incompleto
+            out += String.fromCharCode(parseInt(buf.slice(i + 2, i + 6), 16));
+            i += 6;
+            continue;
+          }
+          out +=
+            nxt === "n" ? "\n"
+            : nxt === "t" ? "\t"
+            : nxt === "r" ? "\r"
+            : nxt === "b" ? "\b"
+            : nxt === "f" ? "\f"
+            : nxt;
+          i += 2;
+          continue;
+        }
+        if (ch === '"') {
+          terminado = true;
+          break;
+        }
+        out += ch;
+        i++;
+      }
+      return out;
+    },
+    get texto(): string {
+      return out;
+    },
+  };
 }
 
 /**
@@ -173,7 +264,7 @@ export async function responderAgente(
 export function extraerRefs(
   texto: string,
   catalogo: EntidadSnapshot[],
-): ResultadoChat {
+): { respuesta: string; refs: RefEntidad[] } {
   const porId = new Map<string, EntidadSnapshot>();
   for (const e of catalogo) porId.set(e.id, e);
 

@@ -10,6 +10,7 @@ import type {
   KrCandidatoSemana,
   KrFocoConDetalle,
   KrFocoSemanal,
+  KrOverview,
   Meta,
   MetaConPlan,
   Periodo,
@@ -1078,6 +1079,109 @@ export async function fetchMetaConPlan(metaId: string): Promise<MetaConPlan | nu
     tareas_hechas,
     progreso,
   };
+}
+
+/** Vista plana de TODOS los KRs del usuario con su meta, su proyecto y
+ *  sus periodos. Es la fuente de la tabla de /krs (una fila por KR).
+ *
+ *  Una sola tanda de queries y todo el cruce se hace en cliente: son
+ *  pocos datos (decenas de KRs) y así la UI no hace N+1. */
+export async function fetchKrsOverview(): Promise<KrOverview[]> {
+  const supabase = createClient();
+  const [krsRes, metasRes, proyectosRes, asignacionesRes, periodosRes, tareasRes] =
+    await Promise.all([
+      supabase
+        .from("resultados_periodo")
+        .select(
+          "id,meta_id,titulo,descripcion,metrica,valor_objetivo,valor_actual,unidad,estado,peso,orden",
+        ),
+      supabase
+        .from("metas")
+        .select("id,codigo,titulo,estado,es_wig,proyecto_id,area_id,ambito"),
+      supabase.from("proyectos").select("id,nombre,color,archivado"),
+      supabase.from("kr_periodos").select("kr_id,periodo_id,orden"),
+      supabase
+        .from("periodos")
+        .select("id,tipo,anio,numero,nombre,fecha_inicio,fecha_fin"),
+      supabase
+        .from("tareas")
+        .select("resultado_periodo_id,estado")
+        .not("resultado_periodo_id", "is", null),
+    ]);
+
+  if (krsRes.error) throw krsRes.error;
+  if (metasRes.error) throw metasRes.error;
+  if (proyectosRes.error) throw proyectosRes.error;
+  if (asignacionesRes.error) throw asignacionesRes.error;
+  if (periodosRes.error) throw periodosRes.error;
+  if (tareasRes.error) throw tareasRes.error;
+
+  const krs = (krsRes.data ?? []) as ResultadoPeriodo[];
+  const metas = (metasRes.data ?? []) as Meta[];
+  const proyectos = (proyectosRes.data ?? []) as Proyecto[];
+
+  const metaById = new Map(metas.map((m) => [m.id, m]));
+  const proyectoById = new Map(proyectos.map((p) => [p.id, p]));
+  const periodoById = new Map(
+    ((periodosRes.data ?? []) as Periodo[]).map((p) => [p.id, p]),
+  );
+
+  // Periodos de cada KR (1..N) vía `kr_periodos`.
+  const periodosPorKr = new Map<string, Periodo[]>();
+  for (const a of (asignacionesRes.data ?? []) as Array<{
+    kr_id: string;
+    periodo_id: string;
+  }>) {
+    const p = periodoById.get(a.periodo_id);
+    if (!p) continue;
+    const arr = periodosPorKr.get(a.kr_id) ?? [];
+    arr.push(p);
+    periodosPorKr.set(a.kr_id, arr);
+  }
+  for (const arr of periodosPorKr.values()) {
+    arr.sort((a, b) => a.fecha_inicio.localeCompare(b.fecha_inicio));
+  }
+
+  // Conteo de tareas por KR (hechas / total).
+  const conteo = new Map<string, { total: number; hechas: number }>();
+  for (const t of (tareasRes.data ?? []) as Array<{
+    resultado_periodo_id: string | null;
+    estado: string;
+  }>) {
+    if (!t.resultado_periodo_id) continue;
+    const c = conteo.get(t.resultado_periodo_id) ?? { total: 0, hechas: 0 };
+    c.total++;
+    if (t.estado === "hecha") c.hechas++;
+    conteo.set(t.resultado_periodo_id, c);
+  }
+
+  return krs
+    .map((kr) => {
+      const meta = metaById.get(kr.meta_id) ?? null;
+      const proyecto = meta?.proyecto_id
+        ? proyectoById.get(meta.proyecto_id) ?? null
+        : null;
+      const c = conteo.get(kr.id);
+      return {
+        kr,
+        meta,
+        proyecto,
+        periodos: periodosPorKr.get(kr.id) ?? [],
+        total_tareas: c?.total ?? 0,
+        tareas_hechas: c?.hechas ?? 0,
+      };
+    })
+    // Orden de lectura: por código de meta, luego por el orden lógico del
+    // KR dentro de la meta. Las metas sin código (huérfanas) al final.
+    .sort((a, b) => {
+      const ca = a.meta?.codigo ?? "￿";
+      const cb = b.meta?.codigo ?? "￿";
+      if (ca !== cb) return ca.localeCompare(cb, "es", { numeric: true });
+      const oa = a.kr.orden ?? 0;
+      const ob = b.kr.orden ?? 0;
+      if (oa !== ob) return oa - ob;
+      return a.kr.titulo.localeCompare(b.kr.titulo, "es");
+    });
 }
 
 /** Lista de metas con su progreso agregado (para la página /metas).

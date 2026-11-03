@@ -324,6 +324,14 @@ export const IconLayers = (p: IconProps) => (
   </svg>
 );
 
+/** Tabla — para la vista global de KRs (/krs). */
+export const IconTable = (p: IconProps) => (
+  <svg {...base} {...p}>
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <path d="M3 9.5h18M9.5 9.5V20" />
+  </svg>
+);
+
 /** Burbuja de chat — para el agente global (flotante en toda la app). */
 export const IconMessage = (p: IconProps) => (
   <svg {...base} {...p}>

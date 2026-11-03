@@ -1382,6 +1382,25 @@ export default function DocsPage() {
           (fuente única) y las tres vistas —esta página, /metodologia y el
           prompt del agente— se actualizan a la vez.
         </p>
+        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+          <strong className="text-foreground">
+            El manual va en dos niveles, por una razón práctica:
+          </strong>{" "}
+          la IA tarda (es un modelo de razonamiento) y el prompt entero son
+          ~55 KB. Así que las{" "}
+          <strong className="text-foreground">
+            preguntas de método
+          </strong>{" "}
+          (“¿qué es el KR de la semana?”, “¿por qué solo 3 WIGs?”) se
+          llevan el manual completo y las{" "}
+          <strong className="text-foreground">preguntas de datos</strong>{" "}
+          (“¿qué hago hoy?”, “¿qué está en riesgo?”) se llevan el{" "}
+          <em>resumen operativo</em> (mismo método, textos recortados: los
+          pilares, las 4 capas, los rituales, el orden de selección y el
+          índice de pantallas). La detección es por palabras clave, sin
+          llamar a la IA: una llamada extra duplicaría la espera. Con eso
+          el prompt baja de ~17k tokens a ~10k.
+        </p>
 
         {/* 4. Cómo está construido (y por qué) */}
         <h3 className="mt-6 text-base font-semibold">
@@ -1426,6 +1445,27 @@ export default function DocsPage() {
           </li>
         </ul>
 
+        <ul className="mt-3 grid gap-3 sm:grid-cols-2">
+          <li className="rounded-lg border border-border bg-background/40 p-3 text-sm leading-relaxed text-muted-foreground">
+            <strong className="text-foreground">La respuesta llega a trozos.</strong>{" "}
+            El chat streamea: el texto se va escribiendo mientras la IA lo
+            genera, en vez de aparecer de golpe tras un minuto de espera.
+            Debajo de cada respuesta verás cuánto tardó ({" "}
+            <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+              tardó 32s
+            </code>
+            ), para distinguir si el cuello de botella es el modelo o tu
+            conexión.
+          </li>
+          <li className="rounded-lg border border-border bg-background/40 p-3 text-sm leading-relaxed text-muted-foreground">
+            <strong className="text-foreground">Si algo falla, se puede reintentar.</strong>{" "}
+            El error es accionable (“no se pudo conectar…”, “pulsa
+            Actualizar app…”) y hay un botón{" "}
+            <strong className="text-foreground">Reintentar</strong> que no
+            duplica tu pregunta en el historial.
+          </li>
+        </ul>
+
         <div className="mt-6 rounded-lg border border-violet-500/30 bg-violet-500/10 p-4 text-sm leading-relaxed text-violet-900 dark:text-violet-200">
           💡 <strong>Empieza por:</strong> “<em>¿qué está en riesgo ahora
           mismo?</em>”, “<em>resume mis metas y sus KRs</em>” o “<em>¿qué
@@ -1463,6 +1503,100 @@ export default function DocsPage() {
         </header>
 
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-11-03
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
+                Los KRs por fin tienen su tabla global, y la home muestra las
+                TRES capas de WIG.
+              </strong>{" "}
+              Dos cambios de un solo tiro.{" "}
+              <strong className="text-foreground">
+                (1) Nueva pantalla <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/krs</code>
+              </strong>
+              : una tabla con{" "}
+              <em>todos</em> los Key Results del sistema — una fila por KR
+              con la <strong className="text-foreground">META a la que
+              pertenece</strong> y el{" "}
+              <strong className="text-foreground">PROYECTO</strong> resueltos,
+              más la entrega (trimestre/mes), el estado, el{" "}
+              <em>valor actual editable</em> (el único dato escribible de la
+              pantalla) y el progreso de tareas. Filtros por texto, por
+              proyecto y por estado. Hasta ahora los KRs solo se veían
+              colgando de cada meta ({"/metas/detalle"}) o por columnas de
+              trimestre ({"/metas/plan"}): faltaba el inventario completo, que
+              es lo que responde a «¿cuántos resultados tengo y de qué
+              son?». Sin migración: solo lee.{" "}
+              <strong className="text-foreground">
+                (2) La home (
+                <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/</code>
+                ) completa la cascada
+              </strong>{" "}
+              : ahora se ven los tres niveles de foco en el mismo sitio —
+              WIGs de <em>meta</em> (violeta) → KRs en foco de la{" "}
+              <em>semana</em> (celeste, el mismo foco que se elige en{" "}
+              {"/semana"}) → WIGs de <em>tarea</em> (fucsia). Antes el
+              escalón intermedio faltaba en la home: se veía la meta y la
+              tarea, pero no el resultado medible que las une. Eso es
+              exactamente la arquitectura de 4 capas (proyecto → meta → KR →
+              tarea) hecha visible en el sitio donde se empieza el día.
+              <em>Sin cambios de metodología ni rituales</em>: es una vista
+              más de lo que ya existía, no una capa nueva.
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-10-30
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
+                El chat va más rápido: manual en dos niveles + streaming.
+              </strong>{" "}
+              Con todo el método en el prompt, cada mensaje eran ~17k tokens
+              y la IA (MiniMax-M3 es un modelo de{" "}
+              <strong className="text-foreground">razonamiento</strong>)
+              tardaba{" "}
+              <em>muchísimo</em>. Tres cambios, de mayor a menor impacto:{" "}
+              (1){" "}
+              <strong className="text-foreground">
+                STREAMING: la respuesta se ve llegar
+              </strong>{" "}
+              en vez de aparecer de golpe tras un minuto de espera (nueva
+              función{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                llamarLLMStream
+              </code>{" "}
+              en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                src/lib/llm.ts
+              </code>
+              , con extractor incremental del JSON{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                {"{"}"respuesta": …{"}"}
+              </code>{" "}
+              que llega a trozos; si el servidor no streamea, cae al formato
+              normal sin cambiar el resultado); (2){" "}
+              <strong className="text-foreground">
+                el manual va en dos niveles
+              </strong>
+              : las preguntas de MÉTODO (heurística de palabras clave, sin
+              llamada extra) se llevan el manual completo (~36 KB) y las de
+              DATOS un resumen operativo del{" "}
+              <em>mismo</em> método (pilares, 4 capas, rituales, orden de
+              selección, índice de pantallas) —todo construido desde el
+              módulo compartido, no escrito a mano; (3) el snapshot se
+              aligera: 150 tareas (priorizadas) en formato compacto, 120
+              KRs en total, descripciones a 140 caracteres. El prompt pasa
+              de ~55 KB a ~30 KB. Además, cada respuesta muestra cuánto
+              tardó (“tardó 32s”) para distinguir si el cuello de botella
+              es el modelo o la red. Tests nuevos (5) del extractor de
+              streaming y (6) de los dos niveles del manual. No cambia el
+              método: el agente sigue conociendo todo el manual, pero solo lo
+              gasta cuando la pregunta lo necesita.
+            </span>
+          </li>
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
               2026-10-30
@@ -3310,6 +3444,8 @@ function AplicacionEnApp({ pilar }: { pilar: 1 | 2 | 3 | 4 | 5 }) {
     ],
     2: [
       "Scorecard de KRs con proyección lineal (/metas/plan)",
+      "Tabla global de KRs (/krs): una fila por Key Result con su META, su PROYECTO, su entrega y su progreso — el inventario completo del sistema en una pantalla, con el valor actual editable en línea",
+      "Tres capas de WIG en la home (/): WIGs de META (violeta) → KRs en foco de la semana (celeste, el foco de /semana) → WIGs de TAREA (fucsia). La cascada meta → KR → tarea completa, visible de un vistazo",
       "Semáforo verde/amarillo/rojo en planes diarios",
       "Estados de meta (sin_empezar → en_progreso → completada) con feedback visible",
       "Botón IA “Generar plan con IA” en /metas/nueva y EditarMetaModal: filtra KRs por el campo plazo (Q3, Q1-Q3, fin de 2026…) y dentro de cada KR anota las tareas y hábitos necesarios para cumplirlo",

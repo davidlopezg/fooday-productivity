@@ -573,7 +573,7 @@ export default function MetodologiaPage() {
             num="6"
             nombre="Áreas + Metas (Lag) + OKRs + KRs + Hitos"
             color="violet"
-            desc="Resultados a 6-12 meses. Sin Lead Measures no avanzan."
+            desc="Resultados a 6-12 meses. Sin Lead Measures no avanzan. El inventario completo de KRs vive en /krs."
             ruta="/metas"
           />
           <Capa
@@ -619,6 +619,21 @@ export default function MetodologiaPage() {
           WIGs, terminarás con un día lleno de actividad sin impacto. La app
           está diseñada para que las capas 4 y 3 no puedan quedarse vacías si
           la 5 existe.
+        </p>
+
+        <p className="mt-3 rounded-lg border border-border bg-muted/30 p-3 text-xs leading-relaxed text-muted-foreground">
+          <strong className="text-foreground">Dónde se ven las capas.</strong>{" "}
+          La home (<code className="rounded bg-muted px-1 py-0.5 text-[10px]">/</code>)
+          abre con las tres capas de foco{" "}
+          <em>una detrás de otra</em>: los WIGs de meta (capa 5, violeta), los
+          KRs en foco de la semana (capa 4, celeste) y los WIGs de tarea
+          (capa 3, fucsia). Esa es la cascada meta → KR → tarea completa en
+          la primera pantalla del día: si una capa está quieta, ya sabes en
+          cuál mirar. Y el{" "}
+          <strong className="text-foreground">inventario global</strong> de
+          la capa de KRs (todos los resultados con su meta, su proyecto y su
+          entrega) está en{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-[10px]">/krs</code>.
         </p>
       </section>
 

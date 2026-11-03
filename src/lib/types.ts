@@ -216,6 +216,22 @@ export interface ResultadoConTareas extends ResultadoPeriodo {
 /** Alias semántico recomendado para `ResultadoConTareas` (migration 0028). */
 export type KeyResultConTareas = ResultadoConTareas;
 
+/** Vista plana de un KR con su meta, su proyecto, sus periodos y el
+ *  conteo de tareas. Es lo que pinta la tabla de /krs: una fila por KR
+ *  con la META a la que pertenece y el PROYECTO resueltos. */
+export interface KrOverview {
+  kr: KeyResult;
+  /** Meta a la que pertenece el KR (null si la meta se borró). */
+  meta: Meta | null;
+  /** Proyecto al que pertenece la META (null = meta suelta). */
+  proyecto: Proyecto | null;
+  /** Periodos de entrega del KR (1..N). Vacío = sin asignar. */
+  periodos: Periodo[];
+  /** Nº de tareas del KR y cuántas están hechas. */
+  total_tareas: number;
+  tareas_hechas: number;
+}
+
 /** Meta con sus KRs (cada uno con sus periodos + tareas) y métricas
  *  calculadas en cliente. */
 export interface MetaConPlan {

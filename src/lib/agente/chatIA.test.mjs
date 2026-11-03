@@ -15,7 +15,7 @@
 //     si lo hay.
 // ============================================================================
 
-import { extraerRefs, construirPrompt } from "./chatIA.ts";
+import { extraerRefs, construirPrompt, extractorDeRespuesta } from "./chatIA.ts";
 
 let pass = 0;
 let fail = 0;
@@ -89,6 +89,38 @@ test("sin marcadores la respuesta se devuelve tal cual", () => {
   const r = extraerRefs("Todo bien por aquí.", CATALOGO);
   eq(r.respuesta, "Todo bien por aquí.");
   eq(r.refs.length, 0);
+});
+
+// ── extractorDeRespuesta (streaming) ───────────────────────────────────────
+test("extrae el texto de {\"respuesta\": ...} de una pieza", () => {
+  const e = extractorDeRespuesta();
+  eq(e.push('{"respuesta": "Hola David"}'), "Hola David");
+});
+
+test("extrae el texto aunque llegue a trozos", () => {
+  const e = extractorDeRespuesta();
+  let salida = "";
+  for (const frag of ['{"respue', 'sta": "Hola', ' David"}']) {
+    salida = e.push(frag);
+  }
+  eq(salida, "Hola David");
+});
+
+test("deshace los escapes del JSON", () => {
+  const e = extractorDeRespuesta();
+  const salida = e.push('{"respuesta": "línea 1\\nlínea 2 \\"quoted\\" \\u00e9"}');
+  eq(salida, 'línea 1\nlínea 2 "quoted" é');
+});
+
+test("si el JSON no trae \"respuesta\", no inventa texto", () => {
+  const e = extractorDeRespuesta();
+  eq(e.push('{"otra": "cosa"}'), "");
+});
+
+test("el extractor es idempotente con el mismo texto", () => {
+  const e = extractorDeRespuesta();
+  e.push('{"respuesta": "abc"}');
+  eq(e.push('{"respuesta": "abc"}'), "abc");
 });
 
 // ── construirPrompt ────────────────────────────────────────────────────────

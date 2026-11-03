@@ -60,9 +60,9 @@ export const AYUDA_POR_RUTA: Record<
         pilar: 2,
       },
       {
-        titulo: "Dos paneles WIG: metas y tareas",
+        titulo: "Tres capas de WIG: meta → KR → tarea",
         cuerpo:
-          "El panel violeta son los WIGs de METAS (qué resultados quieres). El panel fucsia son los WIGs de TAREAS (qué 3 tareas concretas los sostienen). Si los WIGs-metas no avanzan, mira primero las WIGs-tareas.",
+          "El panel violeta son los WIGs de METAS (qué resultados quieres). El panel celeste son los KRs en foco de la semana (en qué resultados medibles pones horas AHORA — se eligen en /semana). El panel fucsia son los WIGs de TAREAS (qué 3 tareas concretas los sostienen). Si los WIGs-metas no avanzan, mira primero las tareas; si las tareas avanzan pero los KRs no, el problema es la medición.",
         pilar: 2,
       },
       {
@@ -161,6 +161,29 @@ export const AYUDA_POR_RUTA: Record<
         titulo: "Cada meta debe tener Key Results medibles",
         cuerpo:
           "Una meta sin KR medible es un deseo. El Scorecard de /metas/plan te dice si vas en línea, por encima o por debajo del ritmo esperado para el trimestre. Si una meta no aparece en el scorecard, plantéate archivarla.",
+        pilar: 2,
+      },
+    ],
+  },
+  "/krs": {
+    pilares: [2],
+    items: [
+      {
+        titulo: "El inventario completo de resultados",
+        cuerpo:
+          "Una fila por Key Result de TODAS tus metas, con la meta a la que pertenece, el proyecto, la entrega (trimestre/mes) y el progreso. Es la foto del sistema en un vistazo: si un KR no aparece aquí, no está medido.",
+        pilar: 2,
+      },
+      {
+        titulo: "Un KR sin entrega no se entrega nunca",
+        cuerpo:
+          "La columna «Entrega» es el trimestre o mes donde el resultado debe estar cerrado. Un KR marcado «sin entrega» está huérfano: no aparece en /metas/plan ni en el scorecard. Asígnale un periodo desde el detalle de la meta.",
+        pilar: 2,
+      },
+      {
+        titulo: "Actualiza el valor actual en el sitio",
+        cuerpo:
+          "Pulsa el número de la columna «Actual / objetivo» y escríbelo. Es el dato con el que se calcula el scorecard y la proyección del trimestre: si no lo actualizas, el sistema no puede decirte si vas en línea.",
         pilar: 2,
       },
     ],

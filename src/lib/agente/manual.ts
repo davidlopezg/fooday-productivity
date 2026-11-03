@@ -12,12 +12,22 @@
 //   Así el agente no puede advicear con un método distinto del que
 //   documenta la app: si mañana cambias un pilar, el manual cambia solo.
 //
-// TAMAÑO (importa: va en CADA mensaje)
-//   El manual completo son ~40 KB. Se recorta lo que no aporta:
-//     · el índice de pantallas va con el propósito recortado (la idea se
-//       conserva, los párrafos largos no);
-//     · nada más se toca: los pilares y las reglas son el conocimiento
-//       que el agente necesita para recomendar con criterio.
+// DOS NIVELES (por qué, y esto es lo importante)
+//   El manual completo son ~36 KB. Mandarlo en CADA mensaje convertía el
+//   chat en una llamada de ~15k tokens: la IA tarda (es un modelo de
+//   razonamiento) y el usuario se queda mirando el spinner.
+//
+//   · NIVEL COMPLETO (36 KB): el manual entero. Se usa cuando la pregunta
+//     es sobre el MÉTODO ("¿qué es el KR de la semana?", "¿por qué solo
+//     3 WIGs?"). Son preguntas raras.
+//   · NIVEL COMPACTO (~13 KB): el mismo método resumido (reglas operativas
+//     + rituales + el orden de selección + el índice de pantallas). Se usa
+//     en el resto de preguntas, que son de DATOS.
+//
+//   Ambos se construyen desde los mismos datos: el compacto recorta los
+//   cuerpos de los puntos, no los inventa. La detección de "pregunta de
+//   método" es una heurística de palabras clave (sin llamada extra a la
+//   IA: una llamada más duplicaría la latencia).
 // ============================================================================
 
 import {
@@ -145,4 +155,140 @@ let cache: string | null = null;
 export function manualMetodo(): string {
   if (cache === null) cache = construirManual();
   return cache;
+}
+
+// ============================================================================
+// NIVEL COMPACTO
+// ============================================================================
+
+/** Recorta a N caracteres (para el nivel compacto). */
+function resumen(s: string, max = 190): string {
+  const t = s.replace(/\s+/g, " ").trim();
+  return t.length > max ? `${t.slice(0, max - 1)}…` : t;
+}
+
+/**
+ * El mismo método, resumido: lo que el agente necesita para RECOMENDAR
+ * (orden de selección, rituales, caps, capas) sin el texto completo de
+ * cada punto.
+ */
+export function construirManualCompacto(): string {
+  const L: string[] = [];
+  L.push(
+    "MÉTODO DE LA APP (resumen operativo). Son las reglas con las que " +
+      "recomiendas: úsalas en vez del criterio genérico de la IA y cita la " +
+      "regla que apliques.",
+  );
+  L.push("");
+
+  L.push("-- PILARES (por qué) --");
+  for (const p of PILARES) {
+    L.push(`  · ${p.num}. ${p.titulo}: ${resumen(p.resumen, 160)}`);
+    L.push(`     puntos: ${p.puntos.map((x) => x.titulo).join(" | ")}`);
+  }
+  L.push("");
+
+  L.push("-- LAS 4 CAPAS (la casa) --");
+  for (const g of GLOSARIO) {
+    L.push(`  · ${g.titulo}: ${resumen(g.cuerpo, 170)}`);
+  }
+  L.push("");
+
+  L.push("-- RITUALES (qué abrir, cuándo) --");
+  const bloque = (titulo: string, filas: typeof RITUALES.diario) => {
+    L.push(`  ${titulo}:`);
+    for (const f of filas) {
+      const pantallas = f.pantallas.map((p) => p.texto).join(" + ");
+      L.push(`    · ${f.cuando}${pantallas ? ` → ${pantallas}` : ""}: ${resumen(f.que, 200)}`);
+    }
+  };
+  bloque("DIARIO", RITUALES.diario);
+  bloque("SEMANAL", RITUALES.semanal);
+  bloque("MENSUAL", RITUALES.mensual);
+  L.push("  Reglas que no se rompen:");
+  for (const h of HABITOS_RECURRENTES) {
+    L.push(`    · ${h.titulo}: ${resumen(h.cuerpo, 200)}`);
+  }
+  L.push("");
+
+  L.push("-- ARQUITECTURA (WIGs / GTD / Próxima Acción) --");
+  L.push("  · El problema: " + resumen(PROBLEMA[0].cuerpo, 200));
+  for (const r of LAG_VS_LEAD.slice(0, 3)) {
+    L.push(`  · ${r.dimension} → LAG: ${resumen(r.lag, 120)} | LEAD: ${resumen(r.lead, 120)}`);
+  }
+  for (const w of WIG_PUNTOS) {
+    L.push(`  · ${w.titulo}: ${resumen(w.cuerpo, 200)}`);
+  }
+  for (const g of GTD_PUNTOS) {
+    L.push(`  · ${g.titulo}: ${resumen(g.cuerpo, 200)}`);
+  }
+  for (const n of NEXT_ACTION_PUNTOS) {
+    L.push(`  · ${n.titulo}: ${resumen(n.cuerpo, 200)}`);
+  }
+  for (const ib of INBOXES) {
+    L.push(`  · ${ib.nombre} (${ib.ruta}): ${resumen(ib.que, 150)} ${resumen(ib.cuando, 150)}`);
+  }
+  for (const a of ANTIPATRONES) {
+    L.push(`  · ANTIPATRÓN: ${a.titulo} → ${resumen(a.que_hacer, 180)}`);
+  }
+  for (const pr of PENDIENTES_RESPUESTA) {
+    L.push(`  · ${pr.titulo}: ${resumen(pr.cuerpo, 180)}`);
+  }
+  L.push("");
+
+  L.push("-- CRITERIO DE SELECCIÓN (qué entra HOY y por qué) --");
+  // El PRIMER punto es el orden de decisión completo: es lo que más se
+  // usa al recomendar, así que va entero.
+  L.push(`  · ${CRITERIO_SELECCION[0].titulo}: ${CRITERIO_SELECCION[0].cuerpo}`);
+  for (const c of CRITERIO_SELECCION.slice(1)) {
+    L.push(`  · ${c.titulo}: ${resumen(c.cuerpo, 180)}`);
+  }
+  L.push("");
+
+  L.push("-- ÍNDICE DE PANTALLAS --");
+  for (const f of FEATURES) {
+    L.push(`  · ${f.ruta} — ${resumen(f.proposito, 70)}`);
+  }
+
+  return L.join("\n");
+}
+
+let cacheCompacto: string | null = null;
+export function manualCompacto(): string {
+  if (cacheCompacto === null) cacheCompacto = construirManualCompacto();
+  return cacheCompacto;
+}
+
+// ============================================================================
+// DETECCIÓN: ¿esta pregunta es sobre el MÉTODO?
+// ============================================================================
+
+/** Palabras que delatan una pregunta sobre el método / la app. */
+const RE_METODO = [
+  /pilar/i,
+  /ritual/i,
+  /metodolog/i,
+  /método/i,
+  /por qué|porque|para qué sirve|para qué es/i,
+  /cómo funciona|como funciona|cómo se usa|como se usa|cómo debo|cómo puedo/i,
+  /explica|explícame|explicar|qué significa|significa/i,
+  /regla|reglas|criterio|criterios/i,
+  /\bwigs?\b|kr de la semana|próxima acción|proxima accion|next action|\bgtd\b/i,
+  /zeigarnik|20\/80|time.?blocking|deep work|shutdown|cierre cognitivo/i,
+  /inbox|captura\b|bandeja de entrada/i,
+  /foco semanal|trimestre|trimestral/i,
+  /documenta|doc\b|ayuda|guía|guia/i,
+];
+
+/** true si la pregunta pide el MÉTODO (y merece el manual completo). */
+export function esPreguntaDeMetodo(pregunta: string): boolean {
+  return RE_METODO.some((re) => re.test(pregunta));
+}
+
+/** El manual que toca para esta pregunta. */
+export function manualPara(pregunta: string): { texto: string; nivel: "completo" | "compacto" } {
+  if (esPreguntaDeMetodo(pregunta)) {
+    return { texto: manualMetodo(), nivel: "completo" };
+  }
+  return { texto: manualCompacto(), nivel: "compacto" };
 }

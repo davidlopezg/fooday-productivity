@@ -49,11 +49,16 @@ export type EntidadSnapshot = {
 };
 
 /** Topes para que el snapshot no crezca sin límite.
- *  OJO: el prompt ya lleva el manual del método (~36 KB). Con 300 tareas el
- *  snapshot llegaba a ~35 KB y el mensaje se iba a 20k tokens (la IA tarda
- *  mucho). 200 tareas priorizadas cubren el 99% de las consultas reales. */
-const MAX_TAREAS = 200;
+ *  OJO: el prompt ya lleva el manual del método. Con 300 tareas el
+ *  snapshot llegaba a ~25 KB y el mensaje se iba a 17k tokens (la IA tarda
+ *  mucho: es un modelo de razonamiento). 150 tareas priorizadas cubren el
+ *  99% de las consultas reales, y el snapshot avisa cuando recorta. */
+const MAX_TAREAS = 150;
 const MAX_METAS = 60;
+/** Topes GLOBALES de KRs (no por meta): 60 metas × 8 KRs = 480 líneas
+ *  (70 KB de prompt). Con 120 KRs el agente sigue viendo el mapa completo
+ *  de resultados y el prompt no se dispara. */
+const MAX_KRS_TOTAL = 120;
 const MAX_KRS_POR_META = 8;
 
 /** Estados de tarea que cuentan como "pendiente" para el snapshot. */
@@ -66,6 +71,16 @@ const ORDEN_PRIORIDAD: Record<string, number> = {
   alta: 2,
   media: 3,
   baja: 4,
+};
+
+/** Estados de tarea abreviados (el prompt va entero en cada mensaje). */
+const ESTADO_CORTO: Record<string, string> = {
+  pendiente: "pend",
+  en_progreso: "enprog",
+  bloqueada: "bloq",
+  hecha: "hecha",
+  descartada: "desc",
+  archivada: "archiv",
 };
 
 function pct(n: number): string {
@@ -121,6 +136,7 @@ export async function construirContexto(consulta: string): Promise<{
   const metas = metasRes.filter((m) => m.meta.estado !== "archivada").slice(0, MAX_METAS);
   lineas.push(`METAS (${metas.length})`);
   if (metas.length === 0) lineas.push("(no hay metas)");
+  let krsUsados = 0;
   for (const mp of metas) {
     const m = mp.meta;
     const krs = mp.resultados.slice(0, MAX_KRS_POR_META);
@@ -141,6 +157,8 @@ export async function construirContexto(consulta: string): Promise<{
     if (m.contexto) lineas.push(`    contexto: ${recortar(m.contexto, 140)}`);
     if (m.situacion_actual) lineas.push(`    situación: ${recortar(m.situacion_actual, 140)}`);
     for (const kr of krs) {
+      if (krsUsados >= MAX_KRS_TOTAL) break;
+      krsUsados++;
       const periodos = kr.periodos.map((p) => p.nombre).join("/");
       const metric = kr.valor_objetivo != null
         ? `${kr.valor_actual ?? 0}/${kr.valor_objetivo}${kr.unidad ? " " + kr.unidad : ""}`
@@ -153,8 +171,8 @@ export async function construirContexto(consulta: string): Promise<{
       );
       catalogo.push({ tipo: "kr", id: kr.id, etiqueta: kr.titulo, meta_id: m.id });
     }
-    if (mp.resultados.length > MAX_KRS_POR_META) {
-      lineas.push(`    (+${mp.resultados.length - MAX_KRS_POR_META} KRs más)`);
+    if (mp.resultados.length > krs.length) {
+      lineas.push(`    (+${mp.resultados.length - krs.length} KRs más)`);
     }
   }
   lineas.push("");
@@ -189,18 +207,20 @@ export async function construirContexto(consulta: string): Promise<{
     const etiquetas: string[] = [];
     if (t.meta_id && metaTitulo.has(t.meta_id)) etiquetas.push(`meta:"${metaTitulo.get(t.meta_id)}"`);
     if (t.resultado_periodo_id && krTitulo.has(t.resultado_periodo_id)) {
-      etiquetas.push(`KR:"${krTitulo.get(t.resultado_periodo_id)}"`);
+      etiquetas.push(`kr:"${krTitulo.get(t.resultado_periodo_id)}"`);
     }
     if (t.proyecto_id && proyectoNombre.has(t.proyecto_id)) {
-      etiquetas.push(`proyecto:"${proyectoNombre.get(t.proyecto_id)}"`);
+      etiquetas.push(`proj:"${proyectoNombre.get(t.proyecto_id)}"`);
     }
     if (t.area_id) etiquetas.push(`area:${t.area_id.slice(0, 8)}`);
+    // Línea compacta a propósito: el prompt va entero en cada mensaje y
+    // 200 tareas en formato largo son 25 KB de más.
     lineas.push(
-      `- [${t.id}] "${t.titulo}" · ${t.prioridad ?? "sin-prio"} · ${t.estado}` +
-        (t.fecha_fin ? ` · fecha_fin:${t.fecha_fin}` : "") +
-        (t.deadline ? ` · deadline:${t.deadline}` : "") +
+      `- [${t.id}] "${t.titulo}" · ${t.prioridad ?? "sin-prio"} · ${ESTADO_CORTO[t.estado] ?? t.estado}` +
+        (t.fecha_fin ? ` · f:${t.fecha_fin}` : "") +
+        (t.deadline ? ` · dl:${t.deadline}` : "") +
         (t.es_wig ? " · WIG" : "") +
-        (t.pendiente_respuesta ? " · esperando-respuesta" : "") +
+        (t.pendiente_respuesta ? " · espera-respuesta" : "") +
         (etiquetas.length ? ` · ${etiquetas.join(" · ")}` : ""),
     );
     catalogo.push({ tipo: "tarea", id: t.id, etiqueta: t.titulo });

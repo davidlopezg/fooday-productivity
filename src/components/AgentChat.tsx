@@ -140,6 +140,8 @@ export function AgentChat() {
   const [mensajes, setMensajes] = useState<MensajeChat[]>([]);
   const [entrada, setEntrada] = useState("");
   const [pensando, setPensando] = useState(false);
+  /** Texto que llega en streaming (se muestra mientras se genera). */
+  const [borrador, setBorrador] = useState<string | null>(null);
   /** Segundos esperando la respuesta (para no dejar al usuario en el aire). */
   const [segundos, setSegundos] = useState(0);
   /** Última pregunta enviada, para poder reintentar sin volver a escribirla. */
@@ -261,6 +263,7 @@ export function AgentChat() {
     setEntrada("");
     setError(null);
     setPensando(true);
+    setBorrador("");
     setUltimaPregunta(texto);
 
     // 1) Si no hay conversación, se crea con el título del 1er mensaje.
@@ -293,7 +296,7 @@ export function AgentChat() {
         contenido: m.contenido,
       }));
       const { texto: snapshot, catalogo } = await construirContexto(texto);
-      const { respuesta, refs } = await responderAgente(
+      const { respuesta, refs, ms } = await responderAgente(
         {
           base_url: cfg.data.base_url,
           minimax_api_key: cfg.data.minimax_api_key!,
@@ -305,12 +308,13 @@ export function AgentChat() {
           historial,
           pregunta: texto,
           perfil: cfg.data,
+          onToken: (t) => setBorrador(t),
         },
       );
 
       // 4) Se guarda la respuesta de la IA.
       const msgIA = await guardarMensaje(idConv, "assistant", respuesta, refs);
-      setMensajes((prev) => [...prev, msgIA]);
+      setMensajes((prev) => [...prev, { ...msgIA, ms }]);
     } catch (e) {
       console.error("[AgentChat] fallo al enviar:", e);
       setError(
@@ -318,6 +322,7 @@ export function AgentChat() {
       );
     } finally {
       setPensando(false);
+      setBorrador(null);
       setSegundos(0);
       // Si acabamos de crear la conversación, recargamos la lista para el título.
       if (esNueva) void cargarHistorial();
@@ -495,6 +500,11 @@ export function AgentChat() {
               <>
                 <TextoIA texto={m.contenido} />
                 <ChipsRefs refs={m.refs ?? []} />
+                {m.ms != null && (
+                  <p className="mt-1 text-[10px] text-muted-foreground/70">
+                    tardó {Math.round(m.ms / 1000)}s
+                  </p>
+                )}
               </>
             ) : (
               <span className="whitespace-pre-wrap break-words">{m.contenido}</span>
@@ -504,14 +514,23 @@ export function AgentChat() {
 
         {pensando && (
           <div className="w-fit max-w-[92%] rounded-2xl rounded-bl-sm bg-muted/60 px-3 py-2 text-sm text-muted-foreground">
-            <p>Consultando tu sistema…</p>
-            <p className="mt-0.5 text-[11px]">
-              {segundos < 5
-                ? "El agente lee tus datos y el manual del método."
-                : segundos < 30
-                  ? `${segundos}s · suele tardar entre 20 y 60s (manda todo tu sistema a la IA).`
-                  : `${segundos}s · sigue pensando. Si se pasa de 2 min, revisa tu conexión.`}
-            </p>
+            {borrador ? (
+              <div className="text-foreground">
+                <TextoIA texto={borrador} />
+                <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse bg-violet-500 align-middle" />
+              </div>
+            ) : (
+              <>
+                <p>Consultando tu sistema…</p>
+                <p className="mt-0.5 text-[11px]">
+                  {segundos < 5
+                    ? "El agente lee tus datos y el manual del método."
+                    : segundos < 30
+                      ? `${segundos}s · suele tardar entre 20 y 60s (manda todo tu sistema a la IA).`
+                      : `${segundos}s · sigue pensando. Si se pasa de 2 min, revisa tu conexión.`}
+                </p>
+              </>
+            )}
           </div>
         )}
 

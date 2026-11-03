@@ -2,16 +2,30 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { fetchContadores, fetchPlanHoy, fetchTareas, fetchWigTareas, fetchWigs } from "@/lib/queries";
+import {
+  fetchContadores,
+  fetchKRsFocoSemanal,
+  fetchPlanHoy,
+  fetchTareas,
+  fetchWigTareas,
+  fetchWigs,
+} from "@/lib/queries";
 import { marcarHecha } from "@/lib/mutations";
 import { useData } from "@/lib/useData";
+import { getCurrentISOWeek } from "@/lib/semana";
 import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
 import { PagosWidget } from "@/components/pagos/PagosWidget";
 import { PagosNotificaciones } from "@/components/pagos/PagosNotificaciones";
 import { PlanRecuperacion } from "@/components/PlanRecuperacion";
 import { usePropuestaRecuperacion } from "@/lib/recuperacion/usePropuestaRecuperacion";
 import { IconCalendar, IconTarget } from "@/components/icons";
-import type { AmbitoTarea, PlanDiario, PlanDiarioTarea, Tarea } from "@/lib/types";
+import type {
+  AmbitoTarea,
+  KrFocoConDetalle,
+  PlanDiario,
+  PlanDiarioTarea,
+  Tarea,
+} from "@/lib/types";
 
 const SEMAFORO: Record<string, string> = {
   verde: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
@@ -68,6 +82,8 @@ type Data = {
   contadores: { tareasPendientes: number; metasActivas: number; capturasPendientes: number };
   pendientes: Tarea[];
   wigs: Wig[];
+  /** KRs en el foco de la semana actual (capa intermedia meta → tarea). */
+  focoKRs: KrFocoConDetalle[];
   wigTareas: WigTarea[];
 };
 
@@ -82,19 +98,22 @@ export default function HoyPage() {
   } = usePropuestaRecuperacion(true);
 
   const { data, loading, reload } = useData<Data>(async () => {
-    const [plan, contadores, pendientes, wigs, wigTareas] = await Promise.all([
+    const semana = getCurrentISOWeek();
+    const [plan, contadores, pendientes, wigs, focoKRs, wigTareas] = await Promise.all([
       fetchPlanHoy(),
       fetchContadores(),
       fetchTareas("pendiente"),
       fetchWigs(),
+      fetchKRsFocoSemanal(semana.anio, semana.semana_iso),
       fetchWigTareas(),
     ]);
-    return { plan, contadores, pendientes, wigs, wigTareas };
+    return { plan, contadores, pendientes, wigs, focoKRs, wigTareas };
   }, {
     plan: null,
     contadores: { tareasPendientes: 0, metasActivas: 0, capturasPendientes: 0 },
     pendientes: [],
     wigs: [],
+    focoKRs: [],
     wigTareas: [],
   });
 
@@ -239,6 +258,72 @@ export default function HoyPage() {
                   <div className="hidden h-1.5 w-24 overflow-hidden rounded-full bg-muted sm:block">
                     <div
                       className="h-full rounded-full bg-violet-500"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
+      {/* KRs WIG — capa intermedia: los resultados medibles en los que se
+          pone horas esta semana (foco semanal de /semana). Va ENTRE los
+          WIGs de meta y los WIGs de tarea porque esa es la cascada:
+          meta → KR → tarea. */}
+      {data.focoKRs.length > 0 && (
+        <section
+          className="rounded-xl border-2 border-sky-500/40 bg-gradient-to-br from-sky-500/10 to-violet-500/5 p-5"
+          aria-label="KRs en foco esta semana"
+        >
+          <header className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="flex items-center gap-2 font-semibold tracking-tight">
+              <IconTarget className="h-5 w-5 text-sky-500" />
+              KRs Enormemente Importantes
+            </h2>
+            <Link
+              href="/semana"
+              className="text-xs text-muted-foreground underline-offset-4 hover:underline"
+            >
+              editar foco semanal
+            </Link>
+          </header>
+          <p className="mb-3 text-xs text-muted-foreground">
+            Los {data.focoKRs.length} resultados medibles en los que pones
+            horas esta semana — el eslabón entre tus WIGs de meta y las
+            tareas que los sostienen.
+          </p>
+          <ul className="space-y-2">
+            {data.focoKRs.map((f) => {
+              const pct = Math.round(f.progreso * 100);
+              return (
+                <li
+                  key={f.kr.id}
+                  className="flex items-center gap-3 rounded-lg border border-sky-500/30 bg-background/70 px-3 py-2.5"
+                >
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sky-500/20 text-sm font-bold tabular-nums text-sky-700 dark:text-sky-300">
+                    {f.foco.orden}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <Link
+                      href={`/metas/detalle?id=${f.meta.id}`}
+                      className="block truncate text-sm font-medium hover:underline"
+                    >
+                      {f.kr.titulo}
+                    </Link>
+                    <p className="truncate text-[11px] text-muted-foreground">
+                      {f.meta.codigo ? `${f.meta.codigo} · ` : ""}
+                      {f.meta.titulo}
+                      {f.periodos[0] ? ` · ${f.periodos[0].nombre}` : ""}
+                    </p>
+                  </div>
+                  <span className="hidden shrink-0 text-[11px] tabular-nums text-muted-foreground sm:inline">
+                    {f.tareas_hechas}/{f.tareas.length} tareas
+                  </span>
+                  <div className="hidden h-1.5 w-24 overflow-hidden rounded-full bg-muted sm:block">
+                    <div
+                      className="h-full rounded-full bg-sky-500"
                       style={{ width: `${pct}%` }}
                     />
                   </div>

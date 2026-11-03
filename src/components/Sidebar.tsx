@@ -25,6 +25,7 @@ import {
   IconRepeat,
   IconSettings,
   IconSparkles,
+  IconTable,
   IconTarget,
   IconWallet,
   IconX,
@@ -52,6 +53,7 @@ const STRATEGY_ITEMS: NavItem[] = [
   { href: "/proyectos", label: "Proyectos", Icon: IconFolder },
   { href: "/escenarios", label: "Escenarios", Icon: IconTarget },
   { href: "/metas", label: "Metas", Icon: IconTarget },
+  { href: "/krs", label: "KRs", Icon: IconTable },
   { href: "/agente", label: "Agente", Icon: IconSparkles },
   { href: "/metas/plan", label: "Plan trimestral", Icon: IconCalendar },
 ];
