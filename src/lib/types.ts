@@ -572,6 +572,22 @@ export const HABITOS_META: HabitoMeta[] = [
   { id: "tres_cosas_buenas", nombre: "3 cosas buenas antes de dormir", emoji: "✨", momento: "Noche" },
 ];
 
+/** Columna real en `estatus_diarios` para cada hábito.
+ *  No siempre es `habito_${id}`: el id `tres_cosas_buenas` se guarda como
+ *  `habito_3_cosas_buenas` (migration 0013). Usar este mapa en vez de
+ *  concatenar strings. */
+export const HABITO_COLUMNA: Record<HabitoId, keyof EstatusDiario> = {
+  qigong: "habito_qigong",
+  caminar: "habito_caminar",
+  ducha: "habito_ducha",
+  meditacion: "habito_meditacion",
+  desayuno: "habito_desayuno",
+  vaciado_mental: "habito_vaciado_mental",
+  comida_siesta: "habito_comida_siesta",
+  estatus: "habito_estatus",
+  tres_cosas_buenas: "habito_3_cosas_buenas",
+};
+
 /** Fila persistida en `estatus_diarios` (1 por día por owner). */
 export interface EstatusDiario {
   id: string;

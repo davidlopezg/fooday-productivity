@@ -13,7 +13,7 @@ import {
   habitosDeEstatus,
   type HabitosValue,
 } from "@/components/HabitosGrid";
-import type { ComidaInput, EstatusConComidas } from "@/lib/types";
+import { HABITO_COLUMNA, type ComidaInput, type EstatusConComidas } from "@/lib/types";
 
 /** Formulario completo de Estatus Diario (modo crear o editar). */
 export function EstatusForm({
@@ -103,13 +103,13 @@ export function EstatusForm({
     setError(null);
     const alive = true;
     try {
-      // Los 9 hábitos viven en `habitos` con claves cortas (qigong, caminar,
-      // ducha, …) pero las columnas de Supabase son `habito_qigong`,
-      // `habito_caminar`, `habito_ducha`, … Hay que prefijar al mezclar
-      // con el resto del payload, si no Postgres los ignora silenciosamente
-      // y siempre quedan en NULL.
+      // Los 9 hábitos viven en `habitos` con ids cortos (qigong, caminar,
+      // tres_cosas_buenas, …) pero las columnas de Supabase usan el mapa
+      // HABITO_COLUMNA (no siempre `habito_${id}`). Mezclar con el resto del
+      // payload usando ese mapa; si no Postgres ignora la clave desconocida
+      // (o falla, en el caso de `tres_cosas_buenas`).
       const habitosPrefijados = Object.fromEntries(
-        Object.entries(habitos).map(([k, v]) => [`habito_${k}`, v]),
+        Object.entries(habitos).map(([k, v]) => [HABITO_COLUMNA[k as keyof typeof HABITO_COLUMNA], v]),
       );
       const payload: EstatusInput = {
         ...datos,
