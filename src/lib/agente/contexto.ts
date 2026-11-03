@@ -48,8 +48,11 @@ export type EntidadSnapshot = {
   meta_id?: string | null;
 };
 
-/** Topes para que el snapshot no crezca sin límite. */
-const MAX_TAREAS = 300;
+/** Topes para que el snapshot no crezca sin límite.
+ *  OJO: el prompt ya lleva el manual del método (~36 KB). Con 300 tareas el
+ *  snapshot llegaba a ~35 KB y el mensaje se iba a 20k tokens (la IA tarda
+ *  mucho). 200 tareas priorizadas cubren el 99% de las consultas reales. */
+const MAX_TAREAS = 200;
 const MAX_METAS = 60;
 const MAX_KRS_POR_META = 8;
 
@@ -134,9 +137,9 @@ export async function construirContexto(consulta: string): Promise<{
         ` · tareas:${mp.tareas_hechas}/${mp.total_tareas} · progreso:${pct(mp.progreso)}`,
     );
     catalogo.push({ tipo: "meta", id: m.id, etiqueta: m.titulo });
-    if (m.descripcion) lineas.push(`    desc: ${recortar(m.descripcion, 220)}`);
-    if (m.contexto) lineas.push(`    contexto: ${recortar(m.contexto, 220)}`);
-    if (m.situacion_actual) lineas.push(`    situación: ${recortar(m.situacion_actual, 220)}`);
+    if (m.descripcion) lineas.push(`    desc: ${recortar(m.descripcion, 140)}`);
+    if (m.contexto) lineas.push(`    contexto: ${recortar(m.contexto, 140)}`);
+    if (m.situacion_actual) lineas.push(`    situación: ${recortar(m.situacion_actual, 140)}`);
     for (const kr of krs) {
       const periodos = kr.periodos.map((p) => p.nombre).join("/");
       const metric = kr.valor_objetivo != null
@@ -169,7 +172,7 @@ export async function construirContexto(consulta: string): Promise<{
         (metasDelProyecto.length ? ` · metas: ${metasDelProyecto.join(", ")}` : " · sin metas"),
     );
     catalogo.push({ tipo: "proyecto", id: p.id, etiqueta: p.nombre });
-    if (p.descripcion) lineas.push(`    desc: ${recortar(p.descripcion, 220)}`);
+    if (p.descripcion) lineas.push(`    desc: ${recortar(p.descripcion, 140)}`);
   }
   lineas.push("");
 

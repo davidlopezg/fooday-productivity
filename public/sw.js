@@ -16,7 +16,7 @@
  * Para forzar una invalidación completa, sube CACHE_VERSION.
  * ========================================================================== */
 
-const CACHE_VERSION = "v3";
+const CACHE_VERSION = "v4";
 const CACHE_STATIC = `fooday-static-${CACHE_VERSION}`;
 const CACHE_PAGES = `fooday-pages-${CACHE_VERSION}`;
 
@@ -66,12 +66,24 @@ self.addEventListener("fetch", (event) => {
       (async () => {
         const cached = await caches.match(req);
         if (cached) return cached;
-        const res = await fetch(req);
-        if (res.ok) {
-          const cache = await caches.open(CACHE_STATIC);
-          cache.put(req, res.clone());
+        try {
+          const res = await fetch(req);
+          if (res.ok) {
+            const cache = await caches.open(CACHE_STATIC);
+            cache.put(req, res.clone());
+          }
+          return res;
+        } catch (e) {
+          // SIN RED no propagamos la excepción: si el `fetch` del SW
+          // falla, `event.respondWith` se rechaza y la página ve un
+          // "TypeError: Failed to fetch" sin explicación (pasó con el
+          // chunk del manual del agente en una conexión móvil mala).
+          // Un 503 explícito permite que la app diga "sin conexión".
+          return new Response(
+            "Sin conexión para descargar este asset.",
+            { status: 503, statusText: "Offline" },
+          );
         }
-        return res;
       })(),
     );
     return;

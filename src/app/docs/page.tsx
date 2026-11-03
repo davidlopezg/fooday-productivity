@@ -1469,6 +1469,67 @@ export default function DocsPage() {
             </span>
             <span className="text-muted-foreground">
               <strong className="text-foreground">
+                El chat del agente fallaba en móvil: “Failed to fetch” y
+                Sinatra.
+              </strong>{" "}
+              El manual del método se cargaba con{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                import()
+              </code>{" "}
+              diferido (para no meter 36 KB en el bundle de todas las
+              páginas). En la práctica eso era un error:{" "}
+              <strong className="text-foreground">
+                el primer mensaje tenía que descargar un chunk extra por la
+                red
+              </strong>{" "}
+              y, con una conexión móvil mala, esa descarga fallaba con un
+              críptico{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                TypeError: Failed to fetch
+              </code>{" "}
+              —además de añadir segundos de espera antes de pedirle nada a
+              la IA.{" "}
+              <strong className="text-foreground">Tres arreglos</strong>:{" "}
+              (1) el manual se importa{" "}
+              <strong className="text-foreground">estático</strong>{" "}
+              (0 peticiones extra; +56 KB en el bundle, +19 KB gzip, sobre
+              1 MB que ya carga la app: asumible frente a un fallo
+              irrecuperable); (2){" "}
+              <strong className="text-foreground">
+                el service worker ya no rompe la app
+              </strong>{" "}
+              —la rama de assets hasheados (cache-first) no tenía{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                try/catch
+              </code>
+              , así que un fallo de red del SW se convertía en el{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                Failed to fetch
+              </code>{" "}
+              que veía el usuario; ahora devuelve un 503 explícito y
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                {" "}
+                CACHE_VERSION
+              </code>{" "}
+              sube a v4; (3){" "}
+              <strong className="text-foreground">la UI cuenta el tiempo</strong>
+              : el bubble de “Consultando tu sistema…” muestra los segundos
+              y avisa de que el prompt es grande (la IA manda el sistema
+              entero + el manual), y si algo falla aparece un botón{" "}
+              <strong className="text-foreground">Reintentar</strong> que no
+              duplica tu mensaje en el historial. Además, el snapshot baja
+              de 300 a 200 tareas (priorizadas) y las descripciones se
+              recortan a 140 caracteres: el prompt se va de ~80 KB a
+              ~55 KB. No cambia el método ni los rituales: cambia cómo se
+              entrega el mismo conocimiento.
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-10-30
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
                 El agente conoce TODO el método de la app (y ya no hay dos
                 copias del método).
               </strong>{" "}

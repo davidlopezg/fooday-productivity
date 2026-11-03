@@ -39,6 +39,7 @@ import {
   IconHistory,
   IconMessage,
   IconPlus,
+  IconRepeat,
   IconSparkles,
   IconTrash,
   IconX,
@@ -53,10 +54,11 @@ const SUGERENCIAS = [
 ];
 
 /**
- * Convierte un error en algo accionable. El caso que más marea es la
- * migration 0035 sin aplicar: Supabase responde "Could not find the
- * table 'public.agente_conversaciones'" y el usuario no tiene ni idea de
- * qué hacer con eso.
+ * Convierte un error en algo accionable. Los dos casos que más marea:
+ *   · La migration 0035 sin aplicar: Supabase responde "Could not find the
+ *     table 'public.agente_conversaciones'" y el usuario no tiene ni idea
+ *     de qué hacer con eso.
+ *   · Un fallo de red ("Failed to fetch"): no dice nada de qué ha fallado.
  */
 function mensajeAmigable(e: unknown, fallback: string): string {
   const msg = e instanceof Error ? e.message : String(e ?? "");
@@ -66,6 +68,20 @@ function mensajeAmigable(e: unknown, fallback: string): string {
     return (
       "Falta la migración 0035 en Supabase (tablas del chat). " +
       "Ejecuta `npx supabase db push` (o pega el SQL en el editor de Supabase)."
+    );
+  }
+  if (/failed to fetch|networkerror|load failed|offline/i.test(msg)) {
+    return (
+      "No se pudo conectar: se ha caído la red (o el servicio de IA no " +
+      "responde). Revisa la conexión y pulsa Reintentar. Si tu conexión va " +
+      "justa, espera un poco: la primera respuesta tarda más (el agente " +
+      "lee todo tu sistema y el manual del método)."
+    );
+  }
+  if (/Loading chunk|ChunkLoadError/i.test(msg)) {
+    return (
+      "Se ha descargado una versión incompleta de la app. Pulsa " +
+      "“Actualizar app” (abajo, en el menú) y vuelve a abrir el chat."
     );
   }
   return msg || fallback;
@@ -124,6 +140,10 @@ export function AgentChat() {
   const [mensajes, setMensajes] = useState<MensajeChat[]>([]);
   const [entrada, setEntrada] = useState("");
   const [pensando, setPensando] = useState(false);
+  /** Segundos esperando la respuesta (para no dejar al usuario en el aire). */
+  const [segundos, setSegundos] = useState(0);
+  /** Última pregunta enviada, para poder reintentar sin volver a escribirla. */
+  const [ultimaPregunta, setUltimaPregunta] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [mostrarHistorial, setMostrarHistorial] = useState(false);
   const [cargandoHistorial, setCargandoHistorial] = useState(false);
@@ -196,6 +216,13 @@ export function AgentChat() {
     finRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [mensajes.length, pensando]);
 
+  // ── Cronómetro de espera ──
+  useEffect(() => {
+    if (!pensando) return;
+    const t = setInterval(() => setSegundos((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [pensando]);
+
   async function abrirConversacion(id: string) {
     setConversacionId(id);
     setMostrarHistorial(false);
@@ -234,6 +261,7 @@ export function AgentChat() {
     setEntrada("");
     setError(null);
     setPensando(true);
+    setUltimaPregunta(texto);
 
     // 1) Si no hay conversación, se crea con el título del 1er mensaje.
     let idConv = conversacionId;
@@ -248,9 +276,16 @@ export function AgentChat() {
         setConversaciones((prev) => [conv, ...prev]);
       }
 
-      // 2) Se guarda el mensaje del usuario.
-      const msgUsuario = await guardarMensaje(idConv, "user", texto);
-      setMensajes((prev) => [...prev, msgUsuario]);
+      // 2) Se guarda el mensaje del usuario (salvo que sea un reintento:
+      //    si el último mensaje ya es esa misma pregunta del usuario, no
+      //    la duplicamos ni en la base de datos ni en la burbuja).
+      const yaEsta = mensajes.length > 0
+        && mensajes[mensajes.length - 1].rol === "user"
+        && mensajes[mensajes.length - 1].contenido === texto;
+      if (!yaEsta) {
+        const msgUsuario = await guardarMensaje(idConv, "user", texto);
+        setMensajes((prev) => [...prev, msgUsuario]);
+      }
 
       // 3) Se arma el snapshot y se pregunta a la IA.
       const historial: Turno[] = mensajes.map((m) => ({
@@ -283,6 +318,7 @@ export function AgentChat() {
       );
     } finally {
       setPensando(false);
+      setSegundos(0);
       // Si acabamos de crear la conversación, recargamos la lista para el título.
       if (esNueva) void cargarHistorial();
     }
@@ -468,7 +504,14 @@ export function AgentChat() {
 
         {pensando && (
           <div className="w-fit max-w-[92%] rounded-2xl rounded-bl-sm bg-muted/60 px-3 py-2 text-sm text-muted-foreground">
-            Consultando tu sistema…
+            <p>Consultando tu sistema…</p>
+            <p className="mt-0.5 text-[11px]">
+              {segundos < 5
+                ? "El agente lee tus datos y el manual del método."
+                : segundos < 30
+                  ? `${segundos}s · suele tardar entre 20 y 60s (manda todo tu sistema a la IA).`
+                  : `${segundos}s · sigue pensando. Si se pasa de 2 min, revisa tu conexión.`}
+            </p>
           </div>
         )}
 
@@ -478,7 +521,18 @@ export function AgentChat() {
       {/* ── Error ── */}
       {error && (
         <div className="shrink-0 border-t border-red-500/30 bg-red-500/10 px-3 py-2 text-[11px] text-red-700 dark:text-red-300">
-          {error}
+          <p>{error}</p>
+          {ultimaPregunta && (
+            <button
+              type="button"
+              onClick={() => void enviar(ultimaPregunta)}
+              disabled={pensando}
+              className="mt-1.5 inline-flex items-center gap-1 rounded-md border border-red-500/40 px-2 py-1 text-[11px] font-medium hover:bg-red-500/10 disabled:opacity-50"
+            >
+              <IconRepeat className="h-3 w-3" />
+              Reintentar
+            </button>
+          )}
         </div>
       )}
 

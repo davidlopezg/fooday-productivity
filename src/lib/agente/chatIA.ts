@@ -24,6 +24,11 @@ import { llamarLLM } from "@/lib/llm";
 import { parsearYValidar } from "@/lib/llm-parser";
 import { bloquePerfil } from "@/lib/perfilIA";
 import type { PerfilIA } from "@/lib/perfilIA";
+// El manual se importa ESTÁTICO a propósito (ver `systemPrompt`): con
+// `import()` diferido, el chunk hay que descargarlo por la red en el
+// primer mensaje, y si esa descarga falla (móvil con mala conexión) el
+// chat peta con un "Failed to fetch" sin llegar a llamar a la IA.
+import { manualMetodo } from "@/lib/agente/manual";
 import type { RefEntidad } from "@/lib/agente/chatStore";
 import type { EntidadSnapshot } from "@/lib/agente/contexto";
 
@@ -60,15 +65,14 @@ REGLAS
 /**
  * System prompt completo: las reglas + el manual del método.
  *
- * El manual se carga con `import()` dinámico a propósito: son ~36 KB de
- * texto y SOLO hacen falta cuando el usuario escribe en el chat. Con
- * import estático, ese texto iría en el bundle de TODAS las páginas
- * (AgentChat vive en AppShell, que está en el layout raíz).
+ * El manual son ~36 KB de texto. Va SIEMPRE en el system prompt (es el
+ * conocimiento que el agente necesita para no recomendar con el criterio
+ * genérico de la IA) y se cachea en memoria: se calcula una vez por
+ * sesión, no en cada mensaje.
  */
 let systemPromptCache: string | null = null;
-export async function systemPrompt(): Promise<string> {
+export function systemPrompt(): string {
   if (systemPromptCache === null) {
-    const { manualMetodo } = await import("@/lib/agente/manual");
     systemPromptCache = `${SYSTEM_PROMPT_BASE}\n\n${manualMetodo()}`;
   }
   return systemPromptCache;
@@ -143,7 +147,7 @@ export async function responderAgente(
     cfg.base_url,
     cfg.minimax_api_key,
     cfg.model,
-    await systemPrompt(),
+    systemPrompt(),
     prompt,
     { temperature: 0.3 },
   );
