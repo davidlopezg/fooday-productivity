@@ -9,6 +9,7 @@ import { ConfigProvider } from "@/lib/configStore";
 import { PomodoroProvider } from "@/lib/pomodoroStore";
 import { PomodoroWidget } from "@/components/PomodoroWidget";
 import { PostFocusDialog } from "@/components/PostFocusDialog";
+import { AgentChat } from "@/components/AgentChat";
 import { ThemeProvider } from "@/lib/themeStore";
 
 /**
@@ -153,6 +154,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
         <PomodoroWidget />
         <PostFocusDialog />
+        {/* Chat del agente: presente en TODA la app (excepto /login, que
+            ni siquiera entra en este árbol). Dentro de PomodoroProvider
+            porque se aparta del widget del temporizador. */}
+        <AgentChat />
       </PomodoroProvider>
     </ConfigProvider>
     </ThemeProvider>

@@ -13,9 +13,22 @@ import {
   IconFlag,
   IconInbox,
   IconList,
+  IconMessage,
   IconTarget,
   IconX,
 } from "@/components/icons";
+import {
+  ANTIPATRONES,
+  CRITERIO_SELECCION,
+  GTD_PUNTOS,
+  INBOXES,
+  LAG_VS_LEAD,
+  NEXT_ACTION_PUNTOS,
+  PENDIENTES_RESPUESTA,
+  PROBLEMA,
+  WIG_PUNTOS,
+  type Punto,
+} from "@/lib/metodologia/conocimiento";
 
 // ============================================================================
 // /metodologia — Arquitectura de metas y tareas
@@ -33,201 +46,34 @@ import {
 // ============================================================================
 
 type Ref = { ruta: string; titulo: string };
-type Punto = { titulo: string; cuerpo: string };
 
 // ============================================================================
 // SECCIÓN 1 — El problema
 // ============================================================================
-const PROBLEMA: Punto[] = [
-  {
-    titulo: "Sobrecarga cognitiva → parálisis por análisis",
-    cuerpo:
-      "Mostrar 40 tareas pendientes en la agenda diaria dispara una fricción psicológica que lleva a la procrastinación. El cerebro, ante un inventario abrumador, prefiere la tarea fácil (responder un email) a la difícil (avanzar el WIG).",
-  },
-  {
-    titulo: "Efecto Zeigarnik: los bucles abiertos consumen atención",
-    cuerpo:
-      "Las tareas inacabadas permanecen activas en la memoria de trabajo, ocupando ciclo del cortex prefrontal. No necesitas terminarlas para liberar al cerebro: basta con que estén en un sistema externo y sepas cuál es la siguiente acción inmediata.",
-  },
-  {
-    titulo: "Confundir resultados con conductas",
-    cuerpo:
-      "Una meta vaga (\"ser más productivo\") no genera un plan accionable. Una meta medible (\"publicar el libro en 6 meses\") sin las 2-3 conductas recurrentes que la sostienen, se queda en deseo. El sistema exige las dos capas explícitas.",
-  },
-];
 
 // ============================================================================
 // SECCIÓN 2 — Lag vs Lead (4DX)
 // ============================================================================
-const LAG_VS_LEAD: { dimension: string; lag: string; lead: string }[] = [
-  {
-    dimension: "¿Qué es?",
-    lag: "El resultado final que quieres alcanzar.",
-    lead: "Las 2-3 conductas recurrentes que tú controlas y que producen el resultado.",
-  },
-  {
-    dimension: "¿Cuándo se mide?",
-    lag: "Al final (semanas / meses).",
-    lead: "Semanal o diario.",
-  },
-  {
-    dimension: "¿Puedes actuar sobre ella hoy?",
-    lag: "No — solo esperar.",
-    lead: "Sí — es la palanca que mueve la aguja.",
-  },
-  {
-    dimension: "En la app",
-    lag: "Tabla `metas` + `periodos` + `resultados_periodo` (los KRs viven aquí, ver /metas/plan). Desde la migración 0025, dos campos reales en `metas` (`fecha_inicio_meta`, `fecha_objetivo` + flag `fecha_fin_bloqueada`) definen el rango real de la meta — la IA reparte los KRs SOLO dentro de ese rango, como meses sueltos (no siempre 4 trimestres). El campo libre `plazo` queda como legacy. Migration 0028: la tabla `resultados_periodo` ya no tiene `periodo_id`; un KR puede vivir en uno o varios trimestres/meses a través de la tabla puente `kr_periodos` (N:M). Eso elimina el límite “1 KR por trimestre” que el usuario vivía como bug.",
-    lead: "Columna `es_wig` en `metas` (panel violeta) y en `tareas` (panel fucsia).",
-  },
-];
 
 // ============================================================================
 // SECCIÓN 3 — WIGs (Wildly Important Goals)
 // ============================================================================
-const WIG_PUNTOS: Punto[] = [
-  {
-    titulo: "Definición",
-    cuerpo:
-      "Un WIG (Wildly Important Goal) es una meta de altísimo impacto a la que dedicas atención desproporcionada. Es la concreción práctica de la Lead Measure: la meta-en-forma-de-resultado-más-3-conductas.",
-  },
-  {
-    titulo: "Por qué máximo 1-3 (y no 10)",
-    cuerpo:
-      "La energía de foco es un recurso finito (~4h/día de trabajo profundo sostenible). Multiplicarla entre 10 WIGs equivale a no tener ninguno. La app lo hace cumplir por la base de datos: índice único (owner_id, wig_orden) + RPC `toggle_meta_wig` que rechaza el 4º.",
-  },
-  {
-    titulo: "El diseño de tres capas de foco (novedad de esta app)",
-    cuerpo:
-      "La mayoría de herramientas mezclan 'meta' y 'tarea' en una sola lista. Esta app separa tres planos: (a) WIGs de METAS (qué resultados quieres, máx 3), (b) KRs de la SEMANA (en qué resultados medibles pones horas ahora, máx 3) y (c) WIGs de TAREAS (qué 3 tareas concretas los sostienen). Son caps independientes de 3 — uno sin el otro no funciona.",
-  },
-  {
-    titulo: "Dónde se ven y cómo se marcan en la app",
-    cuerpo:
-      "Cada capa tiene su panel con contador N/3: el de METAS vive arriba de /metas (con botón “Sugerir 3 WIGs” por IA); el de KRs SEMANALES vive en /semana (con botón “✨ Sugerir 3 KRs” por IA, el ritual del domingo); el de TAREAS vive arriba de /tareas y también en / (sección “Tareas Enormemente Importantes”). En todos los casos el cap lo impone la base de datos: las RPC toggle_meta_wig / toggle_kr_foco_semanal / toggle_tarea_wig rechazan el 4º.",
-  },
-  {
-    titulo: "El KR de la semana: dos ejes de tiempo, no uno",
-    cuerpo:
-      "Un KR se mide en trimestres o meses (su COMPROMISO de entrega: “este resultado está listo antes de Q3”). Además, desde la migration 0033, cada KR puede estar en el FOCO de una semana concreta (tu ESFUERZO: “esta semana pongo horas aquí”). Son dos ejes ortogonales: el trimestre no se sustituye, se complementan. Solo entra en el foco semanal un KR cuyo periodo de entrega contiene la semana actual — así lo caducado y lo prematuro se quedan fuera solos.",
-  },
-];
 
 // ============================================================================
 // SECCIÓN 4 — El repositorio GTD externo
 // ============================================================================
-const GTD_PUNTOS: Punto[] = [
-  {
-    titulo: "Principio: la cabeza es para tener ideas, no para guardarlas",
-    cuerpo:
-      "David Allen (GTD): el cortex prefrontal no está diseñado para almacenar listas. Cada vez que retienes una tarea, consumes atención. La solución: un sistema externo (Supabase, en este caso) donde TODO el inventario existe — incluso lo que no se ve hoy.",
-  },
-  {
-    titulo: "Cómo se materializa en la app",
-    cuerpo:
-      "La tabla `tareas` admite: meta, área, prioridad, deadline, estado, capa, esfuerzo, importe, RICE, adjuntos, comentarios, subtareas (migración 0010) y recurrencia. Es el repositorio completo de tu operativa. La pantalla /tareas lo muestra todo, pero la página Hoy solo expone 6 en preview.",
-  },
-  {
-    titulo: "El inventario completo vs el foco del día",
-    cuerpo:
-      "El sistema hace explícita la distinción: 'tener 200 tareas registradas en Supabase' es señal de buena higiene. 'Ver 200 tareas pendientes en la página de inicio' es un error de diseño. La app impone la primera condición y la previene en la segunda.",
-  },
-];
 
 // ============================================================================
 // SECCIÓN 5 — La Próxima Acción Física
 // ============================================================================
-const NEXT_ACTION_PUNTOS: Punto[] = [
-  {
-    titulo: "Definición GTD",
-    cuerpo:
-      "Una Próxima Acción es la siguiente acción física, visible y concreta que puedes hacer ahora mismo para avanzar la tarea. Si no puedes hacerla en 2 minutos sin ambigüedad, no es una próxima acción — es un proyecto.",
-  },
-  {
-    titulo: "Por qué solo UNA en el foco diario",
-    cuerpo:
-      "La investigación de Masicampo & Baumeister (2011) demuestra que basta con tener un plan concreto de cuándo ejecutar la tarea pendiente para desactivar el efecto Zeigarnik. No necesitas terminarla. Necesitas saber (a) que está guardada y (b) cuál es el siguiente paso físico.",
-  },
-  {
-    titulo: "Cómo se implementa",
-    cuerpo:
-      "La tabla `plan_diario_tareas` admite 4 tipos: imprescindible, autocuidado, micro, extra. La página Hoy prioriza las imprescindibles (3-4) y oculta el resto. El componente `MicroAccionCard` elige, además, una única micro-acción para mañana según criterios (racha, score bajo, patrón semanal).",
-  },
-];
 
 // ============================================================================
 // SECCIÓN 6 — Los dos inboxes
 // ============================================================================
-const INBOXES = [
-  {
-    ruta: "/captura",
-    nombre: "Captura",
-    que: "Pensamiento suelto: tareas, ideas, problemas, pagos, reflexiones.",
-    cuando:
-      "Cuando algo lleva más de 15 segundos en tu cabeza. Es escritura rápida, sin estructura.",
-    color: "violet",
-    icono: IconInbox,
-    rama: "ramas: tarea · problema · reflexión · idea · pago · maría · sin_clasificar",
-  },
-  {
-    ruta: "/tareas/inbox",
-    nombre: "Tareas (inbox de triaje)",
-    que: "Tareas (filas de la tabla `tareas`) sin meta asignada o sin trimestre.",
-    cuando:
-      "Solo cuando ya tienes una tarea formalizada y necesitas decidir a qué objetivo/trimestre pertenece.",
-    color: "sky",
-    icono: IconFlag,
-    rama: "no se mezcla con el inbox de cabeza: aquí ya son tareas, no pensamientos.",
-  },
-];
 
 // ============================================================================
 // SECCIÓN 7 — Anti-patrones
 // ============================================================================
-const ANTIPATRONES: { titulo: string; por_que: string; que_hacer: string }[] = [
-  {
-    titulo: "Marcar 5+ WIGs",
-    por_que:
-      "La RPC `toggle_meta_wig` ya lo bloquea (devuelve false), pero si relajas la restricción perderás el efecto concentrador. Es como repartir un foco de 4h entre 8 objetivos: ninguno avanza.",
-    que_hacer:
-      "Si tienes 5 candidatos, jerarquiza: ¿cuál, si lo logras, hace irrelevantes a los otros 4? Ese es tu WIG.",
-  },
-  {
-    titulo: "Mostrar 40 tareas en la página Hoy",
-    por_que:
-      "Anula el efecto de la Próxima Acción. El cerebro ve la lista, calcula el coste, procrastina. Por eso Hoy está deliberadamente curado (3 stats + 2 paneles WIG + plan + 6 en preview).",
-    que_hacer:
-      "Si quieres ver las 40, ve a /tareas. La página Hoy es para ejecutar, no para revisar.",
-  },
-  {
-    titulo: "Confundir los dos inboxes",
-    por_que:
-      "/captura es para VACIAR la cabeza. /tareas/inbox es para TRIAR tareas. Mezclarlos satura ambos: terminas con ideas de pago en tu lista de tareas formales y con tareas estructuradas en tu captura rápida.",
-    que_hacer:
-      "Regla: si lleva <15s en tu cabeza, ni lo captures. Si es un texto libre sin estructura → /captura. Si ya es una tarea con meta, prioridad y deadline → /tareas/inbox hasta que la asignes.",
-  },
-  {
-    titulo: "No saber si lo tuyo es proyecto o meta",
-    por_que:
-      "Confusión clásica. Un proyecto agrupa 2-4 metas dentro de un área; una meta es un resultado medible con plazo. Sin esta distinción, las metas se quedan sueltas, los proyectos sin metas hijas, y la jerarquía no cuenta la historia.",
-    que_hacer:
-      "El agente de /agente decide por ti: pega el contexto y la IA CLASIFICA entre proyecto (te propone 2-4 metas hijas con KR inicial y fecha objetivo cada una), meta (una sola) o captura (no accionable, va al inbox). Si prefieres decidir tú: «¿puedo partir esto en 2-4 resultados con plazo? → proyecto. ¿es un único resultado medible? → meta. ¿no tiene forma? → captura».",
-  },
-  {
-    titulo: "Saltarse la captura y 'tenerlo en la cabeza'",
-    por_que:
-      "El efecto Zeigarnik se reactiva cada vez que el sistema pierde confianza. Si dudas de que la app guarda todo, el cortex prefrontal vuelve a cargar con la lista.",
-    que_hacer:
-      "Captura todo lo que pese, en cualquier momento. El costo de capturar es bajo; el costo de recordarlo es alto.",
-  },
-  {
-    titulo: "Definir WIGs-meta sin WIGs-tarea (o al revés)",
-    por_que:
-      "Sin Lead Measures concretas, el Lag Measure se queda en deseo. Sin Lag Measure, las tareas son actividad sin propósito. Ambas capas son obligatorias y se conectan por la columna `tareas.meta_id`.",
-    que_hacer:
-      "Cada vez que marques un WIG-meta, pregúntate: '¿cuáles son las 3 tareas semanales que, si las hago, garantizan que avanzo?'. Márcalas como WIGs-tarea.",
-  },
-];
 
 // ============================================================================
 // SECCIÓN 8 — Pendientes de respuesta (lo que NO depende de ti)
@@ -243,33 +89,6 @@ const ANTIPATRONES: { titulo: string; por_que: string; que_hacer: string }[] = [
 // Es un reframe psicológico que refuerza la utilidad operativa del
 // panel con la utilidad mental: soltar la preocupación.
 // ============================================================================
-const PENDIENTES_RESPUESTA: Punto[] = [
-  {
-    titulo: "Definición",
-    cuerpo:
-      "Una tarea está 'pendiente de respuesta' cuando ya iniciaste una acción (mandar un email, pedir un OK, dejar una llamada apuntada) y tu próximo paso es ESPERAR, no actuar. El flag ⏳ en /tareas lo marca. No es un estado (la tarea puede seguir en pendiente, en_progreso o hecha), es un ATRIBUTO SEMÁNTICO.",
-  },
-  {
-    titulo: "El reframe mental: estoico y Covey",
-    cuerpo:
-      "Encima de la lista de /tareas/pendientes-respuesta hay un banner que dice «No te preocupes de lo que está pendiente de los demás». No es un añadido decorativo: es la mitad del trabajo. La utilidad operativa del panel ya te dice cuándo hacer follow-up; este banner te recuerda la regla de fondo: cada fila representa algo que NO está bajo tu control, tu única acción posible es el follow-up, y si hoy no toca, déjalo aquí — el panel vuelve a sacarlo cuando lleve demasiado tiempo esperando. Razón: según Covey (Los 7 hábitos), preocuparse por lo que está fuera del círculo de influencia gasta energía sin mover la aguja; según Epicteto, lo que no depende de ti ni siquiera merece preocupación. El panel te ayuda operativamente a desatascar; el banner te ayuda mentalmente a soltar.",
-  },
-  {
-    titulo: "Por qué necesita un panel propio",
-    cuerpo:
-      "Porque el resto de la lista mide cosas que TÚ controlas (prioridad, deadline, esfuerzo). En cambio, una pendiente de respuesta es algo que depende de OTRO. Mezclada con la lista principal, compite por foco con cosas que sí puedes hacer ahora. Sacada a un panel propio, deja de 'pesar' en el inventario activo y solo reaparece cuando toca hacer follow-up.",
-  },
-  {
-    titulo: "Regla de uso: panel pequeño",
-    cuerpo:
-      "El panel /tareas/pendientes-respuesta debería tener pocos elementos. Si crece, o bien no estás haciendo follow-ups a tiempo (la antigüedad lo delata: lo de arriba lleva esperando más), o bien estás externalizando demasiado trabajo sin control. La acción correctiva casi siempre es la misma: un follow-up corto, escrito, con deadline ('si para el viernes no hay respuesta, escalo / replanteo / descarto').",
-  },
-  {
-    titulo: "Cuándo destildar el flag",
-    cuerpo:
-      "Tres situaciones: (1) llegó la respuesta y la tarea se cierra (destildas y, si era el objetivo, la marcas como hecha). (2) llegó la respuesta y te abre trabajo nuevo (destildas, queda como tarea normal, y creas la nueva si toca). (3) se enfrió y ya no aplica (destildas, opcionalmente archivas la tarea). El botón '✓ Respuesta recibida' en el panel hace (1)/(2)/(3) en un click.",
-  },
-];
 
 // ============================================================================
 // SECCIÓN 9 — El criterio de selección (qué entra HOY y por qué)
@@ -291,63 +110,6 @@ const PENDIENTES_RESPUESTA: Punto[] = [
 //   ("vence mañana", "hay un pago vencido relacionado"), nunca una
 //   puntuación opaca.
 // ============================================================================
-const CRITERIO_SELECCION: Punto[] = [
-  {
-    titulo: "El orden de decisión (de más a menos peso)",
-    cuerpo:
-      "1) RIESGO FINANCIERO: tarea vinculada a un pago vencido o próximo. Va POR DELANTE del resto a propósito: una deuda vencida tiene consecuencias más graves que cualquier otro compromiso, aunque la otra tarea tenga la fecha más restrictiva. 2) COMPROMISO INAMOVIBLE: fecha dura + señal de peso (WIG, meta o capa). 3) RIESGO OPERATIVO: importante y vence en ≤7 días. 4) INGRESOS: solo con el tag explícito 'ingresos' — nunca se infieren. 5) IMPORTANTE NO URGENTE: meta activa o WIG sin urgencia de fecha. 6) MANTENIMIENTO: gestión acotada (≤15 min, o ≤45 min si no tiene fecha próxima). 7) BIENESTAR: ámbito personal — va a su propia sección y NO se descarta. 8) Lo que no encaja en ninguna: candidata a descartar, aplazar o delegar en la revisión semanal.",
-  },
-  {
-    titulo: "Mantenimiento ≠ «tarea corta»",
-    cuerpo:
-      "El hueco de mantenimiento es para una gestión acotada: revisar facturas, contestar un aviso, actualizar un dato. Se recognize por ser corta Y por no aprieta: si tiene fecha próxima, es trabajo programado y va como secundaria, aunque dure 20 minutos. Y si tiene más de 45 minutos, ya no es una gestión: es trabajo de verdad. El orden importa, porque una gestión de 30 minutos con meta no es «avance en el objetivo»: ocuparía el sitio de una tarea grande con el mismo valor operativo.",
-  },
-  {
-    titulo: "El bienestar no es una tarea más: es tiempo protegido",
-    cuerpo:
-      "Las tareas de ámbito personal (caminar, estar con la familia, descansar) NO compiten por el sitio de la tarea principal ni se leen como otra tarea del plan: van a su propia sección, con su propio motivo. Y en ningún caso caen en la lista de descartables — el brief es explícito en que ese tiempo no debe contar automáticamente como improductivo. Ajustar la carga de trabajo y proteger el tiempo de descanso son cosas distintas.",
-  },
-  {
-    titulo: "Qué NO entra nunca en el plan",
-    cuerpo:
-      "Las tareas en estado hecha, descartada, archivada o bloqueada (ya no sonInventory activo). Las marcadas con el flag ⏳ 'pendiente de respuesta' (esperar no es actuar: su próximo paso depende de otro). Y las recurrentes, porque un hábito no es una 'tarea del día': los hábitos viven en /estatus, no en el plan de ejecución.",
-  },
-  {
-    titulo: "La capacidad ajusta la carga, NO silencia los riesgos",
-    cuerpo:
-      "El semáforo emocional que ya existe (verde / amarillo / rojo) se traduce a un NIVEL DE CARGA más fino (alta / media / mínima), y el corte es deliberadamente menos severo: “Sí, todo me arrastra” es saturación (hagamos menos cosas), no fatiga (no puedo más), así que da carga MEDIA, no mínima. El corte severo queda para “Agotado” y para un semáforo rojo ya guardado. Con carga alta entran 1 principal + 2 secundarias; con media, 1 + 1; con mínima, sólo la principal. Pero un pago vencido NO desaparece por estar en carga mínima: sigue apareciendo como AVISO. Ajustar la carga y ocultar un riesgo son cosas distintas, y la segunda es exactamente lo que el sistema debe evitar.",
-  },
-  {
-    titulo: "Los pagos vencidos se agrupan, pero NO se fusionan",
-    cuerpo:
-      "Tres TGSS de 480 € son tres obligaciones distintas y el usuario tiene que ver cuántas son y cuánto pesan: nunca se fusionan ni se descartan. Lo que se agrupa es el RUIDO: los vencidos hace más de 30 días se muestran como un resumen con el total, y al desplegarlo salen uno a uno. Los que vencen esta semana se muestran siempre en individual, porque son los que exigen una decisión hoy. Y el estado que se mira es el EFECTIVO (el que ve el usuario en /pagos), no el crudo de la tabla: si no, los pagos vencidos hace meses pasarían por 'pendientes'.",
-  },
-  {
-    titulo: "Una obligación, un hueco (y la más cara primero)",
-    cuerpo:
-      "Si una tarea enlaza con varios pagos (una fianza de 700 € y otra de 1.000 €, por ejemplo), el sistema elige el de MAYOR IMPORTE PENDIENTE, no el primero que aparece. Y una misma obligación no puede ocupar dos huecos del plan: si la principal ya es “atender la fianza”, la secundaria no vuelve a ser “atender la fianza”. Sin esto, la pantalla decía dos veces “este es el riesgo que debes atender” y la segunda no era una segunda cosa que hacer, sino la misma otra vez.",
-  },
-  {
-    titulo: "El estado del pago va DENTRO del motivo, nunca inventado",
-    cuerpo:
-      "El motivo dice la verdad: “vence en 20 días”, “vence hoy”, “vencido hace 30 días”, con el importe pendiente y qué señal coincidió (importe o proveedor/concepto). Un aviso falso es PEOR que no avisar: si el sistema llama “vencido” a un pago que vence en tres semanas, deja de ser creíble para todo lo demás. Por eso el estado se lee del pago efectivo (el que ve el usuario en /pagos) y se escribe tal cual.",
-  },
-  {
-    titulo: "El tiempo estimado sólo se dice si es fiable",
-    cuerpo:
-      "De `tareas_subtareas.tiempo_estimado_min` (numérico, ya persistido, y la primera subtarea PENDIENTE es la próxima acción = el tiempo real de trabajo). NO de `tareas.esfuerzo`, que es texto libre: en los datos reales aparecía un “1” en una factura que no eran minutos, y el motor lo leía como “1 minuto”. Un número suelto menor de 5, o sin unidad explícita, NO se interpreta como tiempo: es preferible decir “sin estimar” que mentir con un número.",
-  },
-  {
-    titulo: "La relación pago ↔ tarea se resuelve por texto (y con cautela)",
-    cuerpo:
-      "No existe FK entre `pagos.pagos` y `public.tareas` (son schemas separados). La única relación posible hoy es textual: el importe pendiente del pago aparece en el título o la descripción de la tarea, o coincide una palabra significativa del proveedor o del concepto. Se exige UNA sola señal para no generar falsos positivos, y el motivo siempre dice cuál fue ('importe coincidente' / 'concepto coincidente'). Un vínculo duro exigiría una tabla puente: es una decisión pendiente, no una limitación aceptada.",
-  },
-  {
-    titulo: "Sin IA para decidir QUÉ; con IA para explicar CÓMO",
-    cuerpo:
-      "El módulo es una función pura: sin efectos secundarios, sin llamadas a la API y sin escrituras en la BD. Eso permite (a) testearlo sin coste, (b) generar la propuesta en modo 'shadow' —verla sin que se escriba nada— antes de activarla, y (c) cambiar el criterio sin tocar la interfaz. La IA entra después: redacta el motivo en lenguaje natural y propone el primer paso concreto.",
-  },
-];
 
 // ============================================================================
 // Componente
@@ -392,6 +154,22 @@ export default function MetodologiaPage() {
             /docs · Los 5 pilares
           </Link>
           . Esta página es su implementación concreta.
+        </p>
+        <p className="mt-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 text-sm leading-relaxed text-muted-foreground">
+          🤖 <strong className="text-foreground">
+            El chat del agente (botón flotante en toda la app) conoce esta
+            misma arquitectura
+          </strong>
+          . No es una copia:{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+            src/lib/metodologia/conocimiento.ts
+          </code>{" "}
+          es la fuente única de los dos (esta página,{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/docs</code>{" "}
+          y el prompt del agente). Si cambias una regla aquí, el agente la
+          aplica en la misma sesión: recomienda con{" "}
+          <em>tu</em> criterio (WIGs, Próxima Acción, criterio de
+          selección), no con el criterio genérico de la IA.
         </p>
       </header>
 
@@ -702,11 +480,19 @@ export default function MetodologiaPage() {
               }`}
             >
               <header className="mb-2 flex items-center gap-2">
-                <ib.icono
-                  className={`h-5 w-5 ${
-                    ib.color === "violet" ? "text-violet-500" : "text-sky-500"
-                  }`}
-                />
+                {ib.icono === "inbox" ? (
+                  <IconInbox
+                    className={`h-5 w-5 ${
+                      ib.color === "violet" ? "text-violet-500" : "text-sky-500"
+                    }`}
+                  />
+                ) : (
+                  <IconFlag
+                    className={`h-5 w-5 ${
+                      ib.color === "violet" ? "text-violet-500" : "text-sky-500"
+                    }`}
+                  />
+                )}
                 <h3 className="font-semibold">{ib.nombre}</h3>
                 <code className="ml-auto rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">
                   {ib.ruta}
@@ -1129,6 +915,16 @@ export default function MetodologiaPage() {
               <IconTarget className="h-4 w-4 text-violet-500" />
               /escenarios · Capa de escenarios de proyecto: contexto (cronología) + estado (medido) + situación (interpretada), y los escenarios con su estrategia generados bajo demanda (migration 0029)
             </Link>
+          </li>
+          <li>
+            <span className="inline-flex items-center gap-2 font-medium text-foreground">
+              <IconMessage className="h-4 w-4 text-violet-500" />
+              chat del agente · botón flotante en toda la app: pregunta por
+              tus metas, KRs, proyectos y tareas y te responde con el estado
+              real del sistema. Solo lectura — la arquitectura de 4 capas
+              (proyecto → meta → KR → tarea) no cambia, solo se consulta
+              (migration 0035)
+            </span>
           </li>
         </ul>
         <p className="mt-5 text-sm text-muted-foreground">

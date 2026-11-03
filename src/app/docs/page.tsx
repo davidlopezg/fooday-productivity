@@ -2,6 +2,13 @@
 
 import Link from "next/link";
 import { IconArrowLeft, IconCheck, IconTarget } from "@/components/icons";
+import {
+  FEATURES,
+  GLOSARIO,
+  HABITOS_RECURRENTES,
+  PILARES,
+  RITUALES,
+} from "@/lib/metodologia/conocimiento";
 
 // ============================================================================
 // /docs — Los 5 pilares que sustentan fooday·productivity.
@@ -14,204 +21,12 @@ import { IconArrowLeft, IconCheck, IconTarget } from "@/components/icons";
 // para mantener toda la metodología.
 // ============================================================================
 
-type Punto = { titulo: string; cuerpo: string };
-
-type Pilar = {
-  num: 1 | 2 | 3 | 4 | 5;
-  emoji: string;
-  titulo: string;
-  resumen: string;
-  puntos: Punto[];
-};
-
-const PILARES: Pilar[] = [
-  {
-    num: 1,
-    emoji: "🧠",
-    titulo: "Trabajo profundo (Deep Work)",
-    resumen:
-      "La calidad del trabajo es Tiempo × Intensidad, no horas. Eliminar distracciones de entrada es la palanca con mayor retorno.",
-    puntos: [
-      {
-        titulo: "Fórmula del rendimiento de élite",
-        cuerpo:
-          "El trabajo de alta calidad producido es el resultado directo de multiplicar (Tiempo invertido) × (Intensidad de enfoque). Las personas de mayor rendimiento no necesariamente trabajan más horas, sino que maximizan la intensidad de concentración en cada bloque de tiempo.",
-      },
-      {
-        titulo: "Residuo de atención",
-        cuerpo:
-          "Cambiar constantemente de tarea, responder mensajes o revisar redes sociales deja un 'residuo de atención' en el cerebro que degrada significativamente el rendimiento en la siguiente actividad. Enfocarse sin distracciones en una sola tarea compleja es una habilidad cada vez más rara y valiosa.",
-      },
-      {
-        titulo: "Rutinas y rituales",
-        cuerpo:
-          "La fuerza de voluntad es un recurso finito que se agota a lo largo del día. Para no depender de la motivación fluctuante, es indispensable establecer rutinas y rituales claros sobre dónde, cuándo y cómo trabajarás profundamente.",
-      },
-    ],
-  },
-  {
-    num: 2,
-    emoji: "🎯",
-    titulo: "Metas específicas como puntos de referencia",
-    resumen:
-      "Las metas vagas ('hacer lo mejor que pueda') llevan a bajo rendimiento. Las metas medibles activan la aversión a la pérdida y motivan al cerebro a trabajar más.",
-    puntos: [
-      {
-        titulo: "Las metas vagas no funcionan",
-        cuerpo:
-          "Decir simplemente 'haré lo mejor que pueda' suele conducir a un bajo rendimiento porque carece de un estándar claro de evaluación. Las metas específicas y desafiantes actúan como puntos de referencia internos.",
-      },
-      {
-        titulo: "Aversión a la pérdida",
-        cuerpo:
-          "El cerebro se motiva a trabajar más duro debido al temor psicológico a no alcanzar el nivel aspirado. Por eso el Scorecard de KRs en /metas/plan te dice si vas por encima, en línea o por debajo del ritmo esperado: es la 'señal de referencia'.",
-      },
-      {
-        titulo: "Autorregulación equilibrada",
-        cuerpo:
-          "La meta debe ser lo suficientemente alta para motivar al cerebro a superar el sesgo del presente, pero no tan extrema que se vuelva un castigo insostenible que lleve a abandonar la autorregulación. Ajusta cada trimestre.",
-      },
-      {
-        titulo: "Alcance temporal: rango real [inicio, fin]",
-        cuerpo:
-          "Una meta sin plazo se diluye. Desde la migración 0025, /metas/nueva pide dos fechas reales (no texto libre): inicio (cuándo puedes empezar) y límite (deadline). La IA reparte los KRs SOLO dentro de ese rango como meses sueltos — una meta de 2 semanas cabe en un mes; una de 8 meses usa 8. Si el inicio cae en mitad de año (ej. mayo), Q1/Q2 quedan vacíos. Si el límite está marcado 🔒 HARD CONSTRAINT, la IA no puede planificar nada después. Razón: forzar 4 trimestres lineales sesga el plan cuando las metas son de tamaños muy distintos. Un KR es un resultado medible (no una acción): 'dormir 6h/noche' lo es; 'apagar el móvil a las 23h' es la tarea dentro de él.",
-      },
-      {
-        titulo: "El KR de la semana: dónde pones horas, no cuándo se entrega",
-        cuerpo:
-          "Un KR se mide en un trimestre o mes (su compromiso de entrega). Además, cada domingo eliges 3 KRs para la semana: en qué resultados medibles vas a poner horas AHORA. Son dos ejes distintos y complementarios — el trimestre no se sustituye. Sin este paso, la cascada saltaba de la meta a la tarea y la semana se planificaba sin mirar tus metas. Solo entra en el foco un KR cuya entrega está en marcha: lo caducado y lo prematuro quedan fuera solos. La IA elige por riesgo real (los que van por debajo del ritmo y tienen menos días restantes), pero tú confirmas.",
-      },
-    ],
-  },
-  {
-    num: 3,
-    emoji: "⏱",
-    titulo: "Gestión del tiempo y reducir el trabajo superficial",
-    resumen:
-      "La gestión del tiempo se relaciona con mejor rendimiento y, sobre todo, con mayor satisfacción vital. La regla 20/80 y el time-blocking son las herramientas concretas.",
-    puntos: [
-      {
-        titulo: "Impacto en bienestar y rendimiento",
-        cuerpo:
-          "Estructurar, proteger y adaptar la agenda se relaciona de forma moderada con un mejor rendimiento laboral y académico, pero tiene un impacto aún más fuerte en la satisfacción con la vida y el bienestar general.",
-      },
-      {
-        titulo: "Bloqueo de tiempo (Time Blocking)",
-        cuerpo:
-          "Asignar bloques específicos en el calendario para tareas prioritarias evita el costo de hasta un 40% de pérdida de productividad provocado por el cambio continuo de contexto. La pantalla /calendario implementa esto: 4 bloques fijos por día.",
-      },
-      {
-        titulo: "Regla 20/80 y trabajo superficial",
-        cuerpo:
-          "El 20% de tus actividades genera la gran mayoría de tus resultados reales. Se debe establecer un 'presupuesto de trabajo superficial' y reducir con firmeza los compromisos de bajo valor que saturan el día. La auditoría del Estatus Diario te recuerda cada noche cuántas críticas hiciste de más.",
-      },
-    ],
-  },
-  {
-    num: 4,
-    emoji: "🔁",
-    titulo: "Hábitos incrementales y descargar la mente",
-    resumen:
-      "Las grandes mejoras vienen del 1% diario. Sacar lo pendiente de la cabeza (efecto Zeigarnik) libera el cortex prefrontal para ejecutar con claridad.",
-    puntos: [
-      {
-        titulo: "Ganancias marginales",
-        cuerpo:
-          "Los grandes avances a largo plazo se construyen mediante pequeñas mejoras incrementales (del 1%) y la repetición constante. Con la práctica, el control de la acción pasa de la corteza prefrontal al ganglio basal, haciendo que la conducta sea automática y consuma poco esfuerzo mental.",
-      },
-      {
-        titulo: "Liberar la carga cognitiva (GTD)",
-        cuerpo:
-          "Intentar recordar todo genera estrés y activa el efecto Zeigarnik, donde las tareas pendientes interfieren constantemente con el pensamiento enfocado. Sacar los compromisos de la cabeza y llevarlos a un sistema confiable libera recursos mentales. La pantalla /captura es exactamente eso: tu 'vaciar cabeza' externo.",
-      },
-      {
-        titulo: "Pendientes de respuesta: lo que NO depende de ti",
-        cuerpo:
-          "Hay un subtipo especial de pendiente que NO está en tu control: las tareas bloqueadas externamente (un email que mandaste esperando OK, una llamada pendiente, una confirmación que necesitas para avanzar). Marcar la tarea con el flag ⏳ “pendiente de respuesta” (icono de reloj en /tareas) la separa del resto y la muestra en /tareas/pendientes-respuesta ordenada por antigüedad. Razón: lo que más tiempo lleva esperando es lo que más probablemente se te ha “caído” del radar — y muchas veces también lo más fácil de desatascar con un follow-up corto. La regla: este panel debería ser pequeño. Si crece, o bien no haces follow-ups a tiempo, o bien estás delegando demasiado sin control. Cuando llega la respuesta, destildas el flag (botón ✓ Respuesta recibida en el panel) y la tarea vuelve a la lista normal. Encima de la lista hay un banner mental (estoico/Covey): «no te preocupes de lo que está pendiente de los demás». Es un reframe psicológico, no operativo — recuerda que la única acción posible bajo aquí es el follow-up y que el panel te lo recordará cuando toque actuar.",
-      },
-    ],
-  },
-  {
-    num: 5,
-    emoji: "🌙",
-    titulo: "Descanso estratégico y desconexión",
-    resumen:
-      "La capacidad cognitiva para sostener foco profundo está limitada a 1-4h diarias. Un shutdown ritual libera al cerebro del estrés nocturno.",
-    puntos: [
-      {
-        titulo: "Límite diario de concentración",
-        cuerpo:
-          "La capacidad cognitiva para sostener un trabajo profundo de máxima intensidad está limitada a aproximadamente entre 1 y 4 horas diarias. Más allá de eso, el rendimiento cae en picado aunque sigas 'haciendo'. Por eso /calendario limita 4 bloques/día.",
-      },
-      {
-        titulo: "Ritual de cierre (Shutdown Ritual)",
-        cuerpo:
-          "Finalizar la jornada a una hora fija e implementar un ritual explícito de cierre libera al cerebro del estrés nocturno, restaura la atención dirigida y permite que la mente inconsciente procese problemas complejos durante el descanso. El Estatus Diario (cierre cognitivo de 5 preguntas) es tu ritual de cierre.",
-      },
-    ],
-  },
-];
 
 // ----------------------------------------------------------------------------
 // Índice de features documentadas (para la sección "Meta · Índice" de abajo).
 // Mantener en sincronía con /src/app/ — cualquier ruta nueva debe aparecer
 // aquí con su propósito y la sección de la doc que la explica.
 // ----------------------------------------------------------------------------
-const FEATURES: Array<{ ruta: string; proposito: string; docs: string }> = [
-  // ── Núcleo diario ──
-  { ruta: "/", proposito: "Hoy: semáforo del día + plan diario + contadores + paneles WIGs (metas + tareas) + panel ‘Tareas con fecha’ (orden ascendente por deadline, las vencidas arriba) entre WIGs-tareas y Plan de hoy, con check inline para marcarlas hechas sin navegar", docs: "Rituales §1 (mañana 1ª hora) · HelpDrawer" },
-  { ruta: "/captura", proposito: "Inbox rápido para vaciar la cabeza (efecto Zeigarnik)", docs: "Pilar 4 · Rituales §1 · HelpDrawer" },
-  { ruta: "/estatus", proposito: "9 hábitos + auditoría 20/80 + cierre cognitivo", docs: "Pilar 4 · Rituales §1 (final del día) · HelpDrawer" },
-  { ruta: "/estatus/nuevo", proposito: "Crear nueva entrada de Estatus (1 por día)", docs: "Sub-ruta de /estatus" },
-  { ruta: "/estatus/editar", proposito: "Editar entrada existente (1 por día)", docs: "Sub-ruta de /estatus" },
-  { ruta: "/estatus/ver", proposito: "Ver una entrada en detalle (racha + micro-acción)", docs: "Sub-ruta de /estatus" },
-
-  // ── Tareas y GTD ──
-  { ruta: "/tareas", proposito: "Tareas pendientes: marcar hechas, adjuntos, asignar a meta/KR + panel WIGs (foco del ciclo) + toggle ⏳ pendiente de respuesta por fila", docs: "Pilar 2 · WIGs §3 (cap de ejecución) · Pilar 4 (sección “Pendientes de respuesta”) · HelpDrawer" },
-  { ruta: "/tareas/inbox", proposito: "Triaje residual: tareas sin meta o sin KR (después de asignar al crear)", docs: "HelpDrawer" },
-  { ruta: "/tareas/pendientes-respuesta", proposito: "Panel dedicado a tareas con el flag “pendiente de respuesta” (esperando a alguien). Ordenadas por antigüedad: lo que más tiempo lleva esperando primero. Botón para destildar cuando llega la respuesta", docs: "Pilar 4 (sección “Pendientes de respuesta”) · HelpDrawer" },
-  { ruta: "/tareas/completadas", proposito: "Histórico de tareas hechas (7/30/90/365/todo)", docs: "HelpDrawer" },
-
-  // ── Trabajo profundo ──
-  { ruta: "/focus", proposito: "Pomodoro + pre-flight check + post-focus", docs: "Pilar 1 · Productivity Stack · Rituales §1 · HelpDrawer" },
-  { ruta: "/calendario", proposito: "Time-blocking: 4 bloques fijos × 7 días", docs: "Pilar 3 · Rituales §1 (mañana) · HelpDrawer" },
-
-  // ── Metas y planificación ──
-  { ruta: "/metas", proposito: "Cards de metas con estado y progreso + botones Archivar/Editar/WIG/Eliminar + IA Sugerir WIGs + filtro Archivadas + EditarMetaModal con botón IA Generar plan. Cada tarjeta muestra de qué PROYECTO es (con su color) y los KRs que incluye (con su trimestre de entrega y objetivo, desplegables con “Ver los N KRs”). El botón Eliminar muestra preview del impacto (cuántos KRs y tareas quedarán huérfanos) antes de borrar — aprovecha el ON DELETE SET NULL/CASCADE de migration 0001 para que las tareas sigan vivas sin meta", docs: "Pilar 2 · Ritual mensual · HelpDrawer" },
-  { ruta: "/metas/nueva", proposito: "Crear meta con rango real [inicio, fin] + botón IA Generar plan (KRs+tareas+hábitos) que reparte los KRs SOLO dentro del rango. Hard constraint opcional 🔒", docs: "Pilar 2 · HelpDrawer" },
-  { ruta: "/metas/agente", proposito: "Agente IA: contexto libre → meta + plan trimestral completo (atajo directo a meta; la entrada unificada es /agente)", docs: "Pilar 2 · HelpDrawer" },
-  { ruta: "/agente", proposito: "Agente unificado: clasifica la idea (proyecto/meta/captura) y propone estructura. Bucle de aplicación con 2 pases + árbitro adversarial que verifica que el 100% de las metas hijas se persistan en Supabase antes de redirigir; si hay gap muestra panel con nombres faltantes y motivo del error. Fase 2 automática: tras crear metas+KRs iniciales, genera el plan completo (KRs+tareas+hábitos) por meta con generarPlanMetaIA + aplicarKrsYTareasEnMeta. Pre-bucle: getSession() para evitar fallo de RLS por JWT transitorio + backoff de 50ms entre inserts. Detección de PGRST303 (reloj desincronizado) con banner en AppShell + panel diagnóstico. migration 0024", docs: "Pilar 2 · HelpDrawer" },
-  { ruta: "/metas/auditoria", proposito: "Auditoría de metas: qué les falta (área, proyecto, fecha objetivo, contexto, KRs). migration 0024", docs: "Pilar 2 · HelpDrawer" },
-  { ruta: "/metas/detalle", proposito: "Detalle de una meta con sus KRs (uno o varios por trimestre/mes) + tareas por KR + botones Editar/✨ Generar plan con IA (KRs+tareas+hábitos, respeta KRs existentes por título) + Archivar + WIG + asignar tareas del inbox. Migration 0028: ya no hay UNIQUE por (meta, trimestre) — puedes tener N KRs en el mismo trimestre.", docs: "Pilar 2 · HelpDrawer" },
-  { ruta: "/metas/plan", proposito: "Plan trimestral con scorecard de KRs + proyección", docs: "Pilar 2 · Ritual semanal (domingo) · Ritual mensual · HelpDrawer" },
-  { ruta: "/plan-diario", proposito: "Estado emocional + plan diario generado por IA. El prompt recibe los KRs en foco de la semana (migration 0033) y ancla los bloques del día a esos resultados medibles; si no hay foco elegido, el día se planifica igual por compromiso y deadline (el foco semanal nunca bloquea el día). BOTÓN “¿Qué propondría el sistema?” (Modo sombra, Fase 3 del Modo Recuperación): muestra la propuesta del motor DETERMINISTA de selección —1 tarea principal + hasta 2 secundarias + mantenimiento + tiempo personal + avisos de riesgo— con el motivo en texto plano de cada una y comparada con tu plan actual. NO escribe nada en la BD: es de observación", docs: "Rituales §1 (mañana) · HelpDrawer" },
-  { ruta: "/plan-diario/detalle", proposito: "Detalle de un plan con notas e informe", docs: "Sub-ruta de /plan-diario" },
-  { ruta: "/plan-diario/historico", proposito: "Histórico de planes (7/30/90/365/todo)", docs: "Sub-ruta de /plan-diario" },
-  { ruta: "/semana", proposito: "Pipeline semanal con drag & drop + IA 3 críticas/día + PANEL DE FOCO SEMANAL DE KRs (máx 3, migration 0033): los resultados medibles en los que pones horas esta semana, con scorecard y ✨ Sugerir 3 KRs por IA. El trimestre NO se sustituye (sigue diciendo cuándo se entrega); la semana dice dónde pones el esfuerzo. Solo entran KRs con entrega en marcha (regla de contención, aplicada en BD). La propuesta IA de tareas ahora prioriza las ancladas a los KRs en foco", docs: "Ritual semanal (domingo noche) · HelpDrawer" },
-  { ruta: "/pipeline", proposito: "Kanban por prioridad + motor IA de priorización", docs: "Ritual semanal (miércoles) · HelpDrawer" },
-  { ruta: "/matriz", proposito: "Matriz Eisenhower 2D (urgencia × importancia) de tareas activas. Drag & drop entre cuadrantes (dnd-kit/core) + botón IA “✨ Sugerir redistribución” que propone mover las tareas desubicadas al cuadrante correcto (módulo IA en src/lib/tareas/sugerirMatrizIA.ts). Sin migración: la clasificación se calcula en cada render desde fecha_fin + meta.es_wig; aplicar cambios solo escribe `prioridad`. Filtros: solo WIGs-meta / solo con fecha. Complemento visual de /pipeline (1D) — la matriz es 2D", docs: "Pilar 4 · HelpDrawer" },
-
-  // ── Revisión y análisis ──
-  { ruta: "/informes", proposito: "KPIs (incluye subtareas) + heatmap de actividad + chart de tareas y subtareas por día/semana + proyectos con conteo + metas y OKRs cerrados + comparación con plan vs sin plan", docs: "Ritual semanal (viernes) · Ritual mensual · HelpDrawer" },
-  { ruta: "/dashboard-emocional", proposito: "4 dimensiones: despertar / mente / cuerpo / rueda", docs: "Pilar 4 · HelpDrawer" },
-
-  // ── Identidad y horizonte ──
-  { ruta: "/norte", proposito: "Propósito, valores y visión (la brújula)", docs: "Pilar 2 · Ritual diario (despertar) · Ritual mensual · HelpDrawer" },
-  { ruta: "/areas", proposito: "Áreas de responsabilidad (ámbitos continuos sin fecha de cierre). CRUD + listado de proyectos hijos por área + sección 'Sin área' para huérfanos. Migración 0001 (la tabla ya existía; aquí se le da página propia estilo /proyectos). Icono IconLayers. Reordenado en el sidebar Estrategia (posición 2, entre Norte y Proyectos)", docs: "Pilar 2 · HelpDrawer" },
-
-  // ── Sistema ──
-  { ruta: "/pagos", proposito: "Pagos pendientes: ejecutar tesorería lunes 1ª hora + botón IA “✨ Sugerir pagos” (migration 0027) que analiza los pagos activos y propone programación para los próximos 6 lunes aplicando el prompt editable en /configuracion (snowball por defecto, ingresos viernes/sábado). Modal de revisión estilo SugerirWigs: la IA sugiere, tú marcas qué incluir, botón “Aplicar N marcadas” actualiza solo fecha_pago_programada y estado=programado (no registra pagos parciales). Prompt editable en /configuracion §Prompt de pagos (columna prompt_pagos)", docs: "Apéndice §Bucle de equilibrio · Ritual semanal (lunes estricto) · HelpDrawer" },
-  { ruta: "/proyectos", proposito: "Gestión de proyectos con conteo de tareas, DOBLE barra de progreso, listado de metas hijas (migration 0024), archivado en cascada a metas+tareas, confirm con preview de impacto al eliminar, botón Editar (modal ligero con nombre/color/descripción/área), exportación a PDF por proyecto (modal con vista previa + Imprimir a PDF nativo del navegador, sin librerías externas). Las dos barras miden cosas distintas: la de METAS (con el color del proyecto) es el avance real —un proyecto es un contenedor de resultados, así que lo mide cuántas metas hijas están completadas— y la de TAREAS es el esfuerzo operativo. Un proyecto sin metas no muestra la barra de metas (no hay nada que medir todavía). Al pulsar 'ver' se navega a /tareas?proyecto=X y se abre el filtro en 'todas' (no 'activas') para que las tareas hechas/archivadas del mismo proyecto sean visibles, especialmente en proyectos ya cerrados o arrastrados. Sección ámbar final con metas sin proyecto asignado (huérfanas, patrón simétrico a /areas → proyectos sin área) para que David no las pierda — archivadas ocultas, y cada huérfana trae un botón Eliminar con preview de impacto (las tareas no se borran, solo se desvinculan de la meta gracias a ON DELETE SET NULL)", docs: "HelpDrawer" },
-  { ruta: "/escenarios", proposito: "Escenarios de proyecto: las 3 dimensiones separadas — CONTEXTO (cronología append-only de hechos, tipada como contexto/estado/situación), ESTADO (el presente MEDIDO, calculado de las tareas en cada render, sin tabla que se pudra) y SITUACIÓN (el presente interpretado: nota manual + la lectura de la IA). Botón “✨ Analizar escenarios” que pide a la IA los escenarios del proyecto agrupados por categoría (riesgos / oportunidades / puntos ciegos / wildcard), cada uno con probabilidad (dato secundario), estrategia accionable, justificación e indicador de validación; el más probable sale destacado. Historial de todos los análisis (la lectura cambia con los nuevos hechos). Migration 0029 (proyecto_eventos + proyecto_analisis). Módulo IA: src/lib/escenarios/analizarEscenariosIA.ts (prompt adaptado de fooday-intelligence-core/agents/agente-generador-hipotesis.md)", docs: "Ritual semanal (domingo) · Pilar 2 · HelpDrawer" },
-  { ruta: "/configuracion", proposito: "Configuración: API key IA, base URL, modelo, tema, prompt de pagos editable (migration 0027) y perfil para la IA — quién eres, familia, restricciones y contexto del negocio (migration 0032, antes hardcodeado en los prompts). Campo vacío = se usa el valor por defecto de la app", docs: "Pilar 2 · HelpDrawer" },
-
-  // ── Documentación ──
-  { ruta: "/docs", proposito: "Esta página: pilares + rituales + apéndices + índice", docs: "(auto-referencial)" },
-  { ruta: "/metodologia", proposito: "WIGs, GTD, Próxima Acción, dos inboxes", docs: "(complemento directo de /docs)" },
-
-  // ── Auth ──
-  { ruta: "/login", proposito: "Login con Supabase (email + password)", docs: "(no requiere metodología)" },
-];
 
 export default function DocsPage() {
   return (
@@ -276,96 +91,17 @@ export default function DocsPage() {
           </p>
         </header>
 
-        <ol className="mt-6 space-y-5 text-sm leading-relaxed">
-          <li className="rounded-xl border border-border bg-card p-4">
-            <div className="flex items-center gap-2">
-              <span className="text-2xl">🏠</span>
-              <h3 className="text-base font-semibold">Proyecto = la casa</h3>
-            </div>
-            <p className="mt-2 text-muted-foreground">
-              Una <strong className="text-foreground">iniciativa grande</strong>{" "}
-              que tiene sentido por sí sola y engloba varias metas. Ejemplos:
-              “Renegociar el alquiler de Sol de Nit”, “Lanzar la v1 de
-              Fooday”, “Ponerme en forma este trimestre”. Vive en la tabla{" "}
-              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">proyectos</code>.
-              Tiene color, descripción opcional, área opcional.
-            </p>
-            <p className="mt-2 text-xs text-muted-foreground">
-              💡 Si tu idea es una sola cosa, no necesita proyecto: es una meta
-              directa (ver más abajo).
-            </p>
-          </li>
-
-          <li className="rounded-xl border border-border bg-card p-4">
-            <div className="flex items-center gap-2">
-              <span className="text-2xl">🚪</span>
-              <h3 className="text-base font-semibold">Meta = una habitación</h3>
-            </div>
-            <p className="mt-2 text-muted-foreground">
-              Un <strong className="text-foreground">resultado concreto con
-              plazo</strong>. Si la casa es “Renegociar alquiler”, las
-              habitaciones son: “Preparar el dossier financiero”, “Buscar 3
-              locales alternativos”, “Redactar la propuesta para Teresa”,
-              “Ensayar la reunión”. Las metas pueden vivir dentro de un
-              proyecto (<code className="rounded bg-muted px-1.5 py-0.5 text-xs">metas.proyecto_id</code>)
-              o sueltas (sin casa). Una meta sin KRs y sin tareas es una
-              habitación vacía.
-            </p>
-            <p className="mt-2 text-xs text-muted-foreground">
-              💡 La migración 0025 añadió fechas reales (inicio + límite + 🔒
-              hard constraint) para que el planificador no fuerce 4 trimestres
-              lineales cuando tu meta dura 2 semanas.
-            </p>
-          </li>
-
-          <li className="rounded-xl border border-border bg-card p-4">
-            <div className="flex items-center gap-2">
-              <span className="text-2xl">🪟</span>
-              <h3 className="text-base font-semibold">KR (Key Result) = un mueble medible</h3>
-            </div>
-            <p className="mt-2 text-muted-foreground">
-              Una <strong className="text-foreground">medición</strong> que dice
-              “esta habitación está X% hecha”. Para “Buscar 3 locales
-              alternativos”: KR = “Tener 3 locales visitados y valorados
-              antes del 15 de noviembre”. Si los muebles están, la
-              habitación está hecha. Un KR sin tareas es un mueble que
-              todavía no has comprado: sabes lo que quieres, pero nadie lo
-              está montando.
-            </p>
-            <p className="mt-2 text-xs text-muted-foreground">
-              💡 Los KRs viven en la tabla{" "}
-              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">resultados_periodo</code>{" "}
-              con FK a la meta y al periodo (trimestre 1–4 o mes 1–12
-              desde la migración 0025).
-            </p>
-          </li>
-
-          <li className="rounded-xl border border-border bg-card p-4">
-            <div className="flex items-center gap-2">
-              <span className="text-2xl">🔨</span>
-              <h3 className="text-base font-semibold">Tarea / Hábito = mover las manos</h3>
-            </div>
-            <p className="mt-2 text-muted-foreground">
-              Para tener los muebles necesitas <strong className="text-foreground">acciones
-              concretas</strong> que haces una vez (tarea) o que repites
-              (hábito). Para “Tener 3 locales visitados”: llamar a 3
-              inmobiliarias, visitar local 1 el martes, rellenar la ficha
-              comparativa. Si haces todas las tareas del KR, el KR se cumple.
-              Un <strong className="text-foreground">hábito</strong> es una
-              tarea con{" "}
-              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">recurrencia_tipo = diaria | semanal | mensual</code>{" "}
-              en vez de <code className="rounded bg-muted px-1.5 py-0.5 text-xs">null</code>.
-            </p>
-            <p className="mt-2 text-xs text-muted-foreground">
-              💡 Resumen en una línea: <strong className="text-foreground">Proyecto</strong>{" "}
-              = la casa. <strong className="text-foreground">Meta</strong> = una
-              habitación. <strong className="text-foreground">KR</strong> = un
-              mueble medible. <strong className="text-foreground">Tarea</strong>{" "}
-              = la acción que haces para poner el mueble.{" "}
-              <strong className="text-foreground">Hábito</strong> = una tarea
-              que se repite.
-            </p>
-          </li>
+                <ol className="mt-6 space-y-5 text-sm leading-relaxed">
+          {GLOSARIO.map((g) => (
+            <li key={g.titulo} className="rounded-xl border border-border bg-card p-4">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">{g.emoji}</span>
+                <h3 className="text-base font-semibold">{g.titulo}</h3>
+              </div>
+              <p className="mt-2 text-muted-foreground">{g.cuerpo}</p>
+              {g.tip && <p className="mt-2 text-xs text-muted-foreground">💡 {g.tip}</p>}
+            </li>
+          ))}
         </ol>
 
         <div className="mt-6 rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4 text-sm">
@@ -565,7 +301,9 @@ export default function DocsPage() {
               {FEATURES.map((f) => (
                 <tr key={f.ruta}>
                   <td className="px-3 py-2 font-mono font-medium">
-                    {f.ruta === "/docs" || f.ruta === "/login" ? (
+                    {f.ruta === "/docs" ||
+                    f.ruta === "/login" ||
+                    f.ruta.startsWith("(") ? (
                       <span className="text-slate-700 dark:text-slate-300">
                         {f.ruta}
                       </span>
@@ -1318,90 +1056,31 @@ export default function DocsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border bg-background/40">
-              <tr>
-                <td className="px-3 py-2 font-medium">Al despertar</td>
-                <td className="px-3 py-2">
-                  <Link
-                    href="/norte"
-                    className="font-mono text-rose-700 dark:text-rose-300 underline-offset-4 hover:underline"
-                  >
-                    /norte
-                  </Link>
-                </td>
-                <td className="px-3 py-2 text-muted-foreground">
-                  Recordar propósito/valores (10s). Ancla emocional del día.
-                </td>
-              </tr>
-              <tr>
-                <td className="px-3 py-2 font-medium">Mañana, 1ª hora</td>
-                <td className="px-3 py-2">
-                  <Link
-                    href="/plan-diario"
-                    className="font-mono text-rose-700 dark:text-rose-300 underline-offset-4 hover:underline"
-                  >
-                    /plan-diario
-                  </Link>
-                  {" + "}
-                  <Link
-                    href="/calendario"
-                    className="font-mono text-rose-700 dark:text-rose-300 underline-offset-4 hover:underline"
-                  >
-                    /calendario
-                  </Link>
-                </td>
-                <td className="px-3 py-2 text-muted-foreground">
-                  Definir las 3 cosas del día + pintar 4 bloques. Es lo
-                  primero que se hace, antes de emails.
-                </td>
-              </tr>
-              <tr>
-                <td className="px-3 py-2 font-medium">
-                  Cuando algo se te cruce por la cabeza
-                </td>
-                <td className="px-3 py-2">
-                  <Link
-                    href="/captura"
-                    className="font-mono text-rose-700 dark:text-rose-300 underline-offset-4 hover:underline"
-                  >
-                    /captura
-                  </Link>
-                </td>
-                <td className="px-3 py-2 text-muted-foreground">
-                  Vaciar cabeza en &lt;30s. No pienses, captura. Luego lo
-                  trias.
-                </td>
-              </tr>
-              <tr>
-                <td className="px-3 py-2 font-medium">Bloques de trabajo</td>
-                <td className="px-3 py-2">
-                  <Link
-                    href="/focus"
-                    className="font-mono text-rose-700 dark:text-rose-300 underline-offset-4 hover:underline"
-                  >
-                    /focus
-                  </Link>
-                </td>
-                <td className="px-3 py-2 text-muted-foreground">
-                  Pomodoro con pre-flight (silenciar, cerrar email, criterio
-                  de éxito). Máx 4/día.
-                </td>
-              </tr>
-              <tr>
-                <td className="px-3 py-2 font-medium">Final del día</td>
-                <td className="px-3 py-2">
-                  <Link
-                    href="/estatus"
-                    className="font-mono text-rose-700 dark:text-rose-300 underline-offset-4 hover:underline"
-                  >
-                    /estatus
-                  </Link>
-                </td>
-                <td className="px-3 py-2 text-muted-foreground">
-                  Marcar los 9 hábitos + cierre cognitivo 5 preguntas. Esto
-                  es sagrado: si no se hace, el sistema pierde valor al día
-                  siguiente.
-                </td>
-              </tr>
+              {RITUALES.diario.map((f) => (
+                <tr key={f.cuando}>
+                  <td className="px-3 py-2 font-medium">{f.cuando}</td>
+                  <td className="px-3 py-2">
+                    {f.pantallas.map((p, i) => (
+                      <span key={p.texto}>
+                        {i > 0 && " + "}
+                        {p.ruta ? (
+                          <Link
+                            href={p.ruta}
+                            className="font-mono text-rose-700 dark:text-rose-300 underline-offset-4 hover:underline"
+                          >
+                            {p.texto}
+                          </Link>
+                        ) : (
+                          <span className="font-mono text-rose-700 dark:text-rose-300">
+                            {p.texto}
+                          </span>
+                        )}
+                      </span>
+                    ))}
+                  </td>
+                  <td className="px-3 py-2 text-muted-foreground">{f.que}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
@@ -1433,133 +1112,34 @@ export default function DocsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border bg-background/40">
-              <tr>
-                <td className="px-3 py-2 font-medium">Domingo noche</td>
-                <td className="px-3 py-2">
-                  <Link
-                    href="/semana"
-                    className="font-mono text-rose-700 dark:text-rose-300 underline-offset-4 hover:underline"
-                  >
-                    /semana
-                  </Link>
-                  {" + "}
-                  <Link
-                    href="/plan-diario"
-                    className="font-mono text-rose-700 dark:text-rose-300 underline-offset-4 hover:underline"
-                  >
-                    /plan-diario
-                  </Link>
-                </td>
-                <td className="px-3 py-2 text-muted-foreground">
-                  <p>
-                    Planificar la semana entrante:{" "}
-                    <strong className="text-foreground">
-                      primero elige los 3 KRs de la semana
-                    </strong>{" "}
-                    (panel azul arriba del pipeline), luego arrastra las tareas
-                    a los días. Es la base de todo lo demás.
-                  </p>
-                  <p className="mt-1.5 text-xs">
-                    🎯 Los KRs en foco son la capa intermedia: el trimestre dice{" "}
-                    <em>cuándo se entrega</em>, la semana dice{" "}
-                    <em>dónde pones horas</em>. Solo entran KRs cuya entrega
-                    está en marcha. Usa{" "}
-                    <span className="font-medium text-foreground">
-                      ✨ Sugerir 3 KRs
-                    </span>{" "}
-                    y la IA elige por riesgo real (los que van por debajo del
-                    ritmo y tienen menos días restantes).
-                  </p>
-                </td>
-              </tr>
-              <tr>
-                <td className="px-3 py-2 font-medium">
-                  <span className="block">Lunes, 1ª hora</span>
-                  <span className="mt-1 inline-block rounded-full bg-rose-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-rose-700 dark:text-rose-300">
-                    Estricto
-                  </span>
-                </td>
-                <td className="px-3 py-2">
-                  <Link
-                    href="/pagos"
-                    className="font-mono text-rose-700 dark:text-rose-300 underline-offset-4 hover:underline"
-                  >
-                    /pagos
-                  </Link>
-                </td>
-                <td className="px-3 py-2 text-muted-foreground">
-                  <strong className="text-foreground">Estricto.</strong>{" "}
-                  Revisar y ejecutar pagos pendientes. Es lo primero del
-                  lunes, antes de cualquier otra cosa. Si el lunes es
-                  festivo, se hace el martes a 1ª hora (no más tarde). Si
-                  tampoco se puede, se salta esa semana, pero se vuelve al
-                  lunes siguiente sin falta.
-                </td>
-              </tr>
-              <tr>
-                <td className="px-3 py-2 font-medium">Domingo (tras planificar)</td>
-                <td className="px-3 py-2">
-                  <Link
-                    href="/escenarios"
-                    className="font-mono text-rose-700 dark:text-rose-300 underline-offset-4 hover:underline"
-                  >
-                    /escenarios
-                  </Link>
-                </td>
-                <td className="px-3 py-2 text-muted-foreground">
-                  Un vistazo a los proyectos: qué ha pasado (cronología), dónde
-                  están hoy (estado medido) y qué puede pasar (escenarios con
-                  estrategia). Solo entra en los que te importen: el resto se
-                  puede mirar después o nunca, sin penalización.
-                </td>
-              </tr>
-              <tr>
-                <td className="px-3 py-2 font-medium">Miércoles</td>
-                <td className="px-3 py-2">
-                  <Link
-                    href="/pipeline"
-                    className="font-mono text-rose-700 dark:text-rose-300 underline-offset-4 hover:underline"
-                  >
-                    /pipeline
-                  </Link>
-                </td>
-                <td className="px-3 py-2 text-muted-foreground">
-                  Revisar Kanban: mover tarjetas, repriorizar, lanzar motor
-                  IA si hay atasco. Punto medio de semana para corregir
-                  rumbo.
-                </td>
-              </tr>
-              <tr>
-                <td className="px-3 py-2 font-medium">Viernes tarde</td>
-                <td className="px-3 py-2">
-                  <Link
-                    href="/informes"
-                    className="font-mono text-rose-700 dark:text-rose-300 underline-offset-4 hover:underline"
-                  >
-                    /informes
-                  </Link>
-                </td>
-                <td className="px-3 py-2 text-muted-foreground">
-                  Mirar heatmap de foco + scorecard de hábitos. Cierre
-                  semanal objetivo: cuántas horas reales de foco vs. las
-                  4/día prometidas.
-                </td>
-              </tr>
-              <tr>
-                <td className="px-3 py-2 font-medium">Domingo (parte final)</td>
-                <td className="px-3 py-2">
-                  <Link
-                    href="/metas/plan"
-                    className="font-mono text-rose-700 dark:text-rose-300 underline-offset-4 hover:underline"
-                  >
-                    /metas/plan
-                  </Link>
-                </td>
-                <td className="px-3 py-2 text-muted-foreground">
-                  Revisar la proyección lineal de KRs: ¿voy en línea, por
-                  encima o por debajo del ritmo esperado? Ajustar si toca.
-                </td>
-              </tr>
+              {RITUALES.semanal.map((f) => (
+                <tr key={f.cuando}>
+                  <td className="px-3 py-2 font-medium">{f.cuando}</td>
+                  <td className="px-3 py-2">
+                    {f.pantallas.map((p, i) => (
+                      <span key={p.texto}>
+                        {i > 0 && " + "}
+                        {p.ruta ? (
+                          <Link
+                            href={p.ruta}
+                            className="font-mono text-rose-700 dark:text-rose-300 underline-offset-4 hover:underline"
+                          >
+                            {p.texto}
+                          </Link>
+                        ) : (
+                          <span className="font-mono text-rose-700 dark:text-rose-300">
+                            {p.texto}
+                          </span>
+                        )}
+                      </span>
+                    ))}
+                  </td>
+                  <td className="px-3 py-2 text-muted-foreground">
+                    <p>{f.que}</p>
+                    {f.nota && <p className="mt-1.5 text-xs">{f.nota}</p>}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
@@ -1574,80 +1154,36 @@ export default function DocsPage() {
           Reservar un bloque protegido el primer domingo del mes nuevo. No
           más de 90 min. Si se pasa, el ritual está mal dimensionado.
         </p>
-        <ul className="mt-3 space-y-3 text-sm leading-relaxed text-muted-foreground">
-          <li className="flex gap-2">
-            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500" />
-            <span>
-              <Link
-                href="/metas"
-                className="font-mono text-rose-700 dark:text-rose-300 underline-offset-4 hover:underline"
-              >
-                /metas
-              </Link>
-              {" + "}
-              <Link
-                href="/metas/plan"
-                className="font-mono text-rose-700 dark:text-rose-300 underline-offset-4 hover:underline"
-              >
-                /metas/plan
-              </Link>
-              : <strong className="text-foreground">revisión profunda de OKR</strong>.
-              ¿Qué KRs avancé? ¿Cuáles están persistentemente en rojo?
-              ¿Aparecen metas nuevas? ¿Qué metas mueren (ya no aportan al
-              norte)?
-            </span>
-          </li>
-          <li className="flex gap-2">
-            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500" />
-            <span>
-              <Link
-                href="/norte"
-                className="font-mono text-rose-700 dark:text-rose-300 underline-offset-4 hover:underline"
-              >
-                /norte
-              </Link>
-              : <strong className="text-foreground">vigencia del norte</strong>.
-              ¿Mi propósito/valores siguen siendo los mismos? (Esto se hace
-              de forma más profunda cada trimestre; una mirada mensual
-              basta).
-            </span>
-          </li>
-          <li className="flex gap-2">
-            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500" />
-            <span>
-              <Link
-                href="/informes"
-                className="font-mono text-rose-700 dark:text-rose-300 underline-offset-4 hover:underline"
-              >
-                /informes
-              </Link>
-              : <strong className="text-foreground">tendencia 30 días</strong>.
-              Heatmap de foco, score de hábitos, días en rojo emocionales,
-              metas y KRs cerrados en la ventana, y la brecha “metas con
-              plan vs sin plan” (las aspiracionales sin KRs son el típico
-              cuello de botella del mes). Si una racha roja emocional
-              supera los 5 días, abrir una acción correctiva ya (no
-              esperar al mes siguiente).
-            </span>
-          </li>
-          <li className="flex gap-2">
-            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500" />
-            <span>
-              <strong className="text-foreground">
-                Decidir 1-3 experimentos para el mes (no más).
-              </strong>{" "}
-              Cosas concretas que vas a probar los próximos 30 días. Se
-              registran en{" "}
-              <Link
-                href="/tareas"
-                className="font-mono text-rose-700 dark:text-rose-300 underline-offset-4 hover:underline"
-              >
-                /tareas
-              </Link>{" "}
-              con un tag o ámbito "experimento_mes" para poder evaluarlos
-              en el siguiente ritual.
-            </span>
-          </li>
+                <ul className="mt-3 space-y-3 text-sm leading-relaxed text-muted-foreground">
+          {RITUALES.mensual.map((f) => (
+            <li key={f.cuando + f.que.slice(0, 24)} className="flex gap-2">
+              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500" />
+              <span>
+                {f.pantallas.map((p, i) => (
+                  <span key={p.texto}>
+                    {i > 0 && " + "}
+                    {p.ruta ? (
+                      <Link
+                        href={p.ruta}
+                        className="font-mono text-rose-700 dark:text-rose-300 underline-offset-4 hover:underline"
+                      >
+                        {p.texto}
+                      </Link>
+                    ) : (
+                      <span className="font-mono text-rose-700 dark:text-rose-300">
+                        {p.texto}
+                      </span>
+                    )}
+                  </span>
+                ))}
+                {f.pantallas.length > 0 && ": "}
+                {f.que}
+                {f.nota && (
+                  <span className="mt-1 block text-xs">{f.nota}</span>
+                )}
+              </span>
+            </li>
+          ))}
         </ul>
 
         <hr className="my-6 border-border" />
@@ -1662,64 +1198,21 @@ export default function DocsPage() {
           pierde coherencia.
         </p>
 
-        <ol className="mt-3 space-y-3 text-sm">
-          <li className="flex gap-3 rounded-lg border border-rose-500/20 bg-background/40 p-4">
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-rose-500/20 text-sm font-bold text-rose-700 dark:text-rose-300">
-              1
-            </span>
-            <div className="leading-relaxed">
-              <strong className="text-foreground">
-                Nunca dejes una idea en la cabeza.
-              </strong>{" "}
-              <span className="text-muted-foreground">
-                Si piensas algo —una tarea, una preocupación, una idea—,
-                va a{" "}
+                <ol className="mt-3 space-y-3 text-sm">
+          {HABITOS_RECURRENTES.map((h, i) => (
+            <li
+              key={h.titulo}
+              className="flex gap-3 rounded-lg border border-rose-500/20 bg-background/40 p-4"
+            >
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-rose-500/20 text-sm font-bold text-rose-700 dark:text-rose-300">
+                {i + 1}
               </span>
-              <Link
-                href="/captura"
-                className="font-mono text-rose-700 dark:text-rose-300 underline-offset-4 hover:underline"
-              >
-                /captura
-              </Link>
-              <span className="text-muted-foreground">
-                {" "}
-                en el momento. Sin excepción. Luego la trias cuando toca.
-              </span>
-            </div>
-          </li>
-          <li className="flex gap-3 rounded-lg border border-rose-500/20 bg-background/40 p-4">
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-rose-500/20 text-sm font-bold text-rose-700 dark:text-rose-300">
-              2
-            </span>
-            <div className="leading-relaxed">
-              <strong className="text-foreground">
-                Nunca empieces un bloque sin /focus + pre-flight.
-              </strong>{" "}
-              <span className="text-muted-foreground">
-                Silenciar notificaciones, cerrar email, definir criterio de
-                éxito del bloque. Es la única forma de que los 4 bloques
-                diarios sean bloques de verdad y no tiempo perdido con
-                sensación de "trabajar".
-              </span>
-            </div>
-          </li>
-          <li className="flex gap-3 rounded-lg border border-rose-500/20 bg-background/40 p-4">
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-rose-500/20 text-sm font-bold text-rose-700 dark:text-rose-300">
-              3
-            </span>
-            <div className="leading-relaxed">
-              <strong className="text-foreground">
-                Nunca cierres el día sin /estatus.
-              </strong>{" "}
-              <span className="text-muted-foreground">
-                Marcar los 9 hábitos + cierre cognitivo de 5 preguntas. Si
-                saltas esto 2 días seguidos, el sistema pierde valor: el
-                score de hábitos se rompe, el cierre cognitivo se acumula
-                sin procesar y el dashboard emocional deja de detectar
-                patrones a tiempo.
-              </span>
-            </div>
-          </li>
+              <div className="leading-relaxed">
+                <strong className="text-foreground">{h.titulo}.</strong>{" "}
+                <span className="text-muted-foreground">{h.cuerpo}</span>
+              </div>
+            </li>
+          ))}
         </ol>
 
         <div className="mt-6 rounded-lg border border-rose-500/30 bg-rose-500/10 p-4">
@@ -1728,6 +1221,220 @@ export default function DocsPage() {
             abrir la app cada mañana? Puedo añadir un mini-banner en la
             home (/) que muestre "Hoy toca: X" según el día de la semana.
           </p>
+        </div>
+      </section>
+
+      {/* =====================================================================
+          Complemento · El agente que conoce tu sistema
+          El chat global: pregunta por tus datos reales desde cualquier
+          pantalla. Explica qué ve, qué NO hace y por qué está así de
+          constru ido (SPA estática → snapshot en el prompt).
+         ===================================================================== */}
+      <section
+        id="agente-global"
+        className="scroll-mt-20 rounded-2xl border-2 border-violet-500/30 bg-gradient-to-br from-violet-500/5 to-indigo-500/5 p-6 sm:p-8"
+      >
+        <header>
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-violet-700 dark:text-violet-300">
+            Complemento · Agente global
+          </div>
+          <h2 className="mt-1 text-2xl font-bold tracking-tight">
+            💬 El agente que conoce tu sistema
+          </h2>
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+            Hay un botón flotante (abajo a la derecha, en{" "}
+            <strong className="text-foreground">todas</strong> las pantallas)
+            que abre un chat. No es un chatbot genérico:{" "}
+            <strong className="text-foreground">
+              ve el estado real de tu sistema
+            </strong>{" "}
+            —tus metas, sus KRs, tus proyectos, tus tareas, tu plan de hoy,
+            el foco de la semana y tu Norte— y te responde con esos datos.
+            Es la consulta que antes tenías que hacer abriendo cinco
+            pantallas.
+          </p>
+        </header>
+
+        <hr className="my-6 border-border" />
+
+        {/* 1. Qué puede y qué no puede hacer */}
+        <h3 className="text-base font-semibold">
+          1. Qué hace y qué NO hace
+        </h3>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 text-sm">
+            <p className="font-semibold text-emerald-700 dark:text-emerald-300">
+              ✅ Sí (solo lectura)
+            </p>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
+              <li>Consultar metas, KRs, proyectos y tareas.</li>
+              <li>Resumir el estado y decir qué está en riesgo.</li>
+              <li>Proponer qué hacer hoy, con el plan ya generado.</li>
+              <li>Enlazar las entidades que menciona (chips con enlace).</li>
+            </ul>
+          </div>
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 text-sm">
+            <p className="font-semibold text-amber-700 dark:text-amber-300">
+              🚫 No (y no por descuido)
+            </p>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
+              <li>No crea metas ni planes: eso es <code>/agente</code>.</li>
+              <li>No completa ni reordena tareas.</li>
+              <li>No inventa datos: si no está en el sistema, lo dice.</li>
+            </ul>
+          </div>
+        </div>
+        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+          La separación es deliberada:{" "}
+          <strong className="text-foreground">
+            consultar es de lectura, decidir es tuyo
+          </strong>
+          . Un agente que escribe sin revisión rompe la cadena de
+          responsabilidad del sistema (la casa de 4 capas: proyecto → meta →
+          KR → tarea). Por eso el chat no toca nada y{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/agente</code>{" "}
+          sigue siendo la puerta de entrada para{" "}
+          <em>crear</em> estructura.
+        </p>
+
+        {/* 2. Las conversaciones se guardan */}
+        <h3 className="mt-6 text-base font-semibold">
+          2. Las conversaciones se guardan
+        </h3>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          Cada mensaje (tu pregunta y la respuesta) se guarda en Supabase
+          (migration 0035:{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+            agente_conversaciones
+          </code>{" "}
+          +{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+            agente_mensajes
+          </code>
+          , con RLS propia: cada quien ve solo lo suyo). El botón{" "}
+          <strong className="text-foreground">historial</strong>{" "}
+          (⏱-icono en la cabecera del chat) lista las conversaciones, las
+          abre y las borra. La conversación se titula sola con tu primera
+          pregunta, así que no hay que ponerle nombre a mano.
+        </p>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          <strong className="text-foreground">Por qué importa</strong>: una
+          pregunta buena (“¿qué está en riesgo?”) reaparece cada semana. Si
+          se pierde al cerrar la app, el ritual se pierde. Guardarla es lo
+          que convierte el chat en una herramienta de revisión y no en un
+          juguete de un día.
+        </p>
+
+        {/* 3. Lo que sabe: el manual del método */}
+        <h3 className="mt-6 text-base font-semibold">
+          3. Lo que sabe: el manual del método (no solo tus datos)
+        </h3>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          No solo ve tus datos:{" "}
+          <strong className="text-foreground">
+            conoce el método de la app
+          </strong>
+          . Con cada mensaje recibe el <em>manual del sistema</em> —los 5
+          pilares con sus puntos, el glosario de las 4 capas, los rituales
+          (diario/semanal/mensual), las 3 reglas que no se rompen, la
+          arquitectura (WIGs, GTD, Próxima Acción, los dos inboxes, los
+          anti-patrones, el criterio de selección) y el índice de
+          pantallas. Con eso puede:
+        </p>
+        <ul className="mt-2 list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-muted-foreground">
+          <li>
+            <strong className="text-foreground">Explicar el sistema</strong>:
+            “¿qué es el KR de la semana?”, “¿por qué solo 3 WIGs?”, “¿qué
+            hago el lunes?”.
+          </li>
+          <li>
+            <strong className="text-foreground">
+              Recomendar con tu criterio
+            </strong>
+            : cuando pregunta “¿qué hago hoy?”, la respuesta sale del
+            ritual diario y del <em>criterio de selección</em> (riesgo
+            financiero → compromiso inamovible → …), no del criterio
+            genérico de la IA.
+          </li>
+          <li>
+            <strong className="text-foreground">Citar la regla</strong> que
+            aplica: “esto es el Pilar 2, KR de la semana”.
+          </li>
+        </ul>
+        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+          Y lo importante:{" "}
+          <strong className="text-foreground">
+            el manual se construye desde los mismos datos que pintan{" "}
+            <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+              /docs
+            </code>{" "}
+            y{" "}
+            <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+              /metodologia
+            </code>
+          </strong>
+          . No hay dos copias del método que se puedan desincronizar: si
+          mañana cambias un pilar o un ritual, el agente lo sabe en la
+          misma sesión, porque el texto sale de{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+            src/lib/metodologia/conocimiento.ts
+          </code>{" "}
+          (fuente única) y las tres vistas —esta página, /metodologia y el
+          prompt del agente— se actualizan a la vez.
+        </p>
+
+        {/* 4. Cómo está construido (y por qué) */}
+        <h3 className="mt-6 text-base font-semibold">
+          4. Cómo funciona por dentro (y por qué así)
+        </h3>
+        <ul className="mt-2 list-disc space-y-2 pl-5 text-sm leading-relaxed text-muted-foreground">
+          <li>
+            <strong className="text-foreground">Sin tool-calling.</strong>{" "}
+            La app es una SPA estática (export, GitHub Pages): no hay route
+            handlers ni backend donde implementar una herramienta. La única
+            vía es darle a la IA el estado del sistema{" "}
+            <em>dentro del prompt</em>.
+          </li>
+          <li>
+            <strong className="text-foreground">Un snapshot, no un router.</strong>{" "}
+            Antes de cada mensaje se arma un{" "}
+            <em>snapshot de texto</em> con el estado real ({" "}
+            <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+              src/lib/agente/contexto.ts
+            </code>{" "}
+            ) y se manda entero. Se descartó la alternativa de “primero
+            clasificar la pregunta y luego traer solo los datos
+            necesarios”: duplica las llamadas a la IA y, si la
+            clasificación falla, el agente responde “no tengo ese
+            dato” cuando sí lo tenía. Con el snapshot completo, una sola
+            llamada y cero falsos negativos.
+          </li>
+          <li>
+            <strong className="text-foreground">
+              Las referencias se validan, no se confían.
+            </strong>{" "}
+            Cuando el agente menciona una entidad escribe su id; el código
+            lo extrae, lo contrasta con el catálogo real del snapshot y solo
+            entonces lo pinta como chip con enlace. Un id inventado no llega
+            a la interfaz.
+          </li>
+          <li>
+            <strong className="text-foreground">Topes.</strong>{" "}
+            Tareas, metas y KRs se recortan (300 / 60 / 8 por meta) para que
+            el snapshot no crezca sin límite. Cuando hay recorte, el propio
+            snapshot lo dice, para que el agente no afirme que “no hay más”.
+          </li>
+        </ul>
+
+        <div className="mt-6 rounded-lg border border-violet-500/30 bg-violet-500/10 p-4 text-sm leading-relaxed text-violet-900 dark:text-violet-200">
+          💡 <strong>Empieza por:</strong> “<em>¿qué está en riesgo ahora
+          mismo?</em>”, “<em>resume mis metas y sus KRs</em>” o “<em>¿qué
+          debería hacer hoy?</em>”. Si no tiene clave de IA configurada, el
+          chat te avisa y te lleva a{" "}
+          <code className="rounded bg-violet-500/20 px-1.5 py-0.5 text-xs">
+            /configuracion
+          </code>
+          .
         </div>
       </section>
 
@@ -1756,6 +1463,148 @@ export default function DocsPage() {
         </header>
 
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-10-30
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
+                El agente conoce TODO el método de la app (y ya no hay dos
+                copias del método).
+              </strong>{" "}
+              Hasta ahora el método (los 5 pilares, el glosario, los
+              rituales, la arquitectura WIG/GTD/Próxima Acción) vivía{" "}
+              <strong className="text-foreground">dentro del JSX</strong> de{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                /docs
+              </code>{" "}
+              y{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                /metodologia
+              </code>
+              . Eso hacía dos cosas malas: era{" "}
+              <em>imposible</em> dárselo a la IA (un componente de React no
+              es un prompt) y, al no haber fuente única, cualquier cambio
+              del método se tenía que hacer en dos sitios.{" "}
+              <strong className="text-foreground">
+                Ahora el método vive como DATOS
+              </strong>{" "}
+              en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                src/lib/metodologia/conocimiento.ts
+              </code>{" "}
+              (fuente única): los 5 pilares, el glosario de las 4 capas, los
+              rituales diario/semanal/mensual, las 3 reglas que no se
+              rompen, la arquitectura (problema, lag vs lead, WIGs, GTD,
+              Próxima Acción, los dos inboxes, anti-patrones, pendientes de
+              respuesta, criterio de selección) y el índice de pantallas.{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                /docs
+              </code>{" "}
+              y{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                /metodologia
+              </code>{" "}
+              los pintan desde ahí (el texto es el mismo, byte a byte) y{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                src/lib/agente/manual.ts
+              </code>{" "}
+              lo convierte en un{" "}
+              <strong className="text-foreground">
+                MANUAL en texto que va en el system prompt del chat
+              </strong>{" "}
+              (~36 KB, cargado con{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                import()
+              </code>{" "}
+              diferido para que no pese en el bundle de todas las
+              páginas). Con eso el agente: (a) explica el sistema (“¿qué es
+              el KR de la semana?”, “¿qué hago el lunes?”), (b){" "}
+              <strong className="text-foreground">
+                recomienda con el criterio de la app
+              </strong>{" "}
+              y no con el genérico de la IA —a “¿qué hago hoy?” responde
+              con el ritual diario y el criterio de selección (riesgo
+              financiero → compromiso inamovible → …)— y (c) cita la regla
+              que aplica. Y si mañana cambias un pilar, el agente lo sabe
+              en la misma sesión: no hay dos copias del método que se
+              puedan desincronizar. Tests nuevos (9) que comprueban que el
+              manual sale del módulo compartido y que no se dispara de
+              tamaño. FEATURES actualizado (fila{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                (global)
+              </code>
+              ) y sección nueva §3 en “El agente que conoce tu sistema”.
+              No cambian los pilares ni los rituales: cambia{" "}
+              <strong className="text-foreground">dónde</strong> viven, no
+              <strong className="text-foreground">qué</strong> dicen.
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-10-30
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
+                Chat del agente en toda la app (migration 0035).
+              </strong>{" "}
+              Botón flotante (abajo a la derecha) presente en{" "}
+              <strong className="text-foreground">todas</strong> las
+              pantallas: se abre un chat donde preguntas por tus datos
+              reales y te responde con el estado real del sistema — metas,
+              KRs, proyectos, tareas, plan de hoy, foco semanal y Norte.
+              Antes esto solo se podía consultar abriendo cinco pantallas;
+              ahora se pregunta.{" "}
+              <strong className="text-foreground">Solo lectura</strong>:
+              no crea ni modifica nada (escribir sigue siendo cosa de{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                /agente
+              </code>
+              , que tiene su revisión humana).{" "}
+              <strong className="text-foreground">
+                Las conversaciones se guardan
+              </strong>{" "}
+              en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                agente_conversaciones
+              </code>{" "}
+              +{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                agente_mensajes
+              </code>{" "}
+              (RLS propia, cascade al borrar) y se retoman desde el botón
+              de historial; la conversación se titula sola con la primera
+              pregunta.{" "}
+              <strong className="text-foreground">
+                Sin tool-calling
+              </strong>{" "}
+              —la app es una SPA estática (export), no hay backend donde
+              vivir una tool—, así que el estado real se le da a la IA como{" "}
+              <em>snapshot de texto</em> en el prompt ({" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                src/lib/agente/contexto.ts
+              </code>
+              ): una sola llamada por mensaje, sin router previo (un router
+              duplicaría las llamadas y añadiría falsos negativos del tipo
+              “no tengo ese dato” cuando sí lo había). Las referencias que
+              cita el agente (proyecto / meta / KR / tarea) se validan
+              contra el catálogo real del snapshot antes de pintarse como
+              chips con enlace, así que ningún id inventado llega a la
+              interfaz. Topes: 300 tareas / 60 metas / 8 KRs por meta, y el
+              propio snapshot avisa cuando recorta. Nueva sección{" "}
+              <strong className="text-foreground">
+                “Complemento · El agente que conoce tu sistema”
+              </strong>
+              , fila nueva en el índice de features ({" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                (global)
+              </code>
+              ) y dos filas nuevas en los rituales (diario: “¿qué hago
+              hoy?”; domingo: “¿qué está en riesgo?”). No se cambian
+              pilares ni la arquitectura de metas/tareas: el chat es una capa
+              de consulta encima, no una capa más de escritura.
+            </span>
+          </li>
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
               2026-01-14

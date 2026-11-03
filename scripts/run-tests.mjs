@@ -30,6 +30,8 @@ const TESTS = [
   "src/lib/recuperacion/seleccion.test.mjs",
   "src/lib/recuperacion/shadow.test.mjs",
   "src/lib/recuperacion/revision.test.mjs",
+  "src/lib/agente/chatIA.test.mjs",
+  "src/lib/agente/manual.test.mjs",
 ]
 
 // Los tests importan código .ts de la app → necesita type-stripping nativo.
