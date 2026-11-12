@@ -55,6 +55,11 @@ registro de cambios con la fecha (regla de `AGENTS.md`).
 **Cuándo NO vale el atajo:** si toca lógica de negocio, la base de datos, una
 migración, permisos o accesibilidad → flujo completo (con plan, tests y revisión).
 
+**Cómo se pide:** con `arregla el #21` el agente decide según el tamaño del
+cambio. Si quieres forzarlo: `arregla el #21 (rápido)` = flujo corto;
+`arregla el #21 (completo)` = flujo entero, con plan en el issue y revisión del
+diff.
+
 ---
 
 ## Quién hace qué

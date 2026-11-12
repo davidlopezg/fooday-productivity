@@ -47,6 +47,10 @@ Si el cambio toca lógica de negocio, base de datos, migraciones, permisos o
 accesibilidad → flujo completo (plan, tests y revisión). Detalle en
 `docs/proceso.md`.
 
+**Lo puede forzar la persona:** `arregla el #N (rápido)` = flujo corto;
+`arregla el #N (completo)` = flujo entero, con plan en el issue y revisión del
+diff.
+
 # Regla de sincronización docs ↔ app
 
 Cualquier cambio que añada o modifique una **pantalla**, un **hábito**, un
