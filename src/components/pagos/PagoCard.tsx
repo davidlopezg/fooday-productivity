@@ -18,6 +18,7 @@ import {
 } from "@/lib/pagos/types";
 import {
   anularPago,
+  desanularPago,
   desprogramarPago,
   eliminarPago,
   registrarPago,
@@ -196,11 +197,35 @@ export function PagoCard({
   };
 
   const handleAnular = () => {
-    if (!window.confirm(`¿Anular "${pago.proveedor} · ${pago.concepto}"?`)) return;
+    // Si ya hay dinero registrado, avisar antes: anular borra esos importes
+    // del seguimiento. Se puede deshacer después con "Deshacer anulación".
+    if (pago.importe_pagado > 0) {
+      const ok = window.confirm(
+        `¿Anular "${pago.proveedor} · ${pago.concepto}"?\n\n` +
+          `Ya has pagado ${fmtEUR(pago.importe_pagado)} de ${fmtEUR(pago.importe_total)}. ` +
+          `Al anularlo, ese importe deja de contar como pagado.\n\n` +
+          `Podrás deshacerlo después desde el histórico.`,
+      );
+      if (!ok) return;
+    } else if (!window.confirm(`¿Anular "${pago.proveedor} · ${pago.concepto}"?`)) {
+      return;
+    }
     startTransition(async () => {
       try {
         setError(null);
         await anularPago(pago.id);
+        onChanged();
+      } catch (e) {
+        setError(errorMessage(e));
+      }
+    });
+  };
+
+  const handleDesanular = () => {
+    startTransition(async () => {
+      try {
+        setError(null);
+        await desanularPago(pago.id);
         onChanged();
       } catch (e) {
         setError(errorMessage(e));
@@ -432,6 +457,21 @@ export function PagoCard({
                       >
                         🚫 Anular
                       </button>
+                      {pago.estado === "anulado" && pago.importe_pagado > 0 && (
+                        <>
+                          <div className="border-t border-border" />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMenuOpen(false);
+                              handleDesanular();
+                            }}
+                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-accent"
+                          >
+                            ↩︎ Deshacer anulación
+                          </button>
+                        </>
+                      )}
                       <div className="border-t border-border" />
                       <button
                         type="button"

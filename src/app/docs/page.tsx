@@ -1509,6 +1509,35 @@ export default function DocsPage() {
             </span>
             <span className="text-muted-foreground">
               <strong className="text-foreground">
+                Anular un pago ya pagado ya no borra ese dinero, y se puede
+                deshacer.
+              </strong>{" "}
+              Anular un pago (factura errónea, importe 0) funcionaba también
+              sobre pagos <em>parciales</em>: ponía el estado en “anulado” sin
+              mirar lo ya pagado, ese importe dejaba de sumar en los totales y
+              <strong className="text-foreground">no había ninguna forma de
+              atrás</strong>. Ahora: (1) antes de anular, si ya has pagado algo,
+              el aviso lo dice y recuerda que puedes deshacerlo; (2) el menú
+              del pago anulado tiene <strong className="text-foreground">
+                “↩︎ Deshacer anulación”
+              </strong>
+              , que borra los movimientos registrados y devuelve el pago a
+              pendiente con el importe pagado a 0 (RPC{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                pagos.deshacer_anulacion
+              </code>
+              , migración 0037). El dinero que salió de la cuenta sigue
+              visible, y si te arrepientes del annulamiento, se corrige en un
+              clic.
+            </span>
+          </li>
+
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-11-12
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
                 Los 43 controles que solo funcionaban con el ratón ya funcionan
                 con el teclado.
               </strong>{" "}
