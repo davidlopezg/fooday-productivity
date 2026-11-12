@@ -64,7 +64,7 @@ export default function EstatusListadoPage() {
           </div>
           <Link
             href="/estatus/nuevo"
-            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+            className="inline-flex items-center justify-center min-h-10 gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
           >
             <IconPlus className="h-4 w-4" />
             Nuevo estatus
@@ -147,7 +147,7 @@ export default function EstatusListadoPage() {
             </p>
             <Link
               href="/estatus/nuevo"
-              className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground"
+              className="inline-flex items-center justify-center min-h-10 mt-3 inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground"
             >
               <IconPlus className="h-4 w-4" />
               Crear la primera

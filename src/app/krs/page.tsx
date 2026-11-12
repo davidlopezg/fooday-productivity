@@ -136,7 +136,7 @@ export default function KrsPage() {
           <button
             type="button"
             onClick={krsQ.reload}
-            className="mt-2 rounded-md border border-red-500/40 px-3 py-1.5 text-xs font-medium hover:bg-red-500/10"
+            className="inline-flex items-center justify-center min-h-10 mt-2 rounded-md border border-red-500/40 px-3 py-1.5 text-xs font-medium hover:bg-red-500/10"
           >
             Reintentar
           </button>

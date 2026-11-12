@@ -1509,6 +1509,40 @@ export default function DocsPage() {
             </span>
             <span className="text-muted-foreground">
               <strong className="text-foreground">
+                Los controles de la app se pueden pulsar con el dedo.
+              </strong>{" "}
+              La app se usa en el móvil, pero había{" "}
+              <strong className="text-foreground">
+                58 botones, enlaces-acción e iconos pulsables por debajo de 32 px
+              </strong>{" "}
+              de alto —11 por debajo de 24 px, el mínimo de WCAG 2.2 · 2.5.8
+              (nivel AA)—. El más pequeño medía 22 px: con el dedo se falla, y
+              el toque errado marca una tarea hecha o borra algo sin querer.
+              Es la corrección más amplia de toda la auditoría (27 archivos),
+              pero también la más mecánica: todos los controles ganan un{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                min-h-10
+              </code>{" "}
+              (40 px de área táctil, por encima del mínimo) con{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                inline-flex items-center justify-center
+              </code>
+              , sin cambiar el tamaño visual: en escritorio se ven igual,
+              en el móvil se aciertan. El transcriptor quedó sin casos. Anotado
+              en FEATURES (fila{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                /tareas
+              </code>
+              , con su campo de accesibilidad). Sin cambios de modelo ni de
+              metodología: es una corrección de implementación.
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-11-12
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
                 Regla de progreso de las subtareas: el progreso ya no se cuenta
                 dos veces.
               </strong>{" "}

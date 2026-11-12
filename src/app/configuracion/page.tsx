@@ -294,7 +294,7 @@ export default function ConfiguracionPage() {
           <button
             type="button"
             onClick={restaurarPrompt}
-            className="shrink-0 rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-accent"
+            className="inline-flex items-center justify-center min-h-10 shrink-0 rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-accent"
             title="Vuelve al prompt de fábrica (snowball + lunes + ingresos viernes/sábado)"
           >
             Restaurar ejemplo

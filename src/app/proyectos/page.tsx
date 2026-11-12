@@ -78,7 +78,7 @@ function ReporteModal({
         <div className="flex shrink-0 items-center gap-2">
           <button
             onClick={imprimir}
-            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90"
+            className="inline-flex items-center justify-center min-h-10 gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90"
           >
             <IconFile className="h-4 w-4" />
             Imprimir / Guardar PDF

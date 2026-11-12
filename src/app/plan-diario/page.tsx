@@ -948,7 +948,7 @@ function PlanGeneradoView({
           </span>
           <button
             onClick={onEmpezarDeNuevo}
-            className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted"
+            className="inline-flex items-center justify-center min-h-10 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted"
           >
             ↻ Empezar de nuevo
           </button>
@@ -1096,7 +1096,7 @@ function PlanGeneradoView({
             <button
               onClick={onGuardarNotas}
               disabled={notasEstado.status === "guardando"}
-              className="h-fit rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
+              className="inline-flex items-center justify-center min-h-10 h-fit rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
             >
               {notasEstado.status === "guardando" ? "Guardando…" : "Guardar"}
             </button>

@@ -377,7 +377,7 @@ export default function MetaDetallePage() {
                   <button
                     onClick={generarPlanParaMeta}
                     disabled={generandoPlan}
-                    className="inline-flex items-center gap-1.5 rounded-md bg-violet-500 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-violet-600 disabled:opacity-50"
+                    className="inline-flex items-center justify-center min-h-10 gap-1.5 rounded-md bg-violet-500 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-violet-600 disabled:opacity-50"
                     title="Genera o amplía KRs y tareas con IA. Los KRs existentes se respetan (no se duplican) y se les añaden tareas."
                   >
                     <IconSparkles className="h-3.5 w-3.5" />
@@ -780,7 +780,7 @@ function ResultadoCard({
         <button
           onClick={generarTareasIa}
           disabled={generandoIa}
-          className="inline-flex items-center gap-1.5 rounded-md border border-teal-500/30 bg-teal-500/10 px-2.5 py-1.5 text-xs font-medium text-teal-700 hover:bg-teal-500/20 disabled:opacity-50 dark:text-teal-300"
+          className="inline-flex items-center justify-center min-h-10 gap-1.5 rounded-md border border-teal-500/30 bg-teal-500/10 px-2.5 py-1.5 text-xs font-medium text-teal-700 hover:bg-teal-500/20 disabled:opacity-50 dark:text-teal-300"
           title="Genera solo las tareas de este KR con IA, sin tocar el resto de la meta"
         >
           <IconSparkles className="h-3.5 w-3.5" />
@@ -1094,7 +1094,7 @@ function NuevoResultadoForm({
       <button
         onClick={crear}
         disabled={busy}
-        className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+        className="inline-flex items-center justify-center min-h-10 mt-3 inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
       >
         <IconPlus className="h-3.5 w-3.5" />
         {busy ? "Creando…" : "Crear resultado"}

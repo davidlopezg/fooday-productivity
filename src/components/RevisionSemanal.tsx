@@ -87,7 +87,7 @@ export function RevisionSemanal({
             <button
               type="button"
               onClick={onRecargar}
-              className="rounded-md border border-border bg-background/70 px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground"
+              className="inline-flex items-center justify-center min-h-10 rounded-md border border-border bg-background/70 px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground"
             >
               ↻ Recalcular
             </button>

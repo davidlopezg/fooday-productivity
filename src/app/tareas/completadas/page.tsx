@@ -179,7 +179,7 @@ export default function TareasCompletadasPage() {
         </div>
         <button
           onClick={reload}
-          className="rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted"
+          className="inline-flex items-center justify-center min-h-10 rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted"
         >
           Recargar
         </button>
@@ -422,7 +422,7 @@ function TareaCompletadaRow({
             disabled={pending}
             aria-label="Restaurar tarea"
             title="Restaurar tarea"
-            className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:border-amber-500/40 hover:bg-amber-500/10 hover:text-amber-700 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:text-amber-300"
+            className="inline-flex items-center justify-center min-h-10 gap-1 rounded-md border border-border bg-background px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:border-amber-500/40 hover:bg-amber-500/10 hover:text-amber-700 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:text-amber-300"
           >
             <IconX className="h-3 w-3" />
             {pending ? "Restaurando…" : "Restaurar"}

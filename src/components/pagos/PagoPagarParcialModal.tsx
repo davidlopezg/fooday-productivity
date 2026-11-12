@@ -103,7 +103,7 @@ export function PagoPagarParcialModal({
               type="button"
               onClick={onClose}
               disabled={isPending}
-              className="rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent disabled:opacity-50"
+              className="inline-flex items-center justify-center min-h-10 rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent disabled:opacity-50"
             >
               Cancelar
             </button>
@@ -111,7 +111,7 @@ export function PagoPagarParcialModal({
               type="submit"
               form="pago-parcial-form"
               disabled={isPending || !valido}
-              className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
+              className="inline-flex items-center justify-center min-h-10 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
             >
               {isPending ? "Registrando…" : "Registrar"}
             </button>

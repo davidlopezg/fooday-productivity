@@ -331,7 +331,7 @@ function PanelProyecto({
             type="button"
             onClick={onAnalizar}
             disabled={busy}
-            className="inline-flex items-center gap-1.5 rounded-md bg-gradient-to-r from-violet-600 to-indigo-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:opacity-90 disabled:opacity-50"
+            className="inline-flex items-center justify-center min-h-10 gap-1.5 rounded-md bg-gradient-to-r from-violet-600 to-indigo-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:opacity-90 disabled:opacity-50"
           >
             <IconSparkles className="h-3.5 w-3.5" />
             {busy ? "Analizando…" : "✨ Analizar escenarios"}
