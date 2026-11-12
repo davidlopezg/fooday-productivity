@@ -23,6 +23,45 @@ saber en qué fase está cada cosa y qué se espera de ti.
 
 ---
 
+## El flujo corto (arreglos pequeños)
+
+No todos los arreglos necesitan las 8 fases. Si el cambio es **visual o de
+texto** (una alineación, un rótulo, un color) y **no toca lógica, datos ni
+migraciones**, se va por el atajo: el mismo resultado en la mitad de pasos.
+
+| | Flujo completo | Flujo corto |
+|---|---|---|
+| Rama | `ux/<nombre>` desde `origin/main` | igual |
+| Plan en el issue | `plan.mjs` | **no** (el plan va en el cuerpo del PR) |
+| Checks | `typecheck` + `test` + lint | `typecheck` + lint del diff (**`npm test` solo si toca lógica**) |
+| Revisión del diff | `review.mjs` | **no** |
+| PR | `pr.mjs` | `gh pr create` con la checklist |
+
+Los 4 pasos del flujo corto:
+
+```bash
+git checkout -b ux/arreglo-<n> origin/main
+# …código + docs (FEATURES, sección de /docs y changelog)…
+npx tsc --noEmit
+BASE_SHA=$(git rev-parse origin/main) node .github/scripts/lint-diff.mjs
+git commit -am "fix(#N): …" && git push -u origin ux/arreglo-<n>
+gh pr create --title "…" --body-file pr.md
+```
+
+**Los docs se actualizan siempre**, también en el flujo corto: si el cambio toca
+una pantalla, hay que actualizar el índice FEATURES, la sección de `/docs` y el
+registro de cambios con la fecha (regla de `AGENTS.md`).
+
+**Cuándo NO vale el atajo:** si toca lógica de negocio, la base de datos, una
+migración, permisos o accesibilidad → flujo completo (con plan, tests y revisión).
+
+**Cómo se pide:** con `arregla el #21` el agente decide según el tamaño del
+cambio. Si quieres forzarlo: `arregla el #21 (rápido)` = flujo corto;
+`arregla el #21 (completo)` = flujo entero, con plan en el issue y revisión del
+diff.
+
+---
+
 ## Quién hace qué
 
 | Momento | 👤 Tú | 🤖 El agente |
