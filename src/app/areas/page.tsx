@@ -176,8 +176,9 @@ export default function AreasPage() {
           </h2>
           <div className="grid gap-3 sm:grid-cols-[1fr,120px]">
             <div className="space-y-1">
-              <label className="text-xs font-medium">Nombre</label>
+              <label htmlFor="area-nombre" className="text-xs font-medium">Nombre</label>
               <input
+                id="area-nombre"
                 value={nombre}
                 onChange={(e) => setNombre(e.target.value)}
                 placeholder="p.ej. fooday, Salud, Familia, Finanzas"
@@ -185,8 +186,9 @@ export default function AreasPage() {
               />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium">Color</label>
+              <label htmlFor="area-color" className="text-xs font-medium">Color</label>
               <input
+                id="area-color"
                 type="color"
                 value={color}
                 onChange={(e) => setColor(e.target.value)}

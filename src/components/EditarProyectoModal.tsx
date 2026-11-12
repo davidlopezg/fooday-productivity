@@ -72,16 +72,18 @@ export function EditarProyectoModal({
 
         <div className="mt-4 grid gap-3 sm:grid-cols-[1fr,120px]">
           <div className="space-y-1">
-            <label className="text-xs font-medium">Nombre</label>
+            <label htmlFor="editproy-nombre" className="text-xs font-medium">Nombre</label>
             <input
+              id="editproy-nombre"
               value={nombre}
               onChange={(e) => setNombre(e.target.value)}
               className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
           <div className="space-y-1">
-            <label className="text-xs font-medium">Color</label>
+            <label htmlFor="editproy-color" className="text-xs font-medium">Color</label>
             <input
+              id="editproy-color"
               type="color"
               value={color}
               onChange={(e) => setColor(e.target.value)}
@@ -89,8 +91,9 @@ export function EditarProyectoModal({
             />
           </div>
           <div className="space-y-1 sm:col-span-2">
-            <label className="text-xs font-medium">Área</label>
+            <label htmlFor="editproy-area" className="text-xs font-medium">Área</label>
             <select
+              id="editproy-area"
               value={areaId}
               onChange={(e) => setAreaId(e.target.value)}
               className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
@@ -106,8 +109,9 @@ export function EditarProyectoModal({
         </div>
 
         <div className="mt-3 space-y-1">
-          <label className="text-xs font-medium">Descripción (opcional)</label>
+          <label htmlFor="editproy-desc" className="text-xs font-medium">Descripción (opcional)</label>
           <textarea
+            id="editproy-desc"
             value={desc}
             onChange={(e) => setDesc(e.target.value)}
             rows={3}

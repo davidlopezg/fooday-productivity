@@ -956,19 +956,18 @@ export default function AgentePage() {
               />
             </label>
             <label className="flex items-end pb-1">
-              <span className="flex items-start gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={fechaFinBloqueada}
-                  onChange={(e) => setFechaFinBloqueada(e.target.checked)}
-                  disabled={!fechaObjetivo || generando || aplicando}
-                  className="mt-0.5 h-4 w-4 rounded border-input disabled:opacity-50"
-                />
-                <span>
-                  <span className="font-medium">🔒 Fecha crítica — no se mueve</span>
-                  <span className="block text-[11px] text-muted-foreground">
-                    La IA no podrá meter nada después.
-                  </span>
+              <input
+                type="checkbox"
+                checked={fechaFinBloqueada}
+                onChange={(e) => setFechaFinBloqueada(e.target.checked)}
+                disabled={!fechaObjetivo || generando || aplicando}
+                aria-label="Fecha crítica: la IA no podrá meter nada después de esta fecha"
+                className="mt-0.5 h-4 w-4 rounded border-input disabled:opacity-50"
+              />
+              <span className="ml-2 text-sm">
+                <span className="font-medium">🔒 Fecha crítica — no se mueve</span>
+                <span className="block text-[11px] text-muted-foreground">
+                  La IA no podrá meter nada después.
                 </span>
               </span>
             </label>

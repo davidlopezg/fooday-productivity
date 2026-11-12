@@ -1509,6 +1509,42 @@ export default function DocsPage() {
             </span>
             <span className="text-muted-foreground">
               <strong className="text-foreground">
+                Los 18 campos de formulario que estaban “sin nombre” ya se
+                anuncian bien.
+              </strong>{" "}
+              En 8 pantallas y modales había campos con su etiqueta visible en
+              el formulario pero <em>sin asociar</em> al campo correspondiente
+              (faltaba <code className="rounded bg-muted px-1.5 py-0.5 text-xs">htmlFor</code> +{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">id</code>
+              ). El usuario veía “Nombre” encima del campo y lo entendía, pero
+              con lector de pantalla el campo se anunciaba <em>sin nombre</em>,
+              así que no se sabía qué escribir. El mismo patrón afectaba a los
+              checkboxes de “Fecha crítica” (
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/agente</code>,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas/agente</code>,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas/nueva</code>
+              ), donde el aviso de la fecha límite quedaba fuera de la etiqueta.
+              Corregidos los 18 casos en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/areas</code>,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/proyectos</code>,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas/nueva</code>,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/plan-diario</code>,
+              el modal de editar proyecto y el de pago parcial. FEATURES
+              actualizadas (accesibilidad en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/areas</code>,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/proyectos</code> y{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas/nueva</code>
+              ). Solo se añadieron atributos de asociación y nombres accesibles:
+              sin cambiar el texto visible ni la disposición.
+            </span>
+          </li>
+
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-11-12
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
                 Los controles de la app se pueden pulsar con el dedo.
               </strong>{" "}
               La app se usa en el móvil, pero había{" "}

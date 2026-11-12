@@ -138,10 +138,11 @@ export function PagoPagarParcialModal({
 
       <form id="pago-parcial-form" onSubmit={handleSubmit} className="space-y-3">
         <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">
+          <label htmlFor="pago-parcial-importe" className="mb-1 block text-xs font-medium text-muted-foreground">
             Importe a pagar (€) <span className="text-red-500">*</span>
           </label>
           <input
+            id="pago-parcial-importe"
             type="text"
             inputMode="decimal"
             value={importe}
@@ -186,10 +187,11 @@ export function PagoPagarParcialModal({
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1 block text-xs font-medium text-muted-foreground">
+            <label htmlFor="pago-parcial-metodo" className="mb-1 block text-xs font-medium text-muted-foreground">
               Método
             </label>
             <select
+              id="pago-parcial-metodo"
               value={metodo}
               onChange={(e) => setMetodo(e.target.value as MetodoPago)}
               className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
@@ -202,10 +204,11 @@ export function PagoPagarParcialModal({
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-muted-foreground">
+            <label htmlFor="pago-parcial-fecha" className="mb-1 block text-xs font-medium text-muted-foreground">
               Fecha
             </label>
             <input
+              id="pago-parcial-fecha"
               type="date"
               value={fecha}
               onChange={(e) => setFecha(e.target.value)}
