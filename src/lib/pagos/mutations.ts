@@ -95,13 +95,34 @@ export async function desprogramarPago(pagoId: string): Promise<void> {
   if (error) throw new Error(`No se pudo desprogramar: ${error.message}`);
 }
 
-/** Marca como anulado (no se va a pagar: factura errónea, importe 0, etc.). */
+/** Marca como anulado (no se va a pagar: factura errónea, importe 0, etc.).
+ *
+ *  OJO: si el pago ya tiene importes registrados, anularlos BORRA del
+ *  seguimiento (dejaban de sumar en los totales) y no había forma de atrás.
+ *  Ahora el flujo es: la UI avisa antes de anular y ofrece "Deshacer
+ *  anulación" (desanularPago) por si el usuario se arrepiente. */
 export async function anularPago(pagoId: string): Promise<void> {
   const { error } = await db()
     .from("pagos")
     .update({ estado: "anulado", fecha_pago_programada: null })
     .eq("id", pagoId);
   if (error) throw new Error(`No se pudo anular: ${error.message}`);
+}
+
+/** Deshace una anulación: borra los movimientos registrados y devuelve el
+ *  pago a 'pendiente' con el importe pagado a 0.
+ *
+ *  Es la operación inversa de la anulación (issue #14). La hace la RPC
+ *  `pagos.deshacer_anulacion`, que valida que el pago sea del usuario y que
+ *  esté anulado, y borra los movimientos en la misma transacción que el reset
+ *  de importes. */
+export async function desanularPago(pagoId: string): Promise<void> {
+  const { data, error } = await db().rpc("deshacer_anulacion", {
+    p_pago_id: pagoId,
+  });
+  if (error) throw new Error(`No se pudo deshacer la anulación: ${error.message}`);
+  if (data !== true)
+    throw new Error("No se pudo deshacer la anulación: el pago no está anulado");
 }
 
 /** Cambia la prioridad manual del pago. */
