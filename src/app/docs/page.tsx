@@ -1505,6 +1505,103 @@ export default function DocsPage() {
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-11-12
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
+                Regla de progreso de las subtareas: el progreso ya no se cuenta
+                dos veces.
+              </strong>{" "}
+              Una tarea desglosada en subtareas podía marcarse como{" "}
+              <em>hecha</em> dejando subtareas pendientes, y{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/informes</code>{" "}
+              sumaba el trabajo dos veces: la tarea cerrada pesa 1 y{" "}
+              <strong className="text-foreground">
+                cada subtarea hecha pesa 1/3
+              </strong>
+              , así que una tarea con sus 3 subtareas cerradas marcaba 2 en el
+              heatmap y en el chart de barras. La regla que queda escrita (y
+              aplicada) es:{" "}
+              <strong className="text-foreground">
+                una subtarea cuenta como progreso mientras su tarea siga
+                ABIERTA
+              </strong>
+              ; cuando cierras la tarea, su progreso ya lo representa la tarea
+              completa (1) y las subtareas dejan de sumar. Cerrar una tarea{" "}
+              <strong className="text-foreground">
+                no
+              </strong>{" "}
+              cierra sus subtareas (quedan como pendientes y se retoman al
+              reabrir la tarea): marcar como hecho algo que no se ha hecho
+              falsearía el registro, y bloquear el cierre añadiría fricción
+              al ritual. El KPI{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                Subtareas hechas
+              </code>{" "}
+              no cambia (es un contador de actividad, no de progreso): ahora
+              lo dice su pie. FEATURES actualizadas (filas{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                /tareas
+              </code>{" "}
+              y{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                /informes
+              </code>
+              ) y ritual semanal actualizado. Sin cambios en el modelo de
+              datos ni en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                /metodologia
+              </code>
+              : no afecta a WIGs, GTD, Próxima Acción ni los dos inboxes.
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-11-12
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
+                Las tareas recurrentes ya no pierden su clasificación al
+                clonarse.
+              </strong>{" "}
+              Al marcar una tarea recurrente como hecha, la copia para la
+              siguiente fecha se creaba sin{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                ambito
+              </code>
+              , sin{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">tags</code>{" "}
+              y sin{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                fecha_fin
+              </code>
+              : la copia se quedaba “sin clasificar” (y salía del inbox
+              personal/profesional al que pertenecía), perdía sus etiquetas y
+              no aparecía en “Vencen hoy” el día que le tocaba. Ahora la
+              clonación (migración 0036) hereda las tres. El{" "}
+              <strong className="text-foreground">KR no se hereda</strong>{" "}
+              a propósito: un KR pertenece a un trimestre, así que la
+              ocurrencia siguiente debe reasignarse al KR del periodo que le
+              toque, y queda en la bandeja de la meta (el grupo “con meta sin
+              resultado” de{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                /tareas/inbox
+              </code>
+              ). FEATURES actualizada (fila{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                /tareas
+              </code>
+              ). Sin cambios en el modelo de datos más allá de la función de
+              clonación, ni en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                /metodologia
+              </code>
+              : no afecta a WIGs, GTD, Próxima Acción ni los dos inboxes (al
+              contrario: ahora las recurrentes los respetan).
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
               2026-11-03
             </span>
             <span className="text-muted-foreground">

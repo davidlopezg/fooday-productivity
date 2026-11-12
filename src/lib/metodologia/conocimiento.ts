@@ -328,7 +328,7 @@ export const RITUALES: {
     {
       cuando: "Primer domingo del mes",
       pantallas: [{ texto: "/informes", ruta: "/informes" }],
-      que: 'Tendencia 30 días: heatmap de foco, score de hábitos, días en rojo emocionales, metas y KRs cerrados en la ventana, y la brecha "metas con plan vs sin plan" (las aspiracionales sin KRs son el típico cuello de botella del mes). Si una racha roja emocional supera los 5 días, abrir una acción correctiva ya (no esperar al mes siguiente).',
+      que: 'Tendencia 30 días: heatmap de foco, score de hábitos, días en rojo emocionales, metas y KRs cerrados en la ventana, y la brecha "metas con plan vs sin plan" (las aspiracionales sin KRs son el típico cuello de botella del mes). Si una racha roja emocional supera los 5 días, abrir una acción correctiva ya (no esperar al mes siguiente). En el heatmap, una subtarea cuenta como progreso (1/3) mientras su tarea siga abierta; al cerrar la tarea, la tarea cuenta 1 y sus subtareas dejan de sumar.',
     },
     {
       cuando: "Primer domingo del mes",
@@ -637,7 +637,7 @@ export const FEATURES: Feature[] = [
   { ruta: "/estatus/ver", proposito: "Ver una entrada en detalle (racha + micro-acción)", docs: "Sub-ruta de /estatus" },
 
   // ── Tareas y GTD ──
-  { ruta: "/tareas", proposito: "Tareas pendientes: marcar hechas, adjuntos, asignar a meta/KR + toggle ⏳ pendiente de respuesta por fila. Encima de la tabla, la CASCADA DE FOCO completa (como en la home): WIGs de META con sus KRs (violeta) → KRs en foco de la semana (celeste, el mismo foco que se elige en /semana) → WIGs de TAREAS (fucsia). Así, mientras ejecutas, ves en qué resultado medible estás poniendo horas y no solo qué tarea", docs: "Pilar 2 · WIGs §3 (cap de ejecución) · Pilar 4 (sección “Pendientes de respuesta”) · HelpDrawer" },
+  { ruta: "/tareas", proposito: "Tareas pendientes: marcar hechas, adjuntos, asignar a meta/KR + toggle ⏳ pendiente de respuesta por fila. Cerrar una tarea NO cierra sus subtareas: las que queden pendientes siguen visibles como pendientes y se retoman al reabrir la tarea (decisión del usuario, sin falsear el registro). RECURRENCIA: al completarse, la tarea recurrente se clona para la siguiente fecha conservando su clasificación (ámbito personal/profesional, tags y fecha dura de finalización); el KR NO se hereda porque pertenece a un trimestre, así que la copia aparece en la bandeja de la meta para reasignarla al KR del periodo que le toque. Encima de la tabla, la CASCADA DE FOCO completa (como en la home): WIGs de META con sus KRs (violeta) → KRs en foco de la semana (celeste, el mismo foco que se elige en /semana) → WIGs de TAREAS (fucsia). Así, mientras ejecutas, ves en qué resultado medible estás poniendo horas y no solo qué tarea", docs: "Pilar 2 · WIGs §3 (cap de ejecución) · Pilar 4 (sección “Pendientes de respuesta”) · HelpDrawer" },
   { ruta: "/tareas/inbox", proposito: "Triaje residual: tareas sin meta o sin KR (después de asignar al crear)", docs: "HelpDrawer" },
   { ruta: "/tareas/pendientes-respuesta", proposito: "Panel dedicado a tareas con el flag “pendiente de respuesta” (esperando a alguien). Ordenadas por antigüedad: lo que más tiempo lleva esperando primero. Botón para destildar cuando llega la respuesta", docs: "Pilar 4 (sección “Pendientes de respuesta”) · HelpDrawer" },
   { ruta: "/tareas/completadas", proposito: "Histórico de tareas hechas (7/30/90/365/todo)", docs: "HelpDrawer" },
@@ -663,7 +663,7 @@ export const FEATURES: Feature[] = [
   { ruta: "/matriz", proposito: "Matriz Eisenhower 2D (urgencia × importancia) de tareas activas. Drag & drop entre cuadrantes (dnd-kit/core) + botón IA “✨ Sugerir redistribución” que propone mover las tareas desubicadas al cuadrante correcto (módulo IA en src/lib/tareas/sugerirMatrizIA.ts). Sin migración: la clasificación se calcula en cada render desde fecha_fin + meta.es_wig; aplicar cambios solo escribe `prioridad`. Filtros: solo WIGs-meta / solo con fecha. Complemento visual de /pipeline (1D) — la matriz es 2D", docs: "Pilar 4 · HelpDrawer" },
 
   // ── Revisión y análisis ──
-  { ruta: "/informes", proposito: "KPIs (incluye subtareas) + heatmap de actividad + chart de tareas y subtareas por día/semana + proyectos con conteo + metas y OKRs cerrados + comparación con plan vs sin plan", docs: "Ritual semanal (viernes) · Ritual mensual · HelpDrawer" },
+  { ruta: "/informes", proposito: "KPIs (incluye subtareas) + heatmap de actividad + chart de tareas y subtareas por día/semana + proyectos con conteo + metas y OKRs cerrados + comparación con plan vs sin plan. REGLA DE PROGRESO: una subtarea cuenta como progreso mientras su tarea siga ABIERTA; al cerrar la tarea, su progreso ya lo representa la tarea completa (1) y las subtareas dejan de sumar, para no contar dos veces el mismo trabajo", docs: "Ritual semanal (viernes) · Ritual mensual · HelpDrawer" },
   { ruta: "/dashboard-emocional", proposito: "4 dimensiones: despertar / mente / cuerpo / rueda", docs: "Pilar 4 · HelpDrawer" },
 
   // ── Identidad y horizonte ──
