@@ -28,6 +28,9 @@ export async function marcarHecha(id: string) {
   // Sin esto, un UPDATE fallido (RLS, red, columna inexistente) pasaba por
   // bueno y la UI mentia: el usuario veía la tarea tachada sin estar guardada.
   if (error) throw new Error(`No se pudo marcar la tarea como hecha: ${error.message}`);
+  // El plan del día guarda su propio contador: si esta tarea estaba en el plan
+  // de hoy, la fila del plan también pasa a hecha (issue #6).
+  await sincronizarProgresoPlan(id, true);
   // ponytail: la recurrencia es un side-effect de "hecha". Si la IA está
   // apagada o la RPC falla, NO se rompe el marcar-hecha principal: el error
   // se loguea y el usuario lo verá en el log de consola.
@@ -42,6 +45,9 @@ export async function reabrirTarea(id: string) {
     .update({ estado: "pendiente", completada_at: null })
     .eq("id", id);
   if (error) throw new Error(`No se pudo reabrir la tarea: ${error.message}`);
+  // Mismo sincronizado que marcarHecha: reabrir devuelve el contador del plan
+  // a 0 (issue #6).
+  await sincronizarProgresoPlan(id, false);
 }
 
 export async function archivarTarea(id: string) {
@@ -795,12 +801,48 @@ export async function marcarSubtareaHecha(id: string, hecho: boolean) {
   if (error) throw new Error(`No se pudo actualizar la subtarea: ${error.message}`);
 }
 
+/** Marca/desmarca una tarea CONCRETA del plan (la fila de plan_diario_tareas).
+ *  Es el único escritor de `plan_diario_tareas.hecho`.
+ *
+ *  Se usa de dos formas:
+ *   - Desde /plan-diario/detalle, para las tareas libres (las que propone la IA
+ *     y no existen en `tareas`), con el id de la fila del plan.
+ *   - Por `sincronizarProgresoPlan()` cuando se completa la tarea real
+ *     vinculada (la que sí está en `tareas`). */
 export async function marcarTareaPlanHecha(id: string, hecho: boolean) {
   const { error } = await createClient()
     .from("plan_diario_tareas")
     .update({ hecho })
     .eq("id", id);
   if (error) throw new Error(`No se pudo actualizar la tarea del plan: ${error.message}`);
+}
+
+/** Marca/desmarca TODAS las filas del plan que apuntan a una tarea de BD.
+ *
+ *  El plan diario guarda su propio contador (`plan_diario_tareas.hecho`) para
+ *  que el histórico pueda decir "hiciste 3 de 5". Pero una tarea del plan
+ *  vinculada a `tareas` se completa desde /tareas, /plan-diario o el widget
+ *  del día, y ninguno de esos sitios conocía la fila del plan: el contador se
+ *  quedaba en 0 para siempre.
+ *
+ *  Esta función cierra ese hueco. Se llama desde `marcarHecha()` y
+ *  `reabrirTarea()`, así que cualquier pantalla que complete una tarea
+ *  mantiene el plan sincronizado sin saberlo.
+ *
+ *  No lanza si falla: la tarea ya se marcó como hecha (eso es lo importante) y
+ *  el contador del plan es un dato de progreso secundario. El fallo se avisa
+ *  por consola. */
+export async function sincronizarProgresoPlan(
+  tareaId: string,
+  hecho: boolean,
+): Promise<void> {
+  const { error } = await createClient()
+    .from("plan_diario_tareas")
+    .update({ hecho })
+    .eq("tarea_id", tareaId);
+  if (error) {
+    console.warn("[sincronizarProgresoPlan] no se pudo sincronizar el plan:", error.message);
+  }
 }
 
 export async function guardarNotasPlan(id: string, notas: string) {

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { fetchPlanCompleto } from "@/lib/queries";
-import { guardarNotasPlan } from "@/lib/mutations";
+import { guardarNotasPlan, marcarTareaPlanHecha } from "@/lib/mutations";
 import { informeToMarkdown } from "@/lib/plan";
 import type {
   InformePlan,
@@ -42,6 +42,8 @@ export default function PlanDetallePage() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notas, setNotas] = useState("");
+  // Tareas del plan marcadas desde aquí (solo las libres: las vinculadas a una
+  // tarea de BD se completan donde vive la tarea). Issue #6.
   const [notasEstado, setNotasEstado] = useState<
     | { status: "idle" }
     | { status: "guardando" }
@@ -674,6 +676,28 @@ function PlanV3View({ plan }: { plan: PlanCompleto }) {
     .sort((a, b) => (a.bloque_num ?? 0) - (b.bloque_num ?? 0));
   const numBloques = plan.num_bloques_activos ?? tareasPorBloque.length ?? 0;
 
+  // Tareas del plan marcadas desde aquí. Solo las LIBRES (las que propone la IA
+  // y no existen en `tareas`): las vinculadas se completan donde vive la tarea,
+  // y `marcarHecha` sincroniza la fila del plan sola. Issue #6.
+  const [hechasLocal, setHechasLocal] = useState<Record<string, boolean>>({});
+  const [marcandoId, setMarcandoId] = useState<string | null>(null);
+
+  async function toggleTareaPlan(t: { id: string; hecho: boolean; tarea_id: string | null }) {
+    if (t.tarea_id) return;
+    const siguiente = !(hechasLocal[t.id] ?? t.hecho);
+    setHechasLocal((m) => ({ ...m, [t.id]: siguiente }));
+    setMarcandoId(t.id);
+    try {
+      await marcarTareaPlanHecha(t.id, siguiente);
+    } catch (e) {
+      // Revertir si falla: la UI no puede mentir.
+      setHechasLocal((m) => ({ ...m, [t.id]: !siguiente }));
+      console.error("[plan-diario/detalle] no se pudo marcar la tarea del plan:", e);
+    } finally {
+      setMarcandoId(null);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -755,6 +779,21 @@ function PlanV3View({ plan }: { plan: PlanCompleto }) {
                     <span className="text-xs font-semibold uppercase tracking-wide">
                       Bloque {t.bloque_num}
                     </span>
+                    <label className="inline-flex cursor-pointer items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+                      <input
+                        type="checkbox"
+                        className="h-5 w-5 cursor-pointer accent-emerald-600 disabled:cursor-wait"
+                        checked={hechasLocal[t.id] ?? t.hecho}
+                        disabled={!!t.tarea_id || marcandoId === t.id}
+                        onChange={() => void toggleTareaPlan(t)}
+                        title={
+                          t.tarea_id
+                            ? "Marca esta tarea desde /tareas: aquí se sincroniza sola"
+                            : "Marcar como hecha"
+                        }
+                      />
+                      Hecha
+                    </label>
                     {t.tipo_tarea && (
                       <span
                         className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
@@ -769,7 +808,9 @@ function PlanV3View({ plan }: { plan: PlanCompleto }) {
                   </div>
                   <p className="text-sm font-medium leading-snug">{t.titulo_libre ?? "—"}</p>
                   <p className="mt-1 text-[11px] text-muted-foreground">
-                    {t.tarea_id ? "📌 vinculada a tarea en BD" : "✨ tarea propuesta por la IA"}
+                    {t.tarea_id
+                      ? "📌 vinculada a tarea en BD — se marca desde /tareas"
+                      : "✨ tarea propuesta por la IA — márcala aquí"}
                   </p>
                 </div>
               ))}
