@@ -329,8 +329,9 @@ export default function ProyectosPage() {
           </h2>
           <div className="grid gap-3 sm:grid-cols-[1fr,120px]">
             <div className="space-y-1">
-              <label className="text-xs font-medium">Nombre</label>
+              <label htmlFor="proy-nombre" className="text-xs font-medium">Nombre</label>
               <input
+                id="proy-nombre"
                 value={nombre}
                 onChange={(e) => setNombre(e.target.value)}
                 placeholder="p.ej. Q4 fooday-launch"
@@ -338,8 +339,9 @@ export default function ProyectosPage() {
               />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium">Color</label>
+              <label htmlFor="proy-color" className="text-xs font-medium">Color</label>
               <input
+                id="proy-color"
                 type="color"
                 value={color}
                 onChange={(e) => setColor(e.target.value)}
@@ -347,8 +349,9 @@ export default function ProyectosPage() {
               />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium">Área</label>
+              <label htmlFor="proy-area" className="text-xs font-medium">Área</label>
               <select
+                id="proy-area"
                 value={areaId}
                 onChange={(e) => setAreaId(e.target.value)}
                 className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
@@ -363,8 +366,9 @@ export default function ProyectosPage() {
             </div>
           </div>
           <div className="mt-3 space-y-1">
-            <label className="text-xs font-medium">Descripción (opcional)</label>
+            <label htmlFor="proy-desc" className="text-xs font-medium">Descripción (opcional)</label>
             <textarea
+              id="proy-desc"
               value={desc}
               onChange={(e) => setDesc(e.target.value)}
               rows={2}

@@ -728,21 +728,22 @@ export default function PlanDiarioPage() {
 
         {/* 1D — Otras tareas */}
         <div className="mt-5">
-          <label className="block">
+          <label htmlFor="plan-otras-tareas" className="block">
             <span className="mb-1 flex items-center gap-2 text-sm font-medium">
               <span>Otras tareas</span>
               <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                 Opcional
               </span>
             </span>
-            <p className="mb-2 text-xs text-muted-foreground">
+            <span className="mb-2 block text-xs text-muted-foreground">
               Una por línea. Si la tarea ya existe en tu base de datos, no se
               duplica: la IA la reutiliza tal cual.
-            </p>
+            </span>
           </label>
 
           <div className="flex gap-2">
             <input
+              id="plan-otras-tareas"
               type="text"
               className={input}
               value={tareaNueva}

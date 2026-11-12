@@ -455,21 +455,20 @@ export default function NuevaMetaPage() {
               />
             </label>
             <label className="flex items-end pb-1">
-              <span className="flex items-start gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={fechaFinBloqueada}
-                  onChange={(e) => setFechaFinBloqueada(e.target.checked)}
-                  disabled={!fechaObjetivo}
-                  className="mt-0.5 h-4 w-4 rounded border-input disabled:opacity-50"
-                />
-                <span>
-                  <span className="font-medium">
-                    🔒 Fecha crítica — no se mueve
-                  </span>
-                  <span className="block text-[11px] text-muted-foreground">
-                    El planificador no podrá meter nada después de esta fecha.
-                  </span>
+              <input
+                type="checkbox"
+                checked={fechaFinBloqueada}
+                onChange={(e) => setFechaFinBloqueada(e.target.checked)}
+                disabled={!fechaObjetivo}
+                aria-label="Fecha crítica: el planificador no podrá meter nada después de esta fecha"
+                className="mt-0.5 h-4 w-4 rounded border-input disabled:opacity-50"
+              />
+              <span className="ml-2 text-sm">
+                <span className="font-medium">
+                  🔒 Fecha crítica — no se mueve
+                </span>
+                <span className="block text-[11px] text-muted-foreground">
+                  El planificador no podrá meter nada después de esta fecha.
                 </span>
               </span>
             </label>
@@ -589,6 +588,7 @@ export default function NuevaMetaPage() {
             type="checkbox"
             checked={autoTrimestres}
             onChange={(e) => setAutoTrimestres(e.target.checked)}
+            aria-label={`Auto-generar 4 trimestres del ${anioActual}`}
             className="mt-0.5 h-4 w-4 rounded border-input"
           />
           <span>
