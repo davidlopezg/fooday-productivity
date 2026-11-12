@@ -485,9 +485,94 @@ export default function ProyectosPage() {
                       {exportando === p.id ? "Generando…" : "PDF"}
                     </span>
                   </button>
+                    <button
+                      onClick={async () => {
+                        const accion = p.archivado ? "desarchivar" : "archivar";
+                        // Cascade preview: contamos qué se va a afectar.
+                        const metasAfectadas = metasDelProyecto.filter(
+                          (m) =>
+                            p.archivado
+                              ? m.estado === "archivada"
+                              : m.estado !== "archivada" && m.estado !== "completada",
+                        ).length;
+                        const tareasAfectadas = tareasDelProyecto.filter(
+                          (t) =>
+                            p.archivado
+                              ? t.estado === "archivada"
+                              : t.estado !== "hecha" && t.estado !== "archivada",
+                        ).length;
+                        let msg = `¿${accion.charAt(0).toUpperCase() + accion.slice(1)} "${p.nombre}"?`;
+                        if (metasAfectadas > 0 || tareasAfectadas > 0) {
+                          const verb = p.archivado ? "se desarchivarán" : "se archivarán";
+                          msg = `¿${accion.charAt(0).toUpperCase() + accion.slice(1)} "${p.nombre}"?\n\nEsto arrastrará en cascada:\n`;
+                          if (metasAfectadas > 0) {
+                            msg += `  · ${metasAfectadas} meta${metasAfectadas === 1 ? "" : "s"} hija${metasAfectadas === 1 ? "" : "s"} ${verb}\n`;
+                          }
+                          if (tareasAfectadas > 0) {
+                            msg += `  · ${tareasAfectadas} tarea${tareasAfectadas === 1 ? "" : "s"} ${verb}\n`;
+                          }
+                          msg += `\nPuedes ${p.archivado ? "desarchivar" : "archivar"} el proyecto de nuevo para revertir.`;
+                        }
+                        if (!confirm(msg)) return;
+                        setProcesando(`${accion} "${p.nombre}"…`);
+                        try {
+                          if (p.archivado) {
+                            // Desarchivar: solo cambia el flag del proyecto.
+                            await archivarProyecto(p.id, false);
+                          } else {
+                            // Archivar: cascada a metas y tareas.
+                            await archivarProyectoEnCascada(p.id, true);
+                          }
+                          await reload();
+                        } catch (e) {
+                          alert(`No se pudo ${accion}: ${(e as Error).message}`);
+                        } finally {
+                          setProcesando(null);
+                        }
+                      }}
+                      disabled={procesando !== null}
+                      className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50"
+                      title={p.archivado ? "Desarchivar" : "Archivar"}
+                    >
+                      <IconArchive className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={async () => {
+                        // Contamos el impacto del delete (las metas NO se borran,
+                        // quedan con proyecto_id=null gracias al ON DELETE SET
+                        // NULL de la FK; las tareas tampoco, mismo motivo).
+                        const metasHuerfanas = metasDelProyecto.length;
+                        const tareasHuerfanas = tareasDelProyecto.length;
+                        let msg = `¿Eliminar "${p.nombre}"?`;
+                        if (metasHuerfanas > 0 || tareasHuerfanas > 0) {
+                          msg += `\n\nLas filas NO se borran, solo se desvinculan del proyecto:\n`;
+                          if (metasHuerfanas > 0) {
+                            msg += `  · ${metasHuerfanas} meta${metasHuerfanas === 1 ? "" : "s"} quedará${metasHuerfanas === 1 ? "á" : "án"} huérfana${metasHuerfanas === 1 ? "" : "s"} (sin proyecto, pero vivas en /metas)\n`;
+                          }
+                          if (tareasHuerfanas > 0) {
+                            msg += `  · ${tareasHuerfanas} tarea${tareasHuerfanas === 1 ? "" : "s"} quedará${tareasHuerfanas === 1 ? "á" : "án"} sin proyecto\n`;
+                          }
+                          msg += `\nSi quieres archivarlo TODO junto, usa el botón Archivar.`;
+                        }
+                        if (!confirm(msg)) return;
+                        setProcesando(`eliminando "${p.nombre}"…`);
+                        try {
+                          await eliminarProyecto(p.id);
+                          await reload();
+                        } catch (e) {
+                          alert(`No se pudo eliminar: ${(e as Error).message}`);
+                        } finally {
+                          setProcesando(null);
+                        }
+                      }}
+                      disabled={procesando !== null}
+                      className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-red-500 disabled:opacity-50"
+                      title="Eliminar proyecto"
+                    >
+                      <IconTrash className="h-4 w-4" />
+                    </button>
                 </div>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
+                <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span
                         className="inline-block h-3 w-3 rounded-sm"
@@ -620,95 +705,6 @@ export default function ProyectosPage() {
                         </ul>
                       </div>
                     )}
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1">
-                    <button
-                      onClick={async () => {
-                        const accion = p.archivado ? "desarchivar" : "archivar";
-                        // Cascade preview: contamos qué se va a afectar.
-                        const metasAfectadas = metasDelProyecto.filter(
-                          (m) =>
-                            p.archivado
-                              ? m.estado === "archivada"
-                              : m.estado !== "archivada" && m.estado !== "completada",
-                        ).length;
-                        const tareasAfectadas = tareasDelProyecto.filter(
-                          (t) =>
-                            p.archivado
-                              ? t.estado === "archivada"
-                              : t.estado !== "hecha" && t.estado !== "archivada",
-                        ).length;
-                        let msg = `¿${accion.charAt(0).toUpperCase() + accion.slice(1)} "${p.nombre}"?`;
-                        if (metasAfectadas > 0 || tareasAfectadas > 0) {
-                          const verb = p.archivado ? "se desarchivarán" : "se archivarán";
-                          msg = `¿${accion.charAt(0).toUpperCase() + accion.slice(1)} "${p.nombre}"?\n\nEsto arrastrará en cascada:\n`;
-                          if (metasAfectadas > 0) {
-                            msg += `  · ${metasAfectadas} meta${metasAfectadas === 1 ? "" : "s"} hija${metasAfectadas === 1 ? "" : "s"} ${verb}\n`;
-                          }
-                          if (tareasAfectadas > 0) {
-                            msg += `  · ${tareasAfectadas} tarea${tareasAfectadas === 1 ? "" : "s"} ${verb}\n`;
-                          }
-                          msg += `\nPuedes ${p.archivado ? "desarchivar" : "archivar"} el proyecto de nuevo para revertir.`;
-                        }
-                        if (!confirm(msg)) return;
-                        setProcesando(`${accion} "${p.nombre}"…`);
-                        try {
-                          if (p.archivado) {
-                            // Desarchivar: solo cambia el flag del proyecto.
-                            await archivarProyecto(p.id, false);
-                          } else {
-                            // Archivar: cascada a metas y tareas.
-                            await archivarProyectoEnCascada(p.id, true);
-                          }
-                          await reload();
-                        } catch (e) {
-                          alert(`No se pudo ${accion}: ${(e as Error).message}`);
-                        } finally {
-                          setProcesando(null);
-                        }
-                      }}
-                      disabled={procesando !== null}
-                      className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50"
-                      title={p.archivado ? "Desarchivar" : "Archivar"}
-                    >
-                      <IconArchive className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={async () => {
-                        // Contamos el impacto del delete (las metas NO se borran,
-                        // quedan con proyecto_id=null gracias al ON DELETE SET
-                        // NULL de la FK; las tareas tampoco, mismo motivo).
-                        const metasHuerfanas = metasDelProyecto.length;
-                        const tareasHuerfanas = tareasDelProyecto.length;
-                        let msg = `¿Eliminar "${p.nombre}"?`;
-                        if (metasHuerfanas > 0 || tareasHuerfanas > 0) {
-                          msg += `\n\nLas filas NO se borran, solo se desvinculan del proyecto:\n`;
-                          if (metasHuerfanas > 0) {
-                            msg += `  · ${metasHuerfanas} meta${metasHuerfanas === 1 ? "" : "s"} quedará${metasHuerfanas === 1 ? "á" : "án"} huérfana${metasHuerfanas === 1 ? "" : "s"} (sin proyecto, pero vivas en /metas)\n`;
-                          }
-                          if (tareasHuerfanas > 0) {
-                            msg += `  · ${tareasHuerfanas} tarea${tareasHuerfanas === 1 ? "" : "s"} quedará${tareasHuerfanas === 1 ? "á" : "án"} sin proyecto\n`;
-                          }
-                          msg += `\nSi quieres archivarlo TODO junto, usa el botón Archivar.`;
-                        }
-                        if (!confirm(msg)) return;
-                        setProcesando(`eliminando "${p.nombre}"…`);
-                        try {
-                          await eliminarProyecto(p.id);
-                          await reload();
-                        } catch (e) {
-                          alert(`No se pudo eliminar: ${(e as Error).message}`);
-                        } finally {
-                          setProcesando(null);
-                        }
-                      }}
-                      disabled={procesando !== null}
-                      className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-red-500 disabled:opacity-50"
-                      title="Eliminar proyecto"
-                    >
-                      <IconTrash className="h-4 w-4" />
-                    </button>
-                  </div>
                 </div>
                 {errorExportPorProyecto[p.id] && (
                   <p className="mt-2 text-xs text-red-600 dark:text-red-400">
