@@ -369,8 +369,10 @@ export function PagoCard({
                 </button>
                 {menuOpen && (
                   <>
+                    {/* Backdrop decorativo del menú: cierra al pulsar fuera. */}
                     <div
                       className="fixed inset-0 z-10"
+                      aria-hidden="true"
                       onClick={() => setMenuOpen(false)}
                     />
                     <div className="absolute right-0 z-20 mt-1 w-56 overflow-hidden rounded-md border border-border bg-popover shadow-lg">

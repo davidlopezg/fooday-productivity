@@ -100,10 +100,7 @@ export function PostFocusDialog() {
         aria-modal="true"
         aria-labelledby="post-focus-title"
       >
-        <div
-          className="relative w-full max-w-md overflow-hidden rounded-t-2xl border border-border bg-card shadow-xl sm:rounded-2xl"
-          onClick={(e) => e.stopPropagation()}
-        >
+        <div className="relative w-full max-w-md overflow-hidden rounded-t-2xl border border-border bg-card shadow-xl sm:rounded-2xl">
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <div className="flex items-center gap-2">
               <span className="text-xl" aria-hidden>
