@@ -47,6 +47,9 @@ jobs:
 
   deploy:
     needs: build
+    # Desplegar solo cuando se fusiona a main. En un PR no hay nada que
+    # desplegar (y el job fallaba por permisos, dejando el PR en rojo).
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

@@ -8,6 +8,26 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 <!-- END:nextjs-agent-rules -->
 
+# Flujo de trabajo con agentes
+
+Este repo se trabaja con el flujo que explica `docs/proceso.md`. En corto:
+
+1. **Nunca** se edita con `main` activa. Antes de tocar nada:
+   `git branch --show-current` y, si dice `main`, `git checkout -b ux/<nombre>`.
+2. Todo arreglo sale en un **PR con `Closes #N`**, usando la plantilla de
+   `.github/pull_request_template.md` (la checklist de verificación y de
+   documentación es obligatoria).
+3. Antes del PR pasan la aduana técnica: `npm run typecheck`, `npm test` y el
+   lint de los ficheros cambiados (en CI es automático y bloquea el merge).
+4. Si el cambio toca una pantalla, se actualiza la documentación (regla de
+   abajo, en la misma sesión).
+5. **El merge lo pulsa la persona.** Ni el agente ni las herramientas de
+   auditoría fusionan nada.
+
+Las herramientas del ciclo (auditoría, evaluación adversarial, planificación,
+revisión del PR y aprendizaje) están en `~/.pi/agent/skills/ux-audit/`; su
+`MANUAL.md` explica el ciclo entero y `COMANDOS.md` trae todos los comandos.
+
 # Regla de sincronización docs ↔ app
 
 Cualquier cambio que añada o modifique una **pantalla**, un **hábito**, un
