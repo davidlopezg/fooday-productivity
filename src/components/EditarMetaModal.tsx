@@ -278,7 +278,6 @@ export function EditarMetaModal({
             <label className="block">
               <span className="mb-1 block text-xs text-muted-foreground">Título *</span>
               <input
-                autoFocus
                 className={field}
                 value={titulo}
                 onChange={(e) => setTitulo(e.target.value)}

@@ -1562,7 +1562,6 @@ export function CrearModal({
           <label className="block">
             <span className="mb-1 block text-xs text-muted-foreground">Título *</span>
             <input
-              autoFocus
               className={field}
               value={form.titulo}
               onChange={(e) => setForm({ ...form, titulo: e.target.value })}

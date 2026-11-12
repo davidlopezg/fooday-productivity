@@ -150,7 +150,6 @@ export function PagoPagarParcialModal({
             className={`h-10 w-full rounded-md border bg-background px-3 font-mono text-base tabular-nums outline-none focus:ring-2 focus:ring-ring ${
               !valido && importe ? "border-red-500" : "border-input"
             }`}
-            autoFocus
             required
           />
           <div className="mt-1.5 flex flex-wrap gap-1">
