@@ -1509,6 +1509,7 @@ export default function DocsPage() {
             </span>
             <span className="text-muted-foreground">
               <strong className="text-foreground">
+
                 Los 18 campos de formulario que estaban “sin nombre” ya se
                 anuncian bien.
               </strong>{" "}
@@ -1536,6 +1537,56 @@ export default function DocsPage() {
               <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas/nueva</code>
               ). Solo se añadieron atributos de asociación y nombres accesibles:
               sin cambiar el texto visible ni la disposición.
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-11-12
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
+                El histórico del plan diario ya cuenta lo que hiciste.
+              </strong>{" "}
+              El plan guarda su propio contador ({" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                plan_diario_tareas.hecho
+              </code>
+              ) para que el histórico pueda decir “hiciste 3 de 5”. Pero una
+              tarea del plan vinculada a una tarea real se completaba desde{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                /tareas
+              </code>
+              ,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                /plan-diario
+              </code>{" "}
+              o el widget del día, y ninguno de esos sitios conocía la fila del
+              plan: el contador se quedaba en 0 y el histórico del ritual
+              diario ({" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                /plan-diario/historico
+              </code>
+              ) decía siempre “0 / N”, hicieras lo que hicieras. Ahora{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                marcarHecha
+              </code>{" "}
+              y{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                reabrirTarea
+              </code>{" "}
+              sincronizan las filas del plan, así que el contador sube al
+              cerrar y baja al reabrir. Y las tareas{" "}
+              <strong className="text-foreground">libres</strong> del plan (las
+              que propone la IA, sin tarea real detrás) tienen por fin su
+              casilla en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                /plan-diario/detalle
+              </code>
+              : antes no había forma de cerrarlas. FEATURES actualizada (fila{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                /plan-diario/detalle
+              </code>
+              ). Sin cambios de modelo ni de metodología.
             </span>
           </li>
 
