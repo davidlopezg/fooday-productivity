@@ -33,7 +33,9 @@ type SubtareaHecha = {
   descripcion: string;
   hecho: boolean;
   updated_at: string;
-  tarea: Array<{ id: string; proyecto_id: string | null }> | null;
+  /** Tarea padre: `estado` hace falta para la regla de progreso
+   *  (una subtarea solo cuenta mientras su tarea siga abierta). */
+  tarea: Array<{ id: string; proyecto_id: string | null; estado: string | null }> | null;
 };
 
 type Dia = {
@@ -84,6 +86,18 @@ export default function InformesPage() {
     [hechas, desde],
   );
 
+  // REGLA DE PROGRESO (auditoría de lógica, issue #8): una subtarea cuenta
+  // como progreso mientras su tarea padre siga ABIERTA. Si la tarea está
+  // cerrada, su progreso ya está representado por la tarea completa (1) y
+  // sumar además la subtarea (1/3) sería un doble conteo: el heatmap y el
+  // chart de barras inflaban el trabajo real.
+  // Ojo: esto NO cambia el KPI "Subtareas hechas", que es un contador de
+  // ACTIVIDAD (cuántas subtareas se marcaron), no de progreso.
+  const subtareasProgresivas = useMemo(
+    () => subtareas.filter((s) => s.tarea?.[0]?.estado !== "hecha"),
+    [subtareas],
+  );
+
   // Serie diaria (tareas hechas + subtareas hechas + minutos de foco)
   const serie = useMemo<Dia[]>(() => {
     const mapa = new Map<string, Dia>();
@@ -103,7 +117,7 @@ export default function InformesPage() {
       const row = mapa.get(k);
       if (row) row.tareas++;
     }
-    for (const s of subtareas) {
+    for (const s of subtareasProgresivas) {
       const k = fmt(s.updated_at);
       const row = mapa.get(k);
       if (row) row.subtareas++;
@@ -114,7 +128,7 @@ export default function InformesPage() {
       if (row) row.foco_min += Math.round(p.duracion_seg / 60);
     }
     return Array.from(mapa.values());
-  }, [hechasEnRango, subtareas, pomos, dias]);
+  }, [hechasEnRango, subtareasProgresivas, pomos, dias]);
 
   const totalTareas = hechasEnRango.length;
   const totalSubtareas = subtareas.length;
@@ -285,7 +299,7 @@ export default function InformesPage() {
         row.tareas++;
         map.set(lunes, row);
       }
-      for (const s of subtareas) {
+      for (const s of subtareasProgresivas) {
         const fecha = fmt(s.updated_at);
         const lunes = inicioDeSemana(fecha);
         const row = map.get(lunes) ?? {
@@ -307,7 +321,7 @@ export default function InformesPage() {
       tareas: d.tareas,
       subtareas: d.subtareas,
     }));
-  }, [dias, hechasEnRango, subtareas, serie]);
+  }, [dias, hechasEnRango, subtareasProgresivas, serie]);
   const maxBucket = Math.max(1, ...buckets.map((b) => b.tareas + b.subtareas));
 
   return (
@@ -349,7 +363,7 @@ export default function InformesPage() {
         <Kpi
           label="Subtareas hechas"
           value={loading ? "—" : totalSubtareas.toString()}
-          sub={`últimos ${dias} días`}
+          sub={`últimos ${dias} días · actividad`}
           accent="violet"
         />
         <Kpi
