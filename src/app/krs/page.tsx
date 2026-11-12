@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { fetchKrsOverview } from "@/lib/queries";
-import { actualizarResultadoPeriodo, marcarWig } from "@/lib/mutations";
+import { fetchKrsOverview, fetchKRsFocoSemanal } from "@/lib/queries";
+import { actualizarResultadoPeriodo } from "@/lib/mutations";
+import { getCurrentISOWeek } from "@/lib/semana";
 import { useData } from "@/lib/useData";
-import type { KrOverview, MetaConPlan, Periodo, ResultadoConTareas } from "@/lib/types";
+import type { KrFocoConDetalle, KrOverview } from "@/lib/types";
 import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
-import { PanelWigMetas } from "@/components/PanelWigMetas";
+import { PanelFocoSemanaKRs } from "@/components/PanelFocoSemanaKRs";
 import { IconArrowLeft, IconSearch } from "@/components/icons";
 
 // ---------------------------------------------------------------------------
@@ -60,9 +61,6 @@ export default function KrsPage() {
   const [q, setQ] = useState("");
   const [filtroProyecto, setFiltroProyecto] = useState("");
   const [filtroEstado, setFiltroEstado] = useState("");
-  /** Id de la meta cuyo WIG se está quitando (deshabilita el botón). */
-  const [guardandoWigMetaId, setGuardandoWigMetaId] = useState<string | null>(null);
-  const [errorWig, setErrorWig] = useState<string | null>(null);
 
   const filas = useMemo(() => krsQ.data ?? [], [krsQ.data]);
 
@@ -80,62 +78,17 @@ export default function KrsPage() {
     [filas],
   );
 
-  /** Quita una META del panel de WIGs (mismo toggle que en /metas y /tareas). */
-  async function quitarWigMeta(metaId: string) {
-    setErrorWig(null);
-    setGuardandoWigMetaId(metaId);
-    try {
-      const ok = await marcarWig(metaId, false);
-      if (!ok) setErrorWig("No se pudo quitar el WIG de la meta.");
-      else await krsQ.reload();
-    } catch (e) {
-      setErrorWig(e instanceof Error ? e.message : "No se pudo actualizar");
-    } finally {
-      setGuardandoWigMetaId(null);
-    }
-  }
-
   /* ---------------------------------------------------------------------
-   * WIGs (issue #37).
-   * Arriba de la tabla salen las metas marcadas como WIG que tienen KRs,
-   * con sus KRs y su entrega. Es el MISMO panel que /metas y /tareas
-   * (PanelWigMetas): aquí lo alimentamos desde `fetchKrsOverview`, que
-   * ya trae el KR con su meta, su proyecto y sus periodos.
+   * Foco semanal de KRs (issue #43).
+   * Arriba de la tabla va el panel de KRs: los resultados medibles en los
+   * que se pone horas ESTA semana (máx 3). Es el MISMO panel y la misma
+   * query que la home y /tareas. Antes era el de metas WIG, que en una
+   * página de KRs no tenía sentido.
    * ------------------------------------------------------------------- */
-  const wigs = useMemo<MetaConPlan[]>(() => {
-    const porMeta = new Map<string, MetaConPlan>();
-    for (const f of filas) {
-      if (!f.meta?.es_wig) continue;
-      let plan = porMeta.get(f.meta.id);
-      if (!plan) {
-        plan = {
-          meta: f.meta,
-          resultados: [],
-          total_tareas: 0,
-          tareas_hechas: 0,
-          progreso: 0,
-        };
-        porMeta.set(f.meta.id, plan);
-      }
-      const periodos = f.periodos ?? [];
-      const res: ResultadoConTareas = {
-        ...f.kr,
-        periodos,
-        periodo: periodos[0] ?? ({} as Periodo),
-        tareas: [],
-      };
-      plan.resultados.push(res);
-      plan.total_tareas += f.total_tareas ?? 0;
-      plan.tareas_hechas += f.tareas_hechas ?? 0;
-    }
-    const planes = Array.from(porMeta.values());
-    for (const p of planes) {
-      p.progreso = p.total_tareas > 0 ? p.tareas_hechas / p.total_tareas : 0;
-    }
-    return planes.sort(
-      (a, b) => (a.meta.wig_orden ?? 9) - (b.meta.wig_orden ?? 9),
-    );
-  }, [filas]);
+  const focoQ = useData<KrFocoConDetalle[]>(() => {
+    const semana = getCurrentISOWeek();
+    return fetchKRsFocoSemanal(semana.anio, semana.semana_iso);
+  }, []);
 
   /** Filtro por texto: busca en el KR, en su meta y en su proyecto. */
   const filtradas = useMemo(() => {
@@ -190,16 +143,18 @@ export default function KrsPage() {
         </div>
       </header>
 
-      {/* WIGs (metas con foco) de KR — mismo panel que /metas y /tareas. */}
-      {wigs.length > 0 && (
-        <PanelWigMetas
-          wigs={wigs}
-          onQuitar={quitarWigMeta}
-          guardandoId={guardandoWigMetaId}
-        />
-      )}
-      {errorWig && (
-        <p className="text-xs text-red-600 dark:text-red-400">{errorWig}</p>
+      {/* KRs en foco de la semana (issue #43) — mismo panel que la home y
+          /tareas. Antes era el panel de metas WIG, que aquí no tenía
+          sentido: en el inventario de KRs lo que importa es qué KR está
+          moviendo, no qué meta lo contiene. */}
+      <PanelFocoSemanaKRs
+        focos={focoQ.data ?? []}
+        estadoVacio="Esta semana todavía no has elegido el foco: los KRs en los que pones horas son el eslabón entre tus metas y tus tareas. Elige hasta 3 en /semana."
+      />
+      {focoQ.error && (
+        <p className="text-xs text-red-600 dark:text-red-400">
+          No se pudo cargar el foco semanal de KRs: {focoQ.error}
+        </p>
       )}
 
       {krsQ.error && (
