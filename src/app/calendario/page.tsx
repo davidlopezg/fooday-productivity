@@ -749,16 +749,16 @@ function PopoverAsignar({
   // Bloque fijo: solo aviso.
   if (fijo) {
     return (
-      <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="popover-titulo"
-        onClick={onCerrar}
-      >
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        {/* Backdrop: cierra al pulsar fuera. Es decorativo para el lector de
+            pantalla (aria-hidden) y no necesita equivalente de teclado: el
+            diálogo ya se cierra con Escape y con su botón de cerrar. */}
+        <div className="absolute inset-0" aria-hidden="true" onClick={onCerrar} />
         <div
-          className="w-full max-w-md rounded-xl border border-border bg-card p-5 shadow-2xl"
-          onClick={(e) => e.stopPropagation()}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="popover-titulo"
+          className="relative w-full max-w-md rounded-xl border border-border bg-card p-5 shadow-2xl"
         >
           <header className="mb-3 flex items-start justify-between">
             <div>
@@ -814,16 +814,14 @@ function PopoverAsignar({
   // ─── Bloque 3 (operativas): lista actual + buscador para sumar más. ───
   if (esOperativas) {
     return (
-      <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="popover-titulo"
-        onClick={onCerrar}
-      >
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        {/* Backdrop decorativo: ver el modal de bloque fijo. */}
+        <div className="absolute inset-0" aria-hidden="true" onClick={onCerrar} />
         <div
-          className="w-full max-w-md rounded-xl border border-border bg-card p-5 shadow-2xl"
-          onClick={(e) => e.stopPropagation()}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="popover-titulo"
+          className="relative w-full max-w-md rounded-xl border border-border bg-card p-5 shadow-2xl"
         >
           <header className="mb-3 flex items-start justify-between">
             <div>
@@ -975,16 +973,14 @@ function PopoverAsignar({
   // ─── Bloques 1, 2 y 4 (1 sola tarea): comportamiento clásico. ───
   const bloqueActual = bloquesActuales[0] ?? null;
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="popover-titulo"
-      onClick={onCerrar}
-    >
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      {/* Backdrop decorativo: ver el modal de bloque fijo. */}
+      <div className="absolute inset-0" aria-hidden="true" onClick={onCerrar} />
       <div
-        className="w-full max-w-md rounded-xl border border-border bg-card p-5 shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="popover-titulo"
+        className="relative w-full max-w-md rounded-xl border border-border bg-card p-5 shadow-2xl"
       >
         <header className="mb-3 flex items-start justify-between">
           <div>

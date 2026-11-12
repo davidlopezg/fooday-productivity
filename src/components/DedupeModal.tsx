@@ -198,7 +198,7 @@ export function DedupeModal({
       aria-modal="true"
       aria-label="Buscar tareas duplicadas"
     >
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/50" aria-hidden="true" onClick={onClose} />
       <div className="safe-b relative flex max-h-[90dvh] w-full max-w-3xl flex-col rounded-t-2xl border border-border bg-card shadow-lg sm:max-h-[calc(100dvh-2rem)] sm:rounded-xl">
         <header className="flex shrink-0 items-start justify-between gap-3 border-b border-border px-5 py-4">
           <div className="min-w-0 flex-1">

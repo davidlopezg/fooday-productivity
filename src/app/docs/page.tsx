@@ -1538,6 +1538,55 @@ export default function DocsPage() {
             </span>
             <span className="text-muted-foreground">
               <strong className="text-foreground">
+                Los 43 controles que solo funcionaban con el ratón ya funcionan
+                con el teclado.
+              </strong>{" "}
+              Los fondos de los modales y los menús eran{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                div
+              </code>{" "}
+              con un manejador de clic: el lector de pantalla los anunciaba como
+              elementos pulsables sin poder activarlos, y el usuario de teclado
+              no tenía forma de cerrarlos. Ahora el fondo es una capa{" "}
+              <strong className="text-foreground">decorativa</strong> (
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                aria-hidden
+              </code>
+              ) y el cierre sigue funcionando igual: el diálogo conserva su
+              botón de cerrar y Escape. Afectaba a los 3 popover de{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                /calendario
+              </code>
+              , los modales de{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                /semana
+              </code>
+              ,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                /metas
+              </code>
+              ,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                /tareas
+              </code>{" "}
+              y{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/pagos</code>
+              , el panel de ayuda y el diálogo de fin de pomodoro. Además, el
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                {"<dialog>"}
+              </code>{" "}
+              nativo de pagos deja de llevar el manejador de clic encima (la
+              capa decorativa interior hace el mismo trabajo). Sin cambios de
+              aspecto: el fondo sigue cerrando al pulsar fuera.
+            </span>
+          </li>
+
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-11-12
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
                 La app ya no te roba el foco al abrir una pantalla.
               </strong>{" "}
               Nueve campos tenían <code className="rounded bg-muted px-1.5 py-0.5 text-xs">autoFocus</code>:

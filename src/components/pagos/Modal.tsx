@@ -54,16 +54,18 @@ export function Modal({
   };
 
   return (
+    // <dialog> nativo modal (showModal): ya tiene la semántica de diálogo y se
+    // cierra con Escape. El cierre al pulsar fuera del contenido lo lleva una
+    // capa decorativa interior (aria-hidden), igual que el resto de modales de
+    // la app: así el <dialog> no lleva manejadores de ratón encima.
     <dialog
       ref={ref}
       onClose={onClose}
-      onClick={(e) => {
-        // click en el backdrop (fuera del contenido) cierra
-        if (e.target === ref.current) onClose();
-      }}
-      className="w-full max-w-[calc(100vw-2rem)] rounded-xl border border-border bg-card p-0 text-foreground shadow-2xl backdrop:bg-black/50"
+      className="relative w-full max-w-[calc(100vw-2rem)] rounded-xl border border-border bg-card p-0 text-foreground shadow-2xl backdrop:bg-black/50"
     >
-      <div className={`${widths[size]} mx-auto flex max-h-[calc(100vh-4rem)] flex-col`}>
+      {/* Capa decorativa: click fuera del contenido → cierra. */}
+      <div className="absolute inset-0" aria-hidden="true" onClick={onClose} />
+      <div className={`${widths[size]} relative mx-auto flex max-h-[calc(100vh-4rem)] flex-col`}>
         {/* Header */}
         <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-3">
           <h2 className="text-base font-semibold">{title}</h2>
