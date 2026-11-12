@@ -447,7 +447,7 @@ export default function ProyectosPage() {
             return (
               <li
                 key={p.id}
-                className="rounded-xl border border-border bg-card p-4"
+                className="min-w-0 rounded-xl border border-border bg-card p-4"
               >
                 {/* Issues #36 y #40: los botones van en su propia fila, arriba,
                     alineados a la derecha; el resto, a ancho completo. */}
@@ -579,7 +579,12 @@ export default function ProyectosPage() {
                         style={{ backgroundColor: p.color ?? "#64748b" }}
                         aria-hidden
                       />
-                      <h3 className="truncate font-semibold tracking-tight">
+                      {/* Issue #45: `min-w-0` + `flex-1` para que el título
+                          con `truncate` pueda encogerse en móvil. Sin esto el
+                          `min-width:auto` del item flex lo dejaba con el
+                          ancho del texto entero y la tarjeta se salía de la
+                          pantalla. */}
+                      <h3 className="min-w-0 flex-1 truncate font-semibold tracking-tight">
                         {p.nombre}
                       </h3>
                       {p.archivado && (
@@ -620,7 +625,7 @@ export default function ProyectosPage() {
                           proyecto terminado. */}
                     {metasDelProyecto.length > 0 && (
                       <div className="mt-2.5">
-                        <div className="flex items-center justify-between text-[11px]">
+                        <div className="flex flex-wrap items-center justify-between gap-x-2 text-[11px]">
                           <span className="text-muted-foreground">
                             Avance de metas
                           </span>
@@ -640,7 +645,7 @@ export default function ProyectosPage() {
                     )}
                     {p.total_tareas > 0 && (
                       <div className="mt-2">
-                        <div className="flex items-center justify-between text-[11px]">
+                        <div className="flex flex-wrap items-center justify-between gap-x-2 text-[11px]">
                           <span className="text-muted-foreground">Tareas</span>
                           <span className="font-medium tabular-nums">
                             {p.tareas_hechas}/{p.total_tareas}
@@ -748,7 +753,7 @@ export default function ProyectosPage() {
               return (
                 <li
                   key={m.id}
-                  className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/30 bg-background py-1 pl-2 pr-1 text-xs"
+                  className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-amber-500/30 bg-background py-1 pl-2 pr-1 text-xs"
                 >
                   <IconFolder className="h-3 w-3 text-amber-700 dark:text-amber-300" />
                   <span
@@ -759,7 +764,7 @@ export default function ProyectosPage() {
                   />
                   <Link
                     href={`/metas/detalle?id=${m.id}`}
-                    className="text-foreground hover:underline"
+                    className="min-w-0 max-w-[55vw] truncate text-foreground hover:underline"
                     title={m.titulo}
                   >
                     {m.codigo ? (
