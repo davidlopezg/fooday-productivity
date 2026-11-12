@@ -1,0 +1,108 @@
+name: Auditoría de usabilidad en CI
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "URL a auditar (por defecto, el servidor local del build estático)"
+        required: false
+        type: string
+        default: "http://127.0.0.1:3000"
+      publish_issues:
+        description: "Publicar los hallazgos como issues (requiere permiso issues: write)"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Build estático
+        run: npm run build
+
+      - name: Servir el export estático
+        run: |
+          npx --yes serve out -l 3000 &
+          npx --yes wait-on http://127.0.0.1:3000 -t 60000
+
+      - name: Instalar squirrelscan
+        run: |
+          curl -fsSL https://install.squirrelscan.com | bash
+          squirrel --version
+
+      - name: Auditar
+        run: |
+          squirrel audit "${{ inputs.base_url }}" -f json -o squirrel-report.json || true
+          squirrel audit "${{ inputs.base_url }}" --summary || true
+
+      - name: Subir informe
+        uses: actions/upload-artifact@v4
+        with:
+          name: squirrel-report
+          path: squirrel-report.json
+
+      - name: Resumen del informe
+        run: |
+          {
+            echo "### Informe squirrelscan"
+            echo '```json'
+            head -c 4000 squirrel-report.json || echo "{}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Convertir a hallazgos del contrato común
+        run: |
+          mkdir -p .ux-audit
+          node -e "
+            const fs=require('fs');
+            const r=JSON.parse(fs.readFileSync('squirrel-report.json','utf-8'));
+            const out={meta:r.meta,summary:r.summary,issues:(r.issues||[]).map(i=>({
+              ruleId:i.ruleId,name:i.name,description:i.description,category:i.category,group:i.group,
+              severity:i.severity,checks:(i.checks||[]).filter(c=>c.status!=='pass').map(c=>({
+                message:c.message,affectedPages:c.affectedPages||[],affectedPagesCount:c.affectedPagesCount||0
+              }))
+            }))};
+            fs.writeFileSync('.ux-audit/squirrel-findings.json',JSON.stringify(out,null,2));
+          "
+
+      - name: Publicar issues (opcional)
+        if: inputs.publish_issues
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          # Mapea cada issue de squirrelscan a una etiqueta de severidad y crea el issue.
+          node -e "
+            const fs=require('fs');
+            const {execFileSync}=require('child_process');
+            const data=JSON.parse(fs.readFileSync('.ux-audit/squirrel-findings.json','utf-8'));
+            const sev={error:'high',warning:'medium',info:'low'};
+            for(const i of data.issues){
+              const n=(i.checks||[]).length||1;
+              const title=(i.name||i.ruleId)+' ('+n+' casos)';
+              const pages=[...new Set((i.checks||[]).flatMap(c=>c.affectedPages||[]))];
+              const body=['**Descripción**','',i.description||'','','Detectado por squirrelscan en '+n+' caso(s).','',
+                '**Pasos para reproducir**','',(pages.length?'1. Abre '+pages.slice(0,5).map(p=>'\`'+p+'\`').join(', '):'1. Revisa las páginas afectadas'),
+                '2. Comprueba el elemento señalado.','',
+                '**Impacto en el usuario**','',
+                'Reduce la usabilidad, el rendimiento o la accesibilidad de la pantalla.','',
+                '**Evidencia**','',...(pages.slice(0,20).map(p=>'- \`'+p+'\`'))].join('\n');
+              const args=['issue','create','--title',title,'--body',body,'--label','bug','--label','ux','--label','cat:ux-ui','--label','severity:'+(sev[i.severity]||'medium')];
+              try{ execFileSync('gh',args,{stdio:'inherit'}); }catch(e){ console.error('No se pudo crear:',title); }
+            }
+          "
