@@ -1,0 +1,88 @@
+name: Auditoría de usabilidad y lógica
+description: Hallazgo del equipo de auditoría (UX/UI, lógica, código, producto, QA, seguridad).
+title: "[<categoría>] <resumen del problema>"
+labels: ["bug", "ux"]
+body:
+  - type: dropdown
+    id: categoria
+    attributes:
+      label: Categoría
+      description: ¿De qué equipo es este hallazgo?
+      options:
+        - UX/UI (cat:ux-ui)
+        - Lógica y reglas de negocio (cat:logica)
+        - Código e implementación (cat:codigo)
+        - Producto y requisitos (cat:producto)
+        - QA y verificación (cat:qa)
+        - Seguridad y datos (cat:seguridad)
+    validations:
+      required: true
+  - type: dropdown
+    id: severidad
+    attributes:
+      label: Severidad
+      options:
+        - critical — bloquea la tarea o pierde datos (severity:critical)
+        - high — abandono o error costoso (severity:high)
+        - medium — fricción con salida (severity:medium)
+        - low — molestia o cosmético (severity:low)
+    validations:
+      required: true
+  - type: input
+    id: modulo
+    attributes:
+      label: Módulo o área afectada
+      placeholder: "tareas, metas, estados, focus, pagos…"
+    validations:
+      required: false
+  - type: textarea
+    id: descripcion
+    attributes:
+      label: Descripción
+      description: Qué ocurre y bajo qué condiciones.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduccion
+    attributes:
+      label: Pasos para reproducir
+      description: Pasos concretos, con rutas y elementos.
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: textarea
+    id: impacto
+    attributes:
+      label: Impacto en el usuario
+      description: A quién afecta, con qué frecuencia y qué consecuencia tiene.
+    validations:
+      required: true
+  - type: textarea
+    id: evidencia
+    attributes:
+      label: Evidencia
+      description: "Referencias archivo:línea, capturas o logs."
+      render: text
+    validations:
+      required: false
+  - type: dropdown
+    id: tipo
+    attributes:
+      label: Tipo de hallazgo
+      options:
+        - Bug demostrado (tipo:bug)
+        - Contradicción probable (tipo:contradiccion)
+        - Mejora de diseño (tipo:mejora)
+        - Pregunta abierta (tipo:pregunta)
+    validations:
+      required: true
+  - type: textarea
+    id: solucion
+    attributes:
+      label: Solución propuesta o regla esperada
+      description: Regla, criterio de aceptación o enfoque. No hace falta que sea código.
+    validations:
+      required: false
