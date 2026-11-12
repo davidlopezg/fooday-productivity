@@ -453,7 +453,6 @@ function ValorEditor({
   return (
     <span className="flex items-center gap-1">
       <input
-        autoFocus
         value={texto}
         onChange={(e) => setTexto(e.target.value)}
         onBlur={guardar}

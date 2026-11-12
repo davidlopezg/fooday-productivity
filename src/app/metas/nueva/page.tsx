@@ -347,7 +347,6 @@ export default function NuevaMetaPage() {
               value={titulo}
               onChange={(e) => setTitulo(e.target.value)}
               placeholder="p.ej. Migrar app a PWA con GitHub Pages"
-              autoFocus
             />
           </label>
           <label className="block sm:col-span-2">

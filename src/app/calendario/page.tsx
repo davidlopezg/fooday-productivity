@@ -912,7 +912,6 @@ function PopoverAsignar({
               <div className="relative">
                 <IconSearch className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <input
-                  autoFocus
                   type="search"
                   placeholder="Buscar tarea…"
                   value={busqueda}
@@ -1049,7 +1048,6 @@ function PopoverAsignar({
         <div className="relative">
           <IconSearch className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <input
-            autoFocus
             type="search"
             placeholder="Buscar tarea…"
             value={busqueda}

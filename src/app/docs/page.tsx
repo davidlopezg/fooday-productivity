@@ -1509,6 +1509,31 @@ export default function DocsPage() {
             </span>
             <span className="text-muted-foreground">
               <strong className="text-foreground">
+                La app ya no te roba el foco al abrir una pantalla.
+              </strong>{" "}
+              Nueve campos tenían <code className="rounded bg-muted px-1.5 py-0.5 text-xs">autoFocus</code>:
+              al entrar en la pantalla (o al abrir un modal) el cursor saltaba
+              solo a ese campo. En escritorio es un atajo cómodo; en el móvil
+              abre el teclado y tapa media pantalla, y con lector de pantalla
+              interrumpe la lectura del contenido para empezar por un campo que
+              el usuario no había pedido. Afectaba a los buscadores de{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/semana</code> y{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/calendario</code>,
+              a los modales de tarea, editar meta y pago parcial, y a los
+              formularios de <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas/nueva</code>,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/plan-diario</code> y{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/krs</code>.
+              Se elimina el foco automático en los 9: el usuario decide dónde
+              empieza a escribir. Sin cambios de aspecto ni de lógica.
+            </span>
+          </li>
+
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-11-12
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
 
                 Los 18 campos de formulario que estaban “sin nombre” ya se
                 anuncian bien.

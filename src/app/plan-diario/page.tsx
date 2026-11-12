@@ -1291,7 +1291,6 @@ function BloqueBlock({
       {editable ? (
         editando ? (
           <input
-            autoFocus
             value={borrador}
             onChange={(e) => setBorrador(e.target.value)}
             onBlur={commitRename}

@@ -396,7 +396,6 @@ function ModalAnadir({
               <div className="relative mb-3">
                 <IconSearch className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <input
-                  autoFocus
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
                   placeholder="Buscar tarea…"
