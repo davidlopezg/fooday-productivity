@@ -1542,6 +1542,26 @@ export default function DocsPage() {
             </span>
             <span className="text-muted-foreground">
               <strong className="text-foreground">
+                Las tarjetas de /proyectos ya se aguantan al ancho del móvil.
+              </strong>{" "}
+              Issue #45: en la versión móvil los paneles de proyectos se salían
+              de la pantalla. La causa era el título del proyecto: con{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">truncate</code>{" "}
+              pero sin{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">min-w-0</code>,{" "}
+              el navegador le daba el ancho del texto entero y la tarjeta
+              nunca podía encogerse. Ahora el título se recorta con puntos
+              suspensivos, las barras de progreso pueden partirse en dos
+              líneas y las metas sin proyecto también se cortan. Sin cambios
+              de datos ni de metodología.
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-11-12
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
                 Los botones de cada tarjeta de proyecto, arriba y alineados a
                 la derecha.
               </strong>{" "}
@@ -4019,6 +4039,7 @@ function AplicacionEnApp({ pilar }: { pilar: 1 | 2 | 3 | 4 | 5 }) {
       "Semáforo verde/amarillo/rojo en planes diarios",
       "Estados de meta (sin_empezar → en_progreso → completada) con feedback visible — y el estado se DERIVA del trabajo: al completar todas las tareas vivas de una meta, la meta se completa sola (y al reabrir una, vuelve a en progreso). La barra de metas de /proyectos se mueve con ese estado real",
       "Tarjetas de proyecto en dos alturas (/proyectos): los botones van arriba en su propia fila, alineados a la derecha, y el resto del contenido a ancho completo, para que el texto de la tarjeta no se apriete",
+      "Las tarjetas de /proyectos caben en el móvil (issue #45): el título se recorta con puntos suspensivos, las barras de progreso pueden partirse en dos líneas y las metas sin proyecto también se cortan, así que ningún panel se sale de la pantalla en el teléfono",
       "Botón IA “Generar plan con IA” en /metas/nueva y EditarMetaModal: filtra KRs por el campo plazo (Q3, Q1-Q3, fin de 2026…) y dentro de cada KR anota las tareas y hábitos necesarios para cumplirlo",
       "Escenarios de proyecto (/escenarios): cronología + estado medido + lectura de la situación, y los escenarios con su estrategia generados bajo demanda (migration 0029)",
       "Panel “🎯 3 KRs de la semana” en /semana (migration 0033): la capa intermedia entre la meta y la tarea. ✨ Sugerir 3 KRs por IA elige por riesgo real (los que van por debajo del ritmo y tienen menos días restantes). Solo entran KRs con entrega en marcha (regla de contención en BD). El trimestre sigue mandando en la entrega; la semana manda en el esfuerzo",
