@@ -1527,6 +1527,39 @@ export default function DocsPage() {
             </span>
             <span className="text-muted-foreground">
               <strong className="text-foreground">
+                En /krs, el panel de arriba es el de los KRs, no el de las metas.
+              </strong>{" "}
+              Issue #43: la página de KRs enseñaba el panel violeta de metas
+              WIG —el mismo que hay en /metas y /tareas—, que no decía nada
+              en una pantalla que inventaría KRs. Ahora enseña el panel
+              celeste de “KR’s Enormemente Importantes”: los KRs en foco de
+              la semana —los resultados medibles en los que pones horas
+              ahora—, con su meta, su entrega y su progreso. Es el mismo panel
+              y la misma query que la home y /tareas. Si la semana no tiene
+              foco elegido, el panel se pinta igual con su estado vacío y
+              enlaza a /semana.
+              <br />
+              <br />
+              <strong className="text-foreground">Implementación.</strong>{" "}
+              En{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">src/app/krs/page.tsx</code>{" "}
+              se sustituye{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">PanelWigMetas</code>{" "}
+              por{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">PanelFocoSemanaKRs</code>{" "}
+              +{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">fetchKRsFocoSemanal</code>{" "}
+              (misma query que la home). Sin migración. FEATURES (fila
+              /krs), la sección “Aplicación en la app”, el HelpDrawer de /krs y
+              este changelog actualizados en la misma sesión.
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-11-12
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
                 Las tarjetas de /proyectos ya se aguantan al ancho del móvil.
               </strong>{" "}
               Issue #45: en la versión móvil los paneles de proyectos se salían
@@ -4019,7 +4052,7 @@ function AplicacionEnApp({ pilar }: { pilar: 1 | 2 | 3 | 4 | 5 }) {
     ],
     2: [
       "Scorecard de KRs con proyección lineal (/metas/plan)",
-      "Tabla global de KRs (/krs): una fila por Key Result con su META, su PROYECTO, su entrega y su progreso — el inventario completo del sistema en una pantalla, con el valor actual editable en línea. Encima, el panel de WIGs (máx 3): las metas Enormemente Importantes que tienen KRs, con sus resultados y su entrega — el mismo panel que en /metas y /tareas",
+      "Tabla global de KRs (/krs): una fila por Key Result con su META, su PROYECTO, su entrega y su progreso — el inventario completo del sistema en una pantalla, con el valor actual editable en línea. Encima, el panel de KRs (máx 3): los KRs en foco de la semana —en los que pones horas ahora—, con su meta, su entrega y su progreso; el mismo panel que en la home y en /tareas",
       "Tres capas de WIG en la home (/): WIGs de META (violeta, “Metas Enormemente Importantes”) → KRs en foco de la semana (celeste, “KR’s Enormemente Importantes”, el foco de /semana) → WIGs de TAREA (fucsia, “Tareas Enormemente Importantes”). La cascada meta → KR → tarea completa, visible de un vistazo. El panel de KRs se pinta siempre: si la semana no tiene foco elegido, lo dice y enlaza a /semana en vez de desaparecer",
       "Semáforo verde/amarillo/rojo en planes diarios",
       "Estados de meta (sin_empezar → en_progreso → completada) con feedback visible — y el estado se DERIVA del trabajo: al completar todas las tareas vivas de una meta, la meta se completa sola (y al reabrir una, vuelve a en progreso). La barra de metas de /proyectos se mueve con ese estado real",

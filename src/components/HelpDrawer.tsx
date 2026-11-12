@@ -187,9 +187,9 @@ export const AYUDA_POR_RUTA: Record<
         pilar: 2,
       },
       {
-        titulo: "Encima: los WIGs que estás moviendo",
+        titulo: "Encima: los KRs que estás moviendo",
         cuerpo:
-          "El panel violeta de arriba son las metas que has marcado como Enormemente Importantes y que tienen KRs, con sus resultados y su entrega. Es el mismo panel que hay en /metas y en /tareas: al inventariar KRs, lo primero es saber en cuál estás concentrando la energía. Si te distraje y una de esas metas ya no es tu foco, quítala con «Quitar».",
+          "El panel celeste de arriba son los KRs en foco de la semana: los resultados medibles en los que pones horas AHORA (máx 3), con su meta, su entrega y su progreso. Es el mismo panel que hay en la home y en /tareas: al inventariar KRs, lo primero es saber en cuál estás concentrando la energía. Si esta semana no has elegido el foco, el panel te lo dice y te lleva a /semana.",
         pilar: 2,
       },
     ],
