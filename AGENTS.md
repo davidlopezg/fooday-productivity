@@ -28,6 +28,25 @@ Las herramientas del ciclo (auditoría, evaluación adversarial, planificación,
 revisión del PR y aprendizaje) están en `~/.pi/agent/skills/ux-audit/`; su
 `MANUAL.md` explica el ciclo entero y `COMANDOS.md` trae todos los comandos.
 
+## Flujo corto (arreglos pequeños)
+
+Si el cambio es **visual o de texto** (alineación, rótulo, color) y **no toca
+lógica, datos ni migraciones**, no hace falta todo el ciclo:
+
+- **Sin** plan en el issue: el plan va resumido en el cuerpo del PR.
+- **Sin** `review.mjs`: no hace falta revisar un diff de una línea.
+- Checks: `npm run typecheck` + lint del diff
+  (`BASE_SHA=$(git rev-parse origin/main) node .github/scripts/lint-diff.mjs`).
+  `npm test` **solo si el cambio toca lógica**.
+- PR con `gh pr create` y la checklist de `.github/pull_request_template.md`.
+
+La **documentación se actualiza igual** (índice FEATURES, sección de `/docs` y
+registro de cambios con la fecha): el atajo es de proceso, no de docs.
+
+Si el cambio toca lógica de negocio, base de datos, migraciones, permisos o
+accesibilidad → flujo completo (plan, tests y revisión). Detalle en
+`docs/proceso.md`.
+
 # Regla de sincronización docs ↔ app
 
 Cualquier cambio que añada o modifique una **pantalla**, un **hábito**, un
