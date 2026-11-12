@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { fetchAreas, fetchMetas, fetchProyectosConConteo, fetchTareas } from "@/lib/queries";
+import { fetchAreas, fetchMapaMetaDeKr, fetchMetas, fetchProyectosConConteo, fetchTareas } from "@/lib/queries";
 import {
   archivarProyecto,
   archivarProyectoEnCascada,
@@ -11,9 +11,11 @@ import {
 } from "@/lib/mutations";
 import { cargarDatosProyectoParaReporte } from "@/lib/exportarProyecto";
 import { tareasPorProyectoEfectivo, mapaMetas } from "@/lib/proyectos";
+import { progresoMeta, tareasPorMeta as agruparTareasPorMeta } from "@/lib/metas";
 import { useData } from "@/lib/useData";
 import type { Area, Meta, MetaConPlan, Proyecto, Tarea } from "@/lib/types";
 import { IconArchive, IconFile, IconFolder, IconPencil, IconTarget, IconTrash, IconX } from "@/components/icons";
+import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
 import ProyectoReport from "@/components/ProyectoReport";
 import { EditarProyectoModal } from "@/components/EditarProyectoModal";
 
@@ -175,6 +177,25 @@ export default function ProyectosPage() {
     [tareas, metaPorId],
   );
 
+  // Mapa kr_id → meta_id: para agrupar las tareas por la meta a la que
+  // pertenecen (las de un KR llevan `resultado_periodo_id`, no `meta_id`).
+  const { data: mapaMetaDeKr } = useData<Record<string, string>>(
+    fetchMapaMetaDeKr,
+    {},
+  );
+  const metaDeKr = useMemo<Map<string, string>>(
+    () => new Map(Object.entries(mapaMetaDeKr ?? {})),
+    [mapaMetaDeKr],
+  );
+
+  // Tareas agrupadas por la META a la que pertenecen (directas + las de
+  // sus KRs). Es lo que usa la regla "meta ↔ tareas" (issue #35) para
+  // calcular el progreso real de cada meta desde el estado de sus tareas.
+  const tareasPorMeta = useMemo<Map<string, Tarea[]>>(
+    () => agruparTareasPorMeta(tareas ?? [], metaDeKr),
+    [tareas, metaDeKr],
+  );
+
   const [mostrarForm, setMostrarForm] = useState(false);
   const [nombre, setNombre] = useState("");
   const [color, setColor] = useState("#64748b");
@@ -313,13 +334,16 @@ export default function ProyectosPage() {
             </p>
           )}
         </div>
-        <button
-          onClick={() => setMostrarForm((v) => !v)}
-          className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
-        >
-          {mostrarForm ? <IconX className="h-4 w-4" /> : <span className="text-base leading-none">+</span>}
-          {mostrarForm ? "Cancelar" : "Nuevo proyecto"}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <HelpDrawer title="Proyectos" items={AYUDA_POR_RUTA["/proyectos"]?.items ?? []} />
+          <button
+            onClick={() => setMostrarForm((v) => !v)}
+            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
+          >
+            {mostrarForm ? <IconX className="h-4 w-4" /> : <span className="text-base leading-none">+</span>}
+            {mostrarForm ? "Cancelar" : "Nuevo proyecto"}
+          </button>
+        </div>
       </header>
 
       {mostrarForm && (
@@ -407,14 +431,61 @@ export default function ProyectosPage() {
             // Se calcula aquí, sobre la misma lista que se muestra en
             // "Metas hijas (N)" — así el contador y la barra nunca
             // discrepan. Las metas archivadas ya están filtradas arriba.
+            // Issue #35: el progreso se calcula desde el estado real de las
+            // tareas de cada meta, no solo del estado manual de la meta.
             const metasCompletadas = metasDelProyecto.filter(
               (m) => m.estado === "completada",
             ).length;
+            // Avance medio de las metas (0..1): media del progreso de cada meta
+            // calculado desde sus tareas vivas.
+            const avanceMetas = metasDelProyecto.length > 0
+              ? metasDelProyecto.reduce(
+                  (acc, m) => acc + progresoMeta(m, tareasPorMeta.get(m.id) ?? []),
+                  0,
+                ) / metasDelProyecto.length
+              : 0;
             return (
               <li
                 key={p.id}
                 className="rounded-xl border border-border bg-card p-4"
               >
+                {/* Issue #36: botones arriba a la izquierda y el resto a
+                    ancho completo (dos alturas). */}
+                <div className="mb-3 flex flex-wrap items-center gap-1">
+                  <Link
+                    href={`/tareas?proyecto=${p.id}`}
+                    className="rounded-md p-2 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+                    title="Ver tareas del proyecto"
+                  >
+                    ver
+                  </Link>
+                  <button
+                    onClick={() => setEditando(p)}
+                    disabled={procesando !== null}
+                    className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50"
+                    title="Editar proyecto"
+                    aria-label="Editar proyecto"
+                  >
+                    <IconPencil className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => exportarPDF(p.id)}
+                    disabled={
+                      exportando !== null || procesando !== null
+                    }
+                    className="inline-flex items-center gap-1 rounded-md p-2 text-xs text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50"
+                    title="Exportar proyecto a PDF (Imprimir a PDF del navegador)"
+                  >
+                    {exportando === p.id ? (
+                      <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    ) : (
+                      <IconFile className="h-4 w-4" />
+                    )}
+                    <span className="hidden sm:inline">
+                      {exportando === p.id ? "Generando…" : "PDF"}
+                    </span>
+                  </button>
+                </div>
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
@@ -466,22 +537,17 @@ export default function ProyectosPage() {
                       <div className="mt-2.5">
                         <div className="flex items-center justify-between text-[11px]">
                           <span className="text-muted-foreground">
-                            Metas completadas
+                            Avance de metas
                           </span>
                           <span className="font-medium tabular-nums">
-                            {metasCompletadas}/{metasDelProyecto.length}
+                            {Math.round(avanceMetas * 100)}%
                             <span className="ml-1 text-muted-foreground">
-                              (
-                              {Math.round(
-                                (metasCompletadas / metasDelProyecto.length) *
-                                  100,
-                              )}
-                              %)
+                              · {metasCompletadas}/{metasDelProyecto.length} completadas
                             </span>
                           </span>
                         </div>
                         <Barra
-                          valor={metasCompletadas / metasDelProyecto.length}
+                          valor={avanceMetas}
                           color={p.color ?? undefined}
                           className="mt-1"
                         />
@@ -556,39 +622,6 @@ export default function ProyectosPage() {
                     )}
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
-                    <Link
-                      href={`/tareas?proyecto=${p.id}`}
-                      className="rounded-md p-2 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
-                      title="Ver tareas del proyecto"
-                    >
-                      ver
-                    </Link>
-                    <button
-                      onClick={() => setEditando(p)}
-                      disabled={procesando !== null}
-                      className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50"
-                      title="Editar proyecto"
-                      aria-label="Editar proyecto"
-                    >
-                      <IconPencil className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => exportarPDF(p.id)}
-                      disabled={
-                        exportando !== null || procesando !== null
-                      }
-                      className="inline-flex items-center gap-1 rounded-md p-2 text-xs text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50"
-                      title="Exportar proyecto a PDF (Imprimir a PDF del navegador)"
-                    >
-                      {exportando === p.id ? (
-                        <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                      ) : (
-                        <IconFile className="h-4 w-4" />
-                      )}
-                      <span className="hidden sm:inline">
-                        {exportando === p.id ? "Generando…" : "PDF"}
-                      </span>
-                    </button>
                     <button
                       onClick={async () => {
                         const accion = p.archivado ? "desarchivar" : "archivar";

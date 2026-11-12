@@ -19,6 +19,7 @@ import type {
   TareaSubtarea,
 } from "@/lib/types";
 import { desgranarTareaIA, generarCriterioTerminacionIA } from "@/lib/plan";
+import { estadoMetaSegunTareas } from "@/lib/metas";
 
 export async function marcarHecha(id: string) {
   const { error } = await createClient()
@@ -37,6 +38,10 @@ export async function marcarHecha(id: string) {
   await intentarClonarRecurrente(id).catch((e) =>
     console.warn("[marcarHecha] clonación recurrente falló:", e),
   );
+  // La meta se completa sola cuando sus tareas están hechas (issue #35).
+  await sincronizarMetaDeTarea(id).catch((e) =>
+    console.warn("[marcarHecha] no se pudo sincronizar la meta:", e),
+  );
 }
 
 export async function reabrirTarea(id: string) {
@@ -48,6 +53,10 @@ export async function reabrirTarea(id: string) {
   // Mismo sincronizado que marcarHecha: reabrir devuelve el contador del plan
   // a 0 (issue #6).
   await sincronizarProgresoPlan(id, false);
+  // Reabrir una tarea deshace el cierre de su meta (issue #35).
+  await sincronizarMetaDeTarea(id).catch((e) =>
+    console.warn("[reabrirTarea] no se pudo sincronizar la meta:", e),
+  );
 }
 
 export async function archivarTarea(id: string) {
@@ -56,6 +65,10 @@ export async function archivarTarea(id: string) {
     .update({ estado: "archivada" })
     .eq("id", id);
   if (error) throw new Error(`No se pudo archivar la tarea: ${error.message}`);
+  // Archivar una tarea la saca de la cuenta: la meta puede quedar cerrada.
+  await sincronizarMetaDeTarea(id).catch((e) =>
+    console.warn("[archivarTarea] no se pudo sincronizar la meta:", e),
+  );
 }
 
 /** Migration 0026: marca/desmarca una tarea como "pendiente de respuesta".
@@ -84,6 +97,10 @@ export async function desarchivarTarea(id: string) {
     .update({ estado: "pendiente" })
     .eq("id", id);
   if (error) throw new Error(`No se pudo desarchivar la tarea: ${error.message}`);
+  // Desarchivar devuelve trabajo a la cuenta: la meta puede reabrirse.
+  await sincronizarMetaDeTarea(id).catch((e) =>
+    console.warn("[desarchivarTarea] no se pudo sincronizar la meta:", e),
+  );
 }
 
 export async function eliminarTarea(id: string) {
@@ -150,6 +167,12 @@ export async function actualizarTarea(datos: TareaCampos) {
   // Sin esto, un UPDATE fallido (RLS, red, columna inexistente) pasaba por
   // bueno y la UI mentia: el dato no se guardaba y nadie se enteraba.
   if (error) throw new Error(`No se pudo actualizar la tarea: ${error.message}`);
+  // Si cambiamos el estado, la meta se sincroniza (issue #35).
+  if (campos.estado !== undefined) {
+    await sincronizarMetaDeTarea(id).catch((e) =>
+      console.warn("[actualizarTarea] no se pudo sincronizar la meta:", e),
+    );
+  }
 }
 
 /** Aplica cambios de `prioridad` a N tareas en batch. Usado por el botón
@@ -842,6 +865,91 @@ export async function sincronizarProgresoPlan(
     .eq("tarea_id", tareaId);
   if (error) {
     console.warn("[sincronizarProgresoPlan] no se pudo sincronizar el plan:", error.message);
+  }
+}
+
+/** Sincroniza la meta de una tarea con el estado de todas sus tareas.
+ *  Se llama como side-effect de marcarHecha, reabrirTarea, archivarTarea y
+ *  desarchivarTarea.
+ *
+ *  Si la tarea no tiene meta_id ni resultado_periodo_id, no hace nada.
+ *  No lanza si falla: el cambio principal de la tarea ya se guardó;
+ *  el fallo se avisa por consola. */
+async function sincronizarMetaDeTarea(tareaId: string): Promise<void> {
+  const supabase = createClient();
+
+  // 1) Leer la tarea para saber a qué meta pertenece (directa o por KR).
+  const { data: tarea, error: eTarea } = await supabase
+    .from("tareas")
+    .select("meta_id, resultado_periodo_id")
+    .eq("id", tareaId)
+    .maybeSingle();
+  if (eTarea) {
+    console.warn("[sincronizarMetaDeTarea] no se pudo leer la tarea:", eTarea.message);
+    return;
+  }
+  if (!tarea) return; // tarea borrada
+
+  // 2) Si no tiene meta directa, ver si tiene KR (que tiene meta).
+  let metaId = (tarea as { meta_id: string | null }).meta_id;
+  if (!metaId && (tarea as { resultado_periodo_id: string | null }).resultado_periodo_id) {
+    const { data: kr, error: eKr } = await supabase
+      .from("resultados_periodo")
+      .select("meta_id")
+      .eq("id", (tarea as { resultado_periodo_id: string | null }).resultado_periodo_id)
+      .maybeSingle();
+    if (eKr) {
+      console.warn("[sincronizarMetaDeTarea] no se pudo leer el KR:", eKr.message);
+      return;
+    }
+    metaId = (kr as { meta_id: string | null })?.meta_id ?? null;
+  }
+  if (!metaId) return; // la tarea no pertenece a ninguna meta
+
+  // 3) Leer la meta actual.
+  const { data: meta, error: eMeta } = await supabase
+    .from("metas")
+    .select("id, estado")
+    .eq("id", metaId)
+    .maybeSingle();
+  if (eMeta || !meta) return;
+
+
+  // 4) Leer TODAS las tareas de esa meta (directas + las de sus KRs).
+  const { data: krsDeMeta, error: eKrs } = await supabase
+    .from("resultados_periodo")
+    .select("id")
+    .eq("meta_id", metaId);
+  if (eKrs) {
+    console.warn("[sincronizarMetaDeTarea] no se pudieron leer los KRs:", eKrs.message);
+    return;
+  }
+  const krIds = (krsDeMeta ?? []).map((k) => (k as { id: string }).id);
+
+  // Tareas de la meta directa O de los KRs de la meta.
+  const { data: tareasDeMeta, error: eTareas } = await supabase
+    .from("tareas")
+    .select("estado")
+    .or(`meta_id.eq.${metaId},resultado_periodo_id.in.(${krIds.length > 0 ? krIds.join(",") : "null"})`);
+  if (eTareas) {
+    console.warn("[sincronizarMetaDeTarea] no se pudieron leer las tareas:", eTareas.message);
+    return;
+  }
+
+  // 5) Aplicar la regla pura (viene del módulo metas.ts).
+  const nuevoEstado = estadoMetaSegunTareas(
+    { estado: (meta as { estado: string }).estado },
+    (tareasDeMeta ?? []).map((t) => ({ estado: (t as { estado: string }).estado })),
+  );
+  if (!nuevoEstado) return; // no hay cambio
+
+  // 6) Actualizar la meta.
+  const { error: eUpd } = await supabase
+    .from("metas")
+    .update({ estado: nuevoEstado })
+    .eq("id", metaId);
+  if (eUpd) {
+    console.warn("[sincronizarMetaDeTarea] no se pudo actualizar la meta:", eUpd.message);
   }
 }
 

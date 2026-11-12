@@ -186,6 +186,12 @@ export const AYUDA_POR_RUTA: Record<
           "Pulsa el número de la columna «Actual / objetivo» y escríbelo. Es el dato con el que se calcula el scorecard y la proyección del trimestre: si no lo actualizas, el sistema no puede decirte si vas en línea.",
         pilar: 2,
       },
+      {
+        titulo: "Encima: los WIGs que estás moviendo",
+        cuerpo:
+          "El panel violeta de arriba son las metas que has marcado como Enormemente Importantes y que tienen KRs, con sus resultados y su entrega. Es el mismo panel que hay en /metas y en /tareas: al inventariar KRs, lo primero es saber en cuál estás concentrando la energía. Si te distraje y una de esas metas ya no es tu foco, quítala con «Quitar».",
+        pilar: 2,
+      },
     ],
   },
   "/metas/plan": {
@@ -609,6 +615,29 @@ export const AYUDA_POR_RUTA: Record<
         cuerpo:
           "El motor de priorización con IA te devuelve una sola acción concreta (<45 min). El resto del tablero es inventario. Si te pasas el día moviendo tarjetas entre columnas sin hacerlas, el sistema no está cumpliendo su función.",
         pilar: 3,
+      },
+    ],
+  },
+  "/proyectos": {
+    pilares: [2],
+    items: [
+      {
+        titulo: "Dos barras: dos cosas distintas",
+        cuerpo:
+          "La barra de METAS (con el color del proyecto) es el avance real: un proyecto es un contenedor de RESULTADOS, así que lo mide el avance de sus metas hijas. La barra de TAREAS es el esfuerzo operativo: cuántas de sus tareas están cerradas. Verlas moverse por separado es la información; ver una sola barra mezclando las dos es ruido.",
+        pilar: 2,
+      },
+      {
+        titulo: "Las metas se completan solas",
+        cuerpo:
+          "El avance de cada meta se calcula desde el estado real de sus tareas (las directas y las de sus KRs). Cuando terminas todas las tareas vivas de una meta, la meta pasa a «completada» y la barra del proyecto avanza. Si reabres una tarea, la meta vuelve a «en progreso»: el registro no miente en ninguna dirección.",
+        pilar: 2,
+      },
+      {
+        titulo: "Archivar en cascada es reversible",
+        cuerpo:
+          "El botón de archivar arrastra metas y tareas, y antes te enseña exactamente cuántos son. Si te arrepentiste, vuelve a archivar el proyecto y se desarchiva todo (las filas NO se borran: se desvinculan).",
+        pilar: 2,
       },
     ],
   },
