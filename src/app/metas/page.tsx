@@ -406,11 +406,17 @@ export default function MetasPage() {
         </p>
       )}
 
-      {/* Panel WIG — siempre arriba, antes del listado */}
+      {/* Panel WIG — siempre arriba, antes del listado.
+          Issue #47: aquí solo las 3 metas WIG (sin los KRs debajo): en
+          /metas los KRs se consultan al abrir la meta y el panel se
+          quedaba enorme sin aportar nada. En /tareas sí se muestran,
+          porque es donde se ejecuta y necesitas ver el KR que mueves. */}
       <PanelWigMetas
         wigs={wigs}
         onQuitar={(id) => toggleWig(metas.find((m) => m.meta.id === id)!)}
         guardandoId={guardandoId}
+        mostrarKRs={false}
+        compacto
       />
 
       {/* Buscador + filtro por proyecto. En una tabla de 15+ metas esto

@@ -1509,6 +1509,24 @@ export default function DocsPage() {
             </span>
             <span className="text-muted-foreground">
               <strong className="text-foreground">
+                En /metas, el panel de WIGs muestra solo las 3 metas.
+              </strong>{" "}
+              Issue #47: el panel violeta de WIGs de /metas metía debajo los KRs
+              de cada meta y quedaba enorme sin aportar nada —los KRs ya se
+              consultan al abrir la meta—. Ahora el panel de /metas enseña
+              únicamente las 3 metas WIG (con su orden, su contador de tareas y
+              el botón de quitar); en /tareas el panel sigue con sus KRs,
+              porque es la pantalla donde se ejecuta y hay que ver el KR que
+              estás moviendo. El texto de cabecera del panel se adapta al
+              contenido. Sin cambios de datos ni de metodología.
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-11-12
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
                 Las tarjetas de /proyectos ya se aguantan al ancho del móvil.
               </strong>{" "}
               Issue #45: en la versión móvil los paneles de proyectos se salían
@@ -4010,6 +4028,7 @@ function AplicacionEnApp({ pilar }: { pilar: 1 | 2 | 3 | 4 | 5 }) {
       "Botón IA “Generar plan con IA” en /metas/nueva y EditarMetaModal: filtra KRs por el campo plazo (Q3, Q1-Q3, fin de 2026…) y dentro de cada KR anota las tareas y hábitos necesarios para cumplirlo",
       "Escenarios de proyecto (/escenarios): cronología + estado medido + lectura de la situación, y los escenarios con su estrategia generados bajo demanda (migration 0029)",
       "Panel “🎯 3 KRs de la semana” en /semana (migration 0033): la capa intermedia entre la meta y la tarea. ✨ Sugerir 3 KRs por IA elige por riesgo real (los que van por debajo del ritmo y tienen menos días restantes). Solo entran KRs con entrega en marcha (regla de contención en BD). El trimestre sigue mandando en la entrega; la semana manda en el esfuerzo",
+      "El panel de WIGs de /metas muestra solo las 3 metas WIG, sin los KRs debajo (issue #47): se quedaba enorme sin aportar nada y los KRs ya se consultan al abrir la meta. En /tareas el panel sí conserva sus KRs, porque es donde se ejecuta y hay que ver el KR que estás moviendo",
     ],
     3: [
       "Time-blocking con 4 bloques fijos por día (/calendario)",

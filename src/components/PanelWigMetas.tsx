@@ -46,7 +46,7 @@ export function PanelWigMetas({
   return (
     <section
       className="rounded-2xl border-2 border-violet-500/40 bg-gradient-to-br from-violet-500/10 to-fuchsia-500/5 p-5"
-      aria-label="WIGs de metas y sus resultados clave"
+      aria-label={mostrarKRs ? "WIGs de metas y sus resultados clave" : "WIGs de metas"}
     >
       <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -55,10 +55,21 @@ export function PanelWigMetas({
             WIGs — OKR foco (máx 3)
           </h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Las 3 metas a las que dedicas energía desproporcionada este ciclo,
-            con sus resultados clave (KRs). El resto de metas siguen activas
-            pero sin foco — “OKR” describe la fila completa (meta + KRs +
-            tareas); “WIG” es el subconjunto donde concentras la energía.
+            {mostrarKRs ? (
+              <>
+                Las 3 metas a las que dedicas energía desproporcionada este
+                ciclo, con sus resultados clave (KRs). El resto de metas siguen
+                activas pero sin foco — “OKR” describe la fila completa (meta +
+                KRs + tareas); “WIG” es el subconjunto donde concentras la
+                energía.
+              </>
+            ) : (
+              <>
+                Las 3 metas a las que dedicas energía desproporcionada este
+                ciclo. Sus resultados clave (KRs) los ves al abrir la meta.
+                El resto de metas siguen activas pero sin foco.
+              </>
+            )}
           </p>
         </div>
         <span className="rounded-full bg-violet-500/20 px-3 py-1 text-xs font-semibold tabular-nums text-violet-700 dark:text-violet-300">
