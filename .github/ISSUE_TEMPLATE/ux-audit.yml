@@ -86,3 +86,24 @@ body:
       description: Regla, criterio de aceptación o enfoque. No hace falta que sea código.
     validations:
       required: false
+  - type: textarea
+    id: causa_raiz
+    attributes:
+      label: Causa raíz
+      description: Si ya se sabe, dónde está el origen del problema (archivo:línea). Si no, se deja vacío.
+    validations:
+      required: false
+  - type: textarea
+    id: criterios
+    attributes:
+      label: Criterios de aceptación
+      description: "Condiciones observables para dar el arreglo por bueno. Ej.: el usuario ve un aviso y puede reintentar."
+    validations:
+      required: false
+  - type: textarea
+    id: plan
+    attributes:
+      label: Plan de arreglo (opcional)
+      description: "Pasos y ficheros a tocar. El agente rellena esta sección al planificar (se escribe entre <!-- ux-plan:start --> y <!-- ux-plan:end -->)."
+    validations:
+      required: false

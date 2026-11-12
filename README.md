@@ -110,6 +110,8 @@ Ambos comandos corren en CI (`.github/workflows/test.yml`) en cada push a
 ## 📚 Documentación
 
 - [`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md) — capas y decisiones
+- [`docs/proceso.md`](docs/proceso.md) — cómo se trabaja aquí con los agentes (auditoría → issue → plan → PR → merge)
+- [`docs/lecciones.md`](docs/lecciones.md) — lo que el sistema ha aprendido de los ciclos anteriores
 - [`docs/MODELO-DATOS.md`](docs/MODELO-DATOS.md) — esquema de tablas
 - [`docs/MIGRACION.md`](docs/MIGRACION.md) — ETL desde `fooday-intelligence-core`
 - [`docs/CONFIGURACION.md`](docs/CONFIGURACION.md) — Supabase paso a paso

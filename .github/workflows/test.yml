@@ -26,3 +26,23 @@ jobs:
 
       - name: Typecheck
         run: npm run typecheck
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Historia completa: hace falta el commit base para comparar.
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      # El repo tiene errores de lint preexistentes: no son un bloqueo.
+      # La regla es que este cambio no puede subir el contador.
+      - name: Lint de lo cambiado (sin errores nuevos)
+        run: node .github/scripts/lint-diff.mjs
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
