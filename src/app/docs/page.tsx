@@ -1509,6 +1509,25 @@ export default function DocsPage() {
             </span>
             <span className="text-muted-foreground">
               <strong className="text-foreground">
+                Los botones de cada tarjeta de proyecto, arriba y alineados a
+                la derecha.
+              </strong>{" "}
+              En /proyectos, la fila de acciones de cada tarjeta (ver / editar /
+              PDF / archivar / eliminar) ocupa ahora su propia fila arriba y se
+              alinea a la derecha (issue #40), así se lee como el bloque de
+              acciones de la esquina y no se confunde con el contenido de la
+              tarjeta. El resto —nombre, descripción, contadores, barras y metas
+              hijas— sigue a ancho completo debajo, que es lo que arregló el
+              issue #36. FEATURES (fila /proyectos), la sección “Aplicación en
+              la app” y este changelog actualizados en la misma sesión.
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-11-12
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
                 Las metas se completan solas, las tarjetas de proyecto ya no
                 aprietan el texto y /krs enseña arriba los WIGs.
               </strong>{" "}
@@ -3966,7 +3985,7 @@ function AplicacionEnApp({ pilar }: { pilar: 1 | 2 | 3 | 4 | 5 }) {
       "Tres capas de WIG en la home (/): WIGs de META (violeta, “Metas Enormemente Importantes”) → KRs en foco de la semana (celeste, “KR’s Enormemente Importantes”, el foco de /semana) → WIGs de TAREA (fucsia, “Tareas Enormemente Importantes”). La cascada meta → KR → tarea completa, visible de un vistazo. El panel de KRs se pinta siempre: si la semana no tiene foco elegido, lo dice y enlaza a /semana en vez de desaparecer",
       "Semáforo verde/amarillo/rojo en planes diarios",
       "Estados de meta (sin_empezar → en_progreso → completada) con feedback visible — y el estado se DERIVA del trabajo: al completar todas las tareas vivas de una meta, la meta se completa sola (y al reabrir una, vuelve a en progreso). La barra de metas de /proyectos se mueve con ese estado real",
-      "Tarjetas de proyecto en dos alturas (/proyectos): los botones arriba a la izquierda y el resto del contenido a ancho completo, para que el texto de la tarjeta no se apriete",
+      "Tarjetas de proyecto en dos alturas (/proyectos): los botones van arriba en su propia fila, alineados a la derecha, y el resto del contenido a ancho completo, para que el texto de la tarjeta no se apriete",
       "Botón IA “Generar plan con IA” en /metas/nueva y EditarMetaModal: filtra KRs por el campo plazo (Q3, Q1-Q3, fin de 2026…) y dentro de cada KR anota las tareas y hábitos necesarios para cumplirlo",
       "Escenarios de proyecto (/escenarios): cronología + estado medido + lectura de la situación, y los escenarios con su estrategia generados bajo demanda (migration 0029)",
       "Panel “🎯 3 KRs de la semana” en /semana (migration 0033): la capa intermedia entre la meta y la tarea. ✨ Sugerir 3 KRs por IA elige por riesgo real (los que van por debajo del ritmo y tienen menos días restantes). Solo entran KRs con entrega en marcha (regla de contención en BD). El trimestre sigue mandando en la entrega; la semana manda en el esfuerzo",

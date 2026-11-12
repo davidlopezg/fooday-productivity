@@ -449,9 +449,9 @@ export default function ProyectosPage() {
                 key={p.id}
                 className="rounded-xl border border-border bg-card p-4"
               >
-                {/* Issue #36: botones arriba a la izquierda y el resto a
-                    ancho completo (dos alturas). */}
-                <div className="mb-3 flex flex-wrap items-center gap-1">
+                {/* Issues #36 y #40: los botones van en su propia fila, arriba,
+                    alineados a la derecha; el resto, a ancho completo. */}
+                <div className="mb-3 flex flex-wrap items-center justify-end gap-1">
                   <Link
                     href={`/tareas?proyecto=${p.id}`}
                     className="rounded-md p-2 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
