@@ -23,6 +23,7 @@ const TESTS = [
   "src/lib/plan-unidades.test.mjs",
   "src/lib/llm-retry.test.mjs",
   "src/lib/proyectos.test.mjs",
+  "src/lib/metas.test.mjs",
   "src/lib/configStore.test.mjs",
   "src/lib/perfilIA.test.mjs",
   "src/lib/schema-queries.test.mjs",

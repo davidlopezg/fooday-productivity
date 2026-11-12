@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { fetchAreas, fetchMetas, fetchProyectosConConteo, fetchTareas } from "@/lib/queries";
+import { fetchAreas, fetchMapaMetaDeKr, fetchMetas, fetchProyectosConConteo, fetchTareas } from "@/lib/queries";
 import {
   archivarProyecto,
   archivarProyectoEnCascada,
@@ -11,9 +11,11 @@ import {
 } from "@/lib/mutations";
 import { cargarDatosProyectoParaReporte } from "@/lib/exportarProyecto";
 import { tareasPorProyectoEfectivo, mapaMetas } from "@/lib/proyectos";
+import { progresoMeta, tareasPorMeta as agruparTareasPorMeta } from "@/lib/metas";
 import { useData } from "@/lib/useData";
 import type { Area, Meta, MetaConPlan, Proyecto, Tarea } from "@/lib/types";
 import { IconArchive, IconFile, IconFolder, IconPencil, IconTarget, IconTrash, IconX } from "@/components/icons";
+import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
 import ProyectoReport from "@/components/ProyectoReport";
 import { EditarProyectoModal } from "@/components/EditarProyectoModal";
 
@@ -175,6 +177,25 @@ export default function ProyectosPage() {
     [tareas, metaPorId],
   );
 
+  // Mapa kr_id → meta_id: para agrupar las tareas por la meta a la que
+  // pertenecen (las de un KR llevan `resultado_periodo_id`, no `meta_id`).
+  const { data: mapaMetaDeKr } = useData<Record<string, string>>(
+    fetchMapaMetaDeKr,
+    {},
+  );
+  const metaDeKr = useMemo<Map<string, string>>(
+    () => new Map(Object.entries(mapaMetaDeKr ?? {})),
+    [mapaMetaDeKr],
+  );
+
+  // Tareas agrupadas por la META a la que pertenecen (directas + las de
+  // sus KRs). Es lo que usa la regla "meta ↔ tareas" (issue #35) para
+  // calcular el progreso real de cada meta desde el estado de sus tareas.
+  const tareasPorMeta = useMemo<Map<string, Tarea[]>>(
+    () => agruparTareasPorMeta(tareas ?? [], metaDeKr),
+    [tareas, metaDeKr],
+  );
+
   const [mostrarForm, setMostrarForm] = useState(false);
   const [nombre, setNombre] = useState("");
   const [color, setColor] = useState("#64748b");
@@ -313,13 +334,16 @@ export default function ProyectosPage() {
             </p>
           )}
         </div>
-        <button
-          onClick={() => setMostrarForm((v) => !v)}
-          className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
-        >
-          {mostrarForm ? <IconX className="h-4 w-4" /> : <span className="text-base leading-none">+</span>}
-          {mostrarForm ? "Cancelar" : "Nuevo proyecto"}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <HelpDrawer title="Proyectos" items={AYUDA_POR_RUTA["/proyectos"]?.items ?? []} />
+          <button
+            onClick={() => setMostrarForm((v) => !v)}
+            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
+          >
+            {mostrarForm ? <IconX className="h-4 w-4" /> : <span className="text-base leading-none">+</span>}
+            {mostrarForm ? "Cancelar" : "Nuevo proyecto"}
+          </button>
+        </div>
       </header>
 
       {mostrarForm && (
@@ -407,188 +431,60 @@ export default function ProyectosPage() {
             // Se calcula aquí, sobre la misma lista que se muestra en
             // "Metas hijas (N)" — así el contador y la barra nunca
             // discrepan. Las metas archivadas ya están filtradas arriba.
+            // Issue #35: el progreso se calcula desde el estado real de las
+            // tareas de cada meta, no solo del estado manual de la meta.
             const metasCompletadas = metasDelProyecto.filter(
               (m) => m.estado === "completada",
             ).length;
+            // Avance medio de las metas (0..1): media del progreso de cada meta
+            // calculado desde sus tareas vivas.
+            const avanceMetas = metasDelProyecto.length > 0
+              ? metasDelProyecto.reduce(
+                  (acc, m) => acc + progresoMeta(m, tareasPorMeta.get(m.id) ?? []),
+                  0,
+                ) / metasDelProyecto.length
+              : 0;
             return (
               <li
                 key={p.id}
                 className="rounded-xl border border-border bg-card p-4"
               >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="inline-block h-3 w-3 rounded-sm"
-                        style={{ backgroundColor: p.color ?? "#64748b" }}
-                        aria-hidden
-                      />
-                      <h3 className="truncate font-semibold tracking-tight">
-                        {p.nombre}
-                      </h3>
-                      {p.archivado && (
-                        <span className="rounded-full border border-border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                          archivado
-                        </span>
-                      )}
-                    </div>
-                    {p.descripcion && (
-                      <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-                        {p.descripcion}
-                      </p>
+                {/* Issue #36: botones arriba a la izquierda y el resto a
+                    ancho completo (dos alturas). */}
+                <div className="mb-3 flex flex-wrap items-center gap-1">
+                  <Link
+                    href={`/tareas?proyecto=${p.id}`}
+                    className="rounded-md p-2 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+                    title="Ver tareas del proyecto"
+                  >
+                    ver
+                  </Link>
+                  <button
+                    onClick={() => setEditando(p)}
+                    disabled={procesando !== null}
+                    className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50"
+                    title="Editar proyecto"
+                    aria-label="Editar proyecto"
+                  >
+                    <IconPencil className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => exportarPDF(p.id)}
+                    disabled={
+                      exportando !== null || procesando !== null
+                    }
+                    className="inline-flex items-center gap-1 rounded-md p-2 text-xs text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50"
+                    title="Exportar proyecto a PDF (Imprimir a PDF del navegador)"
+                  >
+                    {exportando === p.id ? (
+                      <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    ) : (
+                      <IconFile className="h-4 w-4" />
                     )}
-                    <div className="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
-                      <span>
-                        {activas.length} activas · {p.tareas_hechas} hechas
-                      </span>
-                      {p.total_tareas > 0 && (
-                        <span className="text-muted-foreground/60">
-                          ({p.total_tareas} total)
-                        </span>
-                      )}
-                    </div>
-
-                    {/* PROGRESO DEL PROYECTO.
-                        Dos barras porque son dos cosas distintas y
-                        confundirlas es el error clásico:
-
-                        · La barra de METAS es el avance real del proyecto:
-                          un proyecto es un contenedor de RESULTADOS, así
-                          que lo que lo mide es cuántas metas hijas están
-                          completadas. Si no tiene metas, no hay barra (no
-                          hay nada que medir todavía).
-
-                        · La barra de TAREAS es el esfuerzo operativo:
-                          cuántas de sus tareas están cerradas. Sirve para
-                          ver si hay movimiento, no para declarar el
-                          proyecto terminado. */}
-                    {metasDelProyecto.length > 0 && (
-                      <div className="mt-2.5">
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-muted-foreground">
-                            Metas completadas
-                          </span>
-                          <span className="font-medium tabular-nums">
-                            {metasCompletadas}/{metasDelProyecto.length}
-                            <span className="ml-1 text-muted-foreground">
-                              (
-                              {Math.round(
-                                (metasCompletadas / metasDelProyecto.length) *
-                                  100,
-                              )}
-                              %)
-                            </span>
-                          </span>
-                        </div>
-                        <Barra
-                          valor={metasCompletadas / metasDelProyecto.length}
-                          color={p.color ?? undefined}
-                          className="mt-1"
-                        />
-                      </div>
-                    )}
-                    {p.total_tareas > 0 && (
-                      <div className="mt-2">
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-muted-foreground">Tareas</span>
-                          <span className="font-medium tabular-nums">
-                            {p.tareas_hechas}/{p.total_tareas}
-                            <span className="ml-1 text-muted-foreground">
-                              (
-                              {Math.round(
-                                (p.tareas_hechas / p.total_tareas) * 100,
-                              )}
-                              %)
-                            </span>
-                          </span>
-                        </div>
-                        <Barra
-                          valor={p.tareas_hechas / p.total_tareas}
-                          className="mt-1 [&>div]:bg-muted-foreground/40"
-                        />
-                      </div>
-                    )}
-                    {metasDelProyecto.length > 0 && (
-                      <div className="mt-3 border-t border-border pt-2">
-                        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                          Metas hijas ({metasDelProyecto.length})
-                        </p>
-                        <ul className="mt-1.5 space-y-1">
-                          {metasDelProyecto.map((m) => {
-                            const dotClass: Record<string, string> = {
-                              sin_empezar: "bg-slate-400",
-                              en_progreso: "bg-amber-500",
-                              bloqueada: "bg-red-500",
-                              completada: "bg-emerald-500",
-                              archivada: "bg-slate-300",
-                            };
-                            return (
-                              <li key={m.id} className="flex items-center gap-2 text-xs">
-                                <span
-                                  className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${
-                                    dotClass[m.estado] ?? "bg-slate-400"
-                                  }`}
-                                  aria-hidden
-                                />
-                                <Link
-                                  href={`/metas/detalle?id=${m.id}`}
-                                  className="min-w-0 flex-1 truncate text-foreground hover:underline"
-                                  title={m.titulo}
-                                >
-                                  {m.codigo ? (
-                                    <span className="mr-1 font-mono text-[10px] text-muted-foreground">
-                                      {m.codigo}
-                                    </span>
-                                  ) : null}
-                                  {m.titulo}
-                                </Link>
-                                {m.es_wig && (
-                                  <IconTarget
-                                    className="h-3 w-3 shrink-0 text-violet-500"
-                                    aria-label="WIG activo"
-                                  />
-                                )}
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1">
-                    <Link
-                      href={`/tareas?proyecto=${p.id}`}
-                      className="rounded-md p-2 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
-                      title="Ver tareas del proyecto"
-                    >
-                      ver
-                    </Link>
-                    <button
-                      onClick={() => setEditando(p)}
-                      disabled={procesando !== null}
-                      className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50"
-                      title="Editar proyecto"
-                      aria-label="Editar proyecto"
-                    >
-                      <IconPencil className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => exportarPDF(p.id)}
-                      disabled={
-                        exportando !== null || procesando !== null
-                      }
-                      className="inline-flex items-center gap-1 rounded-md p-2 text-xs text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50"
-                      title="Exportar proyecto a PDF (Imprimir a PDF del navegador)"
-                    >
-                      {exportando === p.id ? (
-                        <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                      ) : (
-                        <IconFile className="h-4 w-4" />
-                      )}
-                      <span className="hidden sm:inline">
-                        {exportando === p.id ? "Generando…" : "PDF"}
-                      </span>
-                    </button>
+                    <span className="hidden sm:inline">
+                      {exportando === p.id ? "Generando…" : "PDF"}
+                    </span>
+                  </button>
                     <button
                       onClick={async () => {
                         const accion = p.archivado ? "desarchivar" : "archivar";
@@ -675,7 +571,140 @@ export default function ProyectosPage() {
                     >
                       <IconTrash className="h-4 w-4" />
                     </button>
-                  </div>
+                </div>
+                <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="inline-block h-3 w-3 rounded-sm"
+                        style={{ backgroundColor: p.color ?? "#64748b" }}
+                        aria-hidden
+                      />
+                      <h3 className="truncate font-semibold tracking-tight">
+                        {p.nombre}
+                      </h3>
+                      {p.archivado && (
+                        <span className="rounded-full border border-border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                          archivado
+                        </span>
+                      )}
+                    </div>
+                    {p.descripcion && (
+                      <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                        {p.descripcion}
+                      </p>
+                    )}
+                    <div className="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
+                      <span>
+                        {activas.length} activas · {p.tareas_hechas} hechas
+                      </span>
+                      {p.total_tareas > 0 && (
+                        <span className="text-muted-foreground/60">
+                          ({p.total_tareas} total)
+                        </span>
+                      )}
+                    </div>
+
+                    {/* PROGRESO DEL PROYECTO.
+                        Dos barras porque son dos cosas distintas y
+                        confundirlas es el error clásico:
+
+                        · La barra de METAS es el avance real del proyecto:
+                          un proyecto es un contenedor de RESULTADOS, así
+                          que lo que lo mide es cuántas metas hijas están
+                          completadas. Si no tiene metas, no hay barra (no
+                          hay nada que medir todavía).
+
+                        · La barra de TAREAS es el esfuerzo operativo:
+                          cuántas de sus tareas están cerradas. Sirve para
+                          ver si hay movimiento, no para declarar el
+                          proyecto terminado. */}
+                    {metasDelProyecto.length > 0 && (
+                      <div className="mt-2.5">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-muted-foreground">
+                            Avance de metas
+                          </span>
+                          <span className="font-medium tabular-nums">
+                            {Math.round(avanceMetas * 100)}%
+                            <span className="ml-1 text-muted-foreground">
+                              · {metasCompletadas}/{metasDelProyecto.length} completadas
+                            </span>
+                          </span>
+                        </div>
+                        <Barra
+                          valor={avanceMetas}
+                          color={p.color ?? undefined}
+                          className="mt-1"
+                        />
+                      </div>
+                    )}
+                    {p.total_tareas > 0 && (
+                      <div className="mt-2">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-muted-foreground">Tareas</span>
+                          <span className="font-medium tabular-nums">
+                            {p.tareas_hechas}/{p.total_tareas}
+                            <span className="ml-1 text-muted-foreground">
+                              (
+                              {Math.round(
+                                (p.tareas_hechas / p.total_tareas) * 100,
+                              )}
+                              %)
+                            </span>
+                          </span>
+                        </div>
+                        <Barra
+                          valor={p.tareas_hechas / p.total_tareas}
+                          className="mt-1 [&>div]:bg-muted-foreground/40"
+                        />
+                      </div>
+                    )}
+                    {metasDelProyecto.length > 0 && (
+                      <div className="mt-3 border-t border-border pt-2">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                          Metas hijas ({metasDelProyecto.length})
+                        </p>
+                        <ul className="mt-1.5 space-y-1">
+                          {metasDelProyecto.map((m) => {
+                            const dotClass: Record<string, string> = {
+                              sin_empezar: "bg-slate-400",
+                              en_progreso: "bg-amber-500",
+                              bloqueada: "bg-red-500",
+                              completada: "bg-emerald-500",
+                              archivada: "bg-slate-300",
+                            };
+                            return (
+                              <li key={m.id} className="flex items-center gap-2 text-xs">
+                                <span
+                                  className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${
+                                    dotClass[m.estado] ?? "bg-slate-400"
+                                  }`}
+                                  aria-hidden
+                                />
+                                <Link
+                                  href={`/metas/detalle?id=${m.id}`}
+                                  className="min-w-0 flex-1 truncate text-foreground hover:underline"
+                                  title={m.titulo}
+                                >
+                                  {m.codigo ? (
+                                    <span className="mr-1 font-mono text-[10px] text-muted-foreground">
+                                      {m.codigo}
+                                    </span>
+                                  ) : null}
+                                  {m.titulo}
+                                </Link>
+                                {m.es_wig && (
+                                  <IconTarget
+                                    className="h-3 w-3 shrink-0 text-violet-500"
+                                    aria-label="WIG activo"
+                                  />
+                                )}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    )}
                 </div>
                 {errorExportPorProyecto[p.id] && (
                   <p className="mt-2 text-xs text-red-600 dark:text-red-400">

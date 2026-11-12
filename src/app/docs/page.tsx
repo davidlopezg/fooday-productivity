@@ -1509,6 +1509,61 @@ export default function DocsPage() {
             </span>
             <span className="text-muted-foreground">
               <strong className="text-foreground">
+                Las metas se completan solas, las tarjetas de proyecto ya no
+                aprietan el texto y /krs enseña arriba los WIGs.
+              </strong>{" "}
+              Tres arreglos de la capa de resultados (issues #35, #36 y #37).
+              (1) <strong className="text-foreground">La barra de metas de
+              /proyectos avanza de verdad</strong>: el avance de cada meta se
+              calcula desde el estado REAL de sus tareas (las directas y las
+              de sus KRs) y, cuando terminas todas las tareas vivas de una
+              meta, la meta pasa a “completada” sola; si reabres una, vuelve
+              a “en progreso”. Antes el estado de una meta solo lo cambiaba
+              el usuario a mano, así que la barra se quedaba en 0 para
+              siempre aunque el trabajo estuviera hecho. (2){" "}
+              <strong className="text-foreground">Las tarjetas de proyecto
+              tienen dos alturas</strong>: los botones (ver / editar / PDF)
+              van arriba a la izquierda y el resto —nombre, descripción,
+              contadores, barras y metas hijas— ocupa el ancho completo de la
+              tarjeta; antes la columna de botones de la derecha robaba el
+              ancho al texto y lo dejaba partido en dos líneas. (3){" "}
+              <strong className="text-foreground">/krs enseña arriba el panel
+              de WIGs</strong> (máx 3): las metas marcadas como Enormemente
+              Importantes que tienen KRs, con sus resultados y su entrega —
+              el mismo panel que ya había en /metas y /tareas. Al inventariar
+              KRs, lo primero es saber en cuál estás concentrando la energía.
+              <br />
+              <br />
+              <strong className="text-foreground">Implementación.</strong>{" "}
+              Módulo nuevo{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">src/lib/metas.ts</code>{" "}
+              con la REGLA ÚNICA de “en qué estado debería estar una meta”
+              (pura, sin BD, con 22 casos en{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">src/lib/metas.test.mjs</code>
+              ), side-effects de sincronización en{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">marcarHecha</code>,{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">reabrirTarea</code>,{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">archivarTarea</code>,{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">desarchivarTarea</code>{" "}
+              y <code className="rounded bg-muted px-1 py-0.5 text-xs">actualizarTarea</code>{" "}
+              (no bloqueantes: si la BD falla, la tarea ya está guardada y
+              el fallo se avisa por consola). Sin migración nueva. FEATURES
+              (filas{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">/proyectos</code>{" "}
+              y <code className="rounded bg-muted px-1 py-0.5 text-xs">/krs</code>),
+              HelpDrawer (nuevas entradas para{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">/proyectos</code>{" "}
+              y <code className="rounded bg-muted px-1 py-0.5 text-xs">/krs</code>)
+              y este changelog actualizados en la misma sesión.
+            </span>
+          </li>
+
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-11-12
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
                 La página Hoy: las tres capas se ven con nombre propio, las
                 fechas ya no son NaN y el Modo Recuperación no se rompe.
               </strong>{" "}
@@ -3907,10 +3962,11 @@ function AplicacionEnApp({ pilar }: { pilar: 1 | 2 | 3 | 4 | 5 }) {
     ],
     2: [
       "Scorecard de KRs con proyección lineal (/metas/plan)",
-      "Tabla global de KRs (/krs): una fila por Key Result con su META, su PROYECTO, su entrega y su progreso — el inventario completo del sistema en una pantalla, con el valor actual editable en línea",
+      "Tabla global de KRs (/krs): una fila por Key Result con su META, su PROYECTO, su entrega y su progreso — el inventario completo del sistema en una pantalla, con el valor actual editable en línea. Encima, el panel de WIGs (máx 3): las metas Enormemente Importantes que tienen KRs, con sus resultados y su entrega — el mismo panel que en /metas y /tareas",
       "Tres capas de WIG en la home (/): WIGs de META (violeta, “Metas Enormemente Importantes”) → KRs en foco de la semana (celeste, “KR’s Enormemente Importantes”, el foco de /semana) → WIGs de TAREA (fucsia, “Tareas Enormemente Importantes”). La cascada meta → KR → tarea completa, visible de un vistazo. El panel de KRs se pinta siempre: si la semana no tiene foco elegido, lo dice y enlaza a /semana en vez de desaparecer",
       "Semáforo verde/amarillo/rojo en planes diarios",
-      "Estados de meta (sin_empezar → en_progreso → completada) con feedback visible",
+      "Estados de meta (sin_empezar → en_progreso → completada) con feedback visible — y el estado se DERIVA del trabajo: al completar todas las tareas vivas de una meta, la meta se completa sola (y al reabrir una, vuelve a en progreso). La barra de metas de /proyectos se mueve con ese estado real",
+      "Tarjetas de proyecto en dos alturas (/proyectos): los botones arriba a la izquierda y el resto del contenido a ancho completo, para que el texto de la tarjeta no se apriete",
       "Botón IA “Generar plan con IA” en /metas/nueva y EditarMetaModal: filtra KRs por el campo plazo (Q3, Q1-Q3, fin de 2026…) y dentro de cada KR anota las tareas y hábitos necesarios para cumplirlo",
       "Escenarios de proyecto (/escenarios): cronología + estado medido + lectura de la situación, y los escenarios con su estrategia generados bajo demanda (migration 0029)",
       "Panel “🎯 3 KRs de la semana” en /semana (migration 0033): la capa intermedia entre la meta y la tarea. ✨ Sugerir 3 KRs por IA elige por riesgo real (los que van por debajo del ritmo y tienen menos días restantes). Solo entran KRs con entrega en marcha (regla de contención en BD). El trimestre sigue mandando en la entrega; la semana manda en el esfuerzo",

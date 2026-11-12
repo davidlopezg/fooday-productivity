@@ -334,6 +334,31 @@ export default function MetodologiaPage() {
                   se conserva por compat pero ya no es la fuente de verdad. Helpers: <code className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono">parsearMesesDeRango()</code> y <code className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono">parsearTrimestresDePlazo()</code> (legacy) en <code className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono">/lib/plan.ts</code>.
                 </span>
               </li>
+              <li className="flex gap-2">
+                <span className="text-fuchsia-500">·</span>
+                <span>
+                  <strong className="text-foreground">Estado de una meta DERIVADO de su trabajo (issue #35).</strong>{" "}
+                  <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">metas.estado</code>{" "}
+                  ya no depende de que te acuerdes de cambiarlo: cuando terminas{" "}
+                  <strong className="text-foreground">todas las tareas vivas</strong>{" "}
+                  de una meta (las sueltas y las de sus KRs), la meta pasa a{" "}
+                  <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">completada</code>{" "}
+                  sola, y al reabrir una vuelve a{" "}
+                  <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">en_progreso</code>.{" "}
+                  Dos excepciones deliberadas: una meta sin tareas vivas no se toca (no hay dato que deducir) y una meta archivada nunca se resucita sola (archivar es decisión explícita del usuario, no un derivado). La regla vive en{" "}
+                  <code className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono">src/lib/metas.ts</code>{" "}
+                  (pura, sin BD, con sus tests) y se aplica como efecto secundario en{" "}
+                  <code className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono">marcarHecha</code>,{" "}
+                  <code className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono">reabrirTarea</code>,{" "}
+                  <code className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono">archivarTarea</code>,{" "}
+                  <code className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono">desarchivarTarea</code>{" "}
+                  y <code className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono">actualizarTarea</code>. Es lo que hace que la barra de metas de{" "}
+                  <Link href="/proyectos" className="font-medium text-foreground underline underline-offset-4">
+                    /proyectos
+                  </Link>{" "}
+                  se mueva sola.
+                </span>
+              </li>
             </ul>
           </div>
         }

@@ -133,6 +133,22 @@ export async function fetchMetas(): Promise<Meta[]> {
   return (data ?? []) as Meta[];
 }
 
+/** Mapa kr_id → meta_id.
+ *  Las tareas que viven dentro de un KR no llevan `meta_id`, solo
+ *  `resultado_periodo_id`: este mapa permite resolver a qué META
+ *  pertenecen (issue #35, la barra de metas de /proyectos). */
+export async function fetchMapaMetaDeKr(): Promise<Record<string, string>> {
+  const { data, error } = await createClient()
+    .from("resultados_periodo")
+    .select("id,meta_id");
+  if (error) throw error;
+  const out: Record<string, string> = {};
+  for (const r of (data ?? []) as Array<{ id: string; meta_id: string | null }>) {
+    if (r.meta_id) out[r.id] = r.meta_id;
+  }
+  return out;
+}
+
 /** WIGs activos del usuario, ordenados por wig_orden.
  *  Incluye métricas rápidas: total_tareas y tareas_hechas (sin unir periodos).
  *  Pensada para /Hoy donde no se necesita el scorecard completo. */

@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { fetchKrsOverview } from "@/lib/queries";
-import { actualizarResultadoPeriodo } from "@/lib/mutations";
+import { actualizarResultadoPeriodo, marcarWig } from "@/lib/mutations";
 import { useData } from "@/lib/useData";
-import type { KrOverview } from "@/lib/types";
+import type { KrOverview, MetaConPlan, Periodo, ResultadoConTareas } from "@/lib/types";
 import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
+import { PanelWigMetas } from "@/components/PanelWigMetas";
 import { IconArrowLeft, IconSearch } from "@/components/icons";
 
 // ---------------------------------------------------------------------------
@@ -59,6 +60,9 @@ export default function KrsPage() {
   const [q, setQ] = useState("");
   const [filtroProyecto, setFiltroProyecto] = useState("");
   const [filtroEstado, setFiltroEstado] = useState("");
+  /** Id de la meta cuyo WIG se está quitando (deshabilita el botón). */
+  const [guardandoWigMetaId, setGuardandoWigMetaId] = useState<string | null>(null);
+  const [errorWig, setErrorWig] = useState<string | null>(null);
 
   const filas = useMemo(() => krsQ.data ?? [], [krsQ.data]);
 
@@ -75,6 +79,63 @@ export default function KrsPage() {
     () => filas.some((f) => !f.proyecto),
     [filas],
   );
+
+  /** Quita una META del panel de WIGs (mismo toggle que en /metas y /tareas). */
+  async function quitarWigMeta(metaId: string) {
+    setErrorWig(null);
+    setGuardandoWigMetaId(metaId);
+    try {
+      const ok = await marcarWig(metaId, false);
+      if (!ok) setErrorWig("No se pudo quitar el WIG de la meta.");
+      else await krsQ.reload();
+    } catch (e) {
+      setErrorWig(e instanceof Error ? e.message : "No se pudo actualizar");
+    } finally {
+      setGuardandoWigMetaId(null);
+    }
+  }
+
+  /* ---------------------------------------------------------------------
+   * WIGs (issue #37).
+   * Arriba de la tabla salen las metas marcadas como WIG que tienen KRs,
+   * con sus KRs y su entrega. Es el MISMO panel que /metas y /tareas
+   * (PanelWigMetas): aquí lo alimentamos desde `fetchKrsOverview`, que
+   * ya trae el KR con su meta, su proyecto y sus periodos.
+   * ------------------------------------------------------------------- */
+  const wigs = useMemo<MetaConPlan[]>(() => {
+    const porMeta = new Map<string, MetaConPlan>();
+    for (const f of filas) {
+      if (!f.meta?.es_wig) continue;
+      let plan = porMeta.get(f.meta.id);
+      if (!plan) {
+        plan = {
+          meta: f.meta,
+          resultados: [],
+          total_tareas: 0,
+          tareas_hechas: 0,
+          progreso: 0,
+        };
+        porMeta.set(f.meta.id, plan);
+      }
+      const periodos = f.periodos ?? [];
+      const res: ResultadoConTareas = {
+        ...f.kr,
+        periodos,
+        periodo: periodos[0] ?? ({} as Periodo),
+        tareas: [],
+      };
+      plan.resultados.push(res);
+      plan.total_tareas += f.total_tareas ?? 0;
+      plan.tareas_hechas += f.tareas_hechas ?? 0;
+    }
+    const planes = Array.from(porMeta.values());
+    for (const p of planes) {
+      p.progreso = p.total_tareas > 0 ? p.tareas_hechas / p.total_tareas : 0;
+    }
+    return planes.sort(
+      (a, b) => (a.meta.wig_orden ?? 9) - (b.meta.wig_orden ?? 9),
+    );
+  }, [filas]);
 
   /** Filtro por texto: busca en el KR, en su meta y en su proyecto. */
   const filtradas = useMemo(() => {
@@ -128,6 +189,18 @@ export default function KrsPage() {
           </Link>
         </div>
       </header>
+
+      {/* WIGs (metas con foco) de KR — mismo panel que /metas y /tareas. */}
+      {wigs.length > 0 && (
+        <PanelWigMetas
+          wigs={wigs}
+          onQuitar={quitarWigMeta}
+          guardandoId={guardandoWigMetaId}
+        />
+      )}
+      {errorWig && (
+        <p className="text-xs text-red-600 dark:text-red-400">{errorWig}</p>
+      )}
 
       {krsQ.error && (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-300">
