@@ -42,6 +42,8 @@ export type PlanRecuperacionProps = {
   propuesta: PropuestaShadow | null;
   cargando?: boolean;
   error?: string | null;
+  /** Aviso no bloqueante (p. ej. la BD va por detrás del código). */
+  aviso?: string | null;
   /** Se llama cuando el usuario acepta o descarta la propuesta entera. */
   onCambio?: () => void;
 };
@@ -263,6 +265,7 @@ export function PlanRecuperacion({
   propuesta,
   cargando = false,
   error = null,
+  aviso = null,
   onCambio,
 }: PlanRecuperacionProps) {
   const grupos = agruparDescartables(propuesta?.resultado.descartables ?? []);
@@ -314,6 +317,11 @@ export function PlanRecuperacion({
           {origenCapacidad === "estimado" &&
             " La carga está estimada a partir de tu estado emocional de hoy."}
         </p>
+        {aviso && (
+          <p className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] leading-relaxed text-amber-800 dark:text-amber-200">
+            ⚠️ {aviso}
+          </p>
+        )}
       </header>
 
       {/* ── Riesgos: no se silencian nunca ── */}

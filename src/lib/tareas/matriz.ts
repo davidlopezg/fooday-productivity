@@ -18,7 +18,12 @@
 //   Q4 → baja      (no urgente + no importante)
 // ============================================================================
 
+import { diasHastaFecha } from "@/lib/fechas";
 import type { Meta, Prioridad, Tarea } from "@/lib/types";
+
+// Reexportado: la calculadora de días vive en `@/lib/fechas` (la usa también
+// la página /Hoy). Se mantiene aquí para no romper las importaciones actuales.
+export { diasHastaFecha };
 
 // ----------------------------------------------------------------------------
 // Tipos públicos
@@ -109,20 +114,6 @@ export const IMPORTANCIA_LABEL: Record<Importancia, string> = {
 // ----------------------------------------------------------------------------
 // Funciones puras
 // ----------------------------------------------------------------------------
-
-/** Diferencia en días entre hoy (LOCAL) y la fecha objetivo (LOCAL).
- *  Negativo si la fecha ya pasó. null si la fecha es null/inválida. */
-export function diasHastaFecha(iso: string | null): number | null {
-  if (!iso) return null;
-  // Trabajamos en local para evitar off-by-one en UTC+ como pasaba con toISOString.
-  const [y, m, d] = iso.split("-").map(Number);
-  if (!y || !m || !d) return null;
-  const target = new Date(y, m - 1, d, 0, 0, 0, 0);
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-  const diffMs = target.getTime() - today.getTime();
-  return Math.round(diffMs / 86400000);
-}
 
 /** Bucket de urgencia a partir de los días hasta vencer. */
 export function clasificarUrgencia(dias: number | null): Urgencia {

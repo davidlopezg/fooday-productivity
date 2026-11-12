@@ -22,15 +22,18 @@ import type { KrFocoConDetalle } from "@/lib/types";
 
 export function PanelFocoSemanaKRs({
   focos,
-  titulo = "KRs Enormemente Importantes",
+  titulo = "KR's Enormemente Importantes",
   descripcion,
+  estadoVacio,
 }: {
   focos: KrFocoConDetalle[];
   titulo?: string;
   /** Texto del párrafo de cabecera (por defecto, el de la home). */
   descripcion?: string;
+  /** Si se pasa, el panel se pinta TAMBIÉN sin focos (con este texto). */
+  estadoVacio?: string;
 }) {
-  if (focos.length === 0) return null;
+  if (focos.length === 0 && !estadoVacio) return null;
   return (
     <section
       className="rounded-xl border-2 border-sky-500/40 bg-gradient-to-br from-sky-500/10 to-violet-500/5 p-5"
@@ -50,8 +53,15 @@ export function PanelFocoSemanaKRs({
       </header>
       <p className="mb-3 text-xs text-muted-foreground">
         {descripcion ??
-          `Los ${focos.length} resultados medibles en los que pones horas esta semana — el eslabón entre tus WIGs de meta y las tareas que los sostienen.`}
+          (focos.length > 0
+            ? `Los ${focos.length} resultados medibles en los que pones horas esta semana — el eslabón entre tus WIGs de meta y las tareas que los sostienen.`
+            : "Los resultados medibles en los que pones horas esta semana — el eslabón entre tus WIGs de meta y las tareas que los sostienen.")}
       </p>
+      {focos.length === 0 && (
+        <p className="rounded-lg border border-sky-500/30 bg-background/70 px-3 py-2.5 text-xs text-muted-foreground">
+          {estadoVacio}
+        </p>
+      )}
       <ul className="space-y-2">
         {focos.map((f) => {
           const pct = Math.round(f.progreso * 100);

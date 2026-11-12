@@ -13,6 +13,7 @@ import {
 import { marcarHecha } from "@/lib/mutations";
 import { useData } from "@/lib/useData";
 import { getCurrentISOWeek } from "@/lib/semana";
+import { diasHastaFecha, fechasDeTarea } from "@/lib/fechas";
 import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
 import { PanelFocoSemanaKRs } from "@/components/PanelFocoSemanaKRs";
 import { PagosWidget } from "@/components/pagos/PagosWidget";
@@ -49,26 +50,19 @@ const AMBITO_LABEL_TAREA: Record<AmbitoTarea, string> = {
 
 // ============================================================================
 // Tareas con fecha — utilidades
-// Una tarea "tiene fecha" si tiene `deadline` (dura) o `fecha_fin` (blanda,
-// migration 0000). Priorizamos `deadline` cuando ambas existen.
-// Devuelve la fecha ISO (YYYY-MM-DD) o null.
+// ----------------------------------------------------------------------------
+// Una tarea "tiene fecha" si tiene `fecha_fin` (columna date) o si su
+// `deadline` es una fecha de verdad. OJO: `deadline` es una NOTA de texto
+// libre ("esta semana", "mañana…"), no una fecha — por eso las fechas se
+// validan con `fechasDeTarea()` y las notas se pintan como texto.
+// Las que solo tienen nota se muestran AL FINAL del panel, sin badge de
+// días: antes se intentaba parsear y salían "en NaNd" / "Invalid Date".
 // ============================================================================
-function fechaLimiteTarea(t: Tarea): string | null {
-  return t.deadline ?? t.fecha_fin ?? null;
-}
 
-/** Días enteros entre hoy (local) y la fecha ISO (YYYY-MM-DD).
- *  Negativo = ya vencida (retrasada). 0 = hoy. Positivo = futura. */
-function diasHastaHoy(fechaIso: string): number {
-  const hoy = new Date();
-  hoy.setHours(0, 0, 0, 0);
-  const f = new Date(fechaIso + "T00:00:00");
-  return Math.round((f.getTime() - hoy.getTime()) / 86_400_000);
-}
-
+/** "mié 12 nov" a partir de un YYYY-MM-DD. */
 function formatoFechaCorta(fechaIso: string): string {
-  const f = new Date(fechaIso + "T00:00:00");
-  return f.toLocaleDateString("es-ES", {
+  const [y, m, d] = fechaIso.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("es-ES", {
     weekday: "short",
     day: "numeric",
     month: "short",
@@ -95,6 +89,7 @@ export default function HoyPage() {
     propuesta,
     cargando: propCargando,
     error: propError,
+    aviso: propAviso,
     recargar: propRecargar,
   } = usePropuestaRecuperacion(true);
 
@@ -120,13 +115,20 @@ export default function HoyPage() {
 
   // ------------------------------------------------------------------------
   // Tareas con fecha: derivamos del listado de pendientes (estado='pendiente')
-  // ya cargado. Filtramos por .deadline o .fecha_fin y ordenamos por fecha
-  // ascendente (las más próximas primero; las vencidas van arriba del todo).
+  // ya cargado. Una tarea entra si tiene `fecha_fin` (fecha real) o un
+  // `deadline` en texto libre (nota). Las de fecha real van primero, ordenadas
+  // ascendente (las vencidas arriba del todo); las que solo tienen nota van
+  // detrás, sin cálculo de días (su deadline no es una fecha).
   // ------------------------------------------------------------------------
   const tareasConFecha = data.pendientes
-    .map((t) => ({ tarea: t, fecha: fechaLimiteTarea(t) }))
-    .filter((x): x is { tarea: Tarea; fecha: string } => !!x.fecha)
-    .sort((a, b) => a.fecha.localeCompare(b.fecha));
+    .map((t) => ({ tarea: t, ...fechasDeTarea(t) }))
+    .filter((x) => x.fecha !== null || x.texto !== null)
+    .sort((a, b) => {
+      if (a.fecha && b.fecha) return a.fecha.localeCompare(b.fecha);
+      if (a.fecha) return -1;
+      if (b.fecha) return 1;
+      return (a.texto ?? "").localeCompare(b.texto ?? "");
+    });
 
   // Para el check inline sin tocar la API de `data`: estado local optimista.
   // Cuando el usuario marca una tarea hecha, la sacamos de la vista al
@@ -219,7 +221,7 @@ export default function HoyPage() {
           <header className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 className="flex items-center gap-2 font-semibold tracking-tight">
               <IconTarget className="h-5 w-5 text-violet-500" />
-              Enormemente Importantes
+              Metas Enormemente Importantes
             </h2>
             <Link
               href="/metas"
@@ -272,8 +274,14 @@ export default function HoyPage() {
       {/* KRs WIG — capa intermedia: los resultados medibles en los que se
           pone horas esta semana (foco semanal de /semana). Va ENTRE los
           WIGs de meta y los WIGs de tarea porque esa es la cascada:
-          meta → KR → tarea. (Panel compartido con /tareas.) */}
-      <PanelFocoSemanaKRs focos={data.focoKRs} />
+          meta → KR → tarea. (Panel compartido con /tareas.)
+          Si esta semana no hay foco elegido, el panel se pinta IGUAL con
+          su estado vacío: la capa intermedia siempre se ve, para que se
+          sepa que falta elegir el foco. */}
+      <PanelFocoSemanaKRs
+        focos={data.focoKRs}
+        estadoVacio="Esta semana todavía no has elegido el foco: los KRs en los que pones horas son el eslabón entre tus metas y tus tareas. Elige hasta 3 en /semana."
+      />
 
       {/* Tareas WIG — capa de ejecución de los WIGs de metas */}
       {data.wigTareas.length > 0 && (
@@ -339,6 +347,7 @@ export default function HoyPage() {
         propuesta={propuesta}
         cargando={propCargando}
         error={propError}
+        aviso={propAviso}
         onCambio={() => {
           void propRecargar();
           void reload();
@@ -366,9 +375,11 @@ export default function HoyPage() {
             </Link>
           </header>
           <p className="mb-3 text-xs text-muted-foreground">
-            Tareas pendientes con <code className="rounded bg-muted px-1 py-0.5 text-[10px]">deadline</code> o{" "}
-            <code className="rounded bg-muted px-1 py-0.5 text-[10px]">fecha_fin</code>, ordenadas de la más
-            urgente (vencida) a la más lejana. Pulsa el ☐ para marcarla hecha sin salir de aquí.
+            Tareas pendientes con{" "}
+            <code className="rounded bg-muted px-1 py-0.5 text-[10px]">fecha_fin</code> (fecha real) o con{" "}
+            <code className="rounded bg-muted px-1 py-0.5 text-[10px]">deadline</code> (nota), ordenadas de la
+            más urgente (vencida) a la más lejana. Las que solo tienen nota van al final, con su texto
+            tal cual. Pulsa el ☐ para marcarla hecha sin salir de aquí.
           </p>
           {errorCheck && (
             <p className="mb-3 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-600 dark:text-red-400">
@@ -376,30 +387,33 @@ export default function HoyPage() {
             </p>
           )}
           <ul className="space-y-1.5">
-            {tareasConFechaVisibles.slice(0, TAREA_CON_FECHA_MAX).map(({ tarea, fecha }) => {
-              const dias = diasHastaHoy(fecha);
-              const vencida = dias < 0;
-              const hoy = dias === 0;
-              // Color del badge por urgencia
-              let badgeCls =
-                "bg-muted text-muted-foreground border-border";
-              let badgeTxt = `en ${dias}d`;
-              if (vencida) {
-                badgeCls =
-                  "bg-red-500/10 text-red-700 dark:text-red-300 border-red-500/30";
-                badgeTxt = `retrasada ${Math.abs(dias)}d`;
-              } else if (hoy) {
-                badgeCls =
-                  "bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/30";
-                badgeTxt = "HOY";
-              } else if (dias <= 2) {
-                badgeCls =
-                  "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30";
+            {tareasConFechaVisibles.slice(0, TAREA_CON_FECHA_MAX).map(({ tarea, fecha, texto }) => {
+              // Sin fecha real no hay badge de días: se muestra la nota tal cual.
+              const dias = fecha ? diasHastaFecha(fecha) : null;
+              let badgeCls = "bg-muted text-muted-foreground border-border";
+              let badgeTxt = texto ?? "";
+              let badgeTitulo = texto ? `Deadline: ${texto}` : "";
+              if (dias !== null) {
+                const vencida = dias < 0;
+                const hoy = dias === 0;
+                // Color del badge por urgencia
                 badgeTxt = `en ${dias}d`;
-              } else if (dias <= 7) {
-                badgeCls =
-                  "bg-amber-500/5 text-amber-700 dark:text-amber-300 border-amber-500/20";
-                badgeTxt = `en ${dias}d`;
+                if (vencida) {
+                  badgeCls =
+                    "bg-red-500/10 text-red-700 dark:text-red-300 border-red-500/30";
+                  badgeTxt = `retrasada ${Math.abs(dias)}d`;
+                } else if (hoy) {
+                  badgeCls =
+                    "bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/30";
+                  badgeTxt = "HOY";
+                } else if (dias <= 2) {
+                  badgeCls =
+                    "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30";
+                } else if (dias <= 7) {
+                  badgeCls =
+                    "bg-amber-500/5 text-amber-700 dark:text-amber-300 border-amber-500/20";
+                }
+                badgeTitulo = `Fecha: ${formatoFechaCorta(fecha!)}`;
               }
               const guardando = guardandoId === tarea.id;
               return (
@@ -431,13 +445,15 @@ export default function HoyPage() {
                   )}
                   <span
                     className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] tabular-nums ${badgeCls}`}
-                    title={`Fecha: ${formatoFechaCorta(fecha)}`}
+                    title={badgeTitulo}
                   >
                     {badgeTxt}
                   </span>
-                  <span className="hidden shrink-0 text-[10px] tabular-nums text-muted-foreground sm:inline">
-                    {formatoFechaCorta(fecha)}
-                  </span>
+                  {fecha && (
+                    <span className="hidden shrink-0 text-[10px] tabular-nums text-muted-foreground sm:inline">
+                      {formatoFechaCorta(fecha)}
+                    </span>
+                  )}
                 </li>
               );
             })}

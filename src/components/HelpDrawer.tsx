@@ -62,13 +62,13 @@ export const AYUDA_POR_RUTA: Record<
       {
         titulo: "Tres capas de WIG: meta → KR → tarea",
         cuerpo:
-          "El panel violeta son los WIGs de METAS (qué resultados quieres). El panel celeste son los KRs en foco de la semana (en qué resultados medibles pones horas AHORA — se eligen en /semana). El panel fucsia son los WIGs de TAREAS (qué 3 tareas concretas los sostienen). Si los WIGs-metas no avanzan, mira primero las tareas; si las tareas avanzan pero los KRs no, el problema es la medición.",
+          "El panel violeta son los WIGs de METAS (‘Metas Enormemente Importantes’: qué resultados quieres). El panel celeste son los KRs en foco de la semana (‘KR’s Enormemente Importantes’: en qué resultados medibles pones horas AHORA — se eligen en /semana; si esta semana no has elegido ninguno, el panel te lo dice y te lleva allí). El panel fucsia son los WIGs de TAREAS (‘Tareas Enormemente Importantes’: qué 3 tareas concretas los sostienen). Si los WIGs-metas no avanzan, mira primero las tareas; si las tareas avanzan pero los KRs no, el problema es la medición.",
         pilar: 2,
       },
       {
         titulo: "📅 Panel ‘Tareas con fecha’",
         cuerpo:
-          "Entre los WIGs-tareas y el Plan de hoy hay un panel ámbar con las tareas pendientes que tienen deadline o fecha_fin, ordenadas de la más urgente a la más lejana (vencidas arriba, luego HOY, luego futuras). Pulsa el ☐ para marcarla hecha sin navegar a /tareas. Si la lista no aparece, es que no tienes tareas pendientes con fecha: date un paseo por /tareas y ponles deadline a las críticas.",
+          "Entre los WIGs-tareas y el Plan de hoy hay un panel ámbar con las tareas pendientes que tienen fecha, ordenadas de la más urgente a la más lejana (vencidas arriba, luego HOY, luego futuras). La fecha real es la de ‘Fecha finalización’; el ‘Deadline’ es una nota de texto libre (‘esta semana’): esas tareas van al final del panel, con su nota tal cual. Pulsa el ☐ para marcarla hecha sin navegar a /tareas. Si la lista no aparece, es que no tienes tareas pendientes con fecha: date un paseo por /tareas y ponles fecha a las críticas.",
         pilar: 3,
       },
     ],
