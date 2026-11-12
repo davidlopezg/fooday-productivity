@@ -192,6 +192,12 @@ export const AYUDA_POR_RUTA: Record<
           "El panel celeste de arriba son los KRs en foco de la semana: los resultados medibles en los que pones horas AHORA (máx 3), con su meta, su entrega y su progreso. Es el mismo panel que hay en la home y en /tareas: al inventariar KRs, lo primero es saber en cuál estás concentrando la energía. Si esta semana no has elegido el foco, el panel te lo dice y te lleva a /semana.",
         pilar: 2,
       },
+      {
+        titulo: "La diana 🎯: el KR que más importa del ciclo",
+        cuerpo:
+          "Cada fila tiene su propia diana, igual que las metas y las tareas: al pulsarla, ese KR pasa a ser Enormemente Importante (máx 3, el límite lo pone la base de datos). El panel violeta de arriba lista los que has elegido, con su meta y su entrega. Ojo: esto NO es el foco de la semana (el panel celeste). El WIG es del ciclo y se queda hasta que lo quites; el foco semanal dice dónde pones horas ESTA semana y rota solo.",
+        pilar: 2,
+      },
     ],
   },
   "/metas/plan": {

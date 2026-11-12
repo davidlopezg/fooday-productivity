@@ -41,7 +41,7 @@ Capturas (inbox / vaciar-cabeza)
 | `valores` | Valores personales | — |
 | `visiones` | Visión / BHAG | — |
 | `metas` | Metas (card por meta) | `owner_id + codigo` |
-| `resultados_periodo` | Key Results (KR) de una meta. Migration 0028: ya no tiene `periodo_id`; la asignación a 1..N trimestres/meses vive en `kr_periodos`. | — |
+| `resultados_periodo` | Key Results (KR) de una meta. Migration 0028: ya no tiene `periodo_id`; la asignación a 1..N trimestres/meses vive en `kr_periodos`. Migration 0038: `es_wig` + `wig_orden` (1-3) para marcar el KR como WIG del ciclo (RPC `toggle_kr_wig`, máx 3). | — |
 | `kr_periodos` | Asignación N:M KR↔periodo. Migration 0028. | `kr_id + periodo_id` |
 | `periodos` | Trimestres / meses / rangos custom. | `owner_id + tipo + anio + numero` |
 | `proyectos` | Proyectos (área_id, hijos de area). | `owner_id + nombre` |

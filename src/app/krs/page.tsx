@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { fetchKrsOverview, fetchKRsFocoSemanal } from "@/lib/queries";
-import { actualizarResultadoPeriodo } from "@/lib/mutations";
+import { actualizarResultadoPeriodo, marcarKrWig } from "@/lib/mutations";
 import { getCurrentISOWeek } from "@/lib/semana";
 import { useData } from "@/lib/useData";
 import type { KrFocoConDetalle, KrOverview } from "@/lib/types";
 import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
 import { PanelFocoSemanaKRs } from "@/components/PanelFocoSemanaKRs";
-import { IconArrowLeft, IconSearch } from "@/components/icons";
+import { PanelWigKrs } from "@/components/PanelWigKrs";
+import { IconArrowLeft, IconSearch, IconTarget } from "@/components/icons";
 
 // ---------------------------------------------------------------------------
 // /krs — Vista global de Key Results.
@@ -62,6 +63,17 @@ export default function KrsPage() {
   const [filtroProyecto, setFiltroProyecto] = useState("");
   const [filtroEstado, setFiltroEstado] = useState("");
 
+  /* ---------------------------------------------------------------------
+   * WIGs de KR (issue #49): los KRs marcados como Enormemente Importantes
+   * del ciclo. Es la capa que faltaba entre los WIGs de meta (violeta en
+   * /metas) y los WIGs de tarea (fucsia en /tareas): el KR es el
+   * resultado medible, y hay que poder decir cuál de ellos manda.
+   * NO es el foco semanal (celeste, el panel de arriba): ese dice dónde
+   * pones horas ESTA semana y rota solo; el WIG es del ciclo.
+   * ------------------------------------------------------------------- */
+  const [guardandoWigId, setGuardandoWigId] = useState<string | null>(null);
+  const [errorWig, setErrorWig] = useState<string | null>(null);
+
   const filas = useMemo(() => krsQ.data ?? [], [krsQ.data]);
 
   /** Proyectos presentes en los KRs (para el desplegable de filtro). */
@@ -77,6 +89,35 @@ export default function KrsPage() {
     () => filas.some((f) => !f.proyecto),
     [filas],
   );
+
+  /** KRs marcados como WIG, ordenados por su posición (1-3). */
+  const wigs = useMemo(
+    () =>
+      filas
+        .filter((f) => f.kr.es_wig)
+        .sort((a, b) => (a.kr.wig_orden ?? 9) - (b.kr.wig_orden ?? 9)),
+    [filas],
+  );
+
+  /** Marca/desmarca un KR como WIG. El cap de 3 lo impone la BD. */
+  async function toggleWig(krId: string, esWig: boolean) {
+    setErrorWig(null);
+    setGuardandoWigId(krId);
+    try {
+      const ok = await marcarKrWig(krId, esWig);
+      if (!ok) {
+        setErrorWig(
+          "Ya tienes 3 KRs marcados como WIG. Quita uno antes de añadir otro.",
+        );
+      } else {
+        await krsQ.reload();
+      }
+    } catch (e) {
+      setErrorWig(e instanceof Error ? e.message : "No se pudo actualizar");
+    } finally {
+      setGuardandoWigId(null);
+    }
+  }
 
   /* ---------------------------------------------------------------------
    * Foco semanal de KRs (issue #43).
@@ -157,6 +198,20 @@ export default function KrsPage() {
         </p>
       )}
 
+      {/* WIGs de KR (issue #49) — la capa que faltaba: el mismo botón 🎯
+          que tienen las metas y las tareas, pero sobre el resultado
+          medible. El cap de 3 lo impone la BD (RPC toggle_kr_wig). */}
+      <PanelWigKrs
+        wigs={wigs}
+        guardandoId={guardandoWigId}
+        onQuitar={(krId) => toggleWig(krId, false)}
+      />
+      {errorWig && (
+        <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+          {errorWig}
+        </p>
+      )}
+
       {krsQ.error && (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-300">
           <p className="font-medium">No se pudieron cargar los KRs.</p>
@@ -229,6 +284,7 @@ export default function KrsPage() {
           <table className="w-full min-w-[980px] text-sm">
             <thead>
               <tr className="border-b border-border text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+                <th className="px-2 py-2.5 font-semibold">WIG</th>
                 <th className="px-3 py-2.5 font-semibold">KR</th>
                 <th className="px-3 py-2.5 font-semibold">Meta</th>
                 <th className="px-3 py-2.5 font-semibold">Proyecto</th>
@@ -244,6 +300,8 @@ export default function KrsPage() {
                   key={f.kr.id}
                   fila={f}
                   onGuardado={krsQ.reload}
+                  onToggleWig={toggleWig}
+                  guardandoWigId={guardandoWigId}
                 />
               ))}
             </tbody>
@@ -278,9 +336,13 @@ export default function KrsPage() {
 function KRTableRow({
   fila,
   onGuardado,
+  onToggleWig,
+  guardandoWigId,
 }: {
   fila: KrOverview;
   onGuardado: () => void;
+  onToggleWig: (krId: string, esWig: boolean) => void | Promise<void>;
+  guardandoWigId: string | null;
 }) {
   const { kr, meta, proyecto, periodos } = fila;
   const [editando, setEditando] = useState(false);
@@ -288,9 +350,46 @@ function KRTableRow({
   const prog = fila.total_tareas === 0 ? 0 : fila.tareas_hechas / fila.total_tareas;
 
   return (
-    <tr className="align-top hover:bg-muted/30">
+    <tr
+      className={`align-top hover:bg-muted/30 ${
+        kr.es_wig ? "bg-violet-500/[0.04]" : ""
+      }`}
+    >
+      {/* WIG (toggle) — el mismo botón 🎯 que tienen las metas y las
+          tareas. Sube el KR a "Enormemente Importante" del ciclo. */}
+      <td className="px-2 py-2.5">
+        <button
+          type="button"
+          onClick={() => onToggleWig(kr.id, !kr.es_wig)}
+          disabled={guardandoWigId === kr.id}
+          className={`rounded-full p-1 transition-colors disabled:opacity-50 ${
+            kr.es_wig
+              ? "bg-violet-500/20 text-violet-600 dark:text-violet-400"
+              : "text-muted-foreground/40 hover:bg-accent hover:text-muted-foreground"
+          }`}
+          title={
+            kr.es_wig
+              ? `Quitar de Enormemente Importantes (WIG #${kr.wig_orden ?? "?"})`
+              : "Marcar como WIG"
+          }
+          aria-label={kr.es_wig ? "Quitar de WIG" : "Marcar como WIG"}
+          aria-pressed={!!kr.es_wig}
+        >
+          {guardandoWigId === kr.id ? (
+            <span className="block h-4 w-4 text-center text-[10px]">…</span>
+          ) : (
+            <IconTarget className="h-4 w-4" />
+          )}
+        </button>
+      </td>
+
       {/* KR */}
       <td className="max-w-[320px] px-3 py-2.5">
+        {kr.es_wig && (
+          <span className="mr-1.5 text-[10px] font-semibold text-violet-600 dark:text-violet-400">
+            🎯 WIG #{kr.wig_orden ?? "?"}
+          </span>
+        )}
         {meta ? (
           <Link
             href={`/metas/detalle?id=${meta.id}`}
