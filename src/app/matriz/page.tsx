@@ -385,7 +385,7 @@ export default function MatrizPage() {
           type="button"
           onClick={abrirModalIA}
           disabled={sugBusy || total === 0}
-          className="inline-flex items-center gap-1.5 rounded-md bg-gradient-to-r from-violet-600 to-indigo-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:opacity-90 disabled:opacity-50"
+          className="inline-flex items-center justify-center min-h-10 gap-1.5 rounded-md bg-gradient-to-r from-violet-600 to-indigo-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:opacity-90 disabled:opacity-50"
           title="La IA revisa cada tarea activa y propone redistribuirla al cuadrante correcto"
         >
           <IconSparkles className="h-4 w-4" />

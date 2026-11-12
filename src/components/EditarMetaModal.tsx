@@ -482,7 +482,7 @@ export function EditarMetaModal({
                   type="button"
                   onClick={generarPlan}
                   disabled={generando || aplicando}
-                  className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-gradient-to-r from-violet-600 to-indigo-600 px-2.5 py-1 text-[11px] font-medium text-white shadow-sm hover:opacity-90 disabled:opacity-50"
+                  className="inline-flex items-center justify-center min-h-10 inline-flex shrink-0 items-center gap-1.5 rounded-md bg-gradient-to-r from-violet-600 to-indigo-600 px-2.5 py-1 text-[11px] font-medium text-white shadow-sm hover:opacity-90 disabled:opacity-50"
                   title={
                     cfg.data.minimax_api_key
                       ? "Proponer KRs + tareas con IA"

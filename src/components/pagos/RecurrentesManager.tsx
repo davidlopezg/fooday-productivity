@@ -63,7 +63,7 @@ export function RecurrentesManager({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md border border-border bg-background px-3 py-1.5 text-sm hover:bg-accent"
+            className="inline-flex items-center justify-center min-h-10 rounded-md border border-border bg-background px-3 py-1.5 text-sm hover:bg-accent"
           >
             Cerrar
           </button>
@@ -184,7 +184,7 @@ function ListaReglas({
           type="button"
           onClick={onGenerar}
           disabled={generando}
-          className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+          className="inline-flex items-center justify-center min-h-10 gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
         >
           <IconRepeat className="h-4 w-4" />
           {generando ? "Generando…" : "Generar mes actual"}
@@ -512,14 +512,14 @@ function FormRegla({
           type="button"
           onClick={onCancel}
           disabled={isPending}
-          className="rounded-md border border-border bg-background px-3 py-1.5 text-sm hover:bg-accent disabled:opacity-50"
+          className="inline-flex items-center justify-center min-h-10 rounded-md border border-border bg-background px-3 py-1.5 text-sm hover:bg-accent disabled:opacity-50"
         >
           Cancelar
         </button>
         <button
           type="submit"
           disabled={isPending}
-          className="rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+          className="inline-flex items-center justify-center min-h-10 rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
         >
           {isPending ? "Guardando…" : regla ? "Guardar cambios" : "Crear regla"}
         </button>

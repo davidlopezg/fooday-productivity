@@ -172,7 +172,7 @@ function EstatusDetalleInner() {
         <div className="flex gap-2">
           <Link
             href={`/estatus/editar?fecha=${fecha}`}
-            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-sm font-medium hover:bg-accent"
+            className="inline-flex items-center justify-center min-h-10 gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-sm font-medium hover:bg-accent"
           >
             <IconPencil className="h-3.5 w-3.5" />
             Editar
@@ -180,7 +180,7 @@ function EstatusDetalleInner() {
           <button
             onClick={onEliminar}
             disabled={borrando}
-            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-500/10 disabled:opacity-50 dark:text-red-400"
+            className="inline-flex items-center justify-center min-h-10 gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-500/10 disabled:opacity-50 dark:text-red-400"
           >
             <IconTrash className="h-3.5 w-3.5" />
             {borrando ? "Borrando…" : "Eliminar"}

@@ -447,7 +447,7 @@ function SubtareasEditor({
             <button
               type="button"
               onClick={onLimpiar}
-              className="rounded-md border border-border px-2 py-1 text-[11px] font-medium hover:bg-accent"
+              className="inline-flex items-center justify-center min-h-10 rounded-md border border-border px-2 py-1 text-[11px] font-medium hover:bg-accent"
               title="Vaciar la lista"
             >
               Limpiar
@@ -457,7 +457,7 @@ function SubtareasEditor({
             type="button"
             onClick={onDesgranar}
             disabled={desgranando}
-            className="inline-flex items-center gap-1.5 rounded-md bg-gradient-to-r from-violet-600 to-indigo-600 px-2.5 py-1 text-[11px] font-medium text-white shadow-sm hover:opacity-90 disabled:opacity-50"
+            className="inline-flex items-center justify-center min-h-10 gap-1.5 rounded-md bg-gradient-to-r from-violet-600 to-indigo-600 px-2.5 py-1 text-[11px] font-medium text-white shadow-sm hover:opacity-90 disabled:opacity-50"
             title={tieneKey ? "Descomponer la tarea en micro-pazos con IA" : "Configura primero la API key"}
           >
             <IconSparkles className="h-3.5 w-3.5" />
@@ -604,7 +604,7 @@ function SubtareasEditor({
       <button
         type="button"
         onClick={anadir}
-        className="mt-2 w-full rounded-md border border-dashed border-border px-2 py-1.5 text-xs text-muted-foreground hover:bg-accent"
+        className="inline-flex items-center justify-center min-h-10 mt-2 w-full rounded-md border border-dashed border-border px-2 py-1.5 text-xs text-muted-foreground hover:bg-accent"
       >
         + Añadir subtarea a mano
       </button>
@@ -685,7 +685,7 @@ function SubtareasEditorLite({
       <button
         type="button"
         onClick={anadir}
-        className="mt-2 w-full rounded-md border border-dashed border-border px-2 py-1.5 text-xs text-muted-foreground hover:bg-accent"
+        className="inline-flex items-center justify-center min-h-10 mt-2 w-full rounded-md border border-dashed border-border px-2 py-1.5 text-xs text-muted-foreground hover:bg-accent"
       >
         + Añadir subtarea a mano
       </button>
@@ -765,7 +765,7 @@ function CriterioTerminacionEditor({
           type="button"
           onClick={generar}
           disabled={generando || !tieneKey}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-gradient-to-r from-violet-600 to-indigo-600 px-2.5 py-1 text-[11px] font-medium text-white shadow-sm hover:opacity-90 disabled:opacity-50"
+          className="inline-flex items-center justify-center min-h-10 inline-flex shrink-0 items-center gap-1.5 rounded-md bg-gradient-to-r from-violet-600 to-indigo-600 px-2.5 py-1 text-[11px] font-medium text-white shadow-sm hover:opacity-90 disabled:opacity-50"
           title={tieneKey ? "Generar la frase con IA" : "Configura primero la API key"}
         >
           <IconSparkles className="h-3.5 w-3.5" />

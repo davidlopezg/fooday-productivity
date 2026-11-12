@@ -52,7 +52,7 @@ export default function PlanDiarioHistoricoPage() {
         </div>
         <Link
           href="/plan-diario"
-          className="rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted"
+          className="inline-flex items-center justify-center min-h-10 rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted"
         >
           ← Volver a Plan diario
         </Link>

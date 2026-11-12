@@ -519,7 +519,7 @@ export function TasksTable({
           </span>
           <a
             href="/tareas"
-            className="ml-auto rounded px-2 py-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+            className="inline-flex items-center justify-center min-h-10 ml-auto rounded px-2 py-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
           >
             quitar filtro
           </a>
