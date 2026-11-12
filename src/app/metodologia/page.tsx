@@ -432,18 +432,26 @@ export default function MetodologiaPage() {
               </li>
               <li className="flex gap-3">
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">3</span>
-                <span><strong>Panel WIG-meta</strong> (violeta) — 1-3 metas, con % de progreso.</span>
+                <span><strong>Panel WIG-meta</strong> (violeta, “Metas Enormemente Importantes”) — 1-3 metas, con % de progreso.</span>
               </li>
               <li className="flex gap-3">
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">4</span>
-                <span><strong>Panel WIG-tarea</strong> (fucsia) — 1-3 tareas que los sostienen.</span>
+                <span><strong>Panel WIG-KR</strong> (celeste, “KR’s Enormemente Importantes”) — los KRs en foco de la semana. Siempre visible: si no hay foco elegido, dice cuál es el siguiente paso (elegirlo en /semana) en vez de desaparecer.</span>
               </li>
               <li className="flex gap-3">
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">5</span>
-                <span><strong>Plan de hoy</strong> — 3-4 imprescindibles + autocuidado + micro + extra.</span>
+                <span><strong>Panel WIG-tarea</strong> (fucsia, “Tareas Enormemente Importantes”) — 1-3 tareas que los sostienen.</span>
               </li>
               <li className="flex gap-3">
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">6</span>
+                <span><strong>Panel “Tareas con fecha”</strong> (ámbar) — las pendientes con fecha real, vencidas arriba; las que solo tienen un deadline en texto van al final, con su nota tal cual.</span>
+              </li>
+              <li className="flex gap-3">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">7</span>
+                <span><strong>Plan de hoy</strong> — 3-4 imprescindibles + autocuidado + micro + extra.</span>
+              </li>
+              <li className="flex gap-3">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">8</span>
                 <span><strong>Preview de pendientes</strong> — máximo 6, con link "ver todas".</span>
               </li>
             </ol>

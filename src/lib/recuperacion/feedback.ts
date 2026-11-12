@@ -20,7 +20,36 @@
 // ============================================================================
 
 import { createClient } from "@/lib/supabase/client";
+import { esEsquemaAusente } from "@/lib/supabase/esquema";
 import { localYMD } from "@/lib/semana";
+
+// ============================================================================
+// Estado del esquema (BD por detrás del código)
+// ----------------------------------------------------------------------------
+// QUÉ ES
+//   La migración 0034 (pospuesta_hasta / postergada_en / motivo_no_prioritaria
+//   + tabla recuperacion_feedback) puede no estar aplicada en el proyecto de
+//   Supabase: el código ya la usa pero la BD va por detrás.
+//
+// POR QUÉ NO SE ROMPE TODO
+//   Antes, un solo select a una columna que no existía tumbaba el Modo
+//   Recuperación entero ("No se pudo calcular la propuesta: ... column
+//   tareas.pospuesta_hasta does not exist"). Ahora:
+//     · lo que SÍ se puede leer (los bloqueos: `tareas.estado`) se lee;
+//     · lo que no se puede (postergaciones) se salta con un aviso;
+//     · lo que el usuario intente GUARDAR se dice con un mensaje accionable.
+//
+// QUÉ NO HACE
+//   No aplica migraciones ni escribe en el esquema: solo detecta que falta
+//   algo y lo dice.
+// ============================================================================
+
+/** Aviso para el usuario cuando la BD va por detrás del código. */
+export const AVISO_MIGRACION_0034 =
+  "Falta aplicar la migración 0034 en Supabase (tareas.pospuesta_hasta): hasta entonces no se pueden guardar postergaciones ni motivos.";
+
+// El detector vive en `@/lib/supabase/esquema` (módulo puro, testeable).
+export { esEsquemaAusente };
 
 // ============================================================================
 // Tipos
@@ -108,6 +137,18 @@ export async function registrarFeedback(args: {
         .update(patch)
         .eq("id", args.tareaId);
       if (error) {
+        if (esEsquemaAusente(error)) {
+          // Sin la migración 0034 solo se puede tocar `tareas.estado` (que
+          // existe desde 0001). Se aplica ese cambio (lo importante: que el
+          // sistema deje de proponer la tarea) y se avisa del resto.
+          if (args.accion === "bloqueada") {
+            await supabase
+              .from("tareas")
+              .update({ estado: "bloqueada" })
+              .eq("id", args.tareaId);
+          }
+          throw new Error(AVISO_MIGRACION_0034);
+        }
         throw new Error(`No se pudo actualizar la tarea: ${error.message}`);
       }
     }
@@ -124,6 +165,9 @@ export async function registrarFeedback(args: {
     nivel_carga: args.nivelCarga ?? null,
   });
   if (error) {
+    if (esEsquemaAusente(error)) {
+      throw new Error(AVISO_MIGRACION_0034);
+    }
     throw new Error(`No se pudo guardar el feedback: ${error.message}`);
   }
 }
@@ -169,6 +213,8 @@ export async function limpiarPostergacion(id: string): Promise<void> {
     .update({ pospuesta_hasta: null, postergada_en: null })
     .eq("id", id);
   if (error) {
+    // Sin la migración 0034 no hay postergaciones que limpiar: no es un fallo.
+    if (esEsquemaAusente(error)) return;
     throw new Error(`No se pudo limpiar la postergación: ${error.message}`);
   }
 }
@@ -202,13 +248,35 @@ export async function fetchFeedbackFecha(
 export async function fetchAparcamientos(): Promise<{
   bloqueadas: Set<string>;
   pospuestasHasta: Map<string, string>;
+  /** Aviso para el usuario si la BD va por detrás del código. */
+  aviso?: string | null;
 }> {
+  const ESTADOS_APARTADOS = ["bloqueada", "archivada", "descartada"];
   const { data, error } = await createClient()
     .from("tareas")
     .select("id, estado, pospuesta_hasta")
-    .in("estado", ["bloqueada", "archivada", "descartada"]);
+    .in("estado", ESTADOS_APARTADOS);
   if (error) {
-    throw new Error(`No se pudieron leer los apartamientos: ${error.message}`);
+    if (!esEsquemaAusente(error)) {
+      throw new Error(`No se pudieron leer los apartamientos: ${error.message}`);
+    }
+    // La BD no tiene la migración 0034. Los BLOQUEOS (tareas.estado) siguen
+    // funcionando; las postergaciones no existen todavía. Antes esto tumbaba
+    // el Modo Recuperación entero.
+    const { data: soloBloqueos, error: e2 } = await createClient()
+      .from("tareas")
+      .select("id, estado")
+      .in("estado", ESTADOS_APARTADOS);
+    if (e2) {
+      throw new Error(`No se pudieron leer los apartamientos: ${e2.message}`);
+    }
+    return {
+      bloqueadas: new Set(
+        (soloBloqueos ?? []).map((t) => (t as { id: string }).id),
+      ),
+      pospuestasHasta: new Map(),
+      aviso: AVISO_MIGRACION_0034,
+    };
   }
   const bloqueadas = new Set<string>();
   const pospuestasHasta = new Map<string, string>();
@@ -234,7 +302,7 @@ export async function fetchAparcamientos(): Promise<{
     }
   }
 
-  return { bloqueadas, pospuestasHasta };
+  return { bloqueadas, pospuestasHasta, aviso: null };
 }
 
 // ============================================================================

@@ -423,7 +423,7 @@ export const WIG_PUNTOS: Punto[] = [
   {
     titulo: "Dónde se ven y cómo se marcan en la app",
     cuerpo:
-      "Cada capa tiene su panel con contador N/3: el de METAS vive arriba de /metas (con botón “Sugerir 3 WIGs” por IA); el de KRs SEMANALES vive en /semana (con botón “✨ Sugerir 3 KRs” por IA, el ritual del domingo); el de TAREAS vive arriba de /tareas y también en / (sección “Tareas Enormemente Importantes”). En todos los casos el cap lo impone la base de datos: las RPC toggle_meta_wig / toggle_kr_foco_semanal / toggle_tarea_wig rechazan el 4º.",
+      "Cada capa tiene su panel con contador N/3: el de METAS vive arriba de /metas (con botón “Sugerir 3 WIGs” por IA); el de KRs SEMANALES vive en /semana (con botón “✨ Sugerir 3 KRs” por IA, el ritual del domingo); el de TAREAS vive arriba de /tareas y también en / (sección “Tareas Enormemente Importantes”). En la home (/), las tres capas aparecen en cascada y con nombre propio: “Metas Enormemente Importantes” → “KR’s Enormemente Importantes” → “Tareas Enormemente Importantes”. El panel de KRs se pinta siempre: si la semana no tiene foco elegido, lo dice y enlaza a /semana en vez de desaparecer (una capa invisible noAvisa de que falta). En todos los casos el cap lo impone la base de datos: las RPC toggle_meta_wig / toggle_kr_foco_semanal / toggle_tarea_wig rechazan el 4º.",
   },
   {
     titulo: "El KR de la semana: dos ejes de tiempo, no uno",
@@ -629,7 +629,7 @@ export const CRITERIO_SELECCION: Punto[] = [
 
 export const FEATURES: Feature[] = [
   // ── Núcleo diario ──
-  { ruta: "/", proposito: "Hoy: semáforo del día + plan diario + contadores + TRES capas de WIG (metas + KRs en foco de la semana + tareas) + panel ‘Tareas con fecha’ (orden ascendente por deadline, las vencidas arriba) entre WIGs-tareas y Plan de hoy, con check inline para marcarlas hechas sin navegar", docs: "Rituales §1 (mañana 1ª hora) · HelpDrawer" },
+  { ruta: "/", proposito: "Hoy: semáforo del día + plan diario + contadores + TRES capas de WIG, una por panel y con nombre propio: ‘Metas Enormemente Importantes’ (violeta) → ‘KR’s Enormemente Importantes’ (celeste, los KRs en foco de la semana; el panel se pinta SIEMPRE, y si esta semana no hay foco elegido dice cuál es el siguiente paso en vez de desaparecer) → ‘Tareas Enormemente Importantes’ (fucsia) + panel ‘Tareas con fecha’ entre los WIGs-tareas y el Plan de hoy, con check inline para marcarlas hechas sin navegar. El panel ordena por fecha REAL (fecha_fin): las vencidas arriba, luego HOY, luego futuras; las tareas cuyo deadline es solo una nota de texto (‘esta semana’) van al final, con su nota tal cual, y nunca con ‘en NaNd’", docs: "Rituales §1 (mañana 1ª hora) · HelpDrawer" },
   { ruta: "/captura", proposito: "Inbox rápido para vaciar la cabeza (efecto Zeigarnik)", docs: "Pilar 4 · Rituales §1 · HelpDrawer" },
   { ruta: "/estatus", proposito: "9 hábitos + auditoría 20/80 + cierre cognitivo", docs: "Pilar 4 · Rituales §1 (final del día) · HelpDrawer" },
   { ruta: "/estatus/nuevo", proposito: "Crear nueva entrada de Estatus (1 por día)", docs: "Sub-ruta de /estatus" },

@@ -32,6 +32,8 @@ export type EstadoPropuesta = {
   propuesta: PropuestaShadow | null;
   cargando: boolean;
   error: string | null;
+  /** Aviso no bloqueante (p. ej. la BD va por detrás del código). */
+  aviso: string | null;
   /** Recarga los datos y recalcula la propuesta. */
   recargar: () => Promise<void>;
 };
@@ -46,6 +48,7 @@ export function usePropuestaRecuperacion(enabled = true): EstadoPropuesta {
   const [propuesta, setPropuesta] = useState<PropuestaShadow | null>(null);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
 
   const recargar = useCallback(async () => {
     setCargando(true);
@@ -85,6 +88,7 @@ export function usePropuestaRecuperacion(enabled = true): EstadoPropuesta {
       const filtrada = aplicarApartados(p, apartados);
 
       setPropuesta(filtrada);
+      setAviso(apartados.aviso ?? null);
     } catch (e) {
       setError(
         e instanceof Error ? e.message : "No se pudo calcular la propuesta.",
@@ -100,7 +104,7 @@ export function usePropuestaRecuperacion(enabled = true): EstadoPropuesta {
     void recargar();
   }, [enabled, recargar]);
 
-  return { propuesta, cargando, error, recargar };
+  return { propuesta, cargando, error, aviso, recargar };
 }
 
 /**

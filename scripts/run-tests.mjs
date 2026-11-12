@@ -18,6 +18,7 @@ import path from "node:path";
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 const TESTS = [
+  "src/lib/fechas.test.mjs",
   "src/lib/llm-parser.test.mjs",
   "src/lib/plan-unidades.test.mjs",
   "src/lib/llm-retry.test.mjs",

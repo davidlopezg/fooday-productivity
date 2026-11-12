@@ -1509,6 +1509,54 @@ export default function DocsPage() {
             </span>
             <span className="text-muted-foreground">
               <strong className="text-foreground">
+                La página Hoy: las tres capas se ven con nombre propio, las
+                fechas ya no son NaN y el Modo Recuperación no se rompe.
+              </strong>{" "}
+              Cuatro arreglos en la home (issue #34): (1) el panel violeta se
+              llama <strong className="text-foreground">“Metas Enormemente
+              Importantes”</strong> (antes “Enormemente Importantes”, que no
+              decía de qué capa hablaba); (2) la capa intermedia —los{" "}
+              <strong className="text-foreground">KR’s Enormemente
+              Importantes</strong>— se pinta SIEMPRE, también sin foco
+              elegido, con un estado vacío que enlaza a /semana: antes, sin
+              foco, el panel desaparecía y la cascada parecía saltarse un
+              escalón; (3) el panel <strong className="text-foreground">“Tareas
+              con fecha”</strong> ya no enseña “en NaNd” ni “Invalid Date”:
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">deadline</code>{" "}
+              es una NOTA de texto libre (“esta semana”), no una fecha, así que
+              ahora se ordena por <code className="rounded bg-muted px-1 py-0.5 text-xs">fecha_fin</code>{" "}
+              (fecha real) y las que solo tienen nota van al final con su
+              texto tal cual; (4) si la base de datos va por detrás del
+              código (falta la migración 0034), el Modo Recuperación{" "}
+              <strong className="text-foreground">degrada en vez de
+              romperse</strong>: lee los bloqueos que sí existen, avisa en
+              pantalla de qué falta y dice qué migración aplicar, en vez de
+              dejar la página entera con “No se pudo calcular la propuesta”.
+              <br />
+              <br />
+              <strong className="text-foreground">Implementación.</strong>{" "}
+              Módulo nuevo{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">src/lib/fechas.ts</code>{" "}
+              (una sola regla de qué es una fecha: valida YYYY-MM-DD y
+              separa la fecha real de la nota) y{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">src/lib/supabase/esquema.ts</code>{" "}
+              (detector de “la BD no tiene esto”). Sin migración nueva: la
+              0034 sigue siendo la que hay que aplicar en el proyecto de
+              Supabase. FEATURES (fila <code className="rounded bg-muted px-1 py-0.5 text-xs">/</code>),
+              Pilar 2 (“Aplicación en la app”), HelpDrawer de{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">/</code>,{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">/metodologia</code>{" "}
+              §5 (“Diseño de la página Hoy”) y este changelog actualizados en
+              la misma sesión.
+            </span>
+          </li>
+
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-11-12
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
                 Anular un pago ya pagado ya no borra ese dinero, y se puede
                 deshacer.
               </strong>{" "}
@@ -3860,7 +3908,7 @@ function AplicacionEnApp({ pilar }: { pilar: 1 | 2 | 3 | 4 | 5 }) {
     2: [
       "Scorecard de KRs con proyección lineal (/metas/plan)",
       "Tabla global de KRs (/krs): una fila por Key Result con su META, su PROYECTO, su entrega y su progreso — el inventario completo del sistema en una pantalla, con el valor actual editable en línea",
-      "Tres capas de WIG en la home (/): WIGs de META (violeta) → KRs en foco de la semana (celeste, el foco de /semana) → WIGs de TAREA (fucsia). La cascada meta → KR → tarea completa, visible de un vistazo",
+      "Tres capas de WIG en la home (/): WIGs de META (violeta, “Metas Enormemente Importantes”) → KRs en foco de la semana (celeste, “KR’s Enormemente Importantes”, el foco de /semana) → WIGs de TAREA (fucsia, “Tareas Enormemente Importantes”). La cascada meta → KR → tarea completa, visible de un vistazo. El panel de KRs se pinta siempre: si la semana no tiene foco elegido, lo dice y enlaza a /semana en vez de desaparecer",
       "Semáforo verde/amarillo/rojo en planes diarios",
       "Estados de meta (sin_empezar → en_progreso → completada) con feedback visible",
       "Botón IA “Generar plan con IA” en /metas/nueva y EditarMetaModal: filtra KRs por el campo plazo (Q3, Q1-Q3, fin de 2026…) y dentro de cada KR anota las tareas y hábitos necesarios para cumplirlo",
