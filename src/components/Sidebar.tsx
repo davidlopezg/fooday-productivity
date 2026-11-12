@@ -266,7 +266,7 @@ export function Sidebar() {
       {open && (
         <div className="fixed inset-0 z-50 md:hidden">
           <div
-            className="absolute inset-0 bg-black/50"
+            className="absolute inset-0 bg-black/50" aria-hidden="true"
             onClick={() => setOpen(false)}
           />
           <aside className="safe-t safe-b absolute left-0 top-0 flex h-full w-72 max-w-[85vw] flex-col overflow-y-auto border-r border-border bg-card px-4 pb-4 overscroll-contain">

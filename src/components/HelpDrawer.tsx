@@ -712,16 +712,19 @@ export function HelpDrawer({
       </button>
 
       {abierto && (
-        <div
-          className="fixed inset-0 z-50 flex justify-end bg-black/40"
-          role="dialog"
-          aria-modal="true"
-          aria-label={`Ayuda: ${title}`}
-          onClick={() => setAbierto(false)}
-        >
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/40">
+          {/* Backdrop decorativo: cierra al pulsar fuera. El panel tiene su
+              propio botón de cerrar y Escape. */}
           <div
-            className="flex h-full w-full max-w-md flex-col overflow-y-auto bg-card shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
+            className="absolute inset-0"
+            aria-hidden="true"
+            onClick={() => setAbierto(false)}
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Ayuda: ${title}`}
+            className="relative flex h-full w-full max-w-md flex-col overflow-y-auto bg-card shadow-2xl"
           >
             <header className="sticky top-0 flex items-center justify-between gap-3 border-b border-border bg-card px-5 py-4">
               <div>
