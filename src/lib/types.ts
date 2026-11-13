@@ -190,6 +190,12 @@ export interface ResultadoPeriodo {
   estado: EstadoResultado;
   peso: number;
   orden: number;
+  /** Wildly Important Goal (4DX) aplicado al KR: resultado clave de alto
+   *  impacto del ciclo. Máx 3 a la vez (migration 0038). Opcional porque
+   *  no todas las queries que leen KRs piden estas columnas. */
+  es_wig?: boolean;
+  /** Posición en el panel WIG de KRs (1-3). */
+  wig_orden?: number | null;
   /** Trigger `set_updated_at` (migration 0015). */
   updated_at?: string;
   created_at?: string;

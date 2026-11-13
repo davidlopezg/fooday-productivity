@@ -2119,6 +2119,20 @@ export async function marcarTareaWig(tareaId: string, esWig: boolean): Promise<b
   return data === true;
 }
 
+/** Marca/desmarca un KR como WIG (Wildly Important Goal — capa de resultado).
+ *  Cap independiente: máx 3 WIG-KRs por owner (ni metas ni tareas).
+ *  Llamada a la RPC `toggle_kr_wig` (migration 0038), que es la misma
+ *  regla que `toggle_meta_wig` y `toggle_tarea_wig`.
+ *  Devuelve `true` si se aplicó, `false` si ya había 3 WIG-KRs. */
+export async function marcarKrWig(krId: string, esWig: boolean): Promise<boolean> {
+  const { data, error } = await createClient().rpc("toggle_kr_wig", {
+    p_kr_id: krId,
+    p_es_wig: esWig,
+  });
+  if (error) throw new Error(`No se pudo actualizar el WIG: ${error.message}`);
+  return data === true;
+}
+
 /** Marca/desmarca un KR como FOCO DE LA SEMANA (migration 0033).
  *
  *  Capa intermedia entre los WIGs de metas (ciclo) y las tareas (día).

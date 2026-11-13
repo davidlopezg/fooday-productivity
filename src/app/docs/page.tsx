@@ -1509,6 +1509,53 @@ export default function DocsPage() {
             </span>
             <span className="text-muted-foreground">
               <strong className="text-foreground">
+                Los KRs también se pueden marcar como WIG (el 🎯 de las metas y
+                las tareas).
+              </strong>{" "}
+              Issue #49: en la base de datos, cada KR ahora tiene las mismas
+              columnas que las metas y las tareas —{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">es_wig</code>{" "}
+              y{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">wig_orden</code>{" "}
+              (1-3)— y su RPC{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">toggle_kr_wig</code>,{" "}
+              que rechaza el cuarto igual que las otras capas. En la página{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">/krs</code>{" "}
+              cada fila tiene ahora su botón 🎯 (marca “WIG #n” si lo es) y
+              arriba hay un panel “WIGs — KRs del ciclo (máx 3)” con los KRs
+              elegidos, su meta y su entrega. Es la capa que faltaba entre los
+              WIGs de meta (violeta) y los WIGs de tarea (fucsia): el
+              resultado MEDIBLE que manda.{" "}
+              <strong className="text-foreground">No es lo mismo que el foco
+              semanal</strong>{" "}
+              (celeste): aquel dice dónde pones horas ESTA semana y rota solo;
+              el WIG de KR es del ciclo y se queda hasta que lo quites. Por
+              eso tienen color y cap distintos.
+              <br />
+              <br />
+              <strong className="text-foreground">Implementación.</strong>{" "}
+              Nueva migration{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">supabase/migrations/0038_kr_wig.sql</code>{" "}
+              (columnas + índice único parcial + RPC), mutación{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">marcarKrWig</code>{" "}
+              en <code className="rounded bg-muted px-1 py-0.5 text-xs">src/lib/mutations.ts</code>,{" "}
+              consulta de{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">es_wig</code>/
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">wig_orden</code>{" "}
+              en <code className="rounded bg-muted px-1 py-0.5 text-xs">fetchKrsOverview</code>{" "}
+              y el panel nuevo{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">src/components/PanelWigKrs.tsx</code>.{" "}
+              FEATURES (fila /krs), la sección “Aplicación en la app”,{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">/metodologia</code>{" "}
+              §3 (WIGs) y este changelog actualizados en la misma sesión.
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-11-12
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
                 En /metas, el panel de WIGs muestra solo las 3 metas.
               </strong>{" "}
               Issue #47: el panel violeta de WIGs de /metas metía debajo los KRs
@@ -4053,6 +4100,7 @@ function AplicacionEnApp({ pilar }: { pilar: 1 | 2 | 3 | 4 | 5 }) {
     2: [
       "Scorecard de KRs con proyección lineal (/metas/plan)",
       "Tabla global de KRs (/krs): una fila por Key Result con su META, su PROYECTO, su entrega y su progreso — el inventario completo del sistema en una pantalla, con el valor actual editable en línea. Encima, el panel de KRs (máx 3): los KRs en foco de la semana —en los que pones horas ahora—, con su meta, su entrega y su progreso; el mismo panel que en la home y en /tareas",
+      "WIGs de KR (/krs, issue #49): cada fila de la tabla de KRs lleva el mismo botón 🎯 que tienen las metas y las tareas, para marcar el KR como Enormemente Importante del ciclo; arriba, el panel “WIGs — KRs del ciclo (máx 3)” con su contador. Es la capa que faltaba entre los WIGs de meta (violeta) y los WIGs de tarea (fucsia): el resultado MEDIBLE que manda. El cap de 3 lo impone la BD (RPC toggle_kr_wig, migration 0038). No es lo mismo que el foco semanal (celeste): ese dice dónde pones horas ESTA semana y rota solo",
       "Tres capas de WIG en la home (/): WIGs de META (violeta, “Metas Enormemente Importantes”) → KRs en foco de la semana (celeste, “KR’s Enormemente Importantes”, el foco de /semana) → WIGs de TAREA (fucsia, “Tareas Enormemente Importantes”). La cascada meta → KR → tarea completa, visible de un vistazo. El panel de KRs se pinta siempre: si la semana no tiene foco elegido, lo dice y enlaza a /semana en vez de desaparecer",
       "Semáforo verde/amarillo/rojo en planes diarios",
       "Estados de meta (sin_empezar → en_progreso → completada) con feedback visible — y el estado se DERIVA del trabajo: al completar todas las tareas vivas de una meta, la meta se completa sola (y al reabrir una, vuelve a en progreso). La barra de metas de /proyectos se mueve con ese estado real",

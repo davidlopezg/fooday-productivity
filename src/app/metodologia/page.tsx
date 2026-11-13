@@ -301,6 +301,15 @@ export default function MetodologiaPage() {
               <li className="flex gap-2">
                 <span className="text-fuchsia-500">·</span>
                 <span>
+                  <strong className="text-foreground">Tabla <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">resultados_periodo</code> (migration 0038) — el WIG de KR.</strong>{" "}
+                  Los KRs (la capa medible que hay entre la meta y la tarea) tienen el mismo patrón que las metas y las tareas: <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">es_wig</code> +{" "}
+                  <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">wig_orden</code>, índice único y RPC{" "}
+                  <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">toggle_kr_wig</code> que rechaza el 4º. En <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">/krs</code> cada fila lleva el mismo botón 🎯, y arriba hay un panel “WIGs — KRs del ciclo (máx 3)”. Es del CICLO: no rota solo como el foco semanal.
+                </span>
+              </li>
+              <li className="flex gap-2">
+                <span className="text-fuchsia-500">·</span>
+                <span>
                   <strong className="text-foreground">Tabla <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">kr_foco_semanal</code> (migration 0033) — la capa intermedia.</strong>{" "}
                   Es la ventana de EJECUCIÓN: qué KRs mueves esta semana. Un KR puede estar en varias semanas (si su entrega dura 3 semanas, aparece 3 veces) y el cap de 3 es <strong>por semana</strong>, así que el foco rota solo cada semana. La RPC{" "}
                   <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">toggle_kr_foco_semanal</code>{" "}
@@ -313,6 +322,10 @@ export default function MetodologiaPage() {
                   UI: panel violeta (WIGs-meta) en{" "}
                   <Link href="/metas" className="font-medium text-foreground underline underline-offset-4">
                     /metas
+                  </Link>
+                  , panel violeta (WIGs-KR) en{" "}
+                  <Link href="/krs" className="font-medium text-foreground underline underline-offset-4">
+                    /krs
                   </Link>
                   , panel azul (KRs de la semana) en{" "}
                   <Link href="/semana" className="font-medium text-foreground underline underline-offset-4">

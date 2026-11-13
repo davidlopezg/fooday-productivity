@@ -1112,7 +1112,7 @@ export async function fetchKrsOverview(): Promise<KrOverview[]> {
       supabase
         .from("resultados_periodo")
         .select(
-          "id,meta_id,titulo,descripcion,metrica,valor_objetivo,valor_actual,unidad,estado,peso,orden",
+          "id,meta_id,titulo,descripcion,metrica,valor_objetivo,valor_actual,unidad,estado,peso,orden,es_wig,wig_orden",
         ),
       supabase
         .from("metas")
