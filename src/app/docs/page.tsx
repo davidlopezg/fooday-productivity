@@ -1509,6 +1509,39 @@ export default function DocsPage() {
             </span>
             <span className="text-muted-foreground">
               <strong className="text-foreground">
+                /krs ya no se rompe si la base de datos va por detrás.
+              </strong>{" "}
+              Issue #54: al fusionar el WIG de KR (migration 0038) la página
+              /krs dejó de cargar con{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">
+                column resultados_periodo.es_wig does not exist
+              </code>
+              , porque la migración estaba en el código pero no en la base de
+              datos. Antes eso tumbaba la página ENTERA (el inventario de
+              KRs, que es el corazón del sistema, quedaba inutilizable).
+              Ahora la app DEGRADA: lee los KRs sin las columnas del WIG,
+              avisa de qué migración falta y deshabilita el 🎯 (que no puede
+              funcionar hasta que se aplique). Es el mismo patrón que ya
+              usaba el Modo Recuperación con la migration 0034.
+              <br />
+              <br />
+              <strong className="text-foreground">Causa de fondo.</strong>{" "}
+              El despliegue (GitHub Pages) publica el código pero NO aplica
+              las migraciones: eso es un paso manual. Está documentado en{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">
+                docs/DESPLIEGUE.md
+              </code>{" "}
+              y hay que hacerlo ANTES de fusionar el PR que trae la
+              migración. FEATURES (fila /krs), la sección “Aplicación en la
+              app” y este changelog actualizados en la misma sesión.
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-11-13
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
                 El desplegable que filtra por proyecto ya cabe en el móvil.
               </strong>{" "}
               Issue #52: en{" "}
@@ -4131,6 +4164,7 @@ function AplicacionEnApp({ pilar }: { pilar: 1 | 2 | 3 | 4 | 5 }) {
       "Tarjetas de proyecto en dos alturas (/proyectos): los botones van arriba en su propia fila, alineados a la derecha, y el resto del contenido a ancho completo, para que el texto de la tarjeta no se apriete",
       "Las tarjetas de /proyectos caben en el móvil (issue #45): el título se recorta con puntos suspensivos, las barras de progreso pueden partirse en dos líneas y las metas sin proyecto también se cortan, así que ningún panel se sale de la pantalla en el teléfono",
       "Los filtros de /krs y /metas caben en el móvil (issue #52): el desplegable de proyecto ya no se dimensiona con la opción más larga (que lo sacaba de la pantalla en el teléfono), sino que ocupa el ancho disponible en móvil y vuelve a su tamaño natural en escritorio",
+      "/krs aguanta que la base de datos vaya por detrás (issue #54): si falta la migration 0038 (la del WIG de KR), los KRs se leen igual, sale un aviso diciendo qué migración falta y el botón 🎯 queda deshabilitado en vez de tumbar la página entera",
       "Botón IA “Generar plan con IA” en /metas/nueva y EditarMetaModal: filtra KRs por el campo plazo (Q3, Q1-Q3, fin de 2026…) y dentro de cada KR anota las tareas y hábitos necesarios para cumplirlo",
       "Escenarios de proyecto (/escenarios): cronología + estado medido + lectura de la situación, y los escenarios con su estrategia generados bajo demanda (migration 0029)",
       "Panel “🎯 3 KRs de la semana” en /semana (migration 0033): la capa intermedia entre la meta y la tarea. ✨ Sugerir 3 KRs por IA elige por riesgo real (los que van por debajo del ritmo y tienen menos días restantes). Solo entran KRs con entrega en marcha (regla de contención en BD). El trimestre sigue mandando en la entrega; la semana manda en el esfuerzo",

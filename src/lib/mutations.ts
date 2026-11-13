@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
+import { AVISO_MIGRACION_0038 } from "@/lib/krsLectura";
+import { esEsquemaAusente } from "@/lib/supabase/esquema";
 import { localYMD } from "@/lib/semana";
 import type {
   ComidaInput,
@@ -2129,7 +2131,15 @@ export async function marcarKrWig(krId: string, esWig: boolean): Promise<boolean
     p_kr_id: krId,
     p_es_wig: esWig,
   });
-  if (error) throw new Error(`No se pudo actualizar el WIG: ${error.message}`);
+  if (error) {
+    // Issue #54: si la RPC no existe (migration 0038 sin aplicar), el
+    // mensaje técnico de PostgREST no le dice nada a nadie: se dice QUÉ
+    // falta y qué hacer.
+    if (esEsquemaAusente(error)) {
+      throw new Error(AVISO_MIGRACION_0038);
+    }
+    throw new Error(`No se pudo actualizar el WIG: ${error.message}`);
+  }
   return data === true;
 }
 

@@ -57,6 +57,46 @@ Así funcionarán los enlaces de confirmación/recuperación.
 
 Se abre a pantalla completa, como una app.
 
+## Migraciones (importante: el deploy NO las aplica)
+
+El workflow `.github/workflows/deploy.yml` **solo construye y publica** el
+código. **No aplica las migraciones de `supabase/migrations/`**: eso es un
+paso MANUAL, y si te lo saltas la app deployed pide columnas que la base de
+datos todavía no tiene.
+
+Qué pasó de verdad (issue #54): al fusionar el PR que traía la migration
+0038 (WIG de KR), la página `/krs` dejó de cargar con
+
+```
+column resultados_periodo.es_wig does not exist code: 42703
+```
+
+porque la migration estaba en `main` pero no en la base de datos.
+
+### Cómo aplicar una migración
+
+1. Abre el proyecto en <https://supabase.com/dashboard> → **SQL Editor**.
+2. Pega el contenido del fichero de `supabase/migrations/` (son idempotentes:
+   `add column if not exists`, `create index if not exists`,
+   `create or replace function`).
+3. Ejecuta y comprueba que no da errores.
+
+> `npm run db:push` (Supabase CLI) necesita un proyecto enlazado
+> (`supabase link`) y aplica TODAS las migraciones pendientes, no solo una.
+> Para una migración nueva, el SQL Editor es lo más seguro.
+
+### Qué hacer si te saltas ese paso
+
+La app **degrada, no se rompe**: la página avisa de qué migración falta y lo
+que deja de funcionar hasta que la apliques. Pero la función NO existe hasta
+entonces: aplícala cuanto antes.
+
+### En los PRs
+
+Si el PR trae una migración, el campo **Riesgo** de la plantilla del PR tiene
+que decir qué migración hay que aplicar. Fusionar sin aplicarla es lo que
+provoca estas roturas.
+
 ## Probar en local
 
 ```bash

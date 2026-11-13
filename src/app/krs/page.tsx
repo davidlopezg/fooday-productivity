@@ -57,7 +57,13 @@ function MiniBar({ value }: { value: number }) {
 }
 
 export default function KrsPage() {
-  const krsQ = useData<KrOverview[]>(fetchKrsOverview, []);
+  // Issue #54: la consulta devuelve `{filas, aviso}`. El aviso sale cuando
+  // la BD va por detrás del código (falta la migration 0038): los KRs se
+  // ven igual, pero el WIG no puede funcionar hasta que se aplique.
+  const krsQ = useData<{ filas: KrOverview[]; aviso: string | null }>(
+    fetchKrsOverview,
+    { filas: [], aviso: null },
+  );
 
   const [q, setQ] = useState("");
   const [filtroProyecto, setFiltroProyecto] = useState("");
@@ -74,7 +80,13 @@ export default function KrsPage() {
   const [guardandoWigId, setGuardandoWigId] = useState<string | null>(null);
   const [errorWig, setErrorWig] = useState<string | null>(null);
 
-  const filas = useMemo(() => krsQ.data ?? [], [krsQ.data]);
+  const filas = useMemo(() => krsQ.data?.filas ?? [], [krsQ.data]);
+
+  /** Aviso de "la BD va por detrás" (falta la migration 0038). */
+  const avisoEsquema = krsQ.data?.aviso ?? null;
+
+  /** Sin la migration 0038 no hay columna `es_wig`: el 🎯 no puede marcar. */
+  const wigDisponible = !avisoEsquema;
 
   /** Proyectos presentes en los KRs (para el desplegable de filtro). */
   const proyectos = useMemo(() => {
@@ -198,14 +210,26 @@ export default function KrsPage() {
         </p>
       )}
 
+      {/* Aviso de "la BD va por detrás" (issue #54). Va ARRIBA de todo lo
+          del WIG: sin la migration 0038 no hay columna `es_wig` ni RPC
+          `toggle_kr_wig`, así que el panel y el botón 🎯 no pueden
+          funcionar. */}
+      {avisoEsquema && (
+        <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+          {avisoEsquema}
+        </p>
+      )}
+
       {/* WIGs de KR (issue #49) — la capa que faltaba: el mismo botón 🎯
           que tienen las metas y las tareas, pero sobre el resultado
           medible. El cap de 3 lo impone la BD (RPC toggle_kr_wig). */}
-      <PanelWigKrs
-        wigs={wigs}
-        guardandoId={guardandoWigId}
-        onQuitar={(krId) => toggleWig(krId, false)}
-      />
+      {wigDisponible && (
+        <PanelWigKrs
+          wigs={wigs}
+          guardandoId={guardandoWigId}
+          onQuitar={(krId) => toggleWig(krId, false)}
+        />
+      )}
       {errorWig && (
         <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
           {errorWig}
@@ -309,6 +333,7 @@ export default function KrsPage() {
                   onGuardado={krsQ.reload}
                   onToggleWig={toggleWig}
                   guardandoWigId={guardandoWigId}
+                  wigDisponible={wigDisponible}
                 />
               ))}
             </tbody>
@@ -345,11 +370,14 @@ function KRTableRow({
   onGuardado,
   onToggleWig,
   guardandoWigId,
+  wigDisponible = true,
 }: {
   fila: KrOverview;
   onGuardado: () => void;
   onToggleWig: (krId: string, esWig: boolean) => void | Promise<void>;
   guardandoWigId: string | null;
+  /** Si la BD va por detrás (falta la migration 0038), el 🎯 no puede marcar. */
+  wigDisponible?: boolean;
 }) {
   const { kr, meta, proyecto, periodos } = fila;
   const [editando, setEditando] = useState(false);
@@ -368,16 +396,18 @@ function KRTableRow({
         <button
           type="button"
           onClick={() => onToggleWig(kr.id, !kr.es_wig)}
-          disabled={guardandoWigId === kr.id}
+          disabled={guardandoWigId === kr.id || !wigDisponible}
           className={`rounded-full p-1 transition-colors disabled:opacity-50 ${
             kr.es_wig
               ? "bg-violet-500/20 text-violet-600 dark:text-violet-400"
               : "text-muted-foreground/40 hover:bg-accent hover:text-muted-foreground"
           }`}
           title={
-            kr.es_wig
-              ? `Quitar de Enormemente Importantes (WIG #${kr.wig_orden ?? "?"})`
-              : "Marcar como WIG"
+            !wigDisponible
+              ? "El WIG de KR necesita la migration 0038 aplicada en Supabase"
+              : kr.es_wig
+                ? `Quitar de Enormemente Importantes (WIG #${kr.wig_orden ?? "?"})`
+                : "Marcar como WIG"
           }
           aria-label={kr.es_wig ? "Quitar de WIG" : "Marcar como WIG"}
           aria-pressed={!!kr.es_wig}

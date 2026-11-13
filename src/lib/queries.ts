@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
+import { leerKrsConRespaldo } from "@/lib/krsLectura";
 import { localYMD, isoWeekToMonday } from "@/lib/semana";
 import { proyectoEfectivoDeTarea } from "@/lib/proyectos";
 import type {
@@ -1104,16 +1105,21 @@ export async function fetchMetaConPlan(metaId: string): Promise<MetaConPlan | nu
  *  sus periodos. Es la fuente de la tabla de /krs (una fila por KR).
  *
  *  Una sola tanda de queries y todo el cruce se hace en cliente: son
- *  pocos datos (decenas de KRs) y así la UI no hace N+1. */
-export async function fetchKrsOverview(): Promise<KrOverview[]> {
+ *  pocos datos (decenas de KRs) y así la UI no hace N+1.
+ *
+ *  Issue #54: si la BD va por detrás del código (falta la migration 0038),
+ *  la tabla de KRs se lee SIN las columnas del WIG y se devuelve un AVISO
+ *  en vez de reventar la página entera (ver `krsLectura.ts`). */
+export async function fetchKrsOverview(): Promise<{
+  filas: KrOverview[];
+  aviso: string | null;
+}> {
   const supabase = createClient();
   const [krsRes, metasRes, proyectosRes, asignacionesRes, periodosRes, tareasRes] =
     await Promise.all([
-      supabase
-        .from("resultados_periodo")
-        .select(
-          "id,meta_id,titulo,descripcion,metrica,valor_objetivo,valor_actual,unidad,estado,peso,orden,es_wig,wig_orden",
-        ),
+      leerKrsConRespaldo((columnas) =>
+        supabase.from("resultados_periodo").select(columnas),
+      ),
       supabase
         .from("metas")
         .select("id,codigo,titulo,estado,es_wig,proyecto_id,area_id,ambito"),
@@ -1128,14 +1134,13 @@ export async function fetchKrsOverview(): Promise<KrOverview[]> {
         .not("resultado_periodo_id", "is", null),
     ]);
 
-  if (krsRes.error) throw krsRes.error;
   if (metasRes.error) throw metasRes.error;
   if (proyectosRes.error) throw proyectosRes.error;
   if (asignacionesRes.error) throw asignacionesRes.error;
   if (periodosRes.error) throw periodosRes.error;
   if (tareasRes.error) throw tareasRes.error;
 
-  const krs = (krsRes.data ?? []) as ResultadoPeriodo[];
+  const krs = krsRes.krs as ResultadoPeriodo[];
   const metas = (metasRes.data ?? []) as Meta[];
   const proyectos = (proyectosRes.data ?? []) as Proyecto[];
 
@@ -1174,7 +1179,7 @@ export async function fetchKrsOverview(): Promise<KrOverview[]> {
     conteo.set(t.resultado_periodo_id, c);
   }
 
-  return krs
+  const filas = krs
     .map((kr) => {
       const meta = metaById.get(kr.meta_id) ?? null;
       const proyecto = meta?.proyecto_id
@@ -1201,6 +1206,8 @@ export async function fetchKrsOverview(): Promise<KrOverview[]> {
       if (oa !== ob) return oa - ob;
       return a.kr.titulo.localeCompare(b.kr.titulo, "es");
     });
+
+  return { filas, aviso: krsRes.aviso };
 }
 
 /** Lista de metas con su progreso agregado (para la página /metas).
