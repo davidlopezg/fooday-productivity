@@ -431,10 +431,14 @@ export default function MetasPage() {
             className="h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-ring"
           />
         </div>
+        {/* Issue #52: mismo problema que en /krs — un <select> se
+            dimensiona con la opción más larga y no puede encogerse, así
+            que en el móvil el filtro de proyecto se salía de la pantalla.
+            w-full en móvil + sm:w-auto en escritorio. */}
         <select
           value={proyectoSel}
           onChange={(e) => setProyectoSel(e.target.value)}
-          className="h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+          className="h-9 w-full min-w-0 max-w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring sm:w-auto"
           title="Filtrar por proyecto"
         >
           <option value="">Todos los proyectos</option>
