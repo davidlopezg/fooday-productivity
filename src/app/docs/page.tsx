@@ -1509,6 +1509,62 @@ export default function DocsPage() {
             </span>
             <span className="text-muted-foreground">
               <strong className="text-foreground">
+                Los KRs tienen un nombre único y dicen en qué eje temporal
+                viven.
+              </strong>{" "}
+              Issue #59: la capa de{" "}
+              <strong className="text-foreground">
+                KRs en foco de la semana
+              </strong>{" "}
+              (celeste) se llamaba{" "}
+              <em>“KR’s Enormemente Importantes”</em> en la home, en /tareas
+              y en /krs, y{" "}
+              <em>“KRs en foco — esta semana (máx 3)”</em> en /semana: dos
+              nombres para la misma capa. Peor: en /krs conviven los dos
+              paneles de KR (el celeste de la semana y el violeta{" "}
+              <em>“WIGs — KRs del ciclo (máx 3)”</em>), y “Enormemente
+              Importantes” —que es la marca de las capas 4DX— hacía pensar que
+              eran la misma cosa. Ahora: (1) el foco semanal se llama{" "}
+              <strong className="text-foreground">
+                “KRs en foco — esta semana (máx 3)”
+              </strong>{" "}
+              <strong className="text-foreground">
+                igual en las cuatro páginas
+              </strong>{" "}
+              (home, /tareas, /krs y /semana) y (2) el WIG de KR del ciclo
+              conserva su rótulo,{" "}
+              <em>“WIGs — KRs del ciclo (máx 3)”</em>: cada capa dice en qué
+              eje vive y “Enormemente Importantes” queda para las capas de
+              meta y de tarea. Sin tocar lógica, modelo de datos ni
+              migraciones: los caps siguen siendo los que impone la BD (
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">
+                toggle_kr_wig
+              </code>
+              ,{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">
+                toggle_kr_foco_semanal
+              </code>
+              ). FEATURES (filas{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">/</code>,{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">/tareas</code>
+              ,{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">/krs</code>
+              ), la sección “Aplicación en la app” del Pilar 2,{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">
+                /metodologia
+              </code>{" "}
+              §3 y §5, el HelpDrawer de{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">/</code> y{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">/krs</code>{" "}
+              y este changelog actualizados en la misma sesión.
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-11-14
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
                 /informes: por dónde va el trabajo (ámbito y área).
               </strong>{" "}
               Issue #51: dos secciones nuevas en{" "}
@@ -4206,9 +4262,10 @@ function AplicacionEnApp({ pilar }: { pilar: 1 | 2 | 3 | 4 | 5 }) {
     ],
     2: [
       "Scorecard de KRs con proyección lineal (/metas/plan)",
-      "Tabla global de KRs (/krs): una fila por Key Result con su META, su PROYECTO, su entrega y su progreso — el inventario completo del sistema en una pantalla, con el valor actual editable en línea. Encima, el panel de KRs (máx 3): los KRs en foco de la semana —en los que pones horas ahora—, con su meta, su entrega y su progreso; el mismo panel que en la home y en /tareas",
-      "WIGs de KR (/krs, issue #49): cada fila de la tabla de KRs lleva el mismo botón 🎯 que tienen las metas y las tareas, para marcar el KR como Enormemente Importante del ciclo; arriba, el panel “WIGs — KRs del ciclo (máx 3)” con su contador. Es la capa que faltaba entre los WIGs de meta (violeta) y los WIGs de tarea (fucsia): el resultado MEDIBLE que manda. El cap de 3 lo impone la BD (RPC toggle_kr_wig, migration 0038). No es lo mismo que el foco semanal (celeste): ese dice dónde pones horas ESTA semana y rota solo",
-      "Tres capas de WIG en la home (/): WIGs de META (violeta, “Metas Enormemente Importantes”) → KRs en foco de la semana (celeste, “KR’s Enormemente Importantes”, el foco de /semana) → WIGs de TAREA (fucsia, “Tareas Enormemente Importantes”). La cascada meta → KR → tarea completa, visible de un vistazo. El panel de KRs se pinta siempre: si la semana no tiene foco elegido, lo dice y enlaza a /semana en vez de desaparecer",
+      "Tabla global de KRs (/krs): una fila por Key Result con su META, su PROYECTO, su entrega y su progreso — el inventario completo del sistema en una pantalla, con el valor actual editable en línea. Encima, el panel de KRs (máx 3): los KRs en foco de la semana —en los que pones horas ahora—, con su meta, su entrega y su progreso; el mismo panel que en la home, en /tareas y en /semana",
+      "WIGs de KR (/krs, issue #49): cada fila de la tabla de KRs lleva el mismo botón 🎯 que tienen las metas y las tareas, para marcar el KR como Enormemente Importante del ciclo; arriba, el panel “WIGs — KRs del ciclo (máx 3)” con su contador. Es la capa que faltaba entre los WIGs de meta (violeta) y los WIGs de tarea (fucsia): el resultado MEDIBLE que manda. El cap de 3 lo impone la BD (RPC toggle_kr_wig, migration 0038). No es lo mismo que el foco semanal (celeste, “KRs en foco — esta semana (máx 3)”): ese dice dónde pones horas ESTA semana y rota solo",
+      "Tres capas de foco en la home (/): WIGs de META (violeta, “Metas Enormemente Importantes”) → KRs en foco de la semana (celeste, “KRs en foco — esta semana (máx 3)”, el foco de /semana) → WIGs de TAREA (fucsia, “Tareas Enormemente Importantes”). La cascada meta → KR → tarea completa, visible de un vistazo. El panel de KRs se pinta siempre: si la semana no tiene foco elegido, lo dice y enlaza a /semana en vez de desaparecer",
+      "Cada capa dice en qué eje temporal vive (issue #59): el foco semanal se llama “KRs en foco — esta semana (máx 3)” IGUAL en la home, en /tareas, en /krs y en /semana, y el WIG de KR del ciclo se llama “WIGs — KRs del ciclo (máx 3)”. Antes la capa semanal se llamaba “KR’s Enormemente Importantes” en tres páginas y “KRs en foco — esta semana” en /semana, y el nombre “Enormemente Importantes” (la marca de las capas 4DX de meta y tarea) se confundía con el WIG de KR del ciclo, que vive justo debajo en /krs",
       "Semáforo verde/amarillo/rojo en planes diarios",
       "Estados de meta (sin_empezar → en_progreso → completada) con feedback visible — y el estado se DERIVA del trabajo: al completar todas las tareas vivas de una meta, la meta se completa sola (y al reabrir una, vuelve a en progreso). La barra de metas de /proyectos se mueve con ese estado real",
       "Tarjetas de proyecto en dos alturas (/proyectos): los botones van arriba en su propia fila, alineados a la derecha, y el resto del contenido a ancho completo, para que el texto de la tarjeta no se apriete",

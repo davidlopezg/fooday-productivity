@@ -271,13 +271,16 @@ export default function HoyPage() {
         </section>
       )}
 
-      {/* KRs WIG — capa intermedia: los resultados medibles en los que se
-          pone horas esta semana (foco semanal de /semana). Va ENTRE los
-          WIGs de meta y los WIGs de tarea porque esa es la cascada:
-          meta → KR → tarea. (Panel compartido con /tareas.)
+      {/* KRs en foco de la semana — capa intermedia: los resultados medibles
+          en los que se pone horas esta semana (foco semanal de /semana). Va
+          ENTRE los WIGs de meta y los WIGs de tarea porque esa es la
+          cascada: meta → KR → tarea. (Panel compartido con /tareas.)
           Si esta semana no hay foco elegido, el panel se pinta IGUAL con
           su estado vacío: la capa intermedia siempre se ve, para que se
-          sepa que falta elegir el foco. */}
+          sepa que falta elegir el foco.
+          El rótulo dice siempre "esta semana" (issue #59): es la capa que
+          rota, no la de WIG de KR del ciclo ("WIGs — KRs del ciclo"), que
+          es otra cosa y sólo vive en /krs. */}
       <PanelFocoSemanaKRs
         focos={data.focoKRs}
         estadoVacio="Esta semana todavía no has elegido el foco: los KRs en los que pones horas son el eslabón entre tus metas y tus tareas. Elige hasta 3 en /semana."

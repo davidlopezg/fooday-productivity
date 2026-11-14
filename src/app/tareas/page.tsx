@@ -335,7 +335,8 @@ export default function TareasPage() {
       />
 
       {/* Capa intermedia: los KRs en foco de la semana (los resultados en
-          los que pones horas AHORA). Mismo panel que la home. */}
+          los que pones horas AHORA). Mismo panel y mismo rótulo que la
+          home y que /semana (issue #59). */}
       <PanelFocoSemanaKRs
         focos={focoKRsSemana}
         descripcion="Los resultados medibles en los que pones horas esta semana — el eslabón entre tus WIGs de meta y las tareas que los sostienen."

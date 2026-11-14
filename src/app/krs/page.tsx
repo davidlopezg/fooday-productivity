@@ -137,6 +137,11 @@ export default function KrsPage() {
    * que se pone horas ESTA semana (máx 3). Es el MISMO panel y la misma
    * query que la home y /tareas. Antes era el de metas WIG, que en una
    * página de KRs no tenía sentido.
+   *
+   * Issue #59: su rótulo dice el eje — "KRs en foco — esta semana (máx
+   * 3)" — y es el MISMO en /, /tareas, /krs y /semana. Aquí conviven los
+   * dos paneles de KR (este, celeste, y el violeta de WIG del ciclo) y
+   * con los rótulos se distinguen de un vistazo.
    * ------------------------------------------------------------------- */
   const focoQ = useData<KrFocoConDetalle[]>(() => {
     const semana = getCurrentISOWeek();
