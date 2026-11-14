@@ -24,6 +24,7 @@ import {
   INBOXES,
   LAG_VS_LEAD,
   NEXT_ACTION_PUNTOS,
+  PARA_QUE,
   PENDIENTES_RESPUESTA,
   PROBLEMA,
   WIG_PUNTOS,
@@ -154,6 +155,20 @@ export default function MetodologiaPage() {
             /docs · Los 5 pilares
           </Link>
           . Esta página es su implementación concreta.
+        </p>
+        <p className="mt-3 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-sm leading-relaxed text-muted-foreground">
+          🎯 <strong className="text-foreground">El para qué</strong>:{" "}
+          {PARA_QUE.map((p) => (
+            <span key={p.titulo}>
+              {p.titulo}: <em>{p.cuerpo}</em>{" "}
+            </span>
+          ))}
+          Todo lo de esta página (WIGs, GTD, Próxima Acción) se encuadra
+          contra eso. Está al principio de{" "}
+          <Link href="/docs" className="font-medium text-foreground underline underline-offset-4">
+            /docs
+          </Link>
+          .
         </p>
         <p className="mt-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 text-sm leading-relaxed text-muted-foreground">
           🤖 <strong className="text-foreground">

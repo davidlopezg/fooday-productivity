@@ -23,6 +23,7 @@ import {
 import {
   PILARES,
   GLOSARIO,
+  PARA_QUE,
   RITUALES,
   HABITOS_RECURRENTES,
   WIG_PUNTOS,
@@ -53,6 +54,13 @@ function ok(cond, msg) {
 const manual = construirManual();
 
 // ── El manual sale del módulo compartido ────────────────────────────────────
+test("incluye el para qué (definición de riqueza) en los dos niveles", () => {
+  for (const p of PARA_QUE) {
+    ok(manual.includes(p.cuerpo), `falta el para qué "${p.titulo}"`);
+    ok(manualCompacto().includes(p.titulo), `falta el para qué en el compacto "${p.titulo}"`);
+  }
+});
+
 test("incluye el título y el resumen de cada uno de los 5 pilares", () => {
   ok(PILARES.length === 5, "se esperaban 5 pilares");
   for (const p of PILARES) {

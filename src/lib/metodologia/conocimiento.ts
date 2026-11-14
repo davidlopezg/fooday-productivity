@@ -198,6 +198,18 @@ export const PILARES: Pilar[] = [
 ];
 
 // ----------------------------------------------------------------------------
+// PARA QUÉ — el criterio del usuario con el que se encuadra todo lo demás.
+// Vive en /docs (arriba) y en el prompt del agente.
+// ----------------------------------------------------------------------------
+export const PARA_QUE: Punto[] = [
+  {
+    titulo: "Definición de riqueza",
+    cuerpo:
+      "La riqueza está compuesta por negocios y activos que producen mientras duermes.",
+  },
+];
+
+// ----------------------------------------------------------------------------
 // GLOSARIO — las 4 capas (la "casa de tus objetivos") — vive en /docs
 // ----------------------------------------------------------------------------
 export const GLOSARIO: GlosarioItem[] = [

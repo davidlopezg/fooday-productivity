@@ -40,6 +40,7 @@ import {
   INBOXES,
   LAG_VS_LEAD,
   NEXT_ACTION_PUNTOS,
+  PARA_QUE,
   PENDIENTES_RESPUESTA,
   PILARES,
   PROBLEMA,
@@ -71,6 +72,16 @@ export function construirManual(): string {
       "(2) RECOMENDAR con el criterio de la app, no con el criterio genérico de la IA. " +
       "Cuando una respuesta se base en una regla de aquí, cita la regla " +
       '(p. ej. "esto es el Pilar 2, KR de la semana" o "criterio de selección nº1: riesgo financiero").',
+  );
+  L.push("");
+
+  // ── 0. El para qué ──
+  L.push("=== 0. EL PARA QUÉ (el criterio del usuario) ===");
+  L.push(...puntos(PARA_QUE, "  "));
+  L.push(
+    "  Úsalo para encuadrar: cuando el usuario pregunta por una meta, una " +
+      "tarea o un plan, contrasta la respuesta con esto (¿esto construye " +
+      "negocios o activos que producen sin su tiempo?).",
   );
   L.push("");
 
@@ -179,6 +190,11 @@ export function construirManualCompacto(): string {
       "recomiendas: úsalas en vez del criterio genérico de la IA y cita la " +
       "regla que apliques.",
   );
+  L.push("");
+
+  L.push("-- PARA QUÉ (el criterio del usuario) --");
+  L.push(`  · ${PARA_QUE[0].titulo}: ${PARA_QUE[0].cuerpo}`);
+  L.push("    Úsalo para encuadrar: ¿esto construye negocios o activos que producen sin su tiempo?");
   L.push("");
 
   L.push("-- PILARES (por qué) --");

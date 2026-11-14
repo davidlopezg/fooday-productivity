@@ -6,6 +6,7 @@ import {
   FEATURES,
   GLOSARIO,
   HABITOS_RECURRENTES,
+  PARA_QUE,
   PILARES,
   RITUALES,
 } from "@/lib/metodologia/conocimiento";
@@ -58,6 +59,46 @@ export default function DocsPage() {
           Cada botón "Por qué existe esto" en las pantallas apunta aquí.
         </p>
       </header>
+
+      {/* =====================================================================
+          El para qué — el criterio del usuario: contra qué se encuadra todo.
+          Los datos vienen de `src/lib/metodologia/conocimiento.ts` (PARA_QUE),
+          la misma fuente que alimenta /metodologia y el prompt del agente.
+         ===================================================================== */}
+      <section
+        id="para-que"
+        className="scroll-mt-20 rounded-2xl border-2 border-amber-500/30 bg-gradient-to-br from-amber-500/5 to-orange-500/5 p-6 sm:p-8"
+      >
+        <header>
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300">
+            El para qué
+          </div>
+          <h2 className="mt-1 text-2xl font-bold tracking-tight">
+            Qué es la riqueza
+          </h2>
+        </header>
+
+        <ul className="mt-4 space-y-2 text-sm leading-relaxed text-muted-foreground">
+          {PARA_QUE.map((p) => (
+            <li key={p.titulo}>
+              <strong className="text-foreground">{p.titulo}:</strong>{" "}
+              {p.cuerpo}
+            </li>
+          ))}
+        </ul>
+
+        <p className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-sm leading-relaxed text-muted-foreground">
+          Todo lo que hay debajo — los 5 pilares, las 4 capas, los rituales y la
+          arquitectura de metas — se encuadra contra esto. También lo conoce el
+          chat del agente:{" "}
+          <code className="rounded bg-muted px-1.5 py-1 text-xs">
+            src/lib/metodologia/conocimiento.ts
+          </code>{" "}
+          es la fuente única (esta página,{" "}
+          <code className="rounded bg-muted px-1.5 py-1 text-xs">/metodologia</code>{" "}
+          y el prompt del agente).
+        </p>
+      </section>
 
       {/* =====================================================================
           Glosario — Arquitectura explicada para humanos.
@@ -1503,6 +1544,37 @@ export default function DocsPage() {
         </header>
 
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-11-14
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
+                El para qué: qué es la riqueza (nueva sección al principio de
+                esta página).
+              </strong>{" "}
+              Se añade la definición de riqueza del usuario:{" "}
+              <em>
+                negocios y activos que producen mientras duermes
+              </em>
+              . Vive en{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">
+                src/lib/metodologia/conocimiento.ts
+              </code>{" "}
+              (constante{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">
+                PARA_QUE
+              </code>
+              ), que es la fuente única: la pintan esta página y{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">
+                /metodologia
+              </code>
+              , y el chat del agente la tiene en su prompt (sección 0 del
+              manual, antes de los 5 pilares). No se cambian pilares, rituales,
+              ni la arquitectura de metas y tareas: es el criterio con el que
+              se encuadra lo que ya existía.
+            </span>
+          </li>
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
               2026-11-13
