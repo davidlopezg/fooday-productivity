@@ -166,6 +166,55 @@ export default function InformesPage() {
       .sort((a, b) => b.n - a.n);
   }, [hechasEnRango, proyectos, metas]);
 
+  // Distribución por ÁMBITO (profesional / personal / sin clasificar).
+  // Mismas tareas que "Por proyecto" (hechasEnRango): sin doble conteo y sin
+  // subtareas. `tareas.ambito` puede ser null (migration 0019): esas van a
+  // "Sin clasificar", no se reparten a un lado por la fuerza.
+  const porAmbito = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const t of hechasEnRango) {
+      const k = t.ambito ?? "sin-clasificar";
+      map.set(k, (map.get(k) ?? 0) + 1);
+    }
+    const etiquetas: Record<string, { nombre: string; color: string }> = {
+      profesional: { nombre: "Profesional", color: "#8b5cf6" },
+      personal: { nombre: "Personal", color: "#10b981" },
+      "sin-clasificar": { nombre: "Sin clasificar", color: "#94a3b8" },
+    };
+    return Array.from(map.entries())
+      .map(([k, n]) => ({
+        id: k,
+        nombre: etiquetas[k]?.nombre ?? "Sin clasificar",
+        color: etiquetas[k]?.color ?? "#94a3b8",
+        n,
+      }))
+      .sort((a, b) => b.n - a.n);
+  }, [hechasEnRango]);
+
+  // Distribución por ÁREA de responsabilidad.
+  // Las tareas traen su `area` ya resuelta (fetchTareasCompletadas). Las que
+  // no tienen área van a "Sin área" (igual que las sin proyecto).
+  const porArea = useMemo(() => {
+    const map = new Map<
+      string | null,
+      { n: number; area: TareaConArea["area"] }
+    >();
+    for (const t of hechasEnRango) {
+      const k = t.area?.id ?? null;
+      const row = map.get(k) ?? { n: 0, area: t.area };
+      row.n++;
+      map.set(k, row);
+    }
+    return Array.from(map.entries())
+      .map(([aid, row]) => ({
+        id: aid,
+        nombre: row.area?.nombre ?? "Sin área",
+        color: row.area?.color ?? "#94a3b8",
+        n: row.n,
+      }))
+      .sort((a, b) => b.n - a.n);
+  }, [hechasEnRango]);
+
   const loading = l1 || l2 || l3 || l4 || l5;
 
   // Para el heatmap simple: max tareas/día en la serie
@@ -553,6 +602,101 @@ export default function InformesPage() {
             })}
           </ul>
         )}
+      </section>
+
+      {/* Por ámbito (profesional / personal) */}
+      <section className="rounded-xl border border-border bg-card p-5">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Por ámbito (hechas en el rango)
+        </h2>
+        {porAmbito.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Sin tareas hechas en este rango.{" "}
+            <Link href="/tareas" className="underline underline-offset-4">
+              Ve a Tareas
+            </Link>{" "}
+            para empezar.
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {porAmbito.map((a) => {
+              const pct = Math.round((a.n / totalTareas) * 100);
+              return (
+                <li key={a.id} className="flex items-center gap-3 text-sm">
+                  <span
+                    className="inline-block h-2.5 w-2.5 shrink-0 rounded-sm"
+                    style={{ backgroundColor: a.color }}
+                    aria-hidden
+                  />
+                  <span className="min-w-[140px] truncate">
+                    {a.id === "profesional" ? "💼 " : null}
+                    {a.id === "personal" ? "👤 " : null}
+                    {a.nombre}
+                  </span>
+                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full rounded-full bg-emerald-500/70"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <span className="w-12 text-right tabular-nums text-muted-foreground">
+                    {a.n} ({pct}%)
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        <p className="mt-2 text-xs text-muted-foreground">
+          Cuántas de las tareas completadas son de trabajo y cuántas son
+          personales. Las que no tienen ámbito asignado van a “Sin clasificar”
+          (no se reparten a un lado por la fuerza).
+        </p>
+      </section>
+
+      {/* Por área de responsabilidad */}
+      <section className="rounded-xl border border-border bg-card p-5">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Por área de responsabilidad (hechas en el rango)
+        </h2>
+        {porArea.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Sin tareas hechas en este rango.{" "}
+            <Link href="/tareas" className="underline underline-offset-4">
+              Ve a Tareas
+            </Link>{" "}
+            para empezar.
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {porArea.map((a) => {
+              const pct = Math.round((a.n / totalTareas) * 100);
+              return (
+                <li key={a.id ?? "none"} className="flex items-center gap-3 text-sm">
+                  <span
+                    className="inline-block h-2.5 w-2.5 shrink-0 rounded-sm"
+                    style={{ backgroundColor: a.color }}
+                    aria-hidden
+                  />
+                  <span className="min-w-[140px] truncate">{a.nombre}</span>
+                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full rounded-full bg-emerald-500/70"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <span className="w-12 text-right tabular-nums text-muted-foreground">
+                    {a.n} ({pct}%)
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        <p className="mt-2 text-xs text-muted-foreground">
+          En qué responsabilidad cae lo que has hecho. Las tareas sin área van
+          a “Sin área”.
+        </p>
       </section>
 
       {/* Metas completadas */}

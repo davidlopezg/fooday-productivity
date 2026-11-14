@@ -669,6 +669,12 @@ export const AYUDA_POR_RUTA: Record<
         pilar: 4,
       },
       {
+        titulo: "Por dónde va el trabajo: ámbito y área",
+        cuerpo:
+          "“Por ámbito” y “Por área” reparten las tareas completadas de la ventana: cuánto es trabajo y cuánto es vida, y en qué responsabilidad cae cada cosa. Cuentan TASAS, no minutos: el foco libre (un pomodoro sin tarea) no se puede atribuir a nadie. Si casi todo cae en “Sin clasificar” o “Sin área”, el problema no es de trabajo: es de clasificación (ámbitos y áreas sin poner al crear la tarea).",
+        pilar: 1,
+      },
+      {
         titulo: "Metas y OKRs cerrados: la auditoría mensual",
         cuerpo:
           "“Con plan vs sin plan” mide madurez OKR: una meta sin Key Results no se mide, solo se desea. Si el grueso de tus metas está en “sin plan”, el cuello de botella no es de ejecución, es de diseño — vuelve a /metas y materializa los KRs (botón ✨ Generar plan con IA) antes de pedirte más foco.",

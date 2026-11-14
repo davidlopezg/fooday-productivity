@@ -1505,6 +1505,56 @@ export default function DocsPage() {
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-11-14
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
+                /informes: por dónde va el trabajo (ámbito y área).
+              </strong>{" "}
+              Issue #51: dos secciones nuevas en{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">/informes</code>{" "}
+              que contestan la pregunta que el resto de la pantalla no hacía:{" "}
+              <strong className="text-foreground">
+                en qué se ha ido el trabajo
+              </strong>
+              . (1){" "}
+              <strong className="text-foreground">“Por ámbito”</strong>:{" "}
+              profesional / personal / sin clasificar, con nº y %; (2){" "}
+              <strong className="text-foreground">
+                “Por área de responsabilidad”
+              </strong>
+              : cada área con su color, nº y % (las tareas sin área van a “Sin
+              área”). Ambas respetan el selector de 7/30/90/365 días y usan las
+              mismas tareas que “Por proyecto” (sin subtareas y sin doble
+              conteo).{" "}
+              <strong className="text-foreground">
+                Cuentan tareas, no minutos
+              </strong>
+              : el foco libre (un pomodoro sin tarea) no se puede atribuir a
+              ningún ámbito, así que medirlo por tiempo daría un reparto
+              incompleto. Sin migración ni queries nuevas:{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">
+                tareas.ambito
+              </code>{" "}
+              (migration 0019) y{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">
+                areas
+              </code>{" "}
+              ya venían en la carga de la pantalla. FEATURES actualizada (fila{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">
+                /informes
+              </code>
+              ), ayuda de{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">
+                /informes
+              </code>{" "}
+              actualizada y este changelog. No se cambian pilares ni rituales,
+              ni la arquitectura de metas y tareas: son dos vistas nuevas
+              dentro de una pantalla que ya existía.
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
               2026-11-13
             </span>
             <span className="text-muted-foreground">
