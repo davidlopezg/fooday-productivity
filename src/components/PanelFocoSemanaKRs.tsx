@@ -14,6 +14,16 @@
 //
 // Regla de contención (migration 0033): solo entra un KR cuyo periodo de
 // entrega contiene la semana actual. Lo aplica la RPC en BD.
+//
+// EL NOMBRE (issue #59)
+// --------------------
+// El título dice SIEMPRE en qué eje temporal vive el panel: "esta
+// semana". Antes esta capa se llamaba "KR's Enormemente Importantes" en
+// la home, /tareas y /krs, y "KRs en foco — esta semana (máx 3)" en
+// /semana: dos nombres para lo mismo, y el primero se confundía con el
+// WIG de KR del ciclo ("WIGs — KRs del ciclo (máx 3)", violeta), que es
+// OTRA capa. Ahora el foco semanal se llama igual en todas las páginas y
+// el rótulo dice el eje.
 // ============================================================================
 
 import Link from "next/link";
@@ -22,7 +32,7 @@ import type { KrFocoConDetalle } from "@/lib/types";
 
 export function PanelFocoSemanaKRs({
   focos,
-  titulo = "KR's Enormemente Importantes",
+  titulo = "KRs en foco — esta semana (máx 3)",
   descripcion,
   estadoVacio,
 }: {

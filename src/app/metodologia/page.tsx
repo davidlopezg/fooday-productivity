@@ -323,11 +323,11 @@ export default function MetodologiaPage() {
                   <Link href="/metas" className="font-medium text-foreground underline underline-offset-4">
                     /metas
                   </Link>
-                  , panel violeta (WIGs-KR) en{" "}
+                  , panel violeta (WIGs-KR del ciclo) en{" "}
                   <Link href="/krs" className="font-medium text-foreground underline underline-offset-4">
                     /krs
                   </Link>
-                  , panel azul (KRs de la semana) en{" "}
+                  , panel celeste (KRs en foco de esta semana) en{" "}
                   <Link href="/semana" className="font-medium text-foreground underline underline-offset-4">
                     /semana
                   </Link>{" "}
@@ -335,7 +335,7 @@ export default function MetodologiaPage() {
                   <Link href="/" className="font-medium text-foreground underline underline-offset-4">
                     Hoy
                   </Link>
-                  .
+                  . Cada rótulo dice en qué eje vive su capa (issue #59): el foco semanal se llama igual en las cuatro páginas (“KRs en foco — esta semana (máx 3)”) y el WIG de KR (“WIGs — KRs del ciclo (máx 3)”) no se confunde con él.
                 </span>
               </li>
               <li className="flex gap-2">
@@ -474,7 +474,7 @@ export default function MetodologiaPage() {
               </li>
               <li className="flex gap-3">
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">4</span>
-                <span><strong>Panel WIG-KR</strong> (celeste, “KR’s Enormemente Importantes”) — los KRs en foco de la semana. Siempre visible: si no hay foco elegido, dice cuál es el siguiente paso (elegirlo en /semana) en vez de desaparecer.</span>
+                <span><strong>Panel de foco semanal de KRs</strong> (celeste, “KRs en foco — esta semana (máx 3)”) — los KRs en foco de la semana. Siempre visible: si no hay foco elegido, dice cuál es el siguiente paso (elegirlo en /semana) en vez de desaparecer.</span>
               </li>
               <li className="flex gap-3">
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">5</span>
@@ -672,10 +672,10 @@ export default function MetodologiaPage() {
           La home (<code className="rounded bg-muted px-1 py-0.5 text-[10px]">/</code>)
           abre con las tres capas de foco{" "}
           <em>una detrás de otra</em>: los WIGs de meta (capa 5, violeta), los
-          KRs en foco de la semana (capa 4, celeste) y los WIGs de tarea
-          (capa 3, fucsia). Esa es la cascada meta → KR → tarea completa en
-          la primera pantalla del día: si una capa está quieta, ya sabes en
-          cuál mirar. Y el{" "}
+          KRs en foco de la semana (capa 4, celeste, “KRs en foco — esta semana
+          (máx 3)”) y los WIGs de tarea (capa 3, fucsia). Esa es la cascada
+          meta → KR → tarea completa en la primera pantalla del día: si una
+          capa está quieta, ya sabes en cuál mirar. Y el{" "}
           <strong className="text-foreground">inventario global</strong> de
           la capa de KRs (todos los resultados con su meta, su proyecto y su
           entrega) está en{" "}

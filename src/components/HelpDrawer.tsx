@@ -60,9 +60,9 @@ export const AYUDA_POR_RUTA: Record<
         pilar: 2,
       },
       {
-        titulo: "Tres capas de WIG: meta → KR → tarea",
+        titulo: "Tres capas de foco: meta → KR → tarea",
         cuerpo:
-          "El panel violeta son los WIGs de METAS (‘Metas Enormemente Importantes’: qué resultados quieres). El panel celeste son los KRs en foco de la semana (‘KR’s Enormemente Importantes’: en qué resultados medibles pones horas AHORA — se eligen en /semana; si esta semana no has elegido ninguno, el panel te lo dice y te lleva allí). El panel fucsia son los WIGs de TAREAS (‘Tareas Enormemente Importantes’: qué 3 tareas concretas los sostienen). Si los WIGs-metas no avanzan, mira primero las tareas; si las tareas avanzan pero los KRs no, el problema es la medición.",
+          "El panel violeta son los WIGs de METAS (‘Metas Enormemente Importantes’: qué resultados quieres). El panel celeste son los KRs en FOCO DE LA SEMANA (‘KRs en foco — esta semana (máx 3)’: en qué resultados medibles pones horas AHORA — se eligen en /semana; si esta semana no has elegido ninguno, el panel te lo dice y te lleva allí). El panel fucsia son los WIGs de TAREAS (‘Tareas Enormemente Importantes’: qué 3 tareas concretas los sostienen). Ojo: la capa celeste ROTA cada semana; el WIG de KR del ciclo (‘WIGs — KRs del ciclo (máx 3)’, que vive en /krs) es otra cosa y se queda hasta que lo quites. Si los WIGs-metas no avanzan, mira primero las tareas; si las tareas avanzan pero los KRs no, el problema es la medición.",
         pilar: 2,
       },
       {
@@ -189,13 +189,13 @@ export const AYUDA_POR_RUTA: Record<
       {
         titulo: "Encima: los KRs que estás moviendo",
         cuerpo:
-          "El panel celeste de arriba son los KRs en foco de la semana: los resultados medibles en los que pones horas AHORA (máx 3), con su meta, su entrega y su progreso. Es el mismo panel que hay en la home y en /tareas: al inventariar KRs, lo primero es saber en cuál estás concentrando la energía. Si esta semana no has elegido el foco, el panel te lo dice y te lleva a /semana.",
+          "El panel celeste de arriba son los KRs en foco de la semana (‘KRs en foco — esta semana (máx 3)’): los resultados medibles en los que pones horas AHORA (máx 3), con su meta, su entrega y su progreso. Es el mismo panel que hay en la home, en /tareas y en /semana: al inventariar KRs, lo primero es saber en cuál estás concentrando la energía. Si esta semana no has elegido el foco, el panel te lo dice y te lleva a /semana.",
         pilar: 2,
       },
       {
         titulo: "La diana 🎯: el KR que más importa del ciclo",
         cuerpo:
-          "Cada fila tiene su propia diana, igual que las metas y las tareas: al pulsarla, ese KR pasa a ser Enormemente Importante (máx 3, el límite lo pone la base de datos). El panel violeta de arriba lista los que has elegido, con su meta y su entrega. Ojo: esto NO es el foco de la semana (el panel celeste). El WIG es del ciclo y se queda hasta que lo quites; el foco semanal dice dónde pones horas ESTA semana y rota solo.",
+          "Cada fila tiene su propia diana, igual que las metas y las tareas: al pulsarla, ese KR pasa a ser Enormemente Importante (máx 3, el límite lo pone la base de datos). El panel violeta de arriba —‘WIGs — KRs del ciclo (máx 3)’— lista los que has elegido, con su meta y su entrega. Ojo: esto NO es el foco de la semana (el panel celeste). El WIG es del ciclo y se queda hasta que lo quites; el foco semanal dice dónde pones horas ESTA semana y rota solo.",
         pilar: 2,
       },
     ],
