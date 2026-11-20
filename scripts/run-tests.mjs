@@ -37,6 +37,8 @@ const TESTS = [
   "src/lib/agente/chatIA.test.mjs",
   "src/lib/agente/manual.test.mjs",
   "runtime/test/runs.test.mjs",
+  "src/lib/agentes/mvp.test.mjs",
+  "src/lib/agentes/mvp-schema.test.mjs",
 ]
 
 // Los tests importan código .ts de la app → necesita type-stripping nativo.
