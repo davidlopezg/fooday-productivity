@@ -132,24 +132,30 @@ create index if not exists idx_agent_activity_mvp_owner on public.agent_activity
 create or replace function public.validar_relaciones_agentes_mvp()
 returns trigger language plpgsql set search_path = public as $$
 begin
-  if tg_table_name = 'agent_config_versions' and not exists (
-    select 1 from public.agent_configs where id = new.agent_id and owner_id = new.owner_id
-  ) then raise exception 'El agente no existe o no es tuyo'; end if;
-  if tg_table_name = 'agent_skill_links' and (
-    not exists (select 1 from public.agent_configs where id = new.agent_id and owner_id = new.owner_id)
-    or not exists (select 1 from public.agent_skills_mvp where id = new.skill_id and owner_id = new.owner_id)
-  ) then raise exception 'Agente o skill no válidos'; end if;
-  if tg_table_name = 'agent_conversation_participants_mvp' and (
-    not exists (select 1 from public.agent_conversations_mvp where id = new.conversation_id and owner_id = new.owner_id)
-    or not exists (select 1 from public.agent_configs where id = new.agent_id and owner_id = new.owner_id)
-  ) then raise exception 'Conversación o agente no válidos'; end if;
-  if tg_table_name = 'agent_messages_mvp' and not exists (
-    select 1 from public.agent_conversations_mvp where id = new.conversation_id and owner_id = new.owner_id
-  ) then raise exception 'La conversación no existe o no es tuya'; end if;
-  if tg_table_name = 'agent_task_assignments_mvp' and (
-    not exists (select 1 from public.tareas where id = new.tarea_id and owner_id = new.owner_id)
-    or not exists (select 1 from public.agent_configs where id = new.agent_id and owner_id = new.owner_id)
-  ) then raise exception 'Tarea o agente no válidos'; end if;
+  if tg_table_name = 'agent_config_versions' then
+    if not exists (
+      select 1 from public.agent_configs where id = new.agent_id and owner_id = new.owner_id
+    ) then raise exception 'El agente no existe o no es tuyo'; end if;
+  end if;
+  if tg_table_name = 'agent_skill_links' then
+    if not exists (select 1 from public.agent_configs where id = new.agent_id and owner_id = new.owner_id)
+       or not exists (select 1 from public.agent_skills_mvp where id = new.skill_id and owner_id = new.owner_id)
+    then raise exception 'Agente o skill no válidos'; end if;
+  end if;
+  if tg_table_name = 'agent_conversation_participants_mvp' then
+    if not exists (select 1 from public.agent_conversations_mvp where id = new.conversation_id and owner_id = new.owner_id)
+       or not exists (select 1 from public.agent_configs where id = new.agent_id and owner_id = new.owner_id)
+    then raise exception 'Conversación o agente no válidos'; end if;
+  end if;
+  if tg_table_name = 'agent_messages_mvp' then
+    if not exists (select 1 from public.agent_conversations_mvp where id = new.conversation_id and owner_id = new.owner_id)
+    then raise exception 'La conversación no existe o no es tuya'; end if;
+  end if;
+  if tg_table_name = 'agent_task_assignments_mvp' then
+    if not exists (select 1 from public.tareas where id = new.tarea_id and owner_id = new.owner_id)
+       or not exists (select 1 from public.agent_configs where id = new.agent_id and owner_id = new.owner_id)
+    then raise exception 'Tarea o agente no válidos'; end if;
+  end if;
   return new;
 end $$;
 
