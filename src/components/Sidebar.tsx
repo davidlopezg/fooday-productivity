@@ -22,6 +22,7 @@ import {
   IconList,
   IconLogout,
   IconMenu,
+  IconMessage,
   IconRepeat,
   IconSettings,
   IconSparkles,
@@ -55,6 +56,7 @@ const STRATEGY_ITEMS: NavItem[] = [
   { href: "/metas", label: "Metas", Icon: IconTarget },
   { href: "/krs", label: "KRs", Icon: IconTable },
   { href: "/agente", label: "Agente", Icon: IconSparkles },
+  { href: "/agentes", label: "Centro de agentes", Icon: IconMessage },
   { href: "/metas/plan", label: "Plan trimestral", Icon: IconCalendar },
 ];
 

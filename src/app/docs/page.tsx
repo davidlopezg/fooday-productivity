@@ -1478,6 +1478,13 @@ export default function DocsPage() {
         </div>
       </section>
 
+      <section className="rounded-2xl border border-violet-500/30 bg-violet-500/5 p-6">
+        <h2 className="text-xl font-bold">Centro de agentes</h2>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          La pantalla <code className="rounded bg-muted px-1 py-0.5 text-xs">/agentes</code> reúne el trabajo con agentes en un lugar separado del gestor de tareas. Puedes configurar sus instrucciones y skills, conversar con un agente, asociar la conversación a un proyecto y asignar tareas existentes. Si el agente propone crear una tarea, la propuesta queda pendiente: solo se aplica cuando tú la confirmas. Así la IA ayuda a decidir y ejecutar, pero no modifica tu sistema a escondidas.
+        </p>
+      </section>
+
       {/* =====================================================================
           Meta · Registro de cambios de esta página
           Historial manual, en orden inverso. No se borran entradas.
@@ -1503,6 +1510,15 @@ export default function DocsPage() {
         </header>
 
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
+          <li className="flex gap-3 rounded-lg border border-violet-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-violet-700 dark:text-violet-300 sm:text-sm">
+              2026-11-20
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">Nuevo centro de mando /agentes.</strong>{" "}
+              Issue #66 añade una página nueva, separada de <code className="rounded bg-muted px-1 py-0.5 text-xs">/agente</code> y del chat global, para configurar agentes y skills compartidas, conversar con participantes, asociar el contexto a un proyecto, asignar tareas existentes y revisar propuestas. La regla es explícita: <strong className="text-foreground">ningún agente escribe de forma autónoma</strong>; una propuesta de tarea queda pendiente hasta que la persona la confirma. La nueva migration <code className="rounded bg-muted px-1 py-0.5 text-xs">0040_agentes_mvp.sql</code> añade las entidades propias del MVP con RLS por propietario e integridad entre relaciones. FEATURES incluye la nueva pantalla y este registro se actualiza en la misma sesión.
+            </span>
+          </li>
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
               2026-11-14
