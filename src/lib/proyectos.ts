@@ -125,3 +125,20 @@ export function filtrarMetasPorProyecto<
   if (!proyectoId) return metas;
   return metas.filter((m) => metaPerteneceAProyecto(m, proyectoId));
 }
+
+/**
+ * ¿La meta sobrevive al cambio de proyecto?
+ *
+ * · Con proyecto nuevo → solo si la meta es de ese proyecto.
+ * · Sin proyecto ("— Sin proyecto —") → solo si la meta tampoco tiene
+ *   proyecto: si la meta es de un proyecto, la tarea lo heredaría y
+ *   "sin proyecto" sería una mentira.
+ */
+export function metaSigueTrasCambiarProyecto(
+  meta: { proyecto_id?: string | null },
+  nuevoProyectoId: string | null,
+): boolean {
+  const metaProyecto = proyectoDeMeta(meta);
+  if (nuevoProyectoId) return metaProyecto === nuevoProyectoId;
+  return metaProyecto === null;
+}
