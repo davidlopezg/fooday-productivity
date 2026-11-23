@@ -24,24 +24,54 @@ import { desgranarTareaIA, generarCriterioTerminacionIA } from "@/lib/plan";
 import { estadoMetaSegunTareas } from "@/lib/metas";
 import { numBloquesActivos, type NumeroBloque } from "@/lib/planBloques";
 
+declare global {
+  interface Window {
+    recurrenciaClonacionFallida?: {
+      error: string;
+      taskId?: string;
+      timestamp: number;
+    };
+  }
+}
+
+/** Parse una fecha YYYY-MM-DD a un Date en hora local (sin interpretar como UTC). */
+function parseDate(ymd: string): Date {
+  const [anio, mes, dia] = ymd.split("-").map(Number);
+  return new Date(anio, mes - 1, dia);
+}
+
 export async function marcarHecha(id: string) {
   const { error } = await createClient()
     .from("tareas")
     .update({ estado: "hecha", completada_at: new Date().toISOString() })
     .eq("id", id);
-  // Sin esto, un UPDATE fallido (RLS, red, columna inexistente) pasaba por
-  // bueno y la UI mentia: el usuario veía la tarea tachada sin estar guardada.
+
   if (error) throw new Error(`No se pudo marcar la tarea como hecha: ${error.message}`);
+
   // El plan del día guarda su propio contador: si esta tarea estaba en el plan
   // de hoy, la fila del plan también pasa a hecha (issue #6).
   await sincronizarProgresoPlan(id, true);
+
   // ponytail: la recurrencia es un side-effect de "hecha". Si la IA está
   // apagada o la RPC falla, NO se rompe el marcar-hecha principal: el error
   // se loguea y el usuario lo verá en el log de consola.
-  await intentarClonarRecurrente(id).catch((e) =>
-    console.warn("[marcarHecha] clonación recurrente falló:", e),
-  );
-  // La meta se completa sola cuando sus tareas están hechas (issue #35).
+  const clonacion = await intentarClonarRecurrente(id).catch((e) => {
+    console.warn("[marcarHecha] clonación recurrente falló:", e);
+    return { ok: false, error: e.message, taskId: id };
+  });
+
+  // Si la clonación falló, el usuario necesita saberlo de forma visible.
+  // Mantener el marcado principal intacto.
+  if (clonacion && !clonacion.ok) {
+    // Notificar al usuario mediante un estado global para que el layout lo muestre
+    window.recurrenciaClonacionFallida = {
+      error: clonacion.error,
+      taskId: id,
+      timestamp: Date.now(),
+    };
+    console.error("[marcarHecha] ERROR: clonación recurrente falló para tarea", id, clonacion.error);
+  }
+
   await sincronizarMetaDeTarea(id).catch((e) =>
     console.warn("[marcarHecha] no se pudo sincronizar la meta:", e),
   );
@@ -1939,72 +1969,90 @@ export interface Recurrencia {
 }
 
 /** Calcula la siguiente fecha en la que debe aparecer la tarea, dado el patrón
- *  y la fecha actual. Devuelve null si no toca generar.
+ *  y una fecha de referencia. Devuelve null si no toca generar.
  *
  *  Reglas:
- *   - 'diaria'  → +1 día desde HOY (mientras se marque hecha cada día, sale otra).
- *   - 'semanal' → próximo día de la semana que esté en `dias_semana` (>= HOY).
- *   - 'mensual' → próximo `dia_mes` del mes actual o el siguiente.
+ *   - 'diaria'  → +1 día desde la fecha de referencia.
+ *   - 'semanal' → próximo día de la semana que esté en `dias_semana` (>= referencia).
+ *   - 'mensual' → próximo `dia_mes` del mes de referencia o el siguiente.
+ *
+ *  issue #22: la fecha de referencia es la fecha de la tarea (deadline o
+ *  recurrencia_ultima_generada) y no la fecha en que se marca como hecha.
  */
 function siguienteFechaRecurrencia(
-  hoy: Date,
+  referencia: Date,
   rec: Recurrencia,
 ): string | null {
-  // localYMD, no toISOString(): `hoy` es un Date en hora LOCAL. Con
-  // toISOString() la siguiente instancia de una tarea recurrente se
+  // localYMD, no toISOString(): `referencia` es un Date en hora LOCAL.
+  // Con toISOString() la siguiente instancia de una tarea recurrente se
   // guardaba con el día anterior en zonas UTC+.
   const iso = (d: Date) => localYMD(d);
   if (rec.tipo === "diaria") {
-    const next = new Date(hoy);
+    const next = new Date(referencia);
     next.setDate(next.getDate() + 1);
     return iso(next);
   }
   if (rec.tipo === "semanal" && rec.dias_semana && rec.dias_semana.length > 0) {
     // Busca el próximo día de la semana (0=Dom..6=Sáb) en los próximos 7 días
     for (let offset = 1; offset <= 7; offset++) {
-      const d = new Date(hoy);
+      const d = new Date(referencia);
       d.setDate(d.getDate() + offset);
       if (rec.dias_semana.includes(d.getDay())) return iso(d);
     }
     return null;
   }
   if (rec.tipo === "mensual" && rec.dia_mes && rec.dia_mes >= 1 && rec.dia_mes <= 28) {
-    const target = new Date(hoy.getFullYear(), hoy.getMonth(), rec.dia_mes);
-    if (target <= hoy) target.setMonth(target.getMonth() + 1);
+    const target = new Date(referencia.getFullYear(), referencia.getMonth(), rec.dia_mes);
+    if (target <= referencia) target.setMonth(target.getMonth() + 1);
     return iso(target);
   }
   return null;
 }
 
+/** Resultado de intentar clonar una tarea recurrente. */
+export interface ClonacionResultado {
+  ok: boolean;
+  nuevaTareaId?: string;
+  error?: string;
+}
+
 /** Si la tarea es recurrente, clona una nueva instancia con la siguiente fecha.
- *  Si NO es recurrente, no hace nada (devuelve null). */
-export async function intentarClonarRecurrente(tareaId: string): Promise<string | null> {
+ *  Si NO es recurrente, devuelve { ok: true, nuevaTareaId: undefined }.
+ *  Si la clonación falla, devuelve { ok: false, error: string }.
+ *
+ *  issue #21: devuelve resultado explícito para que el llamador pueda mostrar
+ *  un aviso al usuario en lugar de fallar silenciosamente. */
+export async function intentarClonarRecurrente(tareaId: string): Promise<ClonacionResultado> {
   const supabase = createClient();
   const { data: t, error } = await supabase
     .from("tareas")
-    .select("id, recurrencia_tipo, recurrencia_dias_semana, recurrencia_dia_mes, recurrencia_ultima_generada")
+    .select("id, recurrencia_tipo, recurrencia_dias_semana, recurrencia_dia_mes, recurrencia_ultima_generada, deadline")
     .eq("id", tareaId)
     .maybeSingle();
-  if (error) throw error;
-  if (!t) return null;
+  if (error) return { ok: false, error: `Error leyendo tarea: ${error.message}` };
+  if (!t) return { ok: false, error: "Tarea no encontrada" };
   const tipo = (t as { recurrencia_tipo: RecurrenciaTipo }).recurrencia_tipo;
-  if (!tipo) return null;
+  if (!tipo) return { ok: true };
 
   const rec: Recurrencia = {
     tipo,
     dias_semana: (t as { recurrencia_dias_semana: number[] | null }).recurrencia_dias_semana,
     dia_mes: (t as { recurrencia_dia_mes: number | null }).recurrencia_dia_mes,
   };
-  const hoy = new Date();
-  const nuevaFecha = siguienteFechaRecurrencia(hoy, rec);
-  if (!nuevaFecha) return null;
+  // issue #22: anclar en la fecha de la tarea (deadline o recurrencia_ultima_generada)
+  // y no en el momento en que se marca como hecha.
+  const deadline = (t as { deadline: string | null }).deadline;
+  const ultimaGen = (t as { recurrencia_ultima_generada: string | null }).recurrencia_ultima_generada;
+  const referencia = ultimaGen ? new Date(ultimaGen) : (deadline ? parseDate(deadline) : new Date());
+  const nuevaFecha = siguienteFechaRecurrencia(referencia, rec);
+  if (!nuevaFecha) return { ok: true };
 
   const { data: nuevaId, error: err2 } = await supabase.rpc("clone_recurring_task", {
     p_tarea_id: tareaId,
     p_nueva_fecha: nuevaFecha,
   });
-  if (err2) throw err2;
-  return (nuevaId as string) ?? null;
+  if (err2) return { ok: false, error: `Error clonando tarea recurrente: ${err2.message}` };
+  return { ok: true, nuevaTareaId: (nuevaId as string) ?? undefined };
 }
 
 /** Actualiza los campos de recurrencia de una tarea (o la quita si tipo=null). */
