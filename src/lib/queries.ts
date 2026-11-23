@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/client";
 import { leerKrsConRespaldo } from "@/lib/krsLectura";
 import { localYMD, isoWeekToMonday } from "@/lib/semana";
 import { proyectoEfectivoDeTarea } from "@/lib/proyectos";
+import type { TareaCandidata } from "@/lib/planBloques";
 import type {
   Area,
   CalendarioBloque,
@@ -54,6 +55,25 @@ export async function fetchTareas(estado?: string): Promise<Tarea[]> {
   const { data, error } = await q;
   if (error) throw error;
   return ordenarSubtareas((data ?? []) as Tarea[]);
+}
+
+/**
+ * Tareas ACTIVAS (pendiente / en_progreso / bloqueada) para los selectores
+ * del plan diario (issue #73).
+ *
+ * Solo se piden las columnas que el selector usa: son muchas tareas y solo
+ * hace falta el título, el estado, la prioridad, el WIG y la fecha.
+ */
+export async function fetchTareasActivas(): Promise<TareaCandidata[]> {
+  const { data, error } = await createClient()
+    .from("tareas")
+    .select("id,titulo,estado,prioridad,es_wig,fecha_fin,deadline")
+    .neq("estado", "hecha")
+    .neq("estado", "descartada")
+    .neq("estado", "archivada")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as TareaCandidata[];
 }
 
 /** Migration 0026: tareas con `pendiente_respuesta = true`, ordenadas
@@ -379,9 +399,10 @@ export async function fetchPlanes(opts?: { desde?: string; hasta?: string; limit
   const supabase = createClient();
   let q2 = supabase
     .from("planes_diarios")
-    .select(`id,fecha,semaforo,resumen,recomendacion,num_generacion,created_at,
-            despertar,mente,cuerpo,rueda,necesidad,notas,
-            tendencia_ia,contexto_dia_ia,num_bloques_activos,
+    .select(`id,fecha,fecha_larga,semaforo,resumen,recomendacion,num_generacion,created_at,
+            despertar,mente,cuerpo,rueda,necesidad,notas,reflexion,
+            estado_emocional_texto,analisis_emocional_ia,tendencia_ia,contexto_dia_ia,
+            num_bloques_activos,
             comida_titulo,comida_descripcion,comida_motivo`)
     .order("fecha", { ascending: false })
     .order("num_generacion", { ascending: false })

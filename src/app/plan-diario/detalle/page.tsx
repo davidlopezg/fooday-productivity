@@ -4,8 +4,15 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { fetchPlanCompleto } from "@/lib/queries";
-import { guardarNotasPlan, marcarTareaPlanHecha } from "@/lib/mutations";
+import {
+  guardarNotasPlan,
+  marcarTareaPlanHecha,
+  marcarHecha,
+  reabrirTarea,
+} from "@/lib/mutations";
 import { informeToMarkdown } from "@/lib/plan";
+import { agruparPorBloque } from "@/lib/planBloques";
+import { BLOQUE_HORARIO } from "@/lib/semana";
 import type {
   InformePlan,
   PlanDiario,
@@ -131,7 +138,15 @@ export default function PlanDetallePage() {
   }
 
   // Plan v3 (Parte 1+2): tiene analisis_emocional_ia o num_bloques_activos pero NO informe_json.
-  if (!plan.informe_json && (plan.analisis_emocional_ia || plan.num_bloques_activos)) {
+  // Se mira también `estado_emocional_texto` porque `num_bloques_activos` puede
+  // quedar a NULL si la persona quita todas las tareas del plan (issue #73).
+  if (
+    !plan.informe_json &&
+    (plan.analisis_emocional_ia ||
+      plan.tendencia_ia ||
+      plan.estado_emocional_texto ||
+      plan.num_bloques_activos)
+  ) {
     return <PlanV3View plan={plan} />;
   }
 
@@ -671,24 +686,35 @@ function TablaSencilla({ headers, filas }: { headers: string[]; filas: string[][
 
 function PlanV3View({ plan }: { plan: PlanCompleto }) {
   const semaforo = (plan.semaforo ?? "amarillo") as "verde" | "amarillo" | "rojo";
-  const tareasPorBloque = plan.tareas
-    .filter((t) => t.bloque_num !== null && t.bloque_num !== undefined)
-    .sort((a, b) => (a.bloque_num ?? 0) - (b.bloque_num ?? 0));
-  const numBloques = plan.num_bloques_activos ?? tareasPorBloque.length ?? 0;
+  // Un bloque puede llevar VARIAS tareas (issue #73): se agrupan por bloque.
+  const grupos = agruparPorBloque(
+    plan.tareas.filter((t) => t.bloque_num !== null && t.bloque_num !== undefined),
+  ).filter((g) => g.tareas.length > 0);
+  const numBloques = plan.num_bloques_activos ?? grupos.length;
 
-  // Tareas del plan marcadas desde aquí. Solo las LIBRES (las que propone la IA
-  // y no existen en `tareas`): las vinculadas se completan donde vive la tarea,
-  // y `marcarHecha` sincroniza la fila del plan sola. Issue #6.
+  // Tareas del plan marcadas desde aquí. Las LIBRES (las que propone la IA
+  // y no existen en `tareas`) se marcan en la fila del plan; las vinculadas
+  // se marcan en la tarea real y `marcarHecha` sincroniza la fila del plan
+  // sola. Issue #6.
   const [hechasLocal, setHechasLocal] = useState<Record<string, boolean>>({});
   const [marcandoId, setMarcandoId] = useState<string | null>(null);
 
-  async function toggleTareaPlan(t: { id: string; hecho: boolean; tarea_id: string | null }) {
-    if (t.tarea_id) return;
+  async function toggleTareaPlan(t: {
+    id: string;
+    hecho: boolean;
+    tarea_id: string | null;
+  }) {
     const siguiente = !(hechasLocal[t.id] ?? t.hecho);
     setHechasLocal((m) => ({ ...m, [t.id]: siguiente }));
     setMarcandoId(t.id);
     try {
-      await marcarTareaPlanHecha(t.id, siguiente);
+      if (t.tarea_id) {
+        // Tarea real: se marca en `tareas` (y el plan se sincroniza solo).
+        if (siguiente) await marcarHecha(t.tarea_id);
+        else await reabrirTarea(t.tarea_id);
+      } else {
+        await marcarTareaPlanHecha(t.id, siguiente);
+      }
     } catch (e) {
       // Revertir si falla: la UI no puede mentir.
       setHechasLocal((m) => ({ ...m, [t.id]: !siguiente }));
@@ -767,51 +793,75 @@ function PlanV3View({ plan }: { plan: PlanCompleto }) {
         )}
 
         {/* 4. Tu día optimizado */}
-        {tareasPorBloque.length > 0 && (
+        {grupos.length > 0 && (
           <Section titulo={`4. Tu día optimizado (${numBloques} de 4 bloques activos)`}>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {tareasPorBloque.map((t) => (
+              {grupos.map((g) => (
                 <div
-                  key={t.id}
+                  key={g.bloque}
                   className="rounded-md border border-primary/30 bg-primary/5 p-3"
                 >
-                  <div className="mb-1 flex items-center justify-between">
+                  <div className="mb-2 flex items-center justify-between gap-2">
                     <span className="text-xs font-semibold uppercase tracking-wide">
-                      Bloque {t.bloque_num}
+                      Bloque {g.bloque}
                     </span>
-                    <label className="inline-flex cursor-pointer items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
-                      <input
-                        type="checkbox"
-                        className="h-5 w-5 cursor-pointer accent-emerald-600 disabled:cursor-wait"
-                        checked={hechasLocal[t.id] ?? t.hecho}
-                        disabled={!!t.tarea_id || marcandoId === t.id}
-                        onChange={() => void toggleTareaPlan(t)}
-                        title={
-                          t.tarea_id
-                            ? "Marca esta tarea desde /tareas: aquí se sincroniza sola"
-                            : "Marcar como hecha"
-                        }
-                      />
-                      Hecha
-                    </label>
-                    {t.tipo_tarea && (
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-                          t.tipo_tarea === "profunda"
-                            ? "border border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-300"
-                            : "border border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300"
-                        }`}
-                      >
-                        {t.tipo_tarea}
-                      </span>
-                    )}
+                    <span className="rounded-full bg-background px-2 py-0.5 text-[10px] text-muted-foreground">
+                      {BLOQUE_HORARIO[g.bloque]}
+                    </span>
                   </div>
-                  <p className="text-sm font-medium leading-snug">{t.titulo_libre ?? "—"}</p>
-                  <p className="mt-1 text-[11px] text-muted-foreground">
-                    {t.tarea_id
-                      ? "📌 vinculada a tarea en BD — se marca desde /tareas"
-                      : "✨ tarea propuesta por la IA — márcala aquí"}
-                  </p>
+                  <ul className="space-y-2">
+                    {g.tareas.map((t) => (
+                      <li
+                        key={t.id}
+                        className="rounded-md border border-border bg-background p-2"
+                      >
+                        <div className="flex items-start gap-2">
+                          <input
+                            type="checkbox"
+                            className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-emerald-600 disabled:cursor-wait"
+                            checked={hechasLocal[t.id] ?? t.hecho}
+                            disabled={marcandoId === t.id}
+                            onChange={() => void toggleTareaPlan(t)}
+                            aria-label={`Marcar "${t.titulo_libre ?? ""}" como hecha`}
+                            title={
+                              t.tarea_id
+                                ? "Se marca la tarea real y el plan se sincroniza solo"
+                                : "Marcar como hecha"
+                            }
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p
+                              className={`text-sm font-medium leading-snug ${
+                                (hechasLocal[t.id] ?? t.hecho)
+                                  ? "text-muted-foreground line-through"
+                                  : ""
+                              }`}
+                            >
+                              {t.titulo_libre ?? "—"}
+                            </p>
+                            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                              {t.tipo_tarea && (
+                                <span
+                                  className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                                    t.tipo_tarea === "profunda"
+                                      ? "border border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-300"
+                                      : "border border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300"
+                                  }`}
+                                >
+                                  {t.tipo_tarea}
+                                </span>
+                              )}
+                              <span className="text-[11px] text-muted-foreground">
+                                {t.tarea_id
+                                  ? "📌 vinculada a tarea en BD"
+                                  : "✨ tarea propuesta por la IA"}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               ))}
             </div>
