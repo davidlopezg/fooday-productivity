@@ -1516,6 +1516,31 @@ export default function DocsPage() {
             </span>
             <span className="text-muted-foreground">
               <strong className="text-foreground">
+                Cada pantalla tiene su propio título en la pestaña.
+              </strong>{" "}
+              Issue #27: el layout raíz fijaba{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">metadata.title</code>{" "}
+              con el valor estático{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">fooday·productivity</code>
+              , así que las 37 rutas compartían el mismo título: las pestañas del
+              navegador, el historial, los marcadores y el anuncio del lector
+              de pantalla decían todos lo mismo. Ahora cada ruta define
+              su título (un <code className="rounded bg-muted px-1 py-0.5 text-xs">layout.tsx</code>{" "}
+              con <code className="rounded bg-muted px-1 py-0.5 text-xs">metadata</code>)
+              y el layout raíz añade la marca con la plantilla{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">%s · fooday</code>.
+              Título de ejemplo: <code className="rounded bg-muted px-1 py-0.5 text-xs">Tareas · fooday</code>,{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">Detalle de la meta · fooday</code>.{" "}
+              También cada ruta lleva su propia descripción (el texto que
+              leen los buscadores y los lectores de pantalla).
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-violet-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-violet-700 dark:text-violet-300 sm:text-sm">
+              2026-11-23
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
                 Crear y editar una tarea: los dos formularios igual — primero
                 qué es, después dónde encaja — y la IA solo cuando la pides.
               </strong>{" "}
