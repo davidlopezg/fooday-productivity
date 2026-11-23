@@ -9,6 +9,7 @@ import { ConfigProvider } from "@/lib/configStore";
 import { PomodoroProvider } from "@/lib/pomodoroStore";
 import { PomodoroWidget } from "@/components/PomodoroWidget";
 import { PostFocusDialog } from "@/components/PostFocusDialog";
+import { RecurrenceWarning } from "@/components/RecurrenceWarning";
 import { AgentChat } from "@/components/AgentChat";
 import { ThemeProvider } from "@/lib/themeStore";
 
@@ -154,6 +155,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
         <PomodoroWidget />
         <PostFocusDialog />
+        {/* Advertencia global: clonación de tarea recurrente falló (issue #21) */}
+        <RecurrenceWarning />
         {/* Chat del agente: presente en TODA la app (excepto /login, que
             ni siquiera entra en este árbol). Dentro de PomodoroProvider
             porque se aparta del widget del temporizador. */}
