@@ -86,3 +86,42 @@ export function mapaMetas(metas: Array<Pick<Meta, "id" | "proyecto_id">>): Map<
 > {
   return new Map(metas.map((m) => [m.id, m]));
 }
+
+// ============================================================================
+// issue #75 — Qué metas se ofrecen cuando ya has elegido un proyecto.
+// ----------------------------------------------------------------------------
+// LA REGLA (la misma de la jerarquía proyecto → meta → KR → tarea):
+//   · si hay proyecto elegido → SOLO las metas de ese proyecto;
+//   · si NO hay proyecto elegido → todas las metas (como hasta ahora).
+// Las metas HUÉRFANAS (sin proyecto) no aparecen cuando hay un proyecto
+// elegido: una tarea con proyecto y meta de otro proyecto sería una
+// contradicción (la tarea hereda el proyecto de su meta).
+// ============================================================================
+
+/** El proyecto al que pertenece una meta (null = meta huérfana). */
+export function proyectoDeMeta(meta: {
+  proyecto_id?: string | null;
+}): string | null {
+  return meta.proyecto_id ?? null;
+}
+
+/**
+ * ¿Esta meta es válida para el proyecto elegido?
+ * Sin proyecto elegido (`null`/`undefined`) vale cualquiera: se muestran
+ * todas, como antes.
+ */
+export function metaPerteneceAProyecto(
+  meta: { proyecto_id?: string | null },
+  proyectoId: string | null | undefined,
+): boolean {
+  if (!proyectoId) return true;
+  return proyectoDeMeta(meta) === proyectoId;
+}
+
+/** Filtra una lista de metas por el proyecto elegido. Sin proyecto → todas. */
+export function filtrarMetasPorProyecto<
+  T extends { proyecto_id?: string | null },
+>(metas: T[], proyectoId: string | null | undefined): T[] {
+  if (!proyectoId) return metas;
+  return metas.filter((m) => metaPerteneceAProyecto(m, proyectoId));
+}

@@ -22,7 +22,7 @@ import {
 } from "@/components/icons";
 import {
   actualizarTarea,
-  crearTareaConIA,
+  crearTarea,
   desgranarTarea,
   eliminarAdjunto,
   MAX_ADJUNTO_BYTES,
@@ -35,7 +35,8 @@ import {
 import { fetchAdjuntosTarea, fetchMetas, fetchMetasConProgreso, fetchProyectos } from "@/lib/queries";
 import { useConfig } from "@/lib/configStore";
 import { usePomodoro } from "@/lib/pomodoroStore";
-import { generarCriterioTerminacionIA } from "@/lib/plan";
+import { desgranarTareaIA, generarCriterioTerminacionIA } from "@/lib/plan";
+import { metaPerteneceAProyecto } from "@/lib/proyectos";
 import { useData } from "@/lib/useData";
 import { ComentariosTarea } from "@/components/ComentariosTarea";
 import type { Meta, MetaConPlan, Proyecto, RecurrenciaTipo, Subtarea, Tarea, TareaAdjunto } from "@/lib/types";
@@ -127,6 +128,7 @@ function ProyectoRecurrenciaEditor({
   metaId,
   metaProyectoNombre,
   metaSinProyecto,
+  fijarProyecto = true,
 }: {
   proyectos: Proyecto[];
   proyectoId: string | null;
@@ -146,10 +148,17 @@ function ProyectoRecurrenciaEditor({
   metaProyectoNombre?: string | null;
   /** True si la meta seleccionada existe pero NO tiene proyecto asignado (huérfana). */
   metaSinProyecto?: boolean;
+  /**
+   * Issue #75 (solo en "Nueva tarea"): el proyecto se elige ANTES que la
+   * meta y es el que filtra la lista de metas. Si se pone a `false`, el
+   * desplegable sigue editable aunque haya meta: al cambiar de proyecto se
+   * recalcula la lista de metas (la que no encaje se limpia).
+   */
+  fijarProyecto?: boolean;
 }) {
   const field =
     "h-9 w-full rounded-md border border-input bg-background px-2 text-sm outline-none focus:ring-2 focus:ring-ring";
-  const derivadoDeMeta = !!metaId;
+  const derivadoDeMeta = !!metaId && fijarProyecto;
   return (
     <section className="rounded-lg border border-border bg-muted/30 p-3">
       <div className="mb-2 flex items-center gap-2">
@@ -295,11 +304,25 @@ function MetaKrEditor({
   resultadoId,
   onMetaChange,
   onResultadoChange,
+  proyectoId = null,
+  proyectoNombre = null,
+  proyectoDeMetaNombre = null,
 }: {
   metaId: string | null;
   resultadoId: string | null;
   onMetaChange: (v: string | null) => void;
   onResultadoChange: (v: string | null) => void;
+  /**
+   * Issue #75: si hay proyecto elegido, la lista de metas se FILTRA por él
+   * (solo las metas de ese proyecto). Sin proyecto → todas, como hasta
+   * ahora. Las metas huérfanas (sin proyecto) no salen cuando hay un
+   * proyecto elegido: la tarea heredaría un proyecto que no encaja.
+   */
+  proyectoId?: string | null;
+  /** Nombre del proyecto elegido, solo para el texto de ayuda. */
+  proyectoNombre?: string | null;
+  /** Nombre del proyecto de la META seleccionada (herencia proyecto → meta → tarea). */
+  proyectoDeMetaNombre?: string | null;
 }) {
   const { data: metas } = useData<MetaConPlan[]>(() => fetchMetasConProgreso(), []);
   const field =
@@ -309,16 +332,27 @@ function MetaKrEditor({
   const metasActivas = (metas ?? []).filter(
     (m) => m.meta.estado !== "archivada" && (m.meta.titulo ?? "").trim().length > 0,
   );
+  // Filtrado por proyecto (issue #75).
+  const metasVisibles = proyectoId
+    ? metasActivas.filter((m) => metaPerteneceAProyecto(m.meta, proyectoId))
+    : metasActivas;
 
   // KRs de la meta seleccionada, ordenados por (año desc, nº periodo desc).
   const krDeMeta = metaId
-    ? (metasActivas.find((m) => m.meta.id === metaId)?.resultados ?? []).slice().sort(
+    ? (metasVisibles.find((m) => m.meta.id === metaId)?.resultados ?? []).slice().sort(
         (a, b) =>
           b.periodo.anio - a.periodo.anio ||
           b.periodo.numero - a.periodo.numero ||
           (a.orden ?? 0) - (b.orden ?? 0),
       )
     : [];
+  // ¿La meta seleccionada es de otro proyecto? Entonces la tarea heredará
+  // el proyecto de la meta (migration 0024) y hay que decirlo.
+  const metaDeOtroProyecto =
+    !!metaId &&
+    !!proyectoDeMetaNombre &&
+    (metasActivas.find((m) => m.meta.id === metaId)?.meta.proyecto_id ?? null) !==
+      proyectoId;
 
   return (
     <section className="rounded-lg border border-border bg-muted/30 p-3">
@@ -341,7 +375,7 @@ function MetaKrEditor({
             }}
           >
             <option value="">— Sin meta (queda en /tareas/inbox) —</option>
-            {metasActivas.map((m) => (
+            {metasVisibles.map((m) => (
               <option key={m.meta.id} value={m.meta.id}>
                 {(m.meta.codigo ? `${m.meta.codigo} · ` : "") + m.meta.titulo}
               </option>
@@ -372,10 +406,29 @@ function MetaKrEditor({
         </label>
       </div>
       <p className="mt-1.5 text-[11px] text-muted-foreground">
-        Cada tarea debe estar dentro de una meta → KR → tareas para que
-        cuente hacia el scorecard de /metas/plan. Si la dejas sin asignar,
-        la tarea va a /tareas/inbox (triaje).
+        {proyectoId ? (
+          <>
+            Solo se ven las metas del proyecto{" "}
+            <strong className="text-foreground">
+              {proyectoNombre ?? "seleccionado"}
+            </strong>
+            . Quita el proyecto si quieres ver todas.
+          </>
+        ) : (
+          <>
+            Cada tarea debe estar dentro de una meta → KR → tareas para que
+            cuente hacia el scorecard de /metas/plan. Si la dejas sin asignar,
+            la tarea va a /tareas/inbox (triaje).
+          </>
+        )}
       </p>
+      {metaDeOtroProyecto && (
+        <p className="mt-1.5 rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-700 dark:text-amber-400">
+          Esta meta es del proyecto{" "}
+          <strong className="text-foreground">{proyectoDeMetaNombre}</strong>: la
+          tarea heredará ese proyecto (proyecto → meta → KR → tarea).
+        </p>
+      )}
     </section>
   );
 }
@@ -614,14 +667,29 @@ function SubtareasEditor({
 
 // ============================================================================
 // Editor "lite" de subtareas — usado por CrearModal.
-// Sin botón de IA (la IA se ejecuta automáticamente al guardar si está vacío).
+// El desglose con IA es SIEMPRE explícito (issue #75): hay un botón fijo
+// ("Desgranar con IA" / "Regenerar") y la IA NO actúa por su cuenta al
+// guardar. Se puede crear una tarea entera sin tocar la IA.
 // ============================================================================
 function SubtareasEditorLite({
   subtareas,
   onChange,
+  desgranando,
+  iaError,
+  onDesgranar,
+  tieneKey,
+  abierto,
+  onToggle,
 }: {
   subtareas: Subtarea[];
   onChange: (next: Subtarea[]) => void;
+  desgranando: boolean;
+  iaError: string | null;
+  onDesgranar: () => void;
+  tieneKey: boolean;
+  /** Panel plegable (el padre lo controla para poder abrirlo al desglosar). */
+  abierto: boolean;
+  onToggle: () => void;
 }) {
   function actualizar(idx: number, patch: Partial<Subtarea>) {
     onChange(subtareas.map((s, i) => (i === idx ? { ...s, ...patch } : s)));
@@ -632,64 +700,125 @@ function SubtareasEditorLite({
   function anadir() {
     onChange([...subtareas, { descripcion: "", tiempo_estimado_min: 5, hecho: false }]);
   }
+  const haySubtareas = subtareas.length > 0;
   return (
-    <div>
-      {subtareas.length === 0 ? (
-        <p className="text-[11px] text-muted-foreground">
-          Aún no hay subtareas. Si guardas así, la IA las generará automáticamente.
+    <section className="rounded-lg border border-border bg-muted/30 p-3">
+      <div className="mb-2 flex items-start justify-between gap-2">
+        <button
+          type="button"
+          onClick={onToggle}
+          className="flex min-w-0 flex-1 items-center justify-between text-left"
+        >
+          <div className="min-w-0">
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Subtareas (desglose)
+            </div>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">
+              Opcional. La IA solo desglosa si se lo pides: al guardar no pasa
+              nada por su cuenta.
+            </p>
+          </div>
+          <span className="ml-2 text-xs text-muted-foreground">
+            {abierto ? "▾" : "▸"}
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={onDesgranar}
+          disabled={desgranando || !tieneKey}
+          className="inline-flex shrink-0 items-center justify-center min-h-10 gap-1.5 rounded-md bg-gradient-to-r from-violet-600 to-indigo-600 px-2.5 py-1 text-[11px] font-medium text-white shadow-sm hover:opacity-90 disabled:opacity-50"
+          title={
+            tieneKey
+              ? "Descomponer la tarea en micro-pazos con IA (reemplaza los que haya)"
+              : "Configura primero la API key"
+          }
+        >
+          <IconSparkles className="h-3.5 w-3.5" />
+          {desgranando
+            ? "Desgranando…"
+            : haySubtareas
+              ? "Regenerar"
+              : "Desgranar con IA"}
+        </button>
+      </div>
+
+      {!tieneKey && abierto && (
+        <p className="mb-2 rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-700 dark:text-amber-400">
+          No hay API key de MiniMax configurada. Ve a{" "}
+          <a href="/configuracion" className="underline">
+            Configuración
+          </a>{" "}
+          para añadir una. Puedes seguir editando las subtareas a mano.
         </p>
-      ) : (
-        <ul className="space-y-1.5">
-          {subtareas.map((s, idx) => (
-            <li
-              key={idx}
-              className="flex items-start gap-2 rounded-md border border-border bg-background px-2 py-1.5"
-            >
-              <input
-                type="text"
-                value={s.descripcion}
-                onChange={(e) => actualizar(idx, { descripcion: e.target.value })}
-                placeholder="Micro-paso (verbo + objeto concreto)…"
-                className="min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-0.5 text-sm outline-none focus:border-input focus:bg-background"
-              />
-              <input
-                type="number"
-                min={1}
-                max={120}
-                step={1}
-                value={s.tiempo_estimado_min ?? ""}
-                onChange={(e) =>
-                  actualizar(idx, {
-                    tiempo_estimado_min:
-                      e.target.value === "" ? null : Math.max(1, Math.min(120, Number(e.target.value))),
-                  })
-                }
-                className="w-12 rounded border border-input bg-background px-1 py-0.5 text-center text-xs outline-none focus:ring-1 focus:ring-ring"
-                title="Minutos estimados (1–120)"
-                aria-label="Minutos estimados"
-              />
-              <span className="text-[10px] text-muted-foreground">min</span>
-              <button
-                type="button"
-                onClick={() => eliminar(idx)}
-                className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                title="Eliminar"
-                aria-label="Eliminar"
-              >
-                <IconTrash className="h-3.5 w-3.5" />
-              </button>
-            </li>
-          ))}
-        </ul>
       )}
-      <button
-        type="button"
-        onClick={anadir}
-        className="inline-flex items-center justify-center min-h-10 mt-2 w-full rounded-md border border-dashed border-border px-2 py-1.5 text-xs text-muted-foreground hover:bg-accent"
-      >
-        + Añadir subtarea a mano
-      </button>
-    </div>
+      {iaError && abierto && (
+        <p className="mb-2 rounded-md border border-red-500/20 bg-red-500/10 px-2 py-1.5 text-[11px] text-red-600 dark:text-red-400">
+          {iaError}
+        </p>
+      )}
+
+      {abierto && (
+        <>
+          {!haySubtareas ? (
+            <p className="text-[11px] text-muted-foreground">
+              Sin subtareas. Puedes escribirlas a mano, pedirle el desglose a la
+              IA con el botón de arriba o dejar la tarea entera para otro
+              momento.
+            </p>
+          ) : (
+            <ul className="space-y-1.5">
+              {subtareas.map((s, idx) => (
+                <li
+                  key={idx}
+                  className="flex items-start gap-2 rounded-md border border-border bg-background px-2 py-1.5"
+                >
+                  <input
+                    type="text"
+                    value={s.descripcion}
+                    onChange={(e) => actualizar(idx, { descripcion: e.target.value })}
+                    placeholder="Micro-paso (verbo + objeto concreto)…"
+                    className="min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-0.5 text-sm outline-none focus:border-input focus:bg-background"
+                  />
+                  <input
+                    type="number"
+                    min={1}
+                    max={120}
+                    step={1}
+                    value={s.tiempo_estimado_min ?? ""}
+                    onChange={(e) =>
+                      actualizar(idx, {
+                        tiempo_estimado_min:
+                          e.target.value === "" ? null : Math.max(1, Math.min(120, Number(e.target.value))),
+                      })
+                    }
+                    className="w-12 rounded border border-input bg-background px-1 py-0.5 text-center text-xs outline-none focus:ring-1 focus:ring-ring"
+                    title="Minutos estimados (1–120)"
+                    aria-label="Minutos estimados"
+                  />
+                  <span className="text-[10px] text-muted-foreground">min</span>
+                  <button
+                    type="button"
+                    onClick={() => eliminar(idx)}
+                    className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                    title="Eliminar"
+                    aria-label="Eliminar"
+                  >
+                    <IconTrash className="h-3.5 w-3.5" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <button
+            type="button"
+            onClick={anadir}
+            className="inline-flex items-center justify-center min-h-10 mt-2 w-full rounded-md border border-dashed border-border px-2 py-1.5 text-xs text-muted-foreground hover:bg-accent"
+          >
+            + Añadir subtarea a mano
+          </button>
+        </>
+      )}
+    </section>
   );
 }
 
@@ -1409,7 +1538,8 @@ export function CrearModal({
   const [subtareas, setSubtareas] = useState<Subtarea[]>([]);
   const [subtareasAbierto, setSubtareasAbierto] = useState(false);
   const [adjuntosCola, setAdjuntosCola] = useState<PendingFile[]>([]);
-  const [iaMsg, setIaMsg] = useState<string | null>(null);
+  const [desgranando, setDesgranando] = useState(false);
+  const [iaError, setIaError] = useState<string | null>(null);
   const [adjMsg, setAdjMsg] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [guardarError, setGuardarError] = useState<string | null>(null);
@@ -1431,15 +1561,78 @@ export function CrearModal({
     : null;
   const metaSinProyecto = !!metaId && !metaProyectoId;
   const proyectoIdEfectivo: string | null = metaId ? metaProyectoId : proyectoId;
+  const proyectoNombre = proyectoId
+    ? proyectoById.get(proyectoId)?.nombre ?? null
+    : null;
 
-  const quiereSubtareas = subtareas.filter((s) => s.descripcion.trim()).length === 0;
-  const quiereCriterio = !form.criterio_terminacion.trim();
-  const usaraIA = (quiereSubtareas || quiereCriterio) && !!cfg.minimax_api_key;
   const tieneAdjuntos = adjuntosCola.length > 0;
+
+  /**
+   * Issue #75: el proyecto se elige ANTES que la meta y es lo que filtra
+   * la lista de metas. Si al cambiar de proyecto la meta elegida ya no
+   * encaja (es de otro proyecto o es huérfana), se limpia: también el KR,
+   * que pertenecía a la meta anterior.
+   */
+  function cambiarProyecto(nuevo: string | null) {
+    setProyectoId(nuevo);
+    if (!metaId) return;
+    const meta = metaById.get(metaId);
+    // Si la meta no viene de este proyecto (o aún no sabemos de cuál es,
+    // porque los datos van cargando) se limpia: también el KR, que
+    // pertenecía a la meta anterior. Es preferible quedarse sin meta que
+    // guardar una tarea con una meta de otro proyecto.
+    if (!meta || !metaPerteneceAProyecto(meta, nuevo)) {
+      setMetaId(null);
+      setResultadoId(null);
+    }
+  }
+
+  /**
+   * Desglose con IA — SIEMPRE a petición explícita (issue #75). No se llama
+   * al guardar: se puede crear una tarea entera sin IA.
+   */
+  async function desgranar() {
+    if (!cfg.minimax_api_key) {
+      setIaError(
+        "No hay API key de MiniMax configurada. Añádela en Configuración para desglosar con IA.",
+      );
+      return;
+    }
+    if (!form.titulo.trim()) {
+      setIaError("Escribe primero un título para la tarea.");
+      return;
+    }
+    setIaError(null);
+    setDesgranando(true);
+    try {
+      const { subtareas: nuevas } = await desgranarTareaIA(
+        cfg.base_url,
+        cfg.minimax_api_key,
+        cfg.model,
+        {
+          titulo: form.titulo.trim(),
+          descripcion: form.descripcion || null,
+          notas: null,
+          // Si ya hay subtareas, la IA las mejora o las reemplaza (mismo
+          // prompt que el botón "Regenerar" de editar tarea).
+          subtareasPrevias: subtareas.length > 0 ? subtareas : null,
+        },
+      );
+      if (nuevas.length > 0) {
+        setSubtareas(nuevas);
+        setSubtareasAbierto(true);
+      } else {
+        setIaError("La IA no propuso ningún micro-paso. Prueba a afinar el título.");
+      }
+    } catch (e) {
+      setIaError((e as Error).message);
+    } finally {
+      setDesgranando(false);
+    }
+  }
 
   function guardar() {
     if (!form.titulo.trim()) return;
-    setIaMsg(null);
     setAdjMsg(null);
     setGuardarError(null);
     startTransition(async () => {
@@ -1460,32 +1653,26 @@ export function CrearModal({
           .map((s) => s.trim().toLowerCase())
           .filter((s) => s.length > 0);
 
-        const creada = await crearTareaConIA(
-          {
-            titulo: form.titulo.trim(),
-            descripcion: form.descripcion || null,
-            prioridad: form.prioridad,
-            estado: form.estado,
-            deadline: form.deadline || null,
-            fecha_fin: form.fecha_fin || null,
-            capa: form.capa || null,
-            pts: form.pts ? Number(form.pts) : null,
-            esfuerzo: form.esfuerzo || null,
-            ambito: ambito,
-            tags: tagsLimpios,
-            criterio_terminacion_manual: form.criterio_terminacion.trim() || null,
-            subtareas_manuales:
-              subtareasLimpias.length > 0 ? subtareasLimpias : null,
-            meta_id: metaId,
-            resultado_periodo_id: resultadoId,
-          },
-          {
-            base_url: cfg.base_url,
-            minimax_api_key: cfg.minimax_api_key,
-            model: cfg.model,
-            onProgress: (m) => setIaMsg(m),
-          },
-        );
+        // Issue #75: se crea la tarea TAL CUAL está el formulario. La IA
+        // solo actúa si el usuario la ha pedido (criterio de terminación o
+        // desglose). Antes, guardar sin subtareas disparaba la IA sola.
+        const creada = await crearTarea({
+          titulo: form.titulo.trim(),
+          descripcion: form.descripcion || null,
+          prioridad: form.prioridad,
+          estado: form.estado,
+          deadline: form.deadline || null,
+          fecha_fin: form.fecha_fin || null,
+          capa: form.capa || null,
+          pts: form.pts ? Number(form.pts) : null,
+          esfuerzo: form.esfuerzo || null,
+          ambito: ambito,
+          tags: tagsLimpios,
+          criterio_terminacion: form.criterio_terminacion.trim() || null,
+          subtareas: subtareasLimpias.length > 0 ? subtareasLimpias : null,
+          meta_id: metaId,
+          resultado_periodo_id: resultadoId,
+        });
 
         // Proyecto y recurrencia (post-creación, no bloquea la creación):
         // si falla, la tarea ya está creada, no se pierde nada.
@@ -1559,6 +1746,9 @@ export function CrearModal({
         </div>
 
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
+          {/* Issue #75: el orden va de "qué es la tarea" a "dónde encaja":
+              título → descripción → criterio de terminación → prioridad/estado →
+              ámbito/tags → proyecto → meta/KR → subtareas → adjuntos. */}
           <label className="block">
             <span className="mb-1 block text-xs text-muted-foreground">Título *</span>
             <input
@@ -1576,13 +1766,6 @@ export function CrearModal({
               onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
             />
           </label>
-
-          <MetaKrEditor
-            metaId={metaId}
-            resultadoId={resultadoId}
-            onMetaChange={setMetaId}
-            onResultadoChange={setResultadoId}
-          />
 
           <CriterioTerminacionEditor
             value={form.criterio_terminacion}
@@ -1632,42 +1815,6 @@ export function CrearModal({
             </label>
           </div>
 
-          <section className="rounded-lg border border-border bg-muted/30 p-3">
-            <button
-              type="button"
-              onClick={() => setSubtareasAbierto((v) => !v)}
-              className="flex w-full items-center justify-between text-left"
-            >
-              <div>
-                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Subtareas (desglose)
-                </div>
-                <p className="mt-0.5 text-[11px] text-muted-foreground">
-                  {usaraIA
-                    ? "🪄 Si lo dejas vacío, la IA las generará automáticamente al guardar."
-                    : "Opcional. Puedes añadirlas a mano o dejarlo para la edición."}
-                </p>
-              </div>
-              <span className="ml-2 text-xs text-muted-foreground">
-                {subtareasAbierto ? "▾" : "▸"}
-              </span>
-            </button>
-            {subtareasAbierto && (
-              <div className="mt-2">
-                <SubtareasEditorLite
-                  subtareas={subtareas}
-                  onChange={setSubtareas}
-                />
-              </div>
-            )}
-          </section>
-
-          <AdjuntosEditor
-            tareaId={null}
-            cola={adjuntosCola}
-            setCola={setAdjuntosCola}
-          />
-
           <AmbitoTagsEditor
             ambito={ambito}
             onAmbitoChange={setAmbito}
@@ -1678,18 +1825,46 @@ export function CrearModal({
           <ProyectoRecurrenciaEditor
             proyectos={proyectos ?? []}
             proyectoId={proyectoId}
-            onProyectoChange={setProyectoId}
+            onProyectoChange={cambiarProyecto}
             recurrencia={recurrencia}
             onRecurrenciaChange={setRecurrenciaState}
             metaId={metaId}
             metaProyectoNombre={metaProyectoNombre}
             metaSinProyecto={metaSinProyecto}
+            fijarProyecto={false}
+          />
+
+          <MetaKrEditor
+            metaId={metaId}
+            resultadoId={resultadoId}
+            onMetaChange={setMetaId}
+            onResultadoChange={setResultadoId}
+            proyectoId={proyectoId}
+            proyectoNombre={proyectoNombre}
+            proyectoDeMetaNombre={metaProyectoNombre}
+          />
+
+          <SubtareasEditorLite
+            subtareas={subtareas}
+            onChange={setSubtareas}
+            desgranando={desgranando}
+            iaError={iaError}
+            onDesgranar={desgranar}
+            tieneKey={!!cfg.minimax_api_key}
+            abierto={subtareasAbierto}
+            onToggle={() => setSubtareasAbierto((v) => !v)}
+          />
+
+          <AdjuntosEditor
+            tareaId={null}
+            cola={adjuntosCola}
+            setCola={setAdjuntosCola}
           />
         </div>
 
         <div className="flex shrink-0 items-center justify-between gap-2 border-t border-border px-5 py-4">
           <span className="text-[11px] text-red-600 dark:text-red-400">
-            {guardarError ?? adjMsg ?? iaMsg ?? (usaraIA ? "🪄 Se enriquecerá con IA al guardar." : "")}
+            {guardarError ?? adjMsg ?? ""}
           </span>
           <div className="flex gap-2">
             <button onClick={onClose} className="rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-accent">
@@ -1700,7 +1875,7 @@ export function CrearModal({
               disabled={pending || !form.titulo.trim()}
               className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
             >
-              {pending ? (guardarError ? "Error — reintentar" : "Creando…") : usaraIA || tieneAdjuntos ? "✨ Crear tarea" : "Crear tarea"}
+              {pending ? (guardarError ? "Error — reintentar" : "Creando…") : "Crear tarea"}
             </button>
           </div>
         </div>

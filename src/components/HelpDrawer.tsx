@@ -262,6 +262,12 @@ export const AYUDA_POR_RUTA: Record<
           "El botón ‘Sugerir 3 siguientes acciones’ mira TODA tu lista abierta (no completadas — incluye inbox, tareas con meta y tareas sin asignar) y los argumentos de cada una (meta, KR, deadline, prioridad, ámbito, tags, WIG) y propone 3 acciones concretas para mañana. Como en el resto de flujos IA: solo sugiere, tú editas y confirmas.",
         pilar: 2,
       },
+      {
+        titulo: "Crear una tarea: la IA solo si la llamas",
+        cuerpo:
+          "En el modal ‘Nueva tarea’ el orden va de lo que define la tarea (título, descripción, criterio de terminación) a lo que la encaja (prioridad, ámbito, proyecto, meta/KR, subtareas, adjuntos). Las metas se filtran por el proyecto que elijas; si no eliges ninguno, se ven todas. Y la IA no se cuela: al guardar NO se desglosa ni se escribe el criterio de terminación por su cuenta. Esos botones (‘Desgranar con IA’, ‘Generar con IA’) están siempre a la vista y solo hacen algo si los pulsas.",
+        pilar: 2,
+      },
     ],
   },
   "/focus": {

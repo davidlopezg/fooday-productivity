@@ -307,6 +307,12 @@ export async function crearTarea(datos: {
  * el criterio de terminación y hay API key configurada, los GENERA con IA
  * en una llamada en background (no bloquea el guardado).
  *
+ * OJO (issue #75): esta función es para los flujos que YA son de IA
+ * (generar el plan de una meta, generar tareas para un KR). El formulario
+ * manual "Nueva tarea" NO la usa: ahí la IA solo actúa si el usuario la
+ * pide (botón "Desgranar con IA" / "Generar con IA"). Para el alta manual
+ * usa `crearTarea`.
+ *
  * Estrategia: guarda la tarea primero (idempotente), luego enriquece.
  * Si la IA falla, no se pierde la tarea: simplemente queda sin esos campos.
  */

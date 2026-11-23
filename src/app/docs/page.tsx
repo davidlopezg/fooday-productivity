@@ -1516,6 +1516,57 @@ export default function DocsPage() {
             </span>
             <span className="text-muted-foreground">
               <strong className="text-foreground">
+                Crear una tarea: primero qué es, después dónde encaja — y la
+                IA solo cuando la pides.
+              </strong>{" "}
+              Issue #75: el modal{" "}
+              <strong className="text-foreground">“Nueva tarea”</strong>{" "}
+              tenía los paneles en un orden que no ayudaba a pensar: la meta
+              y el KR (lo más difícil de encajar) salían{" "}
+              <em>antes</em> que el proyecto, y las subtareas y los adjuntos
+              quedaban al final, medio escondidos. Y al pulsar{" "}
+              <strong className="text-foreground">“Crear tarea”</strong> la IA
+              se colaba sola: si no habías desglosado las subtareas, te las
+              generaba al guardar (y te escribía el criterio de terminación),
+              sin que hubieras pedido nada.{" "}
+              <strong className="text-foreground">Ahora:</strong> (1) el
+              orden es{" "}
+              <strong className="text-foreground">
+                título → descripción → 🎯 criterio de terminación → prioridad,
+                estado, capa… → ámbito y tags → proyecto y recurrencia → meta y
+                resultado clave → subtareas (desglose) → 📎 adjuntos
+              </strong>
+              ; (2){" "}
+              <strong className="text-foreground">
+                las metas se filtran por el proyecto elegido
+              </strong>{" "}
+              (si no hay proyecto, se ven todas, como antes): primero eliges
+              la casa y solo te enseñan sus habitaciones; y (3){" "}
+              <strong className="text-foreground">
+                la IA ya no actúa por su cuenta
+              </strong>
+              : el desglose y el criterio de terminación se generan solo si
+              pulsas su botón (que está{" "}
+              <em>siempre visible</em>, no se esconde), de modo que{" "}
+              <strong className="text-foreground">
+                se puede crear una tarea entera sin IA
+              </strong>
+              . Sin migración y sin tocar la base de datos: el cambio es de
+              orden, de filtrado y de cuándo se llama al modelo. FEATURES
+              actualizada (fila{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/tareas</code>
+              ), la sección “Aplicación en la app” de los pilares 2 y 4, el
+              HelpDrawer de{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/tareas</code>{" "}
+              y este registro.
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-violet-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-violet-700 dark:text-violet-300 sm:text-sm">
+              2026-11-23
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
                 El plan diario deja de ser de solo lectura.
               </strong>{" "}
               Issue #73: el plan del día se generaba y a partir de ahí no se
@@ -4356,6 +4407,7 @@ function AplicacionEnApp({ pilar }: { pilar: 1 | 2 | 3 | 4 | 5 }) {
       "Escenarios de proyecto (/escenarios): cronología + estado medido + lectura de la situación, y los escenarios con su estrategia generados bajo demanda (migration 0029)",
       "Panel “🎯 3 KRs de la semana” en /semana (migration 0033): la capa intermedia entre la meta y la tarea. ✨ Sugerir 3 KRs por IA elige por riesgo real (los que van por debajo del ritmo y tienen menos días restantes). Solo entran KRs con entrega en marcha (regla de contención en BD). El trimestre sigue mandando en la entrega; la semana manda en el esfuerzo",
       "El panel de WIGs de /metas muestra solo las 3 metas WIG, sin los KRs debajo (issue #47): se quedaba enorme sin aportar nada y los KRs ya se consultan al abrir la meta. En /tareas el panel sí conserva sus KRs, porque es donde se ejecuta y hay que ver el KR que estás moviendo",
+      "Al crear una tarea, las metas que se ofrecen están FILTRADAS por el proyecto elegido (issue #75): primero eliges el proyecto y luego solo ves sus metas (si no hay proyecto, se ven todas). La tarea hereda el proyecto de su meta: proyecto → meta → KR → tarea",
     ],
     3: [
       "Time-blocking con 4 bloques fijos por día (/calendario)",
@@ -4369,6 +4421,7 @@ function AplicacionEnApp({ pilar }: { pilar: 1 | 2 | 3 | 4 | 5 }) {
       "Micro-acción priorizada para mañana basada en patrón semanal",
       "Banner mental arriba de /tareas/pendientes-respuesta: «no te preocupes de lo que está pendiente de los demás» (reframe estoico/Covey, sin lógica)",
       "Matriz Eisenhower 2D en /m (/matriz) con drag & drop entre cuadrantes y botón IA «Sugerir redistribución» — clasificación urgencia × importancia calculada en JS desde fecha_fin + meta.es_wig, sin migración",
+      "Alta de tarea sin sorpresas (modal «Nueva tarea», issue #75): el formulario va de lo que DEFINE la tarea (título → descripción → 🎯 criterio de terminación) a lo que la ENCAJA (prioridad/estado/capa → ámbito y tags → proyecto y recurrencia → meta y KR → subtareas → adjuntos). La IA NUNCA actúa sola: el desglose y el criterio de terminación solo se generan si pulsas su botón, así que se puede crear una tarea entera sin IA",
     ],
     5: [
       "Límite de 4 bloques/día en el calendario (señal visual)",
