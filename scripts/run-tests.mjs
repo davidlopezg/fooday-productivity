@@ -21,6 +21,8 @@ const TESTS = [
   "src/lib/fechas.test.mjs",
   "src/lib/llm-parser.test.mjs",
   "src/lib/plan-unidades.test.mjs",
+  "src/lib/planBloques.test.mjs",
+  "src/lib/plan-historico.test.mjs",
   "src/lib/llm-retry.test.mjs",
   "src/lib/proyectos.test.mjs",
   "src/lib/metas.test.mjs",

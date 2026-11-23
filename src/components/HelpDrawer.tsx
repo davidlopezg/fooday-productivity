@@ -577,6 +577,12 @@ export const AYUDA_POR_RUTA: Record<
         pilar: 5,
       },
       {
+        titulo: "El plan es tuyo: se puede editar",
+        cuerpo:
+          "La IA propone, tú dispones. Con el plan ya generado puedes AÑADIR una tarea a cualquier bloque (una nueva o una de tus tareas pendientes, con buscador), ACTIVAR los bloques que la IA dejó desactivados, renombrar la tarea que te propone, cambiarle el tipo (profunda o rápida), sustituirla por otra, moverla de bloque, marcarla como hecha o quitarla del plan. Si ya tienes un plan de hoy, la pantalla te lo abre para seguir con él: no hay que regenerarlo. Quitar una tarea del plan NO borra la tarea de tu base de datos: solo deja de estar en el plan de hoy.",
+        pilar: 1,
+      },
+      {
         titulo: "Máximo 4 bloques críticos",
         cuerpo:
           "La auditoría del Estatus Diario te recordará cada noche si hiciste más de 3 críticas. Si pasa, la planificación de mañana debe bajar a la mitad. La sostenibilidad gana a la heroicidad.",

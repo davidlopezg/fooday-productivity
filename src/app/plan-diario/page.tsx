@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   fetchTareas,
+  fetchTareasActivas,
   fetchHistorialEmocional,
   fetchPlanSemanal,
   fetchKRsFocoSemanal,
@@ -15,9 +16,13 @@ import {
   upsertTareaPorTitulo,
   guardarPlanDiarioSimple,
   guardarNotasPlan,
-  renombrarTareaPlan,
+  actualizarTareaDelPlan,
+  anadirTareaAlPlan,
+  eliminarTareaDelPlan,
   moverTareaABloque,
   marcarHecha,
+  marcarTareaPlanHecha,
+  reabrirTarea,
 } from "@/lib/mutations";
 import { useData } from "@/lib/useData";
 import { useConfig } from "@/lib/configStore";
@@ -26,6 +31,8 @@ import type { EstadoEmocional } from "@/lib/plan";
 import { getCurrentISOWeek, BLOQUE_HORARIO, localYMD } from "@/lib/semana";
 import { calcularPropuestaShadow, type PropuestaShadow } from "@/lib/recuperacion/shadow";
 import { PlanShadow } from "@/components/PlanShadow";
+import SelectorTareaPlan from "@/components/SelectorTareaPlan";
+import { agruparPorBloque, numBloquesActivos, type NumeroBloque, type TareaCandidata } from "@/lib/planBloques";
 import type {
   KrFocoConDetalle,
   Meta,
@@ -90,7 +97,7 @@ type TareaLibre = {
   error?: string;
 };
 
-type PlanLocal = PlanGeneradoSimple & {
+type PlanLocal = Omit<PlanGeneradoSimple, "tu_dia_optimizado"> & {
   /** id de la fila en planes_diarios (post-guardado) */
   planId: string | null;
   fecha: string;
@@ -99,6 +106,17 @@ type PlanLocal = PlanGeneradoSimple & {
   reflexion: string;
   notas: string;
   guardadoAt: number;
+  tu_dia_optimizado: {
+    num_bloques_activos: number;
+    /** Una entrada por TAREA del plan. Un bloque puede tener varias. */
+    bloques: BloqueLocal[];
+  };
+};
+
+/** Una tarea dentro de un bloque del plan (con su id de fila en BD). */
+type BloqueLocal = PlanGeneradoSimple["tu_dia_optimizado"]["bloques"][number] & {
+  /** ¿Ya está hecha? (las vinculadas lo heredan de la tarea real). */
+  hecho?: boolean;
 };
 
 // ----------------------------------------------------------------------------
@@ -170,6 +188,12 @@ export default function PlanDiarioPage() {
   const [tareaNueva, setTareaNueva] = useState("");
   const [tareasLibres, setTareasLibres] = useState<TareaLibre[]>([]);
   const [errorTarea, setErrorTarea] = useState<string | null>(null);
+  // Selector de tareas de la BD abierto en la Parte 1 (issue #73).
+  const [selectorAbierto, setSelectorAbierto] = useState(false);
+
+  // Tareas activas de la BD (pendiente / en_progreso / bloqueada): son las
+  // que se pueden meter en el plan (issue #73).
+  const activasQ = useData<TareaCandidata[]>(() => fetchTareasActivas(), []);
 
   // ── Estado de generación ──
   const [generando, setGenerando] = useState(false);
@@ -231,8 +255,8 @@ export default function PlanDiarioPage() {
   // Handlers
   // ----------------------------------------------------------------------------
 
-  async function anadirTareaLibre() {
-    const titulo = tareaNueva.trim();
+  async function anadirTareaLibre(tituloAlterno?: string) {
+    const titulo = (tituloAlterno ?? tareaNueva).trim();
     if (!titulo) return;
     setErrorTarea(null);
 
@@ -272,6 +296,211 @@ export default function PlanDiarioPage() {
 
   function eliminarTareaLibre(uid: string) {
     setTareasLibres((arr) => arr.filter((t) => t.uid !== uid));
+  }
+
+  /**
+   * Añade una tarea que YA está en la base de datos a la lista de la
+   * Parte 1 (issue #73). La IA la recibe como prioridad 2.
+   */
+  function elegirTareaDeBd(t: TareaCandidata) {
+    if (tareasLibres.some((x) => x.id_bd === t.id)) {
+      setErrorTarea(`"${t.titulo}" ya está en la lista.`);
+      return;
+    }
+    setErrorTarea(null);
+    setTareasLibres((arr) => [
+      ...arr,
+      {
+        uid: `bd-${t.id}`,
+        id_bd: t.id,
+        titulo: t.titulo,
+        creada: false,
+        estado: "guardado",
+      },
+    ]);
+    setSelectorAbierto(false);
+  }
+
+  // --------------------------------------------------------------------------
+  // Edición del plan YA GENERADO (issue #73)
+  // --------------------------------------------------------------------------
+  //
+  // El plan dejó de ser de solo lectura: se pueden añadir tareas (nuevas o
+  // de la base de datos), activar bloques desactivados, renombrar/sustituir/
+  // cambiar el tipo de la tarea que propone la IA, moverla de bloque y
+  // quitarla del plan.
+
+  /** Aplica un cambio a la lista local de tareas del plan. */
+  function actualizarBloquesLocal(fn: (bloques: BloqueLocal[]) => BloqueLocal[]) {
+    setPlanLocal((p) => {
+      if (!p) return p;
+      const bloques = fn(p.tu_dia_optimizado.bloques);
+      return {
+        ...p,
+        tu_dia_optimizado: {
+          ...p.tu_dia_optimizado,
+          bloques,
+          num_bloques_activos: numBloquesActivos(bloques),
+        },
+      };
+    });
+  }
+
+  /** Mete una tarea en un bloque del plan (nueva o de la base de datos). */
+  async function anadirAlPlan(
+    bloqueNum: NumeroBloque,
+    datos: { titulo: string; tareaId?: string | null; tipo?: "profunda" | "rapida" },
+  ) {
+    if (!planLocal?.planId) return;
+    try {
+      const fila = await anadirTareaAlPlan({
+        planId: planLocal.planId,
+        bloqueNum,
+        titulo: datos.titulo,
+        tareaId: datos.tareaId ?? null,
+        tipo: datos.tipo ?? "profunda",
+      });
+      actualizarBloquesLocal((bs) => [
+        ...bs,
+        {
+          bloque_num: bloqueNum,
+          tipo: fila.tipo_tarea ?? datos.tipo ?? "profunda",
+          tarea_id: fila.tarea_id,
+          titulo_libre: fila.titulo_libre ?? datos.titulo,
+          tiempo_min: 60,
+          plan_tarea_id: fila.id,
+          hecho: false,
+        },
+      ]);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
+  /** Añade al bloque una tarea que YA existe en la base de datos. */
+  async function anadirExistenteAlPlan(bloqueNum: NumeroBloque, t: TareaCandidata) {
+    await anadirAlPlan(bloqueNum, { titulo: t.titulo, tareaId: t.id });
+  }
+
+  /**
+   * Añade al bloque una tarea escrita por la persona. Si el título no
+   * existía en `tareas`, se crea (RPC `upsert_tarea_by_titulo`): así la
+   * tarea del plan es una tarea de verdad y se puede marcar desde /tareas.
+   */
+  async function anadirNuevaAlPlan(bloqueNum: NumeroBloque, titulo: string) {
+    try {
+      const r = await upsertTareaPorTitulo(titulo);
+      await anadirAlPlan(bloqueNum, { titulo: r.titulo, tareaId: r.id });
+      tareasQ.reload();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
+  /** Sustituye la tarea de un bloque por otra que ya existe en la BD. */
+  async function sustituirPorExistente(planTareaId: string, t: TareaCandidata) {
+    await actualizarTarea(planTareaId, { titulo: t.titulo, tareaId: t.id });
+  }
+
+  /** Sustituye la tarea de un bloque por una escrita ahora (se crea en BD). */
+  async function sustituirPorTitulo(planTareaId: string, titulo: string) {
+    try {
+      const r = await upsertTareaPorTitulo(titulo);
+      await actualizarTarea(planTareaId, { titulo: r.titulo, tareaId: r.id });
+      tareasQ.reload();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
+  /** Renombra / cambia el tipo / sustituye la tarea de un bloque. */
+  async function actualizarTarea(
+    planTareaId: string,
+    patch: { titulo?: string; tareaId?: string | null; tipoTarea?: "profunda" | "rapida" },
+  ) {
+    if (!planLocal?.planId) return;
+    try {
+      await actualizarTareaDelPlan({ planTareaId, ...patch });
+      actualizarBloquesLocal((bs) =>
+        bs.map((b) =>
+          b.plan_tarea_id === planTareaId
+            ? {
+                ...b,
+                titulo_libre: patch.titulo ?? b.titulo_libre,
+                tarea_id: patch.tareaId !== undefined ? patch.tareaId : b.tarea_id,
+                tipo: patch.tipoTarea ?? b.tipo,
+              }
+            : b,
+        ),
+      );
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
+  /** Quita una tarea del plan (la tarea de la BD no se borra). */
+  async function quitarDelPlan(planTareaId: string) {
+    if (!planLocal?.planId) return;
+    try {
+      await eliminarTareaDelPlan({ planId: planLocal.planId, planTareaId });
+      actualizarBloquesLocal((bs) => bs.filter((b) => b.plan_tarea_id !== planTareaId));
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
+  /** Mueve una tarea a otro bloque del plan. */
+  async function moverTarea(planTareaId: string, nuevoBloqueNum: NumeroBloque) {
+    if (!planLocal?.planId) return;
+    try {
+      await moverTareaABloque(planLocal.planId, planTareaId, nuevoBloqueNum);
+      actualizarBloquesLocal((bs) =>
+        bs.map((b) =>
+          b.plan_tarea_id === planTareaId ? { ...b, bloque_num: nuevoBloqueNum } : b,
+        ),
+      );
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
+  /** Marca (o desmarca) una tarea del plan como hecha. */
+  async function alternarHecha(bloque: BloqueLocal) {
+    const id = bloque.plan_tarea_id;
+    if (!id) return;
+    const siguiente = !bloque.hecho;
+    // Optimista: la UI responde al instante. Si la tarea está vinculada a una
+    // tarea real, se marcan TODAS sus filas del plan (es lo que hace
+    // `sincronizarProgresoPlan` en la BD).
+    actualizarBloquesLocal((bs) =>
+      bs.map((b) => {
+        const misma = bloque.tarea_id
+          ? b.tarea_id === bloque.tarea_id
+          : b.plan_tarea_id === id;
+        return misma ? { ...b, hecho: siguiente } : b;
+      }),
+    );
+    try {
+      if (bloque.tarea_id) {
+        // Tarea real: se marca en `tareas` (el plan se sincroniza solo).
+        if (siguiente) await marcarHecha(bloque.tarea_id);
+        else await reabrirTarea(bloque.tarea_id);
+        tareasQ.reload();
+      } else {
+        await marcarTareaPlanHecha(id, siguiente);
+      }
+    } catch (e) {
+      // Revertir: la UI no puede mentir.
+      actualizarBloquesLocal((bs) =>
+        bs.map((b) => {
+          const misma = bloque.tarea_id
+            ? b.tarea_id === bloque.tarea_id
+            : b.plan_tarea_id === id;
+          return misma ? { ...b, hecho: !siguiente } : b;
+        }),
+      );
+      setError((e as Error).message);
+    }
   }
 
   async function generar() {
@@ -368,6 +597,7 @@ export default function PlanDiarioPage() {
       });
 
       // Hidrata los bloques con los IDs reales de BD para poder editarlos.
+      // Una entrada por TAREA del plan (un bloque puede llevar varias).
       const bloquesConId = tareas
         .filter((t) => t.bloque_num !== null)
         .map((t) => {
@@ -375,12 +605,13 @@ export default function PlanDiarioPage() {
             (b) => b.bloque_num === t.bloque_num,
           );
           return {
-            bloque_num: t.bloque_num as 1 | 2 | 3 | 4,
+            bloque_num: t.bloque_num as NumeroBloque,
             tipo: (ia?.tipo ?? "profunda") as "profunda" | "rapida",
             tarea_id: t.tarea_id,
             titulo_libre: t.titulo_libre ?? ia?.titulo_libre ?? "",
             tiempo_min: 60,
             plan_tarea_id: t.id,
+            hecho: t.hecho,
           };
         })
         .sort((a, b) => a.bloque_num - b.bloque_num);
@@ -390,6 +621,7 @@ export default function PlanDiarioPage() {
         tu_dia_optimizado: {
           ...plan.tu_dia_optimizado,
           bloques: bloquesConId,
+          num_bloques_activos: numBloquesActivos(bloquesConId),
         },
         planId,
         fecha,
@@ -417,54 +649,63 @@ export default function PlanDiarioPage() {
     }
   }
 
-  async function renombrarBloque(planTareaId: string, nuevoTitulo: string) {
-    if (!planLocal) return;
-    try {
-      await renombrarTareaPlan(planTareaId, nuevoTitulo);
-      setPlanLocal({
-        ...planLocal,
-        tu_dia_optimizado: {
-          ...planLocal.tu_dia_optimizado,
-          bloques: planLocal.tu_dia_optimizado.bloques.map((b) =>
-            b.plan_tarea_id === planTareaId ? { ...b, titulo_libre: nuevoTitulo } : b,
-          ),
-        },
-      });
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  }
+  /**
+   * Abre el plan YA GENERADO de hoy para editarlo (issue #73).
+   *
+   * El plan del día no se pierde al recargar: la IA lo propose al amanecer
+   * y a lo largo del día hay que poder seguir metiendo tareas, cambiarlas y
+   * marcarlas. `fetchPlanHoy` devuelve la última generación de hoy con sus
+   * tareas; aquí se traduce al mismo estado local que usa la Parte 2.
+   */
+  function abrirPlanDeHoy() {
+    const p = planHoyQ.data;
+    if (!p) return;
+    const bloques: BloqueLocal[] = p.tareas
+      .filter((t) => t.bloque_num !== null && t.bloque_num !== undefined)
+      .map((t) => ({
+        bloque_num: t.bloque_num as NumeroBloque,
+        tipo: t.tipo_tarea ?? "profunda",
+        tarea_id: t.tarea_id,
+        titulo_libre: t.titulo_libre ?? "",
+        tiempo_min: 60,
+        plan_tarea_id: t.id,
+        hecho: t.hecho,
+      }))
+      .sort((a, b) => a.bloque_num - b.bloque_num);
 
-  async function moverBloque(planTareaId: string, nuevoBloqueNum: 1 | 2 | 3 | 4) {
-    if (!planLocal?.planId) return;
-    const bloques = planLocal.tu_dia_optimizado.bloques;
-    const source = bloques.find((b) => b.plan_tarea_id === planTareaId);
-    if (!source) return;
-    const oldBloqueNum = source.bloque_num;
-    if (oldBloqueNum === nuevoBloqueNum) return;
-
-    // Swap local (optimista) para que la UI responda al instante
-    const swapped = bloques.map((b) => {
-      if (b.bloque_num === nuevoBloqueNum && b.plan_tarea_id !== planTareaId) {
-        return { ...b, bloque_num: oldBloqueNum };
-      }
-      if (b.plan_tarea_id === planTareaId) {
-        return { ...b, bloque_num: nuevoBloqueNum };
-      }
-      return b;
-    });
     setPlanLocal({
-      ...planLocal,
-      tu_dia_optimizado: { ...planLocal.tu_dia_optimizado, bloques: swapped },
+      semaforo: (p.semaforo ?? "amarillo") as PlanLocal["semaforo"],
+      resumen: p.resumen ?? "",
+      recomendacion: p.recomendacion ?? "",
+      lectura_psicologica: {
+        lo_del_dia: p.analisis_emocional_ia ?? "",
+        analisis_historico: p.tendencia_ia ?? "",
+      },
+      tu_dia_optimizado: {
+        num_bloques_activos: numBloquesActivos(bloques),
+        bloques,
+      },
+      propuesta_comida: {
+        titulo: p.comida_titulo ?? "",
+        descripcion: p.comida_descripcion ?? "",
+        motivo: p.comida_motivo ?? "",
+      },
+      planId: p.id,
+      fecha: p.fecha,
+      fecha_larga: p.fecha_larga ?? p.fecha,
+      estado: {
+        despertar: p.despertar ?? "",
+        mente: p.mente ?? "",
+        cuerpo: p.cuerpo ?? "",
+        rueda: p.rueda ?? "",
+        necesidad: p.necesidad ?? "",
+      },
+      reflexion: p.reflexion ?? "",
+      notas: p.notas ?? "",
+      guardadoAt: Date.now(),
     });
-
-    try {
-      await moverTareaABloque(planLocal.planId, planTareaId, nuevoBloqueNum);
-    } catch (e) {
-      setError((e as Error).message);
-      // Rollback en caso de error
-      setPlanLocal({ ...planLocal });
-    }
+    // La Parte 1 se oculta cuando hay un plan abierto.
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function empezarDeNuevo() {
@@ -525,6 +766,14 @@ export default function PlanDiarioPage() {
         </div>
       )}
 
+      {/* Errores de la página (generar plan, editar bloques…): viven aquí
+          arriba para que se vean también con el plan abierto (issue #73). */}
+      {error && (
+        <div className="rounded-md border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-600 dark:text-red-400">
+          {error}
+        </div>
+      )}
+
       {/* =========================================================================
           MODO SOMBRA — la propuesta del sistema, sin escribir nada.
           Toggle manual: por defecto está apagado para noDistraer. Cuando
@@ -554,8 +803,10 @@ export default function PlanDiarioPage() {
       )}
 
       {/* =========================================================================
-          PARTE 1 — INPUT
+          PARTE 1 — INPUT (se oculta cuando hay un plan abierto: el plan es
+          lo que hay que ver y editar; "Empezar de nuevo" vuelve aquí)
       ========================================================================= */}
+      {!planLocal && (
       <section className="rounded-xl border border-border bg-card p-6">
         <h2 className="mb-1 text-base font-semibold tracking-tight">
           Parte 1 — Captura
@@ -736,16 +987,19 @@ export default function PlanDiarioPage() {
               </span>
             </span>
             <span className="mb-2 block text-xs text-muted-foreground">
-              Una por línea. Si la tarea ya existe en tu base de datos, no se
+              Escribe una tarea o elige una de las tuyas que aún no está
+              completada. Si el título ya existe en tu base de datos, no se
               duplica: la IA la reutiliza tal cual.
             </span>
           </label>
 
-          <div className="flex gap-2">
+          {/* En el móvil el campo y el botón van en columna: en una fila el
+              input se comía el ancho y el botón quedaba aplastado (issue #73). */}
+          <div className="flex flex-col gap-2 sm:flex-row">
             <input
               id="plan-otras-tareas"
               type="text"
-              className={input}
+              className={`${input} h-11`}
               value={tareaNueva}
               onChange={(e) => setTareaNueva(e.target.value)}
               onKeyDown={(e) => {
@@ -756,15 +1010,39 @@ export default function PlanDiarioPage() {
               }}
               placeholder='Escribe una tarea y pulsa Enter (ej: "Llamar a María")'
             />
-            <button
-              type="button"
-              onClick={anadirTareaLibre}
-              disabled={!tareaNueva.trim()}
-              className="shrink-0 rounded-md border border-border bg-background px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"
-            >
-              Añadir
-            </button>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <button
+                type="button"
+                onClick={() => anadirTareaLibre()}
+                disabled={!tareaNueva.trim()}
+                className="inline-flex min-h-11 w-full shrink-0 items-center justify-center rounded-md border border-border bg-background px-4 text-sm font-medium hover:bg-muted disabled:opacity-50 sm:w-auto"
+              >
+                Añadir
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectorAbierto((v) => !v)}
+                aria-expanded={selectorAbierto}
+                className="inline-flex min-h-11 w-full shrink-0 items-center justify-center rounded-md border border-primary/40 bg-primary/5 px-4 text-sm font-medium text-primary hover:bg-primary/10 sm:w-auto"
+              >
+                {selectorAbierto ? "✕ Ocultar" : "📋 Elegir de mis tareas"}
+              </button>
+            </div>
           </div>
+
+          {selectorAbierto && (
+            <div className="mt-3">
+              <SelectorTareaPlan
+                candidatas={activasQ.data}
+                yaEnElPlan={tareasLibres.map((t) => t.id_bd).filter((x): x is string => !!x)}
+                onElegir={elegirTareaDeBd}
+                onNueva={(titulo) => anadirTareaLibre(titulo)}
+                onCerrar={() => setSelectorAbierto(false)}
+                titulo="Tareas pendientes de tu base de datos"
+                textoNueva="Escribe una tarea nueva"
+              />
+            </div>
+          )}
 
           {errorTarea && (
             <p className="mt-2 text-xs text-red-600 dark:text-red-400">
@@ -825,7 +1103,28 @@ export default function PlanDiarioPage() {
           )}
         </div>
 
-        {/* 1E — Botón Generar Plan */}
+        {/* 1E — Ya hay un plan hoy: se puede abrir para seguir editándolo */}
+        {!planLocal && planHoyQ.data && (
+          <div className="mt-6 flex flex-wrap items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3">
+            <span className="text-sm font-medium">
+              📌 Ya tienes un plan generado hoy
+              <span className="ml-1 text-xs font-normal text-muted-foreground">
+                (generación #{planHoyQ.data.num_generacion}) — puedes abrirlo
+                para añadir tareas, cambiar las que propone la IA o activar
+                más bloques.
+              </span>
+            </span>
+            <button
+              type="button"
+              onClick={abrirPlanDeHoy}
+              className="inline-flex min-h-10 items-center justify-center rounded-md border border-primary/40 bg-background px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10"
+            >
+              Abrir el plan de hoy
+            </button>
+          </div>
+        )}
+
+        {/* 1F — Botón Generar Plan */}
         <div className="mt-6 flex flex-wrap items-center gap-3">
           <button
             onClick={generar}
@@ -841,12 +1140,13 @@ export default function PlanDiarioPage() {
           </span>
         </div>
 
-        {error && (
-          <div className="mt-4 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-600 dark:text-red-400">
-            {error}
-          </div>
+        {errorTarea && (
+          <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+            {errorTarea}
+          </p>
         )}
       </section>
+      )}
 
       {/* =========================================================================
           PARTE 2 — RESULTADO (se muestra tras pulsar "Generar plan")
@@ -858,8 +1158,18 @@ export default function PlanDiarioPage() {
           onNotasChange={(texto) => setPlanLocal({ ...planLocal, notas: texto })}
           onGuardarNotas={guardarNotas}
           onEmpezarDeNuevo={empezarDeNuevo}
-          onRenombrarBloque={renombrarBloque}
-          onMoverBloque={moverBloque}
+          onAnadirExistente={anadirExistenteAlPlan}
+          onAnadirNueva={anadirNuevaAlPlan}
+          onSustituirExistente={sustituirPorExistente}
+          onSustituirNueva={sustituirPorTitulo}
+          onActualizarTarea={actualizarTarea}
+          onQuitarTarea={quitarDelPlan}
+          onMoverTarea={moverTarea}
+          onAlternarHecha={alternarHecha}
+          candidatas={activasQ.data}
+          yaEnElPlan={planLocal.tu_dia_optimizado.bloques
+            .map((b) => b.tarea_id)
+            .filter((x): x is string => !!x)}
         />
       )}
 
@@ -909,8 +1219,16 @@ function PlanGeneradoView({
   onNotasChange,
   onGuardarNotas,
   onEmpezarDeNuevo,
-  onRenombrarBloque,
-  onMoverBloque,
+  onAnadirExistente,
+  onAnadirNueva,
+  onSustituirExistente,
+  onSustituirNueva,
+  onActualizarTarea,
+  onQuitarTarea,
+  onMoverTarea,
+  onAlternarHecha,
+  candidatas,
+  yaEnElPlan,
 }: {
   plan: PlanLocal;
   notasEstado:
@@ -921,8 +1239,19 @@ function PlanGeneradoView({
   onNotasChange: (texto: string) => void;
   onGuardarNotas: () => void;
   onEmpezarDeNuevo: () => void;
-  onRenombrarBloque: (planTareaId: string, nuevoTitulo: string) => void;
-  onMoverBloque: (planTareaId: string, nuevoBloqueNum: 1 | 2 | 3 | 4) => void;
+  onAnadirExistente: (bloqueNum: NumeroBloque, t: TareaCandidata) => void;
+  onAnadirNueva: (bloqueNum: NumeroBloque, titulo: string) => void;
+  onSustituirExistente: (planTareaId: string, t: TareaCandidata) => void;
+  onSustituirNueva: (planTareaId: string, titulo: string) => void;
+  onActualizarTarea: (
+    planTareaId: string,
+    patch: { titulo?: string; tareaId?: string | null; tipoTarea?: "profunda" | "rapida" },
+  ) => void;
+  onQuitarTarea: (planTareaId: string) => void;
+  onMoverTarea: (planTareaId: string, nuevoBloqueNum: NumeroBloque) => void;
+  onAlternarHecha: (bloque: BloqueLocal) => void;
+  candidatas: TareaCandidata[];
+  yaEnElPlan: string[];
 }) {
   const semaforo = plan.semaforo;
 
@@ -955,6 +1284,33 @@ function PlanGeneradoView({
           </button>
         </div>
       </header>
+
+      {/* Aviso de "guardado": el plan vive en la base de datos y se puede
+          recuperar desde el histórico (issue #73). */}
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 text-sm">
+        <span className="font-medium text-emerald-700 dark:text-emerald-300">
+          ✅ Plan guardado
+        </span>
+        <span className="text-xs text-muted-foreground">
+          Está en el histórico de planes: puedes recuperarlo cuando quieras.
+        </span>
+        <div className="ml-auto flex flex-wrap gap-2">
+          {plan.planId && (
+            <Link
+              href={`/plan-diario/detalle?id=${plan.planId}`}
+              className="inline-flex min-h-10 items-center justify-center rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted"
+            >
+              Ver plan completo
+            </Link>
+          )}
+          <Link
+            href="/plan-diario/historico"
+            className="inline-flex min-h-10 items-center justify-center rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted"
+          >
+            📋 Histórico
+          </Link>
+        </div>
+      </div>
 
       {/* ============================================================
           SECCIÓN 1 — Resumen
@@ -1026,28 +1382,30 @@ function PlanGeneradoView({
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {([1, 2, 3, 4] as const).map((n) => {
-              const bloque = plan.tu_dia_optimizado.bloques.find(
-                (b) => b.bloque_num === n,
-              );
-              const activo = bloque !== undefined;
-
-              return (
-                <BloqueBlock
-                  key={n}
-                  num={n}
-                  bloque={bloque}
-                  activo={activo}
-                  onRenombrarBloque={onRenombrarBloque}
-                  onMoverBloque={onMoverBloque}
-                />
-              );
-            })}
+            {agruparPorBloque(plan.tu_dia_optimizado.bloques).map((grupo) => (
+              <BloqueBlock
+                key={grupo.bloque}
+                num={grupo.bloque}
+                tareas={grupo.tareas}
+                candidatas={candidatas}
+                yaEnElPlan={yaEnElPlan}
+                onAnadirExistente={onAnadirExistente}
+                onAnadirNueva={onAnadirNueva}
+                onSustituirExistente={onSustituirExistente}
+                onSustituirNueva={onSustituirNueva}
+                onActualizar={onActualizarTarea}
+                onQuitar={onQuitarTarea}
+                onMover={onMoverTarea}
+                onAlternarHecha={onAlternarHecha}
+              />
+            ))}
           </div>
         </div>
 
         <p className="mt-3 text-[11px] text-muted-foreground">
-          La IA decide el número de bloques activos según tu estado. Los
+          La IA decide cuántos bloques activa según tu estado, pero el plan es
+          tuyo: puedes activar los bloques que te deje desactivados, cambiar la
+          tarea que propone, añadirle más o moverla a otro bloque. Los
           bloques 1-2 son de mañana (antes de comer); los bloques 3-4 de
           tarde.
         </p>
@@ -1188,67 +1546,64 @@ function fechaToLargaLocal(fecha: string): string {
     timeZone: "UTC",
   });
 }
-
 // ============================================================================
-// Bloque individual: muestra datos + permite renombrar y mover a otro bloque.
+// Bloque individual: las tareas del bloque + las acciones para editarlas.
+//
+// Un bloque puede llevar VARIAS tareas (issue #73): las que propuso la IA y
+// las que ha añadido la persona. Cada tarea se puede renombrar, cambiar de
+// tipo, sustituir por otra de la base de datos, mover a otro bloque, marcar
+// como hecha o quitar del plan.
+//
+// Si el bloque está vacío aparece como "desactivado" y se puede ACTIVAR:
+// la IA propone cuántos bloques encajan con tu estado, pero el plan es tuyo.
 // ============================================================================
 
 function BloqueBlock({
   num,
-  bloque,
-  activo,
-  onRenombrarBloque,
-  onMoverBloque,
+  tareas,
+  candidatas,
+  yaEnElPlan,
+  onAnadirExistente,
+  onAnadirNueva,
+  onSustituirExistente,
+  onSustituirNueva,
+  onActualizar,
+  onQuitar,
+  onMover,
+  onAlternarHecha,
 }: {
-  num: 1 | 2 | 3 | 4;
-  bloque: PlanGeneradoSimple["tu_dia_optimizado"]["bloques"][number] | undefined;
-  activo: boolean;
-  onRenombrarBloque: (planTareaId: string, nuevoTitulo: string) => void;
-  onMoverBloque: (planTareaId: string, nuevoBloqueNum: 1 | 2 | 3 | 4) => void;
+  num: NumeroBloque;
+  tareas: BloqueLocal[];
+  candidatas: TareaCandidata[];
+  yaEnElPlan: string[];
+  onAnadirExistente: (bloqueNum: NumeroBloque, t: TareaCandidata) => void;
+  onAnadirNueva: (bloqueNum: NumeroBloque, titulo: string) => void;
+  onSustituirExistente: (planTareaId: string, t: TareaCandidata) => void;
+  onSustituirNueva: (planTareaId: string, titulo: string) => void;
+  onActualizar: (
+    planTareaId: string,
+    patch: { titulo?: string; tareaId?: string | null; tipoTarea?: "profunda" | "rapida" },
+  ) => void;
+  onQuitar: (planTareaId: string) => void;
+  onMover: (planTareaId: string, nuevoBloqueNum: NumeroBloque) => void;
+  onAlternarHecha: (bloque: BloqueLocal) => void;
 }) {
-  const [editando, setEditando] = useState(false);
-  // Inicialización perezosa: solo se evalúa en mount; updates se gestionan con key+remount.
-  const [borrador, setBorrador] = useState(() => bloque?.titulo_libre ?? "");
+  const [panelAbierto, setPanelAbierto] = useState(false);
+  /** Id de la tarea que se está sustituyendo (null = se está añadiendo). */
+  const [sustituyendoId, setSustituyendoId] = useState<string | null>(null);
 
-  if (!activo || !bloque) {
-    return (
-      <div className="rounded-lg border border-dashed border-border bg-muted/30 p-4 opacity-60">
-        <div className="mb-2 flex items-center justify-between">
-          <span className="text-xs font-semibold uppercase tracking-wide">
-            {BLOQUE_LABELS[num]}
-          </span>
-          <span className="rounded-full bg-background px-2 py-0.5 text-[10px] text-muted-foreground">
-            {BLOQUE_HORARIO[num]}
-          </span>
-        </div>
-        <div className="flex h-[60px] items-center justify-center text-xs italic text-muted-foreground">
-          bloque desactivado
-        </div>
-      </div>
-    );
+  function abrirPanel(sustituyendo: string | null) {
+    setSustituyendoId(sustituyendo);
+    setPanelAbierto(true);
   }
 
-  const editable = !!bloque.plan_tarea_id;
-
-  function commitRename() {
-    if (!bloque?.plan_tarea_id) return;
-    const limpio = borrador.trim();
-    if (limpio && limpio !== bloque.titulo_libre) {
-      onRenombrarBloque(bloque.plan_tarea_id, limpio);
-    } else {
-      setBorrador(bloque.titulo_libre);
-    }
-    setEditando(false);
+  function cerrarPanel() {
+    setPanelAbierto(false);
+    setSustituyendoId(null);
   }
 
   return (
-    <div
-      className={`relative rounded-lg border p-4 ${
-        editable
-          ? "border-primary/30 bg-primary/5"
-          : "border-primary/30 bg-primary/5"
-      }`}
-    >
+    <div className="relative rounded-lg border border-primary/30 bg-primary/5 p-4">
       <div className="mb-2 flex items-center justify-between gap-2">
         <span className="text-xs font-semibold uppercase tracking-wide">
           {BLOQUE_LABELS[num]}
@@ -1257,72 +1612,225 @@ function BloqueBlock({
           <span className="rounded-full bg-background px-2 py-0.5 text-[10px] text-muted-foreground">
             {BLOQUE_HORARIO[num]}
           </span>
-          <select
-            aria-label={`Mover bloque ${num} a`}
-            className="h-7 rounded-md border border-border bg-background px-2 text-[11px] outline-none hover:bg-muted"
-            value={num}
-            onChange={(e) => {
-              const nuevo = Number(e.target.value) as 1 | 2 | 3 | 4;
-              if (bloque.plan_tarea_id) onMoverBloque(bloque.plan_tarea_id, nuevo);
-            }}
-          >
-            {[1, 2, 3, 4].map((b) => (
-              <option key={b} value={b}>
-                ↔ Mover a bloque {b}
-              </option>
-            ))}
-          </select>
+          {tareas.length > 1 && (
+            <span className="rounded-full bg-background px-2 py-0.5 text-[10px] text-muted-foreground">
+              {tareas.length} tareas
+            </span>
+          )}
         </div>
       </div>
 
-      <div className="mb-1 flex flex-wrap items-center gap-2">
-        <span
-          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-            bloque.tipo === "profunda"
-              ? "border border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-300"
-              : "border border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300"
-          }`}
-        >
-          {bloque.tipo}
-        </span>
-        <span className="text-[10px] text-muted-foreground">60 min</span>
-      </div>
-
-      {editable ? (
-        editando ? (
-          <input
-            value={borrador}
-            onChange={(e) => setBorrador(e.target.value)}
-            onBlur={commitRename}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                commitRename();
-              } else if (e.key === "Escape") {
-                setBorrador(bloque.titulo_libre);
-                setEditando(false);
-              }
-            }}
-            className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1 text-sm font-medium outline-none focus:ring-2 focus:ring-ring"
-          />
-        ) : (
+      {tareas.length === 0 ? (
+        <div className="rounded-md border border-dashed border-border bg-background/60 px-3 py-4 text-center">
+          <p className="text-xs italic text-muted-foreground">
+            bloque desactivado — la IA lo dejó fuera según tu estado
+          </p>
           <button
             type="button"
-            onClick={() => setEditando(true)}
-            className="mt-1 w-full rounded-md px-2 py-1 text-left text-sm font-medium leading-snug hover:bg-background"
-            title="Click para renombrar"
+            onClick={() => abrirPanel(null)}
+            className="mt-2 inline-flex min-h-10 w-full items-center justify-center rounded-md border border-primary/40 bg-background px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10"
           >
-            {bloque.titulo_libre}
+            ➕ Activar este bloque
           </button>
-        )
+        </div>
       ) : (
-        <p className="mt-1 text-sm font-medium leading-snug">{bloque.titulo_libre}</p>
+        <>
+          <ul className="space-y-2">
+            {tareas.map((t) => (
+              <TareaEnBloque
+                key={t.plan_tarea_id ?? `${num}-${t.titulo_libre}`}
+                tarea={t}
+                onActualizar={onActualizar}
+                onQuitar={onQuitar}
+                onMover={onMover}
+                onAlternarHecha={onAlternarHecha}
+                onSustituir={() => abrirPanel(t.plan_tarea_id ?? null)}
+              />
+            ))}
+          </ul>
+          <button
+            type="button"
+            onClick={() => abrirPanel(null)}
+            className="mt-2 inline-flex min-h-10 w-full items-center justify-center rounded-md border border-dashed border-primary/40 bg-background px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10"
+          >
+            ➕ Añadir una tarea a este bloque
+          </button>
+        </>
       )}
 
-      <p className="mt-1 text-[11px] text-muted-foreground">
-        {bloque.tarea_id ? "📌 vinculada a tarea en BD" : "✨ tarea propuesta por la IA"}
-        {editable && !editando && " · click para editar"}
-      </p>
+      {panelAbierto && (
+        <div className="mt-2">
+          <SelectorTareaPlan
+            candidatas={candidatas}
+            yaEnElPlan={yaEnElPlan}
+            onElegir={(t) => {
+              if (sustituyendoId) onSustituirExistente(sustituyendoId, t);
+              else onAnadirExistente(num, t);
+              cerrarPanel();
+            }}
+            onNueva={(titulo) => {
+              if (sustituyendoId) onSustituirNueva(sustituyendoId, titulo);
+              else onAnadirNueva(num, titulo);
+              cerrarPanel();
+            }}
+            onCerrar={cerrarPanel}
+            titulo={
+              sustituyendoId
+                ? "Sustituir por otra tarea"
+                : `Añadir una tarea a ${BLOQUE_LABELS[num]}`
+            }
+          />
+        </div>
+      )}
     </div>
+  );
+}
+
+// ============================================================================
+// Una tarea dentro de un bloque: casilla, título editable y acciones.
+// ============================================================================
+
+function TareaEnBloque({
+  tarea,
+  onActualizar,
+  onQuitar,
+  onMover,
+  onAlternarHecha,
+  onSustituir,
+}: {
+  tarea: BloqueLocal;
+  onActualizar: (
+    planTareaId: string,
+    patch: { titulo?: string; tareaId?: string | null; tipoTarea?: "profunda" | "rapida" },
+  ) => void;
+  onQuitar: (planTareaId: string) => void;
+  onMover: (planTareaId: string, nuevoBloqueNum: NumeroBloque) => void;
+  onAlternarHecha: (bloque: BloqueLocal) => void;
+  onSustituir: () => void;
+}) {
+  const [editando, setEditando] = useState(false);
+  const [borrador, setBorrador] = useState(tarea.titulo_libre);
+  const id = tarea.plan_tarea_id;
+
+  function commitRename() {
+    if (!id) return;
+    const limpio = borrador.trim();
+    if (limpio && limpio !== tarea.titulo_libre) {
+      onActualizar(id, { titulo: limpio });
+    } else {
+      setBorrador(tarea.titulo_libre);
+    }
+    setEditando(false);
+  }
+
+  return (
+    <li className="rounded-md border border-border bg-background p-2">
+      <div className="flex items-start gap-2">
+        <input
+          type="checkbox"
+          checked={!!tarea.hecho}
+          onChange={() => onAlternarHecha(tarea)}
+          aria-label={`Marcar "${tarea.titulo_libre}" como hecha`}
+          className="mt-1 h-5 w-5 shrink-0 cursor-pointer accent-emerald-600"
+        />
+        <div className="min-w-0 flex-1">
+          {editando ? (
+            <input
+              value={borrador}
+              onChange={(e) => setBorrador(e.target.value)}
+              onBlur={commitRename}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  commitRename();
+                } else if (e.key === "Escape") {
+                  setBorrador(tarea.titulo_libre);
+                  setEditando(false);
+                }
+              }}
+              aria-label="Nuevo nombre de la tarea"
+              className="w-full rounded-md border border-input bg-background px-2 py-2 text-sm font-medium outline-none focus:ring-2 focus:ring-ring"
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setEditando(true)}
+              title="Toca para renombrar"
+              className={`w-full break-words rounded-md px-2 py-2 text-left text-sm font-medium leading-snug hover:bg-muted ${
+                tarea.hecho ? "text-muted-foreground line-through" : ""
+              }`}
+            >
+              {tarea.titulo_libre}
+            </button>
+          )}
+
+          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
+            <button
+              type="button"
+              disabled={!id}
+              onClick={() =>
+                id && onActualizar(id, { tipoTarea: tarea.tipo === "profunda" ? "rapida" : "profunda" })
+              }
+              title="Cambiar el tipo de bloque (profunda = el bloque entero · rápida = micro-tarea)"
+              className={`rounded-full px-2 py-0.5 font-semibold uppercase tracking-wide disabled:opacity-50 ${
+                tarea.tipo === "profunda"
+                  ? "border border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-300"
+                  : "border border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300"
+              }`}
+            >
+              {tarea.tipo}
+            </button>
+            <span>{tarea.tarea_id ? "📌 vinculada a tarea en BD" : "✨ propuesta por la IA"}</span>
+          </div>
+
+          {/* Acciones: 40 px de alto para que se pulsen con el dedo. */}
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              disabled={!id}
+              onClick={() => setEditando(true)}
+              title="Renombrar"
+              className="inline-flex min-h-10 items-center justify-center rounded-md border border-border bg-background px-2 text-xs hover:bg-muted disabled:opacity-50"
+            >
+              ✎
+            </button>
+            <button
+              type="button"
+              disabled={!id}
+              onClick={onSustituir}
+              title="Sustituir por otra tarea"
+              className="inline-flex min-h-10 items-center justify-center rounded-md border border-border bg-background px-2 text-xs hover:bg-muted disabled:opacity-50"
+            >
+              ⇄
+            </button>
+            <select
+              aria-label="Mover la tarea a otro bloque"
+              disabled={!id}
+              value={tarea.bloque_num}
+              onChange={(e) => {
+                const nuevo = Number(e.target.value) as NumeroBloque;
+                if (id && nuevo !== tarea.bloque_num) onMover(id, nuevo);
+              }}
+              className="h-10 rounded-md border border-border bg-background px-2 text-[11px] outline-none hover:bg-muted disabled:opacity-50"
+            >
+              {([1, 2, 3, 4] as const).map((b) => (
+                <option key={b} value={b}>
+                  ↔ Bloque {b}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              disabled={!id}
+              onClick={() => id && onQuitar(id)}
+              title="Quitar del plan (la tarea de la base de datos no se borra)"
+              className="inline-flex min-h-10 items-center justify-center rounded-md border border-red-500/30 bg-background px-2 text-xs text-red-600 hover:bg-red-500/10 disabled:opacity-50 dark:text-red-400"
+            >
+              🗑
+            </button>
+          </div>
+        </div>
+      </div>
+    </li>
   );
 }

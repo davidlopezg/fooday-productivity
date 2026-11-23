@@ -39,7 +39,7 @@ export default function PlanDiarioHistoricoPage() {
     return { desde: localYMD(d), limit: 500 };
   }, [rango]);
 
-  const planesQ = useData<PlanConConteo[]>(() => fetchPlanes(filtros), []);
+  const planesQ = useData<PlanConConteo[]>(() => fetchPlanes(filtros), [], [rango]);
 
   return (
     <div className="space-y-6">

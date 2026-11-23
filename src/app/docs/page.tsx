@@ -1512,6 +1512,70 @@ export default function DocsPage() {
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
           <li className="flex gap-3 rounded-lg border border-violet-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-violet-700 dark:text-violet-300 sm:text-sm">
+              2026-11-23
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
+                El plan diario deja de ser de solo lectura.
+              </strong>{" "}
+              Issue #73: el plan del día se generaba y a partir de ahí no se
+              podía tocar. La IA decidía cuántos bloques activaba según tu
+              estado (🔴 → 1, 🟡 → 2-3, 🟢 → 3-4) y los bloques que dejaba
+              fuera no tenían ninguna forma de activarse; la tarea que
+              proponía solo se podía renombrar; y durante el día no había
+              dónde meter una tarea nueva o una que ya tenías a medio hacer.{" "}
+              <strong className="text-foreground">Ahora el plan es tuyo:</strong>{" "}
+              (1) se pueden{" "}
+              <strong className="text-foreground">añadir tareas</strong> a
+              cualquier bloque —una nueva (se crea en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">tareas</code>{" "}
+              si ese título no existía) o{" "}
+              <strong className="text-foreground">
+                una de tus tareas pendientes
+              </strong>{" "}
+              con buscador—; (2) se pueden{" "}
+              <strong className="text-foreground">activar los bloques</strong>{" "}
+              desactivados; (3) la tarea propuesta se puede{" "}
+              <strong className="text-foreground">
+                renombrar, cambiar de tipo (profunda/rápida), sustituir por
+                otra, mover de bloque, marcar como hecha o quitar del plan
+              </strong>{" "}
+              (quitar la del plan NO borra la tarea de tu base de datos); (4)
+              un bloque puede llevar{" "}
+              <strong className="text-foreground">varias tareas</strong>, y no
+              hace falta regenerar el plan: si ya hay uno de hoy, la pantalla
+              lo abre para seguir con él. Además el plan generado{" "}
+              <strong className="text-foreground">avisa de que está guardado</strong>{" "}
+              y enlaza a su ficha y al histórico, y el{" "}
+              <strong className="text-foreground">quick-add va en columna</strong>{" "}
+              en el móvil (antes el campo se comía el ancho y el botón
+              quedaba aplastado). Y el{" "}
+              <strong className="text-foreground">histórico</strong>{" "}
+              arreglado: el selector de rango (7/30/90/365/todo){" "}
+              <strong className="text-foreground">no recargaba</strong> —pulsarlo
+              no cambiaba los datos— y la lectura psicológica y la reflexión
+              salían siempre vacías porque no se pedían esas columnas. Además
+              el guardado es ahora atómico: si fallan las filas del plan no
+              queda una cabecera a medias en el histórico, y la generación
+              reintenta si el número de generación está ocupado. Sin
+              migración (la tabla ya admitía varias filas por bloque). FEATURES
+              actualizadas (filas{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/plan-diario</code>
+              ,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                /plan-diario/detalle
+              </code>{" "}
+              y{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                /plan-diario/historico
+              </code>
+              ), la nota del ritual diario y el HelpDrawer de{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/plan-diario</code>
+              .
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-violet-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-violet-700 dark:text-violet-300 sm:text-sm">
               2026-11-20
             </span>
             <span className="text-muted-foreground">
