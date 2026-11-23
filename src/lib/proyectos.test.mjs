@@ -11,6 +11,7 @@ import {
   tareasPorProyectoEfectivo,
   filtrarMetasPorProyecto,
   metaPerteneceAProyecto,
+  metaSigueTrasCambiarProyecto,
   proyectoDeMeta,
 } from "./proyectos.ts";
 
@@ -173,6 +174,24 @@ test("las metas huérfanas no salen cuando hay proyecto elegido", () => {
 
 test("proyecto sin metas devuelve lista vacía", () => {
   eq(filtrarMetasPorProyecto(metas, "projX"), []);
+});
+
+console.log("\nmetaSigueTrasCambiarProyecto");
+
+test("con proyecto nuevo, solo sobrevive la meta de ese proyecto", () => {
+  eq(metaSigueTrasCambiarProyecto({ proyecto_id: "projA" }, "projA"), true);
+  eq(metaSigueTrasCambiarProyecto({ proyecto_id: "projB" }, "projA"), false);
+});
+
+test("la meta huérfana no sobrevive a un proyecto nuevo", () => {
+  eq(metaSigueTrasCambiarProyecto({ proyecto_id: null }, "projA"), false);
+  eq(metaSigueTrasCambiarProyecto({}, "projA"), false);
+});
+
+test("sin proyecto, solo sobrevive la meta que tampoco tiene proyecto", () => {
+  eq(metaSigueTrasCambiarProyecto({ proyecto_id: null }, null), true);
+  eq(metaSigueTrasCambiarProyecto({}, null), true);
+  eq(metaSigueTrasCambiarProyecto({ proyecto_id: "projA" }, null), false);
 });
 
 // ----------------------------------------------------------------------------

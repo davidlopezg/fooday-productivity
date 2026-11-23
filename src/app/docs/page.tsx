@@ -1516,8 +1516,8 @@ export default function DocsPage() {
             </span>
             <span className="text-muted-foreground">
               <strong className="text-foreground">
-                Crear una tarea: primero qué es, después dónde encaja — y la
-                IA solo cuando la pides.
+                Crear y editar una tarea: los dos formularios igual — primero
+                qué es, después dónde encaja — y la IA solo cuando la pides.
               </strong>{" "}
               Issue #75: el modal{" "}
               <strong className="text-foreground">“Nueva tarea”</strong>{" "}
@@ -1551,9 +1551,18 @@ export default function DocsPage() {
               <strong className="text-foreground">
                 se puede crear una tarea entera sin IA
               </strong>
-              . Sin migración y sin tocar la base de datos: el cambio es de
-              orden, de filtrado y de cuándo se llama al modelo. FEATURES
-              actualizada (fila{" "}
+              . Y como los dos formularios hacen lo mismo,{" "}
+              <strong className="text-foreground">
+                editar una tarea que ya está en la tabla se ve igual que
+                crearla
+              </strong>
+              : el modal{" "}
+              <strong className="text-foreground">“Editar tarea”</strong>{" "}
+              tenía el orden viejo y el proyecto bloqueado (readonly) cuando
+              había meta; ahora el proyecto es el ancla, editable, y filtra
+              las metas igual que en el alta. Sin migración y sin tocar la
+              base de datos: el cambio es de orden, de filtrado y de cuándo se
+              llama al modelo. FEATURES actualizada (fila{" "}
               <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/tareas</code>
               ), la sección “Aplicación en la app” de los pilares 2 y 4, el
               HelpDrawer de{" "}
@@ -4407,7 +4416,7 @@ function AplicacionEnApp({ pilar }: { pilar: 1 | 2 | 3 | 4 | 5 }) {
       "Escenarios de proyecto (/escenarios): cronología + estado medido + lectura de la situación, y los escenarios con su estrategia generados bajo demanda (migration 0029)",
       "Panel “🎯 3 KRs de la semana” en /semana (migration 0033): la capa intermedia entre la meta y la tarea. ✨ Sugerir 3 KRs por IA elige por riesgo real (los que van por debajo del ritmo y tienen menos días restantes). Solo entran KRs con entrega en marcha (regla de contención en BD). El trimestre sigue mandando en la entrega; la semana manda en el esfuerzo",
       "El panel de WIGs de /metas muestra solo las 3 metas WIG, sin los KRs debajo (issue #47): se quedaba enorme sin aportar nada y los KRs ya se consultan al abrir la meta. En /tareas el panel sí conserva sus KRs, porque es donde se ejecuta y hay que ver el KR que estás moviendo",
-      "Al crear una tarea, las metas que se ofrecen están FILTRADAS por el proyecto elegido (issue #75): primero eliges el proyecto y luego solo ves sus metas (si no hay proyecto, se ven todas). La tarea hereda el proyecto de su meta: proyecto → meta → KR → tarea",
+      "Al crear o EDITAR una tarea, las metas que se ofrecen están FILTRADAS por el proyecto elegido (issue #75): primero eliges el proyecto y luego solo ves sus metas (si no hay proyecto, se ven todas). El proyecto es el ancla y sigue editable: si la meta elegida deja de encajar, se limpian la meta y su KR. La tarea hereda el proyecto de su meta: proyecto → meta → KR → tarea",
     ],
     3: [
       "Time-blocking con 4 bloques fijos por día (/calendario)",
@@ -4421,7 +4430,7 @@ function AplicacionEnApp({ pilar }: { pilar: 1 | 2 | 3 | 4 | 5 }) {
       "Micro-acción priorizada para mañana basada en patrón semanal",
       "Banner mental arriba de /tareas/pendientes-respuesta: «no te preocupes de lo que está pendiente de los demás» (reframe estoico/Covey, sin lógica)",
       "Matriz Eisenhower 2D en /m (/matriz) con drag & drop entre cuadrantes y botón IA «Sugerir redistribución» — clasificación urgencia × importancia calculada en JS desde fecha_fin + meta.es_wig, sin migración",
-      "Alta de tarea sin sorpresas (modal «Nueva tarea», issue #75): el formulario va de lo que DEFINE la tarea (título → descripción → 🎯 criterio de terminación) a lo que la ENCAJA (prioridad/estado/capa → ámbito y tags → proyecto y recurrencia → meta y KR → subtareas → adjuntos). La IA NUNCA actúa sola: el desglose y el criterio de terminación solo se generan si pulsas su botón, así que se puede crear una tarea entera sin IA",
+      "Alta de tarea sin sorpresas (modales «Nueva tarea» y «Editar tarea», issue #75): los DOS formularios van igual, de lo que DEFINE la tarea (título → descripción → 🎯 criterio de terminación) a lo que la ENCAJA (prioridad/estado/capa → ámbito y tags → proyecto y recurrencia → meta y KR → subtareas → adjuntos). Abrir una tarea que ya está en la tabla se ve igual que crear una nueva. La IA NUNCA actúa sola: el desglose y el criterio de terminación solo se generan si pulsas su botón, así que se puede crear una tarea entera sin IA",
     ],
     5: [
       "Límite de 4 bloques/día en el calendario (señal visual)",

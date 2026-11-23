@@ -263,9 +263,9 @@ export const AYUDA_POR_RUTA: Record<
         pilar: 2,
       },
       {
-        titulo: "Crear una tarea: la IA solo si la llamas",
+        titulo: "Crear o editar una tarea: la IA solo si la llamas",
         cuerpo:
-          "En el modal ‘Nueva tarea’ el orden va de lo que define la tarea (título, descripción, criterio de terminación) a lo que la encaja (prioridad, ámbito, proyecto, meta/KR, subtareas, adjuntos). Las metas se filtran por el proyecto que elijas; si no eliges ninguno, se ven todas. Y la IA no se cuela: al guardar NO se desglosa ni se escribe el criterio de terminación por su cuenta. Esos botones (‘Desgranar con IA’, ‘Generar con IA’) están siempre a la vista y solo hacen algo si los pulsas.",
+          "En los modales ‘Nueva tarea’ y ‘Editar tarea’ el orden es el mismo: de lo que define la tarea (título, descripción, criterio de terminación) a lo que la encaja (prioridad, ámbito, proyecto, meta/KR, subtareas, adjuntos). El proyecto es el ancla: filtra las metas que te ofrecen (si no eliges ninguno, se ven todas) y si la meta elegida deja de encajar se limpia con su KR. Y la IA no se cuela: al guardar NO se desglosa ni se escribe el criterio de terminación por su cuenta. Esos botones (‘Desgranar con IA’, ‘Generar con IA’) están siempre a la vista y solo hacen algo si los pulsas.",
         pilar: 2,
       },
     ],
