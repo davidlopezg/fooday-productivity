@@ -67,7 +67,14 @@ const THEME_SCRIPT = `
 `.trim();
 
 export const metadata: Metadata = {
-  title: "fooday·productivity",
+  // Cada ruta define su propio título (layout.tsx de esa carpeta) y aquí se
+  // le añade el sufijo de la marca. `default` es el título de la home ("/"),
+  // que no tiene layout propio. Así las pestañas, el historial y los
+  // marcadores dicen en qué pantalla estás (#27).
+  title: {
+    default: "Hoy · fooday",
+    template: "%s · fooday",
+  },
   description: "Sistema operativo personal: propósito, metas, tareas y planificación",
   manifest: `${basePath}/manifest.webmanifest`,
   icons: {
