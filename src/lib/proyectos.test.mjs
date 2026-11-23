@@ -9,6 +9,9 @@ import {
   proyectoEfectivoDeTarea,
   tareasDeProyecto,
   tareasPorProyectoEfectivo,
+  filtrarMetasPorProyecto,
+  metaPerteneceAProyecto,
+  proyectoDeMeta,
 } from "./proyectos.ts";
 
 let pass = 0;
@@ -112,6 +115,64 @@ test("tareas sueltas sin proyecto no entran en ningún grupo", () => {
   const map = tareasPorProyectoEfectivo(tareas, metaPorId);
   const total = Array.from(map.values()).flat().length;
   eq(total, 4); // t5 se queda fuera
+});
+
+console.log("\nproyectoDeMeta");
+
+test("la meta con proyecto lo devuelve", () => {
+  eq(proyectoDeMeta({ proyecto_id: "projA" }), "projA");
+});
+
+test("la meta huérfana devuelve null", () => {
+  eq(proyectoDeMeta({ proyecto_id: null }), null);
+});
+
+test("una meta sin la columna devuelve null", () => {
+  eq(proyectoDeMeta({}), null);
+});
+
+console.log("\nmetaPerteneceAProyecto");
+
+test("sin proyecto elegido vale cualquier meta", () => {
+  eq(metaPerteneceAProyecto({ proyecto_id: "projA" }, null), true);
+  eq(metaPerteneceAProyecto({ proyecto_id: null }, null), true);
+  eq(metaPerteneceAProyecto({ proyecto_id: "projA" }, undefined), true);
+});
+
+test("con proyecto elegido solo vale la meta de ese proyecto", () => {
+  eq(metaPerteneceAProyecto({ proyecto_id: "projA" }, "projA"), true);
+  eq(metaPerteneceAProyecto({ proyecto_id: "projB" }, "projA"), false);
+});
+
+test("la meta huérfana NO vale cuando hay proyecto elegido", () => {
+  eq(metaPerteneceAProyecto({ proyecto_id: null }, "projA"), false);
+  eq(metaPerteneceAProyecto({}, "projA"), false);
+});
+
+console.log("\nfiltrarMetasPorProyecto");
+
+const metas = [
+  { id: "m1", proyecto_id: "projA" },
+  { id: "m2", proyecto_id: "projB" },
+  { id: "m3", proyecto_id: null },
+];
+
+test("sin proyecto elegido devuelve todas las metas", () => {
+  eq(filtrarMetasPorProyecto(metas, null).map((m) => m.id), ["m1", "m2", "m3"]);
+  eq(filtrarMetasPorProyecto(metas, undefined).map((m) => m.id), ["m1", "m2", "m3"]);
+});
+
+test("con proyecto elegido devuelve solo sus metas", () => {
+  eq(filtrarMetasPorProyecto(metas, "projA").map((m) => m.id), ["m1"]);
+  eq(filtrarMetasPorProyecto(metas, "projB").map((m) => m.id), ["m2"]);
+});
+
+test("las metas huérfanas no salen cuando hay proyecto elegido", () => {
+  eq(filtrarMetasPorProyecto(metas, "projA").includes(metas[2]), false);
+});
+
+test("proyecto sin metas devuelve lista vacía", () => {
+  eq(filtrarMetasPorProyecto(metas, "projX"), []);
 });
 
 // ----------------------------------------------------------------------------
