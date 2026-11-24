@@ -29,6 +29,7 @@ const TESTS = [
   "src/lib/configStore.test.mjs",
   "src/lib/perfilIA.test.mjs",
   "src/lib/schema-queries.test.mjs",
+  "src/lib/wig.test.mjs",
   "src/lib/krsLectura.test.mjs",
   "src/lib/recuperacion/feedback.test.mjs",
   "src/lib/escenarios/hipotesis.test.mjs",
