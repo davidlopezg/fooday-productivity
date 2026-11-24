@@ -1510,6 +1510,58 @@ export default function DocsPage() {
         </header>
 
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-11-24
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
+                El contador del plan del día ya no puede quedar descuadrado.
+              </strong>{" "}
+              Issue #23: al cerrar una tarea se escribían{" "}
+              <strong className="text-foreground">dos filas</strong> —el
+              estado de la tarea ({""}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">tareas.estado</code>
+              ) y su casilla en el plan ({" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                plan_diario_tareas.hecho
+              </code>
+              )— en dos operaciones sueltas, sin transacción. Si la segunda
+              fallaba (un corte de red justo después de la primera), la tarea
+              quedaba tachada pero el contador del día seguía marcando la
+              tarea como pendiente, y el histórico del plan mostraba un
+              progreso que no correspondía con lo hecho (el mismo síntoma que
+              se corrigió en el issue #6, pero por la vía del fallo de red).
+              Ahora la nueva RPC{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                marcar_tarea_y_plan
+              </code>{" "}
+              (migration{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                0042_progreso_plan_atomico.sql
+              </code>
+              ) hace las dos escrituras{" "}
+              <strong className="text-foreground">
+                en la misma transacción de Postgres
+              </strong>
+              : o van las dos, o no va ninguna. Y como red de seguridad,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                reconciliar_plan_diario
+              </code>{" "}
+              alinea el plan con el estado real de las tareas cada vez que se
+              lee (hoy, el detalle del plan y el histórico), por si algún
+              dato antiguo quedó a medias. FEATURES actualizadas (filas{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                /plan-diario/detalle
+              </code>{" "}
+              y{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                /plan-diario/historico
+              </code>
+              ) y la nota del ritual diario. Sin cambios de modelo ni de
+              metodología: es un bug de consistencia, no una regla nueva.
+            </span>
+          </li>
           <li className="flex gap-3 rounded-lg border border-violet-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-violet-700 dark:text-violet-300 sm:text-sm">
               2026-11-23

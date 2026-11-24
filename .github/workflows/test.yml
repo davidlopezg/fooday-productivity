@@ -9,6 +9,22 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # Postgres para el test del progreso del plan (issue #23): comprueba que
+    # la tarea y su reflejo en el plan se escriben en la MISMA transacción.
+    # Sin este servicio el test se salta solo (no falla).
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -21,8 +37,15 @@ jobs:
           cache: npm
       - run: npm ci
 
+      # `psql` para el test del progreso del plan (viene en las imágenes de
+      # GitHub, pero se instala por si acaso).
+      - name: Cliente de Postgres
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+
       - name: Tests
         run: npm test
+        env:
+          PGURL: postgres://postgres:postgres@localhost:5432/postgres
 
       - name: Typecheck
         run: npm run typecheck

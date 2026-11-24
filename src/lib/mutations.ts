@@ -41,16 +41,10 @@ function parseDate(ymd: string): Date {
 }
 
 export async function marcarHecha(id: string) {
-  const { error } = await createClient()
-    .from("tareas")
-    .update({ estado: "hecha", completada_at: new Date().toISOString() })
-    .eq("id", id);
-
-  if (error) throw new Error(`No se pudo marcar la tarea como hecha: ${error.message}`);
-
-  // El plan del día guarda su propio contador: si esta tarea estaba en el plan
-  // de hoy, la fila del plan también pasa a hecha (issue #6).
-  await sincronizarProgresoPlan(id, true);
+  // issue #23: la tarea y su reflejo en el plan del día se escriben en la
+  // MISMA transacción (RPC `marcar_tarea_y_plan`). Si la red se cae entre
+  // ambas escrituras, no queda la tarea hecha con el plan pendiente.
+  await marcarTareaYPlan(id, true);
 
   // ponytail: la recurrencia es un side-effect de "hecha". Si la IA está
   // apagada o la RPC falla, NO se rompe el marcar-hecha principal: el error
@@ -78,14 +72,9 @@ export async function marcarHecha(id: string) {
 }
 
 export async function reabrirTarea(id: string) {
-  const { error } = await createClient()
-    .from("tareas")
-    .update({ estado: "pendiente", completada_at: null })
-    .eq("id", id);
-  if (error) throw new Error(`No se pudo reabrir la tarea: ${error.message}`);
-  // Mismo sincronizado que marcarHecha: reabrir devuelve el contador del plan
-  // a 0 (issue #6).
-  await sincronizarProgresoPlan(id, false);
+  // issue #23: reabrir también va en una sola transacción con el plan del día
+  // (el contador vuelve a 0 sin dejar la tarea a medias, issue #6).
+  await marcarTareaYPlan(id, false);
   // Reabrir una tarea deshace el cierre de su meta (issue #35).
   await sincronizarMetaDeTarea(id).catch((e) =>
     console.warn("[reabrirTarea] no se pudo sincronizar la meta:", e),
@@ -905,6 +894,72 @@ export async function sincronizarProgresoPlan(
   if (error) {
     console.warn("[sincronizarProgresoPlan] no se pudo sincronizar el plan:", error.message);
   }
+}
+
+/** Aplica el estado (hecha/pendiente) a una tarea Y a su reflejo en el
+ *  plan del día, en una sola transacción de Postgres (issue #23).
+ *
+ *  La RPC `marcar_tarea_y_plan` (migration 0042) actualiza `tareas.estado`
+ *  y `plan_diario_tareas.hecho` juntas: o van las dos, o no va ninguna. Antes
+ *  eran dos escrituras sueltas y, si la segunda fallaba (red caída), la
+ *  tarea quedaba hecha con el contador del día descuadrado.
+ *
+ *  Aquí solo se añade la RED: si la llamada falla, se reintenta (la RPC es
+ *  idempotente, repetirla no cambia nada). Si la RPC no existe (migración sin
+ *  aplicar) se cae directamente al camino viejo de dos escrituras; y si
+ *  tampoco funciona, el reconciliador del plan (`reconciliar_plan_diario`)
+ *  lo arregla al leer el plan.
+ */
+const REINTENTOS_PROGRESO = 3;
+
+/** Error de PostgREST cuando la RPC no existe en la base de datos. */
+const RPC_NO_EXISTE = /PGRST202|42883|does not exist/i;
+
+/** La RPC se niega a tocar tareas que no son tuyas (o que no existen):
+ *  reintentar no va a cambiar nada. */
+const TAREA_INEXISTENTE = /no encontrada|no es tuya/i;
+
+export async function marcarTareaYPlan(
+  tareaId: string,
+  hecho: boolean,
+): Promise<void> {
+  for (let intento = 1; intento <= REINTENTOS_PROGRESO; intento++) {
+    const { error } = await createClient().rpc("marcar_tarea_y_plan", {
+      p_tarea_id: tareaId,
+      p_hecho: hecho,
+    });
+    if (!error) return;
+    console.warn(
+      `[marcarTareaYPlan] intento ${intento}/${REINTENTOS_PROGRESO} falló:`,
+      error.message,
+    );
+    // Si la RPC no existe (migración sin aplicar), reintentar no sirve.
+    if (RPC_NO_EXISTE.test(error.message)) break;
+    // Si la tarea no es tuya (o no existe), tampoco.
+    if (TAREA_INEXISTENTE.test(error.message)) break;
+    if (intento < REINTENTOS_PROGRESO) {
+      await new Promise((r) => setTimeout(r, 500 * intento));
+    }
+  }
+
+  // Último recurso: el camino viejo (dos escrituras sueltas). El reconciliador
+  // del plan deja el contador coherente aunque esta segunda falle.
+  console.warn(
+    "[marcarTareaYPlan] la RPC atómica no respondió; se aplica el camino de dos escrituras",
+  );
+  const { error: errorTarea } = await createClient()
+    .from("tareas")
+    .update({
+      estado: hecho ? "hecha" : "pendiente",
+      completada_at: hecho ? new Date().toISOString() : null,
+    })
+    .eq("id", tareaId);
+  if (errorTarea) {
+    throw new Error(
+      `No se pudo ${hecho ? "marcar la tarea como hecha" : "reabrir la tarea"}: ${errorTarea.message}`,
+    );
+  }
+  await sincronizarProgresoPlan(tareaId, hecho);
 }
 
 /** Sincroniza la meta de una tarea con el estado de todas sus tareas.
