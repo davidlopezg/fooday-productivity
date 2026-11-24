@@ -295,7 +295,18 @@ export default function MetodologiaPage() {
                   Tabla <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">tareas</code>{" "}
                   tiene el mismo patrón (<code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">es_wig</code>,{" "}
                   <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">wig_orden</code>, RPC{" "}
-                  <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">toggle_tarea_wig</code>).
+                  <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">toggle_tarea_wig</code>).{" "}
+                  <strong className="text-foreground">
+                    El foco de tarea solo cuenta tareas VIVAS (issue #80):
+                  </strong>{" "}
+                  al completar (o archivar) una tarea WIG, sale del panel{" "}
+                  <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">“WIGs — Tareas foco (máx 3)”</code>{" "}
+                  y libera su plaza de las 3, para poder promover la
+                  siguiente. Lo aplica un trigger{" "}
+                  <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">BEFORE UPDATE</code>{" "}
+                  en la BD (migration 0041), no la app, para que cubra
+                  todos los caminos que cierran una tarea. Reabrirla no la
+                  devuelve al panel: el foco se elige de nuevo a mano.
                 </span>
               </li>
               <li className="flex gap-2">

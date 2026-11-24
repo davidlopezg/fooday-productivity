@@ -1512,6 +1512,58 @@ export default function DocsPage() {
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
           <li className="flex gap-3 rounded-lg border border-violet-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-violet-700 dark:text-violet-300 sm:text-sm">
+              2026-11-24
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
+                Al completar una tarea WIG, sale del panel de foco y libera
+                su plaza.
+              </strong>{" "}
+              Issue #80: una tarea marcada como WIG (🎯) que luego marcabas
+              como HECHA se quedaba en el panel{" "}
+              <strong className="text-foreground">
+                “WIGs — Tareas foco (máx 3)”
+              </strong>{" "}
+              (y en “Tareas Enormemente Importantes” de la home), tachada
+              pero{" "}
+              <strong className="text-foreground">ocupando una de las 3
+              plazas</strong>
+              : la RPC{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">toggle_tarea_wig</code>{" "}
+              contaba{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">es_wig = true</code>{" "}
+              sin mirar el estado, así que con 3 WIGs marcadas y una
+              completada el contador decía 3/3 y no podías ascender otra
+              tarea a WIG.{" "}
+              <strong className="text-foreground">Ahora el foco es para lo
+              que está vivo</strong>
+              : al completar (o archivar) una tarea WIG, sale del panel y
+              libera su plaza, y ya puedes promover la siguiente. La regla
+              la pone la{" "}
+              <strong className="text-foreground">base de datos</strong>{" "}
+              con un trigger{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">BEFORE UPDATE</code>{" "}
+              sobre{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">public.tareas</code>{" "}
+              (migration 0041), no la app: así vale por todos los caminos que
+              cierran una tarea (marcarla hecha, editarla, archivarla o
+              archivar el proyecto entero). La migration también hace
+              <em>backfill</em>: las tareas que ya estaban completadas y
+              quedaban como WIG también salen. Reabrir una tarea{" "}
+              <strong className="text-foreground">no</strong> la devuelve al
+              panel: el foco se elige de nuevo a mano. FEATURES actualizada
+              (filas{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/tareas</code>{" "}
+              y{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/</code>
+              ), la sección “Aplicación en la app” del Pilar 2, un punto
+              nuevo en la §3 de{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metodologia</code>{" "}
+              (“El foco solo cuenta lo que está vivo”) y este registro.
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-violet-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-violet-700 dark:text-violet-300 sm:text-sm">
               2026-11-23
             </span>
             <span className="text-muted-foreground">
@@ -4442,6 +4494,7 @@ function AplicacionEnApp({ pilar }: { pilar: 1 | 2 | 3 | 4 | 5 }) {
       "Panel “🎯 3 KRs de la semana” en /semana (migration 0033): la capa intermedia entre la meta y la tarea. ✨ Sugerir 3 KRs por IA elige por riesgo real (los que van por debajo del ritmo y tienen menos días restantes). Solo entran KRs con entrega en marcha (regla de contención en BD). El trimestre sigue mandando en la entrega; la semana manda en el esfuerzo",
       "El panel de WIGs de /metas muestra solo las 3 metas WIG, sin los KRs debajo (issue #47): se quedaba enorme sin aportar nada y los KRs ya se consultan al abrir la meta. En /tareas el panel sí conserva sus KRs, porque es donde se ejecuta y hay que ver el KR que estás moviendo",
       "Al crear o EDITAR una tarea, las metas que se ofrecen están FILTRADAS por el proyecto elegido (issue #75): primero eliges el proyecto y luego solo ves sus metas (si no hay proyecto, se ven todas). El proyecto es el ancla y sigue editable: si la meta elegida deja de encajar, se limpian la meta y su KR. La tarea hereda el proyecto de su meta: proyecto → meta → KR → tarea",
+      "WIGs de TAREA = foco vivo (issue #80): al completar o archivar una tarea WIG, sale del panel “WIGs — Tareas foco (máx 3)” y libera su plaza de las 3, para que al terminar una ya puedas promover la siguiente. Lo aplica la base de datos con un trigger (migration 0041), no la app: vale por todos los caminos que cierran una tarea (marcarla hecha, editarla, archivarla, archivar el proyecto entero). Reabrirla NO la devuelve al panel: el foco se elige de nuevo a mano",
     ],
     3: [
       "Time-blocking con 4 bloques fijos por día (/calendario)",
