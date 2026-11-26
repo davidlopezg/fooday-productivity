@@ -6,6 +6,8 @@ import type {
   ComidaInput,
   EstatusConComidas,
   EstatusDiario,
+  EstadoMeta,
+  EstadoTarea,
   HabitoEstado,
   InformePlan,
   Meta,
@@ -14,6 +16,7 @@ import type {
   PlanGeneradoSimple,
   Prioridad,
   ProyectoAnalisis,
+  ProyectoEstado,
   ProyectoEvento,
   ResultadoPeriodo,
   Subtarea,
@@ -23,6 +26,11 @@ import type {
 import { desgranarTareaIA, generarCriterioTerminacionIA } from "@/lib/plan";
 import { estadoMetaSegunTareas } from "@/lib/metas";
 import { numBloquesActivos, type NumeroBloque } from "@/lib/planBloques";
+import {
+  normalizarBitacora,
+  normalizarFases,
+  type BitacoraSemanal,
+} from "@/lib/ritualSemanal";
 
 declare global {
   interface Window {
@@ -2675,4 +2683,150 @@ export async function asignarTareaResultado(
     .eq("id", tareaId);
   if (error)
     throw new Error(`No se pudo asignar la tarea: ${error.message}`);
+}
+
+// ============================================================================
+// RITUAL SEMANAL (migration 0043)
+// ----------------------------------------------------------------------------
+// Escrituras de la capa de datos del ritual. Ninguna de ellas "decide" por
+// la persona: el cupo lo impone un trigger en la BD (0043) y aquí solo se
+// traduce el error a un mensaje legible.
+// ============================================================================
+
+/** Pausar / reanudar / archivar una meta. */
+export async function actualizarEstadoMeta(
+  id: string,
+  estado: EstadoMeta,
+): Promise<void> {
+  const { error } = await createClient()
+    .from("metas")
+    .update({ estado })
+    .eq("id", id);
+  if (error) throw new Error(`No se pudo actualizar la meta: ${error.message}`);
+}
+
+/** Asignar (o quitar) la fase de una meta. */
+export async function actualizarFaseMeta(
+  id: string,
+  fase: string | null,
+): Promise<void> {
+  const { error } = await createClient()
+    .from("metas")
+    .update({ fase })
+    .eq("id", id);
+  if (error) throw new Error(`No se pudo actualizar la fase: ${error.message}`);
+}
+
+/**
+ * Escribe la SITUACIÓN de una meta (el "Status Meta").
+ * Deja una fila en el historial y actualiza el valor actual + su fecha.
+ */
+export async function guardarSituacionMeta(
+  metaId: string,
+  situacion: string,
+  origen: "manual" | "ia" | "wizard" = "manual",
+): Promise<void> {
+  const supabase = createClient();
+  const texto = situacion.trim();
+  if (!texto) throw new Error("La situación está vacía");
+  const { error: eIns } = await supabase
+    .from("meta_situaciones")
+    .insert({ meta_id: metaId, situacion: texto, origen });
+  if (eIns)
+    throw new Error(`No se pudo guardar el historial: ${eIns.message}`);
+  const { error: eUpd } = await supabase
+    .from("metas")
+    .update({
+      situacion_actual: texto,
+      situacion_actualizada_at: new Date().toISOString(),
+    })
+    .eq("id", metaId);
+  if (eUpd) throw new Error(`No se pudo actualizar la situación: ${eUpd.message}`);
+}
+
+/** Ciclo de vida del proyecto en el ritual: vivo / pausado / muerto. */
+export async function actualizarEstadoProyecto(
+  id: string,
+  estado: ProyectoEstado,
+): Promise<void> {
+  const { error } = await createClient()
+    .from("proyectos")
+    .update({ estado })
+    .eq("id", id);
+  if (error)
+    throw new Error(`No se pudo actualizar el proyecto: ${error.message}`);
+}
+
+/**
+ * Cambia el estado de una tarea respetando el cupo de 10 activas.
+ * El trigger de la BD (0043) es quien manda; aquí solo se traduce el error.
+ */
+export async function setEstadoTarea(
+  id: string,
+  estado: EstadoTarea,
+): Promise<void> {
+  const { error } = await createClient()
+    .from("tareas")
+    .update({ estado })
+    .eq("id", id);
+  if (error) {
+    if (error.code === "23514" || /cupo/i.test(error.message)) {
+      throw new Error(
+        "Cupo de tareas activas alcanzado (máx 10). Baja alguna a “En espera” o “Cancelada” antes de activar esta.",
+      );
+    }
+    throw new Error(`No se pudo actualizar la tarea: ${error.message}`);
+  }
+}
+
+/** Guarda (o sobrescribe) la fila de la bitácora de una semana. */
+export async function guardarRitualSemanal(
+  datos: BitacoraSemanal & { notas?: string | null },
+): Promise<void> {
+  const b = normalizarBitacora(datos);
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("ritual_semanales")
+    .upsert(
+      {
+        anio: b.anio,
+        semana_iso: b.semana_iso,
+        metas_vivas: b.metas_vivas,
+        wigs_meta: b.wigs_meta,
+        krs_foco: b.krs_foco,
+        metas_pausadas: b.metas_pausadas,
+        tareas_activas: b.tareas_activas,
+        notas: b.notas ?? null,
+        cerrado_en: new Date().toISOString(),
+      },
+      { onConflict: "owner_id,anio,semana_iso" },
+    );
+  if (error)
+    throw new Error(`No se pudo guardar la bitácora: ${error.message}`);
+}
+
+/** Guarda una lista configurable (p.ej. el catálogo de fases de meta). */
+export async function guardarConfigLista(
+  clave: string,
+  valores: string[],
+): Promise<void> {
+  const supabase = createClient();
+  const limpio = normalizarFases(valores);
+  const { data: existente } = await supabase
+    .from("config_listas")
+    .select("id")
+    .eq("clave", clave)
+    .maybeSingle();
+  if (existente) {
+    const { error } = await supabase
+      .from("config_listas")
+      .update({ valores: limpio })
+      .eq("id", (existente as { id: string }).id);
+    if (error) throw new Error(`No se pudo guardar la lista: ${error.message}`);
+    return;
+  }
+  const { error } = await supabase
+    .from("config_listas")
+    .insert({ clave, valores: limpio });
+  if (error) throw new Error(`No se pudo guardar la lista: ${error.message}`);
 }

@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/client";
 import { leerKrsConRespaldo } from "@/lib/krsLectura";
 import { localYMD, isoWeekToMonday } from "@/lib/semana";
 import { proyectoEfectivoDeTarea } from "@/lib/proyectos";
+import { CLAVE_FASES_META, fasesDisponibles } from "@/lib/ritualSemanal";
 import type { TareaCandidata } from "@/lib/planBloques";
 import type {
   Area,
@@ -15,6 +16,7 @@ import type {
   KrOverview,
   Meta,
   MetaConPlan,
+  MetaSituacion,
   Periodo,
   PlanDiario,
   PlanDiarioBloque,
@@ -29,6 +31,7 @@ import type {
   ResultadoConTareas,
   ResultadoPeriodo,
   Ritual,
+  RitualSemanal,
   Tarea,
   TareaAdjunto,
   TareaComentario,
@@ -672,7 +675,7 @@ export async function fetchSubtareasHechas(
 export async function fetchProyectos(opts?: { includeArchivados?: boolean }): Promise<Proyecto[]> {
   let q = createClient()
     .from("proyectos")
-    .select("id,nombre,color,descripcion,orden,archivado,area_id")
+    .select("id,nombre,color,descripcion,orden,archivado,area_id,estado")
     .order("orden")
     .order("nombre");
   if (!opts?.includeArchivados) q = q.eq("archivado", false);
@@ -692,7 +695,7 @@ export async function fetchProyectosConConteo(): Promise<
 > {
   const supabase = createClient();
   const [proyectosRes, tareasRes, metasRes] = await Promise.all([
-    supabase.from("proyectos").select("id,nombre,color,descripcion,orden,archivado,area_id").order("orden"),
+    supabase.from("proyectos").select("id,nombre,color,descripcion,orden,archivado,area_id,estado").order("orden"),
     supabase.from("tareas").select("meta_id,proyecto_id,estado"),
     // Metas: para derivar el proyecto EFECTIVO de las tareas que viven
     // dentro de un KR (esas no llevan `proyecto_id`).
@@ -1923,4 +1926,55 @@ export async function fetchIdsKRsFocoSemanal(
     .eq("semana_iso", semana_iso);
   if (error) throw error;
   return Array.from(new Set((data ?? []).map((f) => f.kr_id)));
+}
+
+// ============================================================================
+// RITUAL SEMANAL (migration 0043)
+// ----------------------------------------------------------------------------
+// Lecturas de la capa de datos del ritual: historial de situación de una
+// meta, bitácora de la semana y listas configurables (catálogo de fases).
+// ============================================================================
+
+/** Historial del "Status Meta": todas las situaciones escritas, más nuevas primero. */
+export async function fetchMetaSituaciones(metaId: string): Promise<MetaSituacion[]> {
+  const { data, error } = await createClient()
+    .from("meta_situaciones")
+    .select("id,meta_id,situacion,origen,creada_en")
+    .eq("meta_id", metaId)
+    .order("creada_en", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as MetaSituacion[];
+}
+
+/** La fila de la bitácora de una semana (null si el ritual no se ha cerrado). */
+export async function fetchRitualSemanal(
+  anio: number,
+  semana_iso: number,
+): Promise<RitualSemanal | null> {
+  const { data, error } = await createClient()
+    .from("ritual_semanales")
+    .select("*")
+    .eq("anio", anio)
+    .eq("semana_iso", semana_iso)
+    .maybeSingle();
+  if (error) throw error;
+  return (data ?? null) as RitualSemanal | null;
+}
+
+/** Una lista configurable por clave (p.ej. "fases_meta"). [] si no existe. */
+export async function fetchConfigLista(clave: string): Promise<string[]> {
+  const { data, error } = await createClient()
+    .from("config_listas")
+    .select("valores")
+    .eq("clave", clave)
+    .maybeSingle();
+  if (error) throw error;
+  const valores = (data as { valores?: unknown } | null)?.valores;
+  return Array.isArray(valores) ? (valores as string[]) : [];
+}
+
+/** Fases de meta disponibles: las configuradas + el catálogo por defecto + las ya usadas. */
+export async function fetchFasesMeta(usadas?: string[]): Promise<string[]> {
+  const configuradas = await fetchConfigLista(CLAVE_FASES_META);
+  return fasesDisponibles(configuradas, usadas ?? []);
 }

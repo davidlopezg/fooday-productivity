@@ -10,6 +10,7 @@ import {
   IconSparkles,
   IconSun,
 } from "@/components/icons";
+import { EditorFasesMeta } from "@/components/config/EditorFasesMeta";
 
 const TEMAS: { value: Theme; label: string; descripcion: string }[] = [
   { value: "system", label: "Sistema", descripcion: "Sigue el ajuste del sistema operativo." },
@@ -181,6 +182,9 @@ export default function ConfiguracionPage() {
           })}
         </div>
       </section>
+
+      {/* Fases de meta — el catálogo que usa el ritual semanal (#87). */}
+      <EditorFasesMeta />
 
       <section className="rounded-xl border border-border bg-card p-6 space-y-5">
         <div>
