@@ -1810,6 +1810,47 @@ export default function DocsPage() {
             </span>
             <span className="text-muted-foreground">
               <strong className="text-foreground">
+                El Estatus tiene REVISIÓN DIARIA: 9 afirmaciones + la mejora de
+                mañana.
+              </strong>{" "}
+              Issue #85: el Estatus tenía hábitos, auditoría 20/80 y cierre
+              cognitivo, pero no el checklist de cierre de día. Ahora, en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                /estatus/nuevo
+              </code>{" "}
+              y{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                /estatus/editar
+              </code>{" "}
+              hay una sección “Revisión diaria” con 9 afirmaciones de sí / no
+              / sin responder (Trabajo: he avanzado en mi tarea principal · he
+              evitado abrir nuevos proyectos · he cerrado el trabajo a una
+              hora razonable. Atención: he evitado el consumo automático del
+              móvil · he trabajado sin interrupciones importantes. Vida
+              personal: he dedicado tiempo de calidad a mi familia · he leído
+              al menos 30 minutos · he caminado o hecho ejercicio · he tenido
+              un momento de descanso real) y el campo “Una cosa que quiero
+              mejorar mañana”. En{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                /estatus/ver
+              </code>{" "}
+              se lee con el recuento (X de Y cumplidas) y los pendientes. Cada
+              afirmación es una columna propia (migration 0044): “sin
+              responder” (null) NO es “no lo hice” (false), porque el dato
+              ausente y el incumplimiento son cosas distintas. La chuleta
+              del ritual diario (final del día) y el cajón de ayuda de{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                /estatus
+              </code>{" "}
+              lo cuentan.
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-11-26
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
                 El ritual semanal ya es una pantalla: /ritual-semanal.
               </strong>{" "}
               Issue #88: la capa de datos (#87) ya existía, pero las decisiones
