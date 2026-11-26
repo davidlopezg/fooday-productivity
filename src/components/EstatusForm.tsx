@@ -14,6 +14,11 @@ import {
   type HabitosValue,
 } from "@/components/HabitosGrid";
 import { HABITO_COLUMNA, type ComidaInput, type EstatusConComidas } from "@/lib/types";
+import {
+  CAMPO_MEJORA_MANANA,
+  CHECKLIST_REVISION,
+  type CampoRevision,
+} from "@/lib/estatusRevision";
 
 /** Formulario completo de Estatus Diario (modo crear o editar). */
 export function EstatusForm({
@@ -78,6 +83,16 @@ export function EstatusForm({
       cierre_decisiones_tomadas: "",
       cierre_carga_mental: "",
       cierre_primer_problema_manana: "",
+      rev_trabajo_avance: null,
+      rev_trabajo_sin_nuevos: null,
+      rev_trabajo_cierre_razonable: null,
+      rev_atencion_movil: null,
+      rev_atencion_sin_interrupciones: null,
+      rev_vida_familia: null,
+      rev_vida_lectura: null,
+      rev_vida_ejercicio: null,
+      rev_vida_descanso: null,
+      rev_mejora_manana: "",
       podes_soltar: "",
       micro_accion_manana: "",
       semaforo: null,
@@ -95,6 +110,11 @@ export function EstatusForm({
 
   function set<K extends keyof EstatusInput>(key: K, value: EstatusInput[K]) {
     setDatos((d) => ({ ...d, [key]: value }));
+  }
+
+  /** Escribe un ítem del checklist de revisión (booleano o null). */
+  function setRevision(campo: CampoRevision, valor: boolean | null) {
+    setDatos((d) => ({ ...d, [campo]: valor }));
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -205,6 +225,65 @@ export function EstatusForm({
             rows={2}
           />
         </Grid2>
+      </Section>
+
+      {/* === Revisión diaria (issue #85) === */}
+      <Section
+        titulo="Revisión diaria"
+        emoji="🧾"
+        subtitulo="Sí · No · sin responder"
+      >
+        <div className="space-y-4">
+          {CHECKLIST_REVISION.map((grupo) => (
+            <div key={grupo.titulo}>
+              <h3 className="mb-2 text-sm font-semibold">
+                <span className="mr-1.5">{grupo.emoji}</span>
+                {grupo.titulo}
+              </h3>
+              <ul className="space-y-2">
+                {grupo.items.map((item) => {
+                  const valor = datos[item.campo] as boolean | null;
+                  return (
+                    <li
+                      key={item.campo}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-background/60 px-3 py-2"
+                    >
+                      <span className="min-w-0 flex-1 text-sm">
+                        {item.texto}
+                      </span>
+                      <div className="flex shrink-0 gap-1">
+                        <BotonSiNo
+                          etiqueta="Sí"
+                          ariaLabel={`${item.texto}: Sí`}
+                          activo={valor === true}
+                          onClick={() =>
+                            setRevision(item.campo, valor === true ? null : true)
+                          }
+                        />
+                        <BotonSiNo
+                          etiqueta="No"
+                          ariaLabel={`${item.texto}: No`}
+                          activo={valor === false}
+                          onClick={() =>
+                            setRevision(item.campo, valor === false ? null : false)
+                          }
+                        />
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
+
+          <Textarea
+            label="Una cosa que quiero mejorar mañana"
+            value={(datos[CAMPO_MEJORA_MANANA] as string | null) ?? ""}
+            onChange={(v) => set(CAMPO_MEJORA_MANANA, v || null)}
+            rows={2}
+            placeholder="Una sola cosa. Se puede leer mañana en /estatus."
+          />
+        </div>
       </Section>
 
       {/* === Estado emocional === */}
@@ -518,6 +597,34 @@ function Section({
       </div>
       {children}
     </section>
+  );
+}
+
+function BotonSiNo({
+  etiqueta,
+  ariaLabel,
+  activo,
+  onClick,
+}: {
+  etiqueta: string;
+  ariaLabel: string;
+  activo: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={ariaLabel}
+      aria-pressed={activo}
+      className={`min-h-10 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors ${
+        activo
+          ? "border-primary bg-primary/15 text-foreground"
+          : "border-border bg-background text-muted-foreground hover:bg-accent"
+      }`}
+    >
+      {etiqueta}
+    </button>
   );
 }
 

@@ -623,6 +623,12 @@ export const AYUDA_POR_RUTA: Record<
           "Los 9 hábitos no son 'el bonus', son el suelo sobre el que se construye todo lo demás. Sin ellos (sueño, comida, movimiento, vaciado mental), los bloques de foco se desmoronan. Revisa el score al final de cada semana.",
         pilar: 4,
       },
+      {
+        titulo: "La revisión diaria: un checklist, no un texto",
+        cuerpo:
+          "Las 9 afirmaciones del cierre (Trabajo · Atención · Vida personal) se responden con sí / no / sin responder. «Sin responder» no es «no lo hice»: si no lo marcas, el día queda incompleto a propósito. La mejora de mañana es una sola frase: es la que te vas a leer al día siguiente.",
+        pilar: 5,
+      },
     ],
   },
   "/dias-malos": {
