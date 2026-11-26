@@ -3,6 +3,7 @@ import { leerKrsConRespaldo } from "@/lib/krsLectura";
 import { localYMD, isoWeekToMonday } from "@/lib/semana";
 import { proyectoEfectivoDeTarea } from "@/lib/proyectos";
 import { CLAVE_FASES_META, fasesDisponibles } from "@/lib/ritualSemanal";
+import { ordenarPorEjecucion, type ContextoEjecucion } from "@/lib/orden";
 import type { TareaCandidata } from "@/lib/planBloques";
 import type {
   Area,
@@ -156,6 +157,54 @@ export async function fetchTareasCompletadas(opts?: { limit?: number }) {
 export async function fetchMetas(): Promise<Meta[]> {
   const { data } = await createClient().from("metas").select("*").order("codigo");
   return (data ?? []) as Meta[];
+}
+
+/**
+ * CONTEXTO DE ORDEN DE EJECUCIÓN (issue #105).
+ *
+ * Reúne en tres consultas ligeras el árbol que decide el orden en que se
+ * ejecuta el trabajo:
+ *   proyecto (`proyectos.orden`) → meta (`metas.orden_ejecucion`)
+ *     → KR (`resultados_periodo.orden`) → tarea (`tareas.orden_ejecucion`)
+ *
+ * Lo usan el planificador diario y la priorización para respetar el orden
+ * manual que ha puesto la persona.
+ */
+export async function fetchContextoEjecucion(): Promise<ContextoEjecucion> {
+  const supabase = createClient();
+  const [proyectosRes, metasRes, krsRes] = await Promise.all([
+    supabase.from("proyectos").select("id,orden"),
+    supabase.from("metas").select("id,proyecto_id,orden_ejecucion"),
+    supabase.from("resultados_periodo").select("id,meta_id,orden"),
+  ]);
+  const ctx: ContextoEjecucion = {
+    ordenProyecto: new Map(),
+    proyectoDeMeta: new Map(),
+    ordenMeta: new Map(),
+    metaDeKr: new Map(),
+    ordenKr: new Map(),
+  };
+  for (const p of (proyectosRes.data ?? []) as Array<{ id: string; orden: number }>) {
+    ctx.ordenProyecto.set(p.id, p.orden ?? 0);
+  }
+  for (const m of (metasRes.data ?? []) as Array<{
+    id: string;
+    proyecto_id: string | null;
+    orden_ejecucion: number | null;
+  }>) {
+    ctx.proyectoDeMeta.set(m.id, m.proyecto_id ?? null);
+    ctx.ordenMeta.set(m.id, m.orden_ejecucion ?? 0);
+  }
+  for (const k of (krsRes.data ?? []) as Array<{
+    id: string;
+    meta_id: string | null;
+    orden: number | null;
+  }>) {
+    if (!k.meta_id) continue;
+    ctx.metaDeKr.set(k.id, k.meta_id);
+    ctx.ordenKr.set(k.id, k.orden ?? 0);
+  }
+  return ctx;
 }
 
 /** Mapa kr_id → meta_id.
@@ -1121,25 +1170,26 @@ export async function fetchMetaConPlan(metaId: string): Promise<MetaConPlan | nu
             fecha_inicio: "",
             fecha_fin: "",
           },
-          tareas: (tareasPorKr.get(r.id) ?? []).slice().sort(
-            (a, b) => +new Date(b.created_at ?? 0) - +new Date(a.created_at ?? 0),
-          ),
+          tareas: ordenarPorEjecucion(tareasPorKr.get(r.id) ?? []),
         } as ResultadoConTareas;
       }
       return {
         ...r,
         periodos: periodosDelKr,
         periodo,
-        tareas: (tareasPorKr.get(r.id) ?? []).slice().sort(
-          (a, b) => +new Date(b.created_at ?? 0) - +new Date(a.created_at ?? 0),
-        ),
+        tareas: ordenarPorEjecucion(tareasPorKr.get(r.id) ?? []),
       } as ResultadoConTareas;
     })
-    // Orden principal por periodo principal; secundarios por orden del KR.
+    // ORDEN DE EJECUCIÓN (issue #105): el orden manual del KR dentro de la
+    // meta manda (`resultados_periodo.orden`, 1..N). El periodo solo
+    // desempata (un KR puede vivir en varios periodos).
     .sort((a, b) => {
+      const oa = a.orden ?? 0;
+      const ob = b.orden ?? 0;
+      if (oa !== ob) return oa - ob;
       if (a.periodo.anio !== b.periodo.anio) return a.periodo.anio - b.periodo.anio;
       if (a.periodo.numero !== b.periodo.numero) return a.periodo.numero - b.periodo.numero;
-      return (a.orden ?? 0) - (b.orden ?? 0);
+      return (a.id ?? "").localeCompare(b.id ?? "");
     });
 
   const total_tareas = tareas.length;

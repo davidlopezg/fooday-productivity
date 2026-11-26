@@ -59,6 +59,15 @@ export type GenerarPlanSimpleOpts = {
    * 0032). Si se omite, se usa DEFAULT_PERFIL_IA.
    */
   perfil?: PerfilIA | null;
+  /**
+   * ORDEN DE EJECUCIÓN (issue #105): mapa tarea_id → posición global
+   * (1..N) en el orden manual proyecto → meta → KR → tarea.
+   *
+   * Si se pasa, el backlog se presenta YA ORDENADO por esa secuencia y el
+   * prompt dice que, a igualdad de prioridad, va antes la que tenga menor
+   * número. Es el desempate que la persona ha decidido a mano.
+   */
+  secuenciaEjecucion?: Record<string, number>;
 };
 
 export type LlamadaIA = {
@@ -89,6 +98,7 @@ function fechaToLarga(fecha: string): string {
 function buildPrompt(opts: GenerarPlanSimpleOpts): string {
   const { estado, reflexion, fecha, tareas, tareasProgramadasHoy, tareasLibres, historial } = opts;
   const fechaLarga = fechaToLarga(fecha);
+  const seq = opts.secuenciaEjecucion ?? {};
 
   // Tres fuentes de tareas, se muestran al LLM como tres listas separadas
   // con prioridad explícita. Las listas de prioridades altas se eliminan de
@@ -99,12 +109,23 @@ function buildPrompt(opts: GenerarPlanSimpleOpts): string {
     (t) => !programadasIds.has(t.id) && !libresIds.has(t.id),
   );
 
+  // ORDEN DE EJECUCIÓN (issue #105): el backlog se presenta en el orden
+  // manual que ha puesto la persona (proyecto → meta → KR → tarea). Las
+  // tareas sin secuencia (sin meta ni KR) se quedan al final.
+  if (Object.keys(seq).length > 0) {
+    backlog.sort((a, b) => {
+      const sa = seq[a.id] ?? Number.MAX_SAFE_INTEGER;
+      const sb = seq[b.id] ?? Number.MAX_SAFE_INTEGER;
+      return sa - sb;
+    });
+  }
+
   const fmt = (arr: Tarea[]) =>
     arr
       .slice(0, 25)
       .map(
         (t, i) =>
-          `${i + 1}. [${t.prioridad ?? "media"}${t.codigo ? ` · ${t.codigo}` : ""}] ${t.titulo}${t.deadline ? ` (deadline: ${t.deadline})` : ""}`,
+          `${i + 1}. [${t.prioridad ?? "media"}${t.codigo ? ` · ${t.codigo}` : ""}${seq[t.id] !== undefined ? ` · orden ${seq[t.id]}` : ""}] ${t.titulo}${t.deadline ? ` (deadline: ${t.deadline})` : ""}`,
       )
       .join("\n") || "(ninguna)";
 
@@ -223,7 +244,7 @@ D) TU DÍA OPTIMIZADO (sección 4):
      1º Tareas PROGRAMADAS PARA HOY (compromiso explícito de David).
      2º Tareas AÑADIDAS EN ESTA SESIÓN.
      3º Resto del BACKLOG (último recurso).
-   - Orden: (1) prioridad de fuente, (2) estado emocional (ligeras si rojo), (3) prioridad de la tarea, (4) tipo (profunda antes que rápida salvo que el cuerpo pida pausa).
+   - Orden: (1) prioridad de fuente, (2) estado emocional (ligeras si rojo), (3) prioridad de la tarea, (4) tipo (profunda antes que rápida salvo que el cuerpo pida pausa), (5) ORDEN DE EJECUCIÓN: si dos tareas empatan en prioridad, va antes la que tenga menor número de "orden N" (el orden manual que ha puesto la persona: proyecto → meta → KR → tarea).
    - Si un bloque se queda sin tarea, propón una abstracta ("Paseo consciente de 60 min").
 
 E) PROPUESTA DE COMIDA (sección 5):

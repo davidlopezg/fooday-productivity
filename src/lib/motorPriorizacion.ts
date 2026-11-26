@@ -31,6 +31,15 @@ export type GenerarPriorizacionOpts = {
   horaLocal: string;
   /** Día de la semana en español (ej: "lunes"). */
   diaSemana: string;
+  /**
+   * ORDEN DE EJECUCIÓN (issue #105): mapa tarea_id → posición global
+   * (1..N) en el orden manual proyecto → meta → KR → tarea.
+   *
+   * Si se pasa, el motor lo RESPETA: a igualdad de prioridad y deadline,
+   * va antes la tarea con menor posición. Es el "desempate" que la persona
+   * ha decidido a mano.
+   */
+  secuenciaEjecucion?: Record<string, number>;
 };
 
 export type PriorizacionInmediata = {
@@ -58,6 +67,7 @@ function endpoint(baseUrl: string): string {
 
 function buildPrompt(opts: GenerarPriorizacionOpts): string {
   const { tareas, metas, fecha, horaLocal, diaSemana } = opts;
+  const seq = opts.secuenciaEjecucion ?? {};
 
   // Cap defensivo: si David tiene miles de tareas, no abrumamos al prompt.
   // Ordenamos por prioridad y deadline para que las más relevantes estén
@@ -83,6 +93,11 @@ function buildPrompt(opts: GenerarPriorizacionOpts): string {
       if (!a.deadline && b.deadline) return 1;
       if (a.deadline && b.deadline)
         return a.deadline.localeCompare(b.deadline);
+      // ORDEN DE EJECUCIÓN (issue #105): desempate con el orden manual que
+      // ha puesto la persona (proyecto → meta → KR → tarea).
+      const sa = seq[a.id] ?? Number.MAX_SAFE_INTEGER;
+      const sb = seq[b.id] ?? Number.MAX_SAFE_INTEGER;
+      if (sa !== sb) return sa - sb;
       return 0;
     })
     .slice(0, 60);
@@ -95,7 +110,7 @@ function buildPrompt(opts: GenerarPriorizacionOpts): string {
     ? tareasActivas
         .map(
           (t, i) =>
-            `${i + 1}. [id=${t.id}] [prio=${t.prioridad ?? "media"}] [estado=${t.estado}] [deadline=${t.deadline ?? "—"}] [esfuerzo=${t.esfuerzo ?? "—"}] ${t.titulo}${t.descripcion ? ` — ${t.descripcion.slice(0, 120)}` : ""}${t.capa ? ` (capo=${t.capa})` : ""}`,
+            `${i + 1}. [id=${t.id}] [prio=${t.prioridad ?? "media"}] [estado=${t.estado}] [deadline=${t.deadline ?? "—"}] [esfuerzo=${t.esfuerzo ?? "—"}]${seq[t.id] !== undefined ? ` [orden=${seq[t.id]}]` : ""} ${t.titulo}${t.descripcion ? ` — ${t.descripcion.slice(0, 120)}` : ""}${t.capa ? ` (capo=${t.capa})` : ""}`,
         )
         .join("\n")
     : "(sin tareas activas)";
@@ -222,7 +237,8 @@ Si dos tareas son similares, elige la que:
 1. desbloquee más cosas;
 2. tenga mayor coste de retraso;
 3. genere un resultado verificable antes;
-4. reduzca más incertidumbre.
+4. reduzca más incertidumbre;
+5. tenga menor número de [orden] (el ORDEN DE EJECUCIÓN que ha puesto la persona: proyecto → meta → KR → tarea). Este desempate es explícito: si dos tareas empatan en todo lo anterior, GANA la que va antes en ese orden.
 
 ## 8. SALIDA
 

@@ -2898,3 +2898,98 @@ export async function guardarWigsMeta(ids: string[]): Promise<void> {
       throw new Error(`No se pudo marcar la WIG: ${error.message}`);
   }
 }
+
+// ============================================================================
+// ORDEN DE EJECUCIÓN (migration 0047 · issue #105)
+// ----------------------------------------------------------------------------
+// El orden en que se ejecuta el trabajo es MANUAL, en los tres niveles:
+//   proyecto ──▶ meta (`metas.orden_ejecucion`)
+//                   └──▶ KR (`resultados_periodo.orden`)
+//                          └──▶ tarea (`tareas.orden_ejecucion`)
+//
+// Estas funciones persisten una lista de ids YA ORDENADA: la posición en el
+// array es la posición de ejecución (1..N). Se actualizan fila a fila (son
+// pocas: las metas de un proyecto, los KRs de una meta, las tareas de un
+// KR), así que no hace falta ninguna RPC nueva.
+//
+// Idempotente: aplicar el mismo array dos veces deja el mismo resultado.
+// ============================================================================
+
+/** Guarda el orden de las metas de un proyecto. `idsEnOrden` es la lista de
+ *  ids de las metas YA en el orden que quiere la persona.
+ *  Devuelve el número de metas actualizadas. */
+export async function reordenarMetasDeProyecto(
+  idsEnOrden: string[],
+): Promise<number> {
+  const ids = idsEnOrden.filter(Boolean);
+  if (ids.length === 0) return 0;
+  const supabase = createClient();
+  const resultados = await Promise.allSettled(
+    ids.map(async (id, i) => {
+      const { error } = await supabase
+        .from("metas")
+        .update({ orden_ejecucion: i + 1 })
+        .eq("id", id);
+      if (error) throw new Error(error.message);
+      return id;
+    }),
+  );
+  const fallidas = resultados.filter((r) => r.status === "rejected");
+  if (fallidas.length > 0) {
+    const detalle = fallidas
+      .map((f) => (f.reason instanceof Error ? f.reason.message : String(f.reason)))
+      .join("; ");
+    throw new Error(`No se pudo guardar el orden de las metas: ${detalle}`);
+  }
+  return ids.length;
+}
+
+/** Guarda el orden de los KRs de una meta (`resultados_periodo.orden`). */
+export async function reordenarKrsDeMeta(idsEnOrden: string[]): Promise<number> {
+  const ids = idsEnOrden.filter(Boolean);
+  if (ids.length === 0) return 0;
+  const supabase = createClient();
+  const resultados = await Promise.allSettled(
+    ids.map(async (id, i) => {
+      const { error } = await supabase
+        .from("resultados_periodo")
+        .update({ orden: i + 1 })
+        .eq("id", id);
+      if (error) throw new Error(error.message);
+      return id;
+    }),
+  );
+  const fallidas = resultados.filter((r) => r.status === "rejected");
+  if (fallidas.length > 0) {
+    const detalle = fallidas
+      .map((f) => (f.reason instanceof Error ? f.reason.message : String(f.reason)))
+      .join("; ");
+    throw new Error(`No se pudo guardar el orden de los KRs: ${detalle}`);
+  }
+  return ids.length;
+}
+
+/** Guarda el orden de las tareas de un KR (`tareas.orden_ejecucion`). */
+export async function reordenarTareasDeKr(idsEnOrden: string[]): Promise<number> {
+  const ids = idsEnOrden.filter(Boolean);
+  if (ids.length === 0) return 0;
+  const supabase = createClient();
+  const resultados = await Promise.allSettled(
+    ids.map(async (id, i) => {
+      const { error } = await supabase
+        .from("tareas")
+        .update({ orden_ejecucion: i + 1 })
+        .eq("id", id);
+      if (error) throw new Error(error.message);
+      return id;
+    }),
+  );
+  const fallidas = resultados.filter((r) => r.status === "rejected");
+  if (fallidas.length > 0) {
+    const detalle = fallidas
+      .map((f) => (f.reason instanceof Error ? f.reason.message : String(f.reason)))
+      .join("; ");
+    throw new Error(`No se pudo guardar el orden de las tareas: ${detalle}`);
+  }
+  return ids.length;
+}

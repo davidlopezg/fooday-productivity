@@ -532,6 +532,12 @@ function SubtareasEditor({
             key={idx}
             className="flex items-start gap-2 rounded-md border border-border bg-background px-2 py-1.5"
           >
+            <span
+              aria-hidden
+              className="mt-2 w-4 shrink-0 text-right font-mono text-[10px] tabular-nums text-muted-foreground"
+            >
+              {idx + 1}
+            </span>
             <input
               type="checkbox"
               checked={!!s.hecho}
@@ -679,6 +685,17 @@ function SubtareasEditorLite({
   function anadir() {
     onChange([...subtareas, { descripcion: "", tiempo_estimado_min: 5, hecho: false }]);
   }
+  /** ORDEN DE EJECUCIÓN (issue #105): las subtareas se ejecutan en el
+   *  orden en que están. Este editor "lite" (alta de tarea) también
+   *  permite moverlas, como el editor completo. */
+  function mover(idx: number, delta: number) {
+    const j = idx + delta;
+    if (j < 0 || j >= subtareas.length) return;
+    const out = subtareas.slice();
+    const [s] = out.splice(idx, 1);
+    out.splice(j, 0, s);
+    onChange(out);
+  }
   const haySubtareas = subtareas.length > 0;
   return (
     <section className="rounded-lg border border-border bg-muted/30 p-3">
@@ -751,6 +768,12 @@ function SubtareasEditorLite({
                   key={idx}
                   className="flex items-start gap-2 rounded-md border border-border bg-background px-2 py-1.5"
                 >
+                  <span
+                    aria-hidden
+                    className="mt-2 w-4 shrink-0 text-right font-mono text-[10px] tabular-nums text-muted-foreground"
+                  >
+                    {idx + 1}
+                  </span>
                   <input
                     type="text"
                     value={s.descripcion}
@@ -775,6 +798,28 @@ function SubtareasEditorLite({
                     aria-label="Minutos estimados"
                   />
                   <span className="text-[10px] text-muted-foreground">min</span>
+                  <div className="flex flex-col">
+                    <button
+                      type="button"
+                      onClick={() => mover(idx, -1)}
+                      disabled={idx === 0}
+                      className="rounded px-1 text-xs text-muted-foreground hover:bg-accent disabled:opacity-30"
+                      title="Subir"
+                      aria-label="Subir"
+                    >
+                      ▲
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => mover(idx, 1)}
+                      disabled={idx === subtareas.length - 1}
+                      className="rounded px-1 text-xs text-muted-foreground hover:bg-accent disabled:opacity-30"
+                      title="Bajar"
+                      aria-label="Bajar"
+                    >
+                      ▼
+                    </button>
+                  </div>
                   <button
                     type="button"
                     onClick={() => eliminar(idx)}
