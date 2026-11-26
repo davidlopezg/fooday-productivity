@@ -9,6 +9,7 @@ import {
   PILARES,
   RITUALES,
 } from "@/lib/metodologia/conocimiento";
+import { PROTOCOLO_DIAS_MALOS } from "@/lib/diasMalos";
 
 // ============================================================================
 // /docs — Los 5 pilares que sustentan fooday·productivity.
@@ -486,6 +487,90 @@ export default function DocsPage() {
             <strong className="text-foreground">Pilar 4 (energía y salud)</strong>:
             los límites sobre móvil, sueño, movimiento y descanso alimentan
             los hábitos y el dashboard emocional.
+          </li>
+        </ul>
+      </section>
+
+      {/* =====================================================================
+          Complemento · Protocolo de días malos
+          El plan de emergencia para los días en los que no se hace nada.
+          ===================================================================== */}
+      <section
+        id="dias-malos"
+        className="scroll-mt-20 rounded-2xl border-2 border-rose-500/30 bg-gradient-to-br from-rose-500/5 to-transparent p-6 sm:p-8"
+      >
+        <header>
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Complemento · Plan de emergencia
+          </div>
+          <h2 className="mt-1 text-2xl font-bold tracking-tight">
+            🛟 Protocolo para los días malos
+          </h2>
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+            Hay días en los que pasas la mañana mirando el móvil, aunque sabes
+            perfectamente qué tienes pendiente. Lo peligroso no es el día: es
+            la <strong className="text-foreground">espiral de culpa</strong>,
+            que convierte un mal día en dos. Por eso existe{" "}
+            <Link
+              href="/dias-malos"
+              className="font-mono text-slate-700 dark:text-slate-300 underline-offset-4 hover:underline"
+            >
+              /dias-malos
+            </Link>
+            : un protocolo de 6 pasos para{" "}
+            <strong className="text-foreground">romper la inactividad</strong>,
+            no para recuperarla.
+          </p>
+        </header>
+
+        <ol className="mt-5 space-y-2 text-sm leading-relaxed">
+          {PROTOCOLO_DIAS_MALOS.pasos.map((p) => (
+            <li
+              key={p.numero}
+              className="flex gap-3 rounded-lg border border-border bg-background/60 p-3"
+            >
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-rose-500/15 text-xs font-bold text-rose-700 dark:text-rose-300">
+                {p.numero}
+              </span>
+              <span>
+                <strong className="text-foreground">
+                  {p.emoji} {p.titulo}.
+                </strong>{" "}
+                <span className="text-muted-foreground">{p.accion}</span>
+              </span>
+            </li>
+          ))}
+        </ol>
+
+        <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+          Cierra con dos frases que son la clave del método:{" "}
+          <strong className="text-foreground">
+            «Hay días en los que tu objetivo será simplemente romper la
+            inactividad. Eso también cuenta»
+          </strong>{" "}
+          y{" "}
+          <em>
+            si esta dificultad para empezar continúa afectando de forma
+            importante a tu vida, merece la pena abordarla profesionalmente:
+            no se asume que todo sea una cuestión de disciplina
+          </em>
+          . El checklist de cada día se guarda solo en el navegador
+          (localStorage) y se reinicia al día siguiente: no se escribe nada
+          en la base de datos, porque esto no es un dato del sistema, es un
+          plan de emergencia.
+        </p>
+
+        <ul className="mt-4 space-y-2 text-sm leading-relaxed text-muted-foreground">
+          <li>
+            <strong className="text-foreground">Pilar 4 (energía y salud)</strong>:
+            los pasos 1 y 2 (móvil fuera de la habitación, agua, caminar) son
+            el suelo mínimo del día, por debajo del cual no hay trabajo que
+            salga.
+          </li>
+          <li>
+            <strong className="text-foreground">Pilar 5 (cierre y descanso)</strong>:
+            el paso 6 («no intentes compensar las horas perdidas») es la regla
+            que evita la espiral de culpa.
           </li>
         </ul>
       </section>
@@ -1804,6 +1889,35 @@ export default function DocsPage() {
         </header>
 
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-11-26
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
+                Nueva pantalla: /dias-malos, el protocolo de emergencia.
+              </strong>{" "}
+              Issue #86: hay días en los que no se hace nada y lo peligroso no
+              es el día, sino la espiral de culpa. Ahora existe{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                /dias-malos
+              </code>{" "}
+              con los 6 pasos del protocolo de recuperación (① interrumpe el
+              ciclo · ② muévete · ③ reduce el trabajo · ④ empieza · ⑤ continúa
+              si puedes · ⑥ recupera el día) y un checklist de HOY que se
+              guarda en el navegador y se reinicia cada día: no se escribe
+              nada en la base de datos, porque un plan de emergencia no es un
+              dato del sistema. Cierra con «hay días en los que tu objetivo
+              será simplemente romper la inactividad: eso también cuenta» y con
+              la advertencia de que, si esta dificultad para empezar sigue
+              afectando de forma importante a tu vida, merece la pena
+              abordarla profesionalmente: no se asume que todo sea
+              disciplina. Nueva sección “Complemento · Plan de emergencia” en
+              esta misma página, fila nueva en el índice de features y una
+              entrada en la chuleta del ritual diario (“cuando el día va
+              mal”).
+            </span>
+          </li>
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
               2026-11-26
