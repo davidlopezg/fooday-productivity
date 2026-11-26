@@ -46,6 +46,7 @@ import {
   actualizarFaseMeta,
   actualizarMeta,
   actualizarTarea,
+  asignarTareaADia,
   crearEventoProyecto,
   guardarRitualSemanal,
   guardarSituacionMeta,
@@ -53,11 +54,16 @@ import {
   guardarWigsMeta,
   marcarKrFocoSemanal,
   marcarKrWig,
+  quitarTareaDeSemana,
 } from "@/lib/mutations";
 import { useData } from "@/lib/useData";
 import type { Tarea } from "@/lib/types";
 import { useConfig } from "@/lib/configStore";
-import { estadoCupo } from "@/lib/ritualSemanal";
+import {
+  diffPlanCompleto,
+  fusionarPlan,
+  type PlanSemana,
+} from "@/lib/ritual/semana";
 import { redactarSituacionIA } from "@/lib/ritual/situacionIA";
 import {
   draftVacio,
@@ -237,19 +243,27 @@ export function WizardRitual({
   }, [anio, semana_iso]);
 
   // Candidatas de cada día: las tareas ya repartidas en /semana.
-  const candidatasPorDia = useMemo(() => {
-    const porId = new Map((tareas ?? []).map((t) => [t.id, t]));
-    const m = new Map<number, { id: string; titulo: string }[]>();
-    for (const d of DIAS_SEMANA) m.set(d.id, []);
-    for (const a of planSemanal ?? []) {
-      const t = porId.get(a.tarea_id);
-      if (!t) continue;
-      const arr = m.get(a.dia_semana);
-      if (!arr) continue;
-      arr.push({ id: t.id, titulo: t.titulo });
+  const planGuardado = useMemo<PlanSemana>(() => {
+    const m: PlanSemana = {};
+    for (const a of planSemanal ?? []) m[a.tarea_id] = a.dia_semana;
+    return m;
+  }, [planSemanal]);
+
+  // El reparto de la semana: lo guardado + lo que has movido en este draft.
+  const planSemana = useMemo(
+    () => fusionarPlan(planGuardado, draft.plan),
+    [planGuardado, draft.plan],
+  );
+
+  // El reparto final: las tareas completadas, apartadas o canceladas salen
+  // de la semana (dejarlas ahí sería ruido en /semana).
+  const planFinal = useMemo(() => {
+    const m: PlanSemana = { ...planSemana };
+    for (const [id, d] of Object.entries(draft.tareas)) {
+      if (d !== "activa") delete m[id];
     }
     return m;
-  }, [planSemanal, tareas]);
+  }, [planSemana, draft.tareas]);
 
   // Lo ya comprometido (BD) + lo que se ha tocado en este draft.
   const seleccionPorDia = useMemo(() => {
@@ -263,8 +277,14 @@ export function WizardRitual({
     for (const [dia, ids] of Object.entries(draft.tresDelDia)) {
       guardada[Number(dia)] = ids;
     }
+    // Solo cuentan las tareas que están en la semana: una tarea que sale de
+    // la semana no puede seguir comprometida en su día.
+    for (const [dia, ids] of Object.entries(guardada)) {
+      const d = Number(dia);
+      guardada[d] = ids.filter((id) => planFinal[id] === d);
+    }
     return guardada;
-  }, [tresDelDiaGuardadas, draft.tresDelDia]);
+  }, [tresDelDiaGuardadas, draft.tresDelDia, planFinal]);
 
   const krsEnFoco = useMemo(
     () =>
@@ -276,6 +296,14 @@ export function WizardRitual({
     cambiar({
       ...draft,
       tareas: { ...draft.tareas, [tareaId]: decision },
+    });
+  }
+
+  /** Poner una tarea en un día de la semana (o quitarla de la semana). */
+  function onPlanTarea(tareaId: string, dia: number | null) {
+    cambiar({
+      ...draft,
+      plan: { ...draft.plan, [tareaId]: dia },
     });
   }
 
@@ -426,11 +454,29 @@ export function WizardRitual({
 
       if (paso === "tareas") {
         // 5a) El inventario: completar / En espera / Cancelada.
-        // El cupo de 10 lo impone la BD (trigger de la migration 0043):
-        // si no cabe, el error sale de la propia BD y se muestra tal cual.
+        // El cupo de 10 es ORIENTATIVO (issue #96): avisa la pantalla, no la
+        // BD (la migration 0046 quitó el trigger global).
         for (const [tareaId, decision] of Object.entries(draft.tareas)) {
           const estado = decision === "activa" ? "pendiente" : decision;
           await actualizarTarea({ id: tareaId, estado });
+        }
+        // 5a) El reparto por días: el ritual decide la semana y la escribe
+        // en `plan_semanal_tareas`. /semana la afina a partir de aquí.
+        const { asignar, quitar } = diffPlanCompleto(planGuardado, planFinal);
+        for (const a of asignar) {
+          await asignarTareaADia({
+            anio,
+            semana_iso,
+            tarea_id: a.tarea_id,
+            dia_semana: a.dia_semana,
+          });
+        }
+        for (const tareaId of quitar) {
+          await quitarTareaDeSemana({
+            anio,
+            semana_iso,
+            tarea_id: tareaId,
+          });
         }
         // 5c) Las 3 del día: solo se escribe lo que ha cambiado.
         for (const d of diasSemana) {
@@ -439,13 +485,14 @@ export function WizardRitual({
           const guardada = (tresDelDiaGuardadas ?? [])
             .filter((r) => r.dia_semana === d.dia)
             .map((r) => r.tarea_id);
-          if (sonIguales(seleccion, guardada)) continue;
+          const final = seleccion.filter((id) => planFinal[id] === d.dia);
+          if (sonIguales(final, guardada)) continue;
           await guardarTresDelDia({
             anio,
             semana_iso,
             dia_semana: d.dia,
             fecha: d.fecha,
-            tarea_ids: seleccion,
+            tarea_ids: final,
           });
         }
       }
@@ -479,11 +526,20 @@ export function WizardRitual({
         metas_pausadas: Object.entries(draft.metas)
           .filter(([, v]) => v.estado === "pausada")
           .map(([k]) => k),
-        tareas_activas: estadoCupo(
-          (tareas ?? []).map((t) => ({
-            estado: (draft.tareas[t.id] ?? t.estado) as Tarea["estado"],
-          })),
-        ).activas,
+        // Las tareas activas DE LA SEMANA (las que has elegido en el paso 5),
+        // no el inventario entero del sistema.
+        tareas_activas: Object.keys(planFinal).filter((id) => {
+          const t = (tareas ?? []).find((x) => x.id === id);
+          if (!t) return false;
+          const decision = draft.tareas[id];
+          const estado =
+            !decision || decision === "activa" ? t.estado : decision;
+          return (
+            estado === "pendiente" ||
+            estado === "en_progreso" ||
+            estado === "bloqueada"
+          );
+        }).length,
         notas: null,
       });
       if (typeof window !== "undefined") {
@@ -617,12 +673,12 @@ export function WizardRitual({
         {draft.paso === "tareas" && (
           <PasoTareas
             tareas={tareas ?? []}
-            planSemanal={planSemanal ?? []}
             krsEnFoco={krsEnFoco}
+            plan={planSemana}
+            onPlan={onPlanTarea}
             decisiones={draft.tareas}
             onDecision={onDecisionTarea}
             dias={diasSemana}
-            candidatasPorDia={candidatasPorDia}
             seleccionPorDia={seleccionPorDia}
             onSeleccion={onSeleccionTresDelDia}
           />
@@ -659,12 +715,12 @@ export function WizardRitual({
           Cerrar la semana (guardar bitácora)
         </button>
         <span className="ml-auto text-[11px] text-muted-foreground">
-          Nada se escribe hasta que pulsas “Guardar”. El reparto por días
-          vive en{" "}
+          Nada se escribe hasta que pulsas “Guardar”. En el paso 5 eliges las
+          tareas de la semana y su día;{" "}
           <Link href="/semana" className="underline underline-offset-4">
             /semana
-          </Link>
-          : el paso 5 usa las tareas que ya están repartidas ahí.
+          </Link>{" "}
+          las afina a partir de ahí.
         </span>
       </footer>
     </div>

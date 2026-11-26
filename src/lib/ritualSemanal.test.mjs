@@ -7,16 +7,11 @@
 
 import {
   CLAVE_FASES_META,
-  CUPO_TAREAS_ACTIVAS,
-  ESTADOS_ACTIVOS_TAREA,
   FASES_META_POR_DEFECTO,
-  contarActivas,
-  estadoCupo,
   etiquetaSemana,
   fasesDisponibles,
   normalizarBitacora,
   normalizarFases,
-  tareaEsActiva,
 } from "./ritualSemanal.ts";
 
 let pass = 0;
@@ -40,68 +35,6 @@ function eq(a, b, msg) {
   const sb = JSON.stringify(b);
   if (sa !== sb) throw new Error(`${msg ?? "desigual"}: ${sa} !== ${sb}`);
 }
-
-const t = (estado) => ({ estado });
-
-console.log("\ntareaEsActiva");
-
-test("pendiente, en progreso y bloqueada son activas", () => {
-  eq(tareaEsActiva(t("pendiente")), true);
-  eq(tareaEsActiva(t("en_progreso")), true);
-  eq(tareaEsActiva(t("bloqueada")), true);
-});
-
-test("en espera, cancelada, hecha, descartada y archivada NO son activas", () => {
-  eq(tareaEsActiva(t("en_espera")), false);
-  eq(tareaEsActiva(t("cancelada")), false);
-  eq(tareaEsActiva(t("hecha")), false);
-  eq(tareaEsActiva(t("descartada")), false);
-  eq(tareaEsActiva(t("archivada")), false);
-});
-
-test("la lista de estados activos no incluye en_espera ni cancelada", () => {
-  eq(ESTADOS_ACTIVOS_TAREA.includes("en_espera"), false);
-  eq(ESTADOS_ACTIVOS_TAREA.includes("cancelada"), false);
-  eq(ESTADOS_ACTIVOS_TAREA.length, 3);
-});
-
-console.log("\ncontarActivas");
-
-test("cuenta solo las activas de una lista mezclada", () => {
-  eq(
-    contarActivas([
-      t("pendiente"),
-      t("hecha"),
-      t("en_espera"),
-      t("en_progreso"),
-      t("cancelada"),
-    ]),
-    2,
-  );
-});
-
-console.log("\nestadoCupo");
-
-test("con hueco muestra cuántas quedan", () => {
-  const c = estadoCupo(Array.from({ length: 7 }, () => t("pendiente")));
-  eq(c.activas, 7);
-  eq(c.cupo, CUPO_TAREAS_ACTIVAS);
-  eq(c.libres, 3);
-  eq(c.excedido, false);
-  eq(c.mensaje.includes("7/10"), true);
-});
-
-test("con el cupo lleno avisa y no quedan huecos", () => {
-  const c = estadoCupo(Array.from({ length: 10 }, () => t("pendiente")));
-  eq(c.libres, 0);
-  eq(c.mensaje.includes("En espera"), true);
-});
-
-test("si alguien escribe por fuera y se pasa, lo dice", () => {
-  const c = estadoCupo(Array.from({ length: 12 }, () => t("pendiente")));
-  eq(c.excedido, true);
-  eq(c.libres, 0);
-});
 
 console.log("\nnormalizarFases");
 
@@ -156,7 +89,6 @@ console.log("\nconstantes");
 
 test("la clave de la lista configurable es la esperada", () => {
   eq(CLAVE_FASES_META, "fases_meta");
-  eq(CUPO_TAREAS_ACTIVAS, 10);
 });
 
 // ── resumen ────────────────────────────────────────────────────────────────
