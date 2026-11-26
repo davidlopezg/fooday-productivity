@@ -85,6 +85,19 @@ porque la migration estaba en `main` pero no en la base de datos.
 > (`supabase link`) y aplica TODAS las migraciones pendientes, no solo una.
 > Para una migración nueva, el SQL Editor es lo más seguro.
 
+> **En Android (Termux) el Supabase CLI no funciona**: `npx supabase db push`
+> aborta con `Error: Unsupported platform: android` (el binario oficial es
+> para Linux/macOS/Windows). Cuando te pase, usa el **SQL Editor** del
+> dashboard (pasos 1-3 de arriba) o `psql` si lo tienes instalado:
+>
+> ```bash
+> psql "postgresql://postgres.<ref>:<PASSWORD>@aws-0-<region>.pooler.supabase.com:6543/postgres" \
+>   -f supabase/migrations/0043_ritual_semanal_datos.sql
+> ```
+>
+> (la contraseña de la base de datos está en Supabase → Project Settings →
+> Database; no es la del panel).
+
 ### Qué hacer si te saltas ese paso
 
 La app **degrada, no se rompe**: la página avisa de qué migración falta y lo
