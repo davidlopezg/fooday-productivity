@@ -625,6 +625,29 @@ export const AYUDA_POR_RUTA: Record<
       },
     ],
   },
+  "/dias-malos": {
+    pilares: [4, 5],
+    items: [
+      {
+        titulo: "El objetivo de hoy es romper la inactividad",
+        cuerpo:
+          "En un día malo, el objetivo no es recuperar las horas perdidas: es hacer algo. Por eso el paso 3 pide una acción de 10 minutos (no la tarea entera) y el paso 5 dice «si consigues trabajar 10 minutos, intenta otros 20» — pero sin exigir nada más. «Eso también cuenta».",
+        pilar: 4,
+      },
+      {
+        titulo: "La culpa es el enemigo, no el día",
+        cuerpo:
+          "El paso 6 (recupera el día: no intentes compensar) existe para cortar la espiral. Si el día va mal y además te castigas, mañana empieza peor: el protocolo es un plan de emergencia, no un examen.",
+        pilar: 5,
+      },
+      {
+        titulo: "Esto no es solo disciplina",
+        cuerpo:
+          "Si la dificultad para empezar sigue afectando de forma importante a tu vida, merece la pena abordarla profesionalmente, además de cambiar los hábitos. La app no lo diagnostica: solo te lo recuerda.",
+        pilar: 4,
+      },
+    ],
+  },
   "/pipeline": {
     pilares: [3],
     items: [

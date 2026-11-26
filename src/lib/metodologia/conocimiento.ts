@@ -291,6 +291,12 @@ export const RITUALES: {
       que: "Marcar los 9 hábitos + cierre cognitivo 5 preguntas. Esto es sagrado: si no se hace, el sistema pierde valor al día siguiente.",
     },
     {
+      cuando: "Cuando el día va mal",
+      pantallas: [{ texto: "/dias-malos", ruta: "/dias-malos" }],
+      que: "El protocolo de emergencia: 6 pasos para romper el ciclo de inactividad sin caer en la espiral de culpa. El objetivo del día es romper la inactividad, no recuperar las horas.",
+      nota: "Se abre cuando el día ya va mal, no al final del día: por eso es una página aparte y no una sección del Estatus. El checklist se reinicia cada día.",
+    },
+    {
       cuando: "Cuando quieras saber dónde estás",
       pantallas: [{ texto: "chat del agente" }],
       que: 'El botón flotante (abajo a la derecha) está en todas las pantallas. Pregunta en lenguaje natural: "¿qué hago hoy?", "¿qué está en riesgo?", "resume el proyecto X". Te responde con el estado real del sistema (metas, KRs, proyectos, tareas, plan de hoy, foco semanal) y solo lee: no crea ni cambia nada.',
@@ -710,6 +716,7 @@ export const FEATURES: Feature[] = [
   // ── Revisión y análisis ──
   { ruta: "/informes", proposito: "KPIs (incluye subtareas) + heatmap de actividad + chart de tareas y subtareas por día/semana + proyectos con conteo + reparto por ámbito (profesional/personal/sin clasificar) y por área de responsabilidad + metas y OKRs cerrados + comparación con plan vs sin plan. REGLA DE PROGRESO: una subtarea cuenta como progreso mientras su tarea siga ABIERTA; al cerrar la tarea, su progreso ya lo representa la tarea completa (1) y las subtareas dejan de sumar, para no contar dos veces el mismo trabajo. REPARTO: las dos vistas nuevas cuentan TASAS completadas de la ventana (mismo criterio que 'Por proyecto': sin subtareas y sin doble conteo); el foco libre (pomodoro sin tarea) no se puede atribuir a ningún ámbito, por eso son cuentas y no minutos", docs: "Ritual semanal (viernes) · Ritual mensual · HelpDrawer" },
   { ruta: "/dashboard-emocional", proposito: "4 dimensiones: despertar / mente / cuerpo / rueda", docs: "Pilar 4 · HelpDrawer" },
+  { ruta: "/dias-malos", proposito: "PROTOCOLO DE EMERGENCIA para los días en los que no consigues hacer nada (issue #86): los 6 pasos del protocolo de recuperación —① interrumpe el ciclo (levántate, móvil fuera de la habitación, agua) ② muévete (10 minutos a pie) ③ reduce el trabajo (una acción de 10 minutos, no la tarea entera) ④ empieza (el primer párrafo, el primer dato, la primera llamada) ⑤ continúa si puedes (10 minutos → 20) ⑥ recupera el día (no intentes compensar las horas perdidas)— con un checklist de HOY que se guarda en el navegador (localStorage) y se reinicia cada día: no se escribe nada en la base de datos. Cierra con «hay días en los que tu objetivo es simplemente romper la inactividad: eso también cuenta» y con la advertencia de que, si esta dificultad para empezar sigue afectando de forma importante a tu vida, merece la pena abordarla profesionalmente: no se asume que todo sea disciplina", docs: "Pilar 4 · Pilar 5 · Rituales §1 (cuando el día va mal) · HelpDrawer" },
 
   // ── Identidad y horizonte ──
   { ruta: "/norte", proposito: "Propósito, valores y visión (la brújula) + MARCO PERSONAL DE VIDA (issue #83): el documento estático de principios, límites no negociables, prioridades y compromisos, con 10 secciones numeradas (§1 propósito, §2 lo que no quiero, §3 lo que sí quiero, §4 límites no negociables, §5 organización diaria, §6 las 8 preguntas para decidir, §7 señales de alerta, §8 compromiso de 90 días, §9 medición semanal, §10 declaración personal). Arriba hay un CUADRO RECORDATORIO de lectura (diaria 2 min, semanal 15 min, mensual 30 min, trimestral 45 min y antes de aceptar un compromiso) con botón 'Marcar lectura de hoy' (la fecha se guarda solo en el navegador, localStorage). El texto vive en src/lib/norte/marcoPersonal.ts y se renderiza en src/app/norte/MarcoPersonal.tsx", docs: "Pilar 2 · Ritual diario (despertar) · Ritual mensual · HelpDrawer" },
