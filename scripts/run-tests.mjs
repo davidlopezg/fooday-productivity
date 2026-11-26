@@ -28,6 +28,8 @@ const TESTS = [
   "src/lib/proyectos.test.mjs",
   "src/lib/metas.test.mjs",
   "src/lib/ritualSemanal.test.mjs",
+  "src/lib/ritual/draft.test.mjs",
+  "src/lib/ritual/situacionIA.test.mjs",
   "src/lib/configStore.test.mjs",
   "src/lib/perfilIA.test.mjs",
   "src/lib/schema-queries.test.mjs",

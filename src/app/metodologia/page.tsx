@@ -414,6 +414,27 @@ export default function MetodologiaPage() {
                   interfaz.
                 </span>
               </li>
+              <li className="flex gap-2">
+                <span className="text-fuchsia-500">·</span>
+                <span>
+                  <strong className="text-foreground">El wizard del ritual semanal (issue #88).</strong>{" "}
+                  <code className="rounded bg-muted px-1 py-0.5 text-[10px] font-mono">/ritual-semanal</code>{" "}
+                  recorre el ritual en 4 pasos (proyectos → metas → 3 WIGs → KRs
+                  de la semana) y aplica una regla de diseño que evita
+                  duplicar pantallas:{" "}
+                  <strong className="text-foreground">el wizard decide QUÉ;
+                  las pantallas hacen CÓMO</strong>. No reordena tareas ni
+                  reparte la semana: eso sigue siendo{" "}
+                  <Link href="/semana" className="font-medium text-foreground underline underline-offset-4">
+                    /semana
+                  </Link>
+                  . Solo escribe en los campos y banderas que ya existen
+                  (WIG de meta, WIG de KR, foco semanal, situación, fase),
+                  respectando los caps que impone la BD. Su borrador vive en
+                  el navegador, no en la base de datos: es un estado de
+                  trabajo, no un dato del sistema.
+                </span>
+              </li>
             </ul>
           </div>
         }

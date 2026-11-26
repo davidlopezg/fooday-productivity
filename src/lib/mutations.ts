@@ -2830,3 +2830,29 @@ export async function guardarConfigLista(
     .insert({ clave, valores: limpio });
   if (error) throw new Error(`No se pudo guardar la lista: ${error.message}`);
 }
+
+/**
+ * Fija las WIGs de meta de una semana (máx 3, en orden 1-3).
+ *
+ * No usa la RPC `toggle_meta_wig` porque el ritual quiere dejar EXACTAMENTE
+ * las 3 que ha elegido la persona, en un orden: primero se quitan las WIGs
+ * actuales y luego se asignan las nuevas con su posición. El cap de 3 lo
+ * sigue imponiendo el índice único parcial (migration 0018).
+ */
+export async function guardarWigsMeta(ids: string[]): Promise<void> {
+  const supabase = createClient();
+  const unicas = [...new Set(ids.filter(Boolean))].slice(0, 3);
+  const { error: eClear } = await supabase
+    .from("metas")
+    .update({ es_wig: false, wig_orden: null })
+    .eq("es_wig", true);
+  if (eClear) throw new Error(`No se pudieron quitar las WIGs: ${eClear.message}`);
+  for (let i = 0; i < unicas.length; i++) {
+    const { error } = await supabase
+      .from("metas")
+      .update({ es_wig: true, wig_orden: i + 1 })
+      .eq("id", unicas[i]);
+    if (error)
+      throw new Error(`No se pudo marcar la WIG: ${error.message}`);
+  }
+}
