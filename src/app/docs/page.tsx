@@ -3004,7 +3004,25 @@ export default function DocsPage() {
 
               <strong>con historial</strong>. El semáforo que ves es{" "}
 
-              <strong>derivado</strong>: no se guarda, se calcula.
+              <strong>derivado</strong>: no se guarda, se calcula.{" "}
+
+              <strong className="text-foreground">Qué metas aparecen:</strong>{" "}
+
+              solo las de proyectos{" "}
+
+              <strong className="text-foreground">vivos o en pausa</strong> (o
+
+              las metas sueltas, sin proyecto). Las metas de un proyecto{" "}
+
+              <strong className="text-foreground">muerto</strong> —o de un
+
+              proyecto que ya no está disponible—{" "}
+
+              <strong className="text-foreground">no aparecen</strong>: se
+
+              listan aparte, una a una, con el motivo, para que sepas qué has
+
+              dejado fuera y por qué.
 
             </span>
 
@@ -3886,6 +3904,63 @@ export default function DocsPage() {
 
 
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
+
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+
+              2026-11-26
+            </span>
+
+            <span className="text-muted-foreground">
+
+              <strong className="text-foreground">
+
+                El paso 2 del ritual semanal solo te enseña las metas que
+
+                compiten.
+              </strong>{" "}
+
+              El filtro ya existía, pero era invisible: el paso 1 marcaba un
+
+              proyecto como muerto y el paso 2 solo decía{" "}
+
+              <em>“N meta(s) están en proyectos que has marcado como muertos”</em>
+
+              , sin decir cuáles. Y la frase mentía cuando el proyecto ya no
+
+              estaba en la lista (archivado o borrado): esas metas se
+
+              contaban como de proyectos muertos. Ahora: (a) el aviso{" "}
+
+              <strong className="text-foreground">lista una a una las metas que
+
+              no aparecen</strong> y el motivo (proyecto muerto en este ritual
+
+              o proyecto no disponible); (b) las metas de un proyecto{" "}
+
+              <strong className="text-foreground">en pausa</strong> se siguen
+
+              revisando —pausa no es muerte: la meta puede volver— pero se
+
+              marcan con el nombre del proyecto; (c) la regla de qué entra y
+
+              qué no vive en{" "}
+
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+
+                src/lib/ritual/metasVisibles.ts
+
+              </code>{" "}
+
+              con su test. Sin migración: solo cambia lo que se ve. FEATURES y
+
+              la sección 2.c de esta página actualizadas.
+
+            </span>
+
+          </li>
+
 
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
 

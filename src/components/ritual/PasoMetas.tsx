@@ -15,12 +15,15 @@
 //   la lectura interpretation de la persona.
 //
 // EL FILTRO
-//   Solo entran las metas de proyectos VIVOS (o sin proyecto). Las metas de
-//   un proyecto muerto se avisan, pero no compiten por una WIG.
+//   Solo entran las metas de proyectos VIVOS o EN PAUSA (o sin proyecto). Las
+//   metas de un proyecto muerto (o que ya no está disponible) NO aparecen:
+//   se listan aparte, con el motivo, para que sepas qué has dejado fuera.
+//   La regla vive en @/lib/ritual/metasVisibles (con su test).
 // ============================================================================
 
 import Link from "next/link";
 import type { DraftRitual } from "@/lib/ritual/draft";
+import { textoMotivo, type MetaExcluida } from "@/lib/ritual/metasVisibles";
 import type { EstadoMeta, Meta } from "@/lib/types";
 
 const ESTADOS_META: { valor: EstadoMeta; label: string }[] = [
@@ -40,7 +43,8 @@ function semaforo(m: Meta, d: DraftRitual): { color: string; label: string } {
 
 export function PasoMetas({
   metas,
-  metasDeProyectosMuertos,
+  metasExcluidas,
+  estadoProyectoDeMeta,
   fases,
   draft,
   onChange,
@@ -48,38 +52,50 @@ export function PasoMetas({
   redactando,
 }: {
   metas: Meta[];
-  metasDeProyectosMuertos: Meta[];
+  metasExcluidas: MetaExcluida[];
+  estadoProyectoDeMeta: Map<string, { nombre: string; estado: string }>;
   fases: string[];
   draft: DraftRitual;
   onChange: (d: DraftRitual) => void;
   onRedactar: (metaId: string) => void;
   redactando: string | null;
 }) {
-  if (metas.length === 0) {
-    return (
-      <p className="rounded-lg border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
-        No hay metas vivas que revisar.
-      </p>
-    );
-  }
-
   return (
     <div className="space-y-3">
-      {metasDeProyectosMuertos.length > 0 && (
-        <p className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
-          {metasDeProyectosMuertos.length} meta(s) están en proyectos que has
-          marcado como muertos: no compiten por una WIG. Revísalas en{" "}
-          <Link href="/metas" className="underline underline-offset-4">
-            /metas
-          </Link>
-          .
-        </p>
+      {metasExcluidas.length > 0 && (
+        <details className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+          <summary className="cursor-pointer font-medium">
+            {metasExcluidas.length} meta(s) no aparecen aquí: su proyecto ha
+            muerto en este ritual o ya no está disponible. No compiten por una
+            WIG.
+          </summary>
+          <ul className="mt-2 space-y-1">
+            {metasExcluidas.map((x) => (
+              <li key={x.meta.id}>
+                · {x.meta.codigo ? `${x.meta.codigo} · ` : ""}
+                {x.meta.titulo}
+                {x.proyecto ? ` (${x.proyecto})` : " (proyecto desconocido)"} —{" "}
+                {textoMotivo(x.motivo)}. Revísala en{" "}
+                <Link href="/metas" className="underline underline-offset-4">
+                  /metas
+                </Link>
+                .
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
 
+      {metas.length === 0 ? (
+        <p className="rounded-lg border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
+          No hay metas vivas que revisar.
+        </p>
+      ) : (
       <ul className="space-y-3">
         {metas.map((m) => {
           const d = draft.metas[m.id] ?? {};
           const sem = semaforo(m, draft);
+          const proj = estadoProyectoDeMeta.get(m.id);
 
           return (
             <li key={m.id} className="rounded-xl border border-border bg-card p-4">
@@ -91,6 +107,18 @@ export function PasoMetas({
                   </p>
                   <p className="mt-0.5 text-[11px] text-muted-foreground">
                     Semáforo DERIVADO: {sem.label} (no se guarda: se calcula)
+                    {proj && (
+                      <>
+                        {" · "}
+                        {proj.estado === "pausado" ? (
+                          <span className="text-amber-600 dark:text-amber-400">
+                            proyecto “{proj.nombre}” en pausa
+                          </span>
+                        ) : (
+                          <>proyecto “{proj.nombre}”</>
+                        )}
+                      </>
+                    )}
                   </p>
                 </div>
                 <div className="flex shrink-0 gap-1">
@@ -221,6 +249,7 @@ export function PasoMetas({
           );
         })}
       </ul>
+      )}
     </div>
   );
 }
