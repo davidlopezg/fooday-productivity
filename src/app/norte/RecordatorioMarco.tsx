@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { MARCO_RECORDATORIO } from "@/lib/norte/marcoPersonal";
 
 // ============================================================================
@@ -9,9 +9,50 @@ import { MARCO_RECORDATORIO } from "@/lib/norte/marcoPersonal";
 // No guarda nada en la base de datos: solo la fecha de la última lectura en
 // el navegador (localStorage), que es lo único que hace falta para saber si
 // toca releer el documento.
+//
+// El valor se lee con useSyncExternalStore para no tener setState dentro de
+// un efecto (y para que no haya diferencias entre servidor y navegador).
 // ============================================================================
 
 const CLAVE = "fooday:marco-personal:lectura";
+
+let cache: string | null | undefined; // undefined = aún no leído
+let suscriptores: (() => void)[] = [];
+
+function leer(): string | null {
+  try {
+    return window.localStorage.getItem(CLAVE);
+  } catch {
+    // Modo privado / almacenamiento bloqueado: se juega sin recordar.
+    return null;
+  }
+}
+
+function getSnapshot(): string | null {
+  if (cache === undefined) cache = leer();
+  return cache;
+}
+
+function getServerSnapshot(): string | null {
+  return null;
+}
+
+function suscribir(cb: () => void): () => void {
+  suscriptores.push(cb);
+  return () => {
+    suscriptores = suscriptores.filter((s) => s !== cb);
+  };
+}
+
+function guardar(hoy: string) {
+  cache = hoy;
+  try {
+    window.localStorage.setItem(CLAVE, hoy);
+  } catch {
+    // Sin almacenamiento: la fecha solo vive en esta sesión.
+  }
+  suscriptores.forEach((s) => s());
+}
 
 function hoyISO(): string {
   return new Date().toISOString().slice(0, 10);
@@ -33,28 +74,7 @@ function siguienteLectura(dias: number | null): string {
 }
 
 export default function RecordatorioMarco() {
-  const [ultima, setUltima] = useState<string | null>(null);
-  const [listo, setListo] = useState(false);
-
-  useEffect(() => {
-    try {
-      setUltima(window.localStorage.getItem(CLAVE));
-    } catch {
-      // Modo privado / almacenamiento bloqueado: se juega sin recordar.
-    }
-    setListo(true);
-  }, []);
-
-  function marcarLeido() {
-    const hoy = hoyISO();
-    setUltima(hoy);
-    try {
-      window.localStorage.setItem(CLAVE, hoy);
-    } catch {
-      // Sin almacenamiento: la fecha solo vive en esta sesión.
-    }
-  }
-
+  const ultima = useSyncExternalStore(suscribir, getSnapshot, getServerSnapshot);
   const dias = ultima ? diasDesde(ultima) : null;
 
   return (
@@ -68,33 +88,27 @@ export default function RecordatorioMarco() {
             {MARCO_RECORDATORIO.intro}
           </p>
         </div>
-        {listo && (
-          <button
-            type="button"
-            onClick={marcarLeido}
-            className="rounded-md border border-border bg-background px-3 py-2 text-sm font-medium hover:bg-accent"
-          >
-            {dias === 0 ? "✓ Leído hoy" : "Marcar lectura de hoy"}
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => guardar(hoyISO())}
+          className="rounded-md border border-border bg-background px-3 py-2 text-sm font-medium hover:bg-accent"
+        >
+          {dias === 0 ? "✓ Leído hoy" : "Marcar lectura de hoy"}
+        </button>
       </div>
 
       <div className="mt-4 overflow-x-auto rounded-lg border border-border bg-background/70">
         <table className="w-full text-left text-sm">
           <thead className="bg-muted/50">
             <tr>
-              <th className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Cuándo
-              </th>
-              <th className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Cuánto
-              </th>
-              <th className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                En qué momento
-              </th>
-              <th className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Qué leer
-              </th>
+              {["Cuándo", "Cuánto", "En qué momento", "Qué leer"].map((c) => (
+                <th
+                  key={c}
+                  className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
+                >
+                  {c}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
@@ -112,9 +126,7 @@ export default function RecordatorioMarco() {
         </table>
       </div>
 
-      {listo && (
-        <p className="mt-3 text-sm font-medium text-foreground">{siguienteLectura(dias)}</p>
-      )}
+      <p className="mt-3 text-sm font-medium">{siguienteLectura(dias)}</p>
     </section>
   );
 }

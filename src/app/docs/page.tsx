@@ -462,7 +462,7 @@ export default function DocsPage() {
           </table>
         </div>
         <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-          El botón <strong className="text-foreground">"Marcar lectura de hoy"</strong>{" "}
+          El botón <strong className="text-foreground">«Marcar lectura de hoy»</strong>{" "}
           guarda solo la fecha en el navegador (localStorage): no escribe nada
           en la base de datos, pero permite que la propia página te diga si ya
           toca la revisión semanal, mensual o trimestral.
@@ -1688,7 +1688,7 @@ export default function DocsPage() {
               </strong>
               : 10 secciones numeradas con los límites no negociables, las 8
               preguntas para decidir, las señales de alerta y el compromiso de
-              90 días. El botón "Marcar lectura de hoy" guarda solo la fecha
+              90 días. El botón «Marcar lectura de hoy» guarda solo la fecha
               en el navegador (localStorage, sin base de datos). Texto en{" "}
               <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
                 src/lib/norte/marcoPersonal.ts
