@@ -107,10 +107,20 @@ export function claveFila(fila: FilaPlan): string | null {
 // Candidatas: qué tareas de la base de datos se pueden meter en el plan
 // ----------------------------------------------------------------------------
 
-/** Una tarea está ACTIVA si no está hecha, descartada ni archivada. */
+/**
+ * Una tarea está ACTIVA si no está hecha, descartada ni archivada.
+ * Desde la migration 0043 tampoco lo están `en_espera` (apartada por el
+ * ritual semanal) ni `cancelada`: no se ofrecen para el plan del día.
+ */
 export function esTareaActiva(estado?: string | null): boolean {
   if (!estado) return true;
-  return estado !== "hecha" && estado !== "descartada" && estado !== "archivada";
+  return (
+    estado !== "hecha" &&
+    estado !== "descartada" &&
+    estado !== "archivada" &&
+    estado !== "en_espera" &&
+    estado !== "cancelada"
+  );
 }
 
 /**

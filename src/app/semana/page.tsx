@@ -61,6 +61,10 @@ import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
 import { useConfig } from "@/lib/configStore";
 import { sugerirKRsSemanaIA, type KrSugerido } from "@/lib/sugerirKRsSemanaIA";
 import {
+  calcularCobertura,
+  textoAvisoCobertura,
+} from "@/lib/ritual/cobertura";
+import {
   BLOQUES_FIJOS,
   DIAS_IA,
   DIAS_SEMANA,
@@ -884,9 +888,27 @@ export default function SemanaPage() {
     return m;
   }, [plan, tareasById]);
 
+  // Cobertura de los KRs en foco: ¿cuál se queda sin tareas esta semana?
+  const coberturaKRs = useMemo(() => {
+    const tareasPorId = new Map((tareas ?? []).map((t) => [t.id, t]));
+    const deLaSemana = (plan ?? [])
+      .map((a) => tareasPorId.get(a.tarea_id))
+      .filter((t): t is Tarea => !!t)
+      .map((t) => ({
+        id: t.id,
+        titulo: t.titulo,
+        resultado_periodo_id: t.resultado_periodo_id ?? null,
+      }));
+    return calcularCobertura(
+      (focoKRs ?? []).map((f) => ({ id: f.kr.id, titulo: f.kr.titulo })),
+      deLaSemana,
+    );
+  }, [plan, tareas, focoKRs]);
+
+  const avisoCobertura = textoAvisoCobertura(coberturaKRs);
+
   // Pool para el buscador del popover y para el backlog
-  const tareasNoAsignadas = useMemo(() => {
-    return (tareas ?? []).filter((t) => !tareasAsignadasIds.has(t.id));
+  const tareasNoAsignadas = useMemo(() => {    return (tareas ?? []).filter((t) => !tareasAsignadasIds.has(t.id));
   }, [tareas, tareasAsignadasIds]);
 
   const backlogCandidatas = useMemo(() => {
@@ -1206,6 +1228,46 @@ export default function SemanaPage() {
         onAplicar={(krId) => aplicarKrFoco(krId, true)}
         onQuitar={(krId) => aplicarKrFoco(krId, false)}
       />
+
+      {/* Cobertura de los KRs en foco (paso 5b del ritual, issue #89):
+          un KR en foco sin ninguna tarea esta semana es foco que no
+          empuja nada. */}
+      {focoKRs && focoKRs.length > 0 && (
+        <section className="rounded-xl border border-border bg-card p-4">
+          <h2 className="text-sm font-semibold tracking-tight">
+            🎯 Cobertura de los KRs en foco
+          </h2>
+          <ul className="mt-2 space-y-1 text-sm">
+            {coberturaKRs.map((c) => (
+              <li key={c.krId} className="flex items-start gap-2">
+                <span aria-hidden>{c.vacio ? "⚠️" : "✅"}</span>
+                <span className="min-w-0">
+                  <span
+                    className={
+                      c.vacio
+                        ? "font-medium text-amber-700 dark:text-amber-300"
+                        : undefined
+                    }
+                  >
+                    {c.titulo}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {" · "}
+                    {c.vacio
+                      ? "sin tareas esta semana"
+                      : `${c.tareas} tarea${c.tareas === 1 ? "" : "s"}`}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          {avisoCobertura && (
+            <p className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300">
+              {avisoCobertura}
+            </p>
+          )}
+        </section>
+      )}
 
       {/* Pipeline */}
       <DndContext

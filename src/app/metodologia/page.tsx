@@ -386,9 +386,10 @@ export default function MetodologiaPage() {
               <li className="flex gap-2">
                 <span className="text-fuchsia-500">·</span>
                 <span>
-                  <strong className="text-foreground">El modelo del ritual semanal (migration 0043).</strong>{" "}
-                  La derivación de arriba (“el estado de la meta lo deducen sus
-                  tareas”) es una de las tres respuestas posibles a la pregunta
+                  <strong className="text-foreground">El modelo del ritual semanal (migration 0043 y 0045).</strong>{" "}
+                  La derivación de arriba ("el estado de la meta lo deduce sus
+tareas" — ahora incluye el paso 5: inventario, cobertura y las 3 del día)
+is una de las tres respuestas posibles a la pregunta
                   del ritual: <strong className="text-foreground">viva</strong>,{" "}
                   <strong className="text-foreground">en pausa</strong> o{" "}
                   <strong className="text-foreground">archivada</strong>. La pausa
@@ -419,7 +420,7 @@ export default function MetodologiaPage() {
                 <span>
                   <strong className="text-foreground">El wizard del ritual semanal (issue #88).</strong>{" "}
                   <code className="rounded bg-muted px-1 py-0.5 text-[10px] font-mono">/ritual-semanal</code>{" "}
-                  recorre el ritual en 4 pasos (proyectos → metas → 3 WIGs → KRs
+                  recorre el ritual en 5 pasos (proyectos → metas → 3 WIGs → KRs → tareas)
                   de la semana) y aplica una regla de diseño que evita
                   duplicar pantallas:{" "}
                   <strong className="text-foreground">el wizard decide QUÉ;

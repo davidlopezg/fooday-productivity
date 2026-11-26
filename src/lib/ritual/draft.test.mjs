@@ -42,9 +42,9 @@ function eq(a, b, msg) {
 
 console.log("\nPASOS");
 
-test("son 4 pasos, en orden, con minutos", () => {
-  eq(PASOS.length, 4);
-  eq(PASOS.map((p) => p.id), ["proyectos", "metas", "wigs", "krs"]);
+test("son 5 pasos, en orden, con minutos", () => {
+  eq(PASOS.length, 5);
+  eq(PASOS.map((p) => p.id), ["proyectos", "metas", "wigs", "krs", "tareas"]);
   eq(PASOS.every((p) => p.minutos > 0), true);
 });
 
@@ -56,6 +56,8 @@ test("empieza en el primer paso, con espejo activado y sin respuestas", () => {
   eq(d.espejo, true);
   eq(d.wigsMeta, []);
   eq(d.krs, {});
+  eq(d.tareas, {});
+  eq(d.tresDelDia, {});
   eq(d.version, VERSION_DRAFT);
 });
 

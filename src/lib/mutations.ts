@@ -2805,6 +2805,48 @@ export async function guardarRitualSemanal(
     throw new Error(`No se pudo guardar la bitácora: ${error.message}`);
 }
 
+/**
+ * GUARDA las 3 del día de un día concreto (migration 0045).
+ *
+ * Reemplaza por completo la selección de ese día: lo que no está en la
+ * lista se queda fuera. El cap de 3 lo impone el trigger de la BD; aquí
+ * solo se escribe lo que el usuario ha elegido.
+ */
+export async function guardarTresDelDia(payload: {
+  anio: number;
+  semana_iso: number;
+  dia_semana: number;
+  /** La fecha concreta del día (YYYY-MM-DD). */
+  fecha: string;
+  /** Ids de las tareas, en orden (máx 3). */
+  tarea_ids: string[];
+}): Promise<void> {
+  const supabase = createClient();
+  const ids = payload.tarea_ids.filter(Boolean).slice(0, 3);
+
+  const { error: errDel } = await supabase
+    .from("ritual_tareas_dia")
+    .delete()
+    .eq("anio", payload.anio)
+    .eq("semana_iso", payload.semana_iso)
+    .eq("dia_semana", payload.dia_semana);
+  if (errDel)
+    throw new Error(`No se pudo limpiar el día: ${errDel.message}`);
+
+  if (ids.length === 0) return;
+
+  const filas = ids.map((tarea_id, i) => ({
+    anio: payload.anio,
+    semana_iso: payload.semana_iso,
+    dia_semana: payload.dia_semana,
+    orden: i + 1,
+    tarea_id,
+    fecha: payload.fecha,
+  }));
+  const { error } = await supabase.from("ritual_tareas_dia").insert(filas);
+  if (error) throw new Error(`No se pudieron guardar las 3 del día: ${error.message}`);
+}
+
 /** Guarda una lista configurable (p.ej. el catálogo de fases de meta). */
 export async function guardarConfigLista(
   clave: string,
