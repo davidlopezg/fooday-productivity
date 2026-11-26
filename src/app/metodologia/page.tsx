@@ -410,9 +410,9 @@ is una de las tres respuestas posibles a la pregunta
                   situación se escribe. En las tareas, el ritual añade{" "}
                   <em>en espera</em> (la aparto, vuelve) frente a{" "}
                   <em>cancelada</em> (no la haré) y un{" "}
-                  <strong className="text-foreground">cupo de 10 tareas
-                  activas</strong> que impone un trigger de la BD, no la
-                  interfaz.
+                  <strong className="text-foreground">objetivo de ~10 tareas
+                  activas en la semana</strong> que avisa la interfaz (la BD ya
+                  no lo impone: issue #96).
                 </span>
               </li>
               <li className="flex gap-2">
@@ -424,8 +424,10 @@ is una de las tres respuestas posibles a la pregunta
                   de la semana) y aplica una regla de diseño que evita
                   duplicar pantallas:{" "}
                   <strong className="text-foreground">el wizard decide QUÉ;
-                  las pantallas hacen CÓMO</strong>. No reordena tareas ni
-                  reparte la semana: eso sigue siendo{" "}
+                  las pantallas hacen CÓMO</strong>. El paso 5 sí elige el
+                  inventario de tareas de la semana y su día (eso es QUÉ: el
+                  trabajo de la semana); afinar el reparto, arrastrar tareas y
+                  añadir al día sigue siendo cosa de{" "}
                   <Link href="/semana" className="font-medium text-foreground underline underline-offset-4">
                     /semana
                   </Link>

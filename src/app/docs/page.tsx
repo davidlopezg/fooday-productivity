@@ -2782,9 +2782,11 @@ export default function DocsPage() {
 
           revisan metas y proyectos, se eligen tres WIGs, de ellas se eligen
 
-          los KRs de la semana, y se deja el inventario de tareas limpio con
+          los KRs de la semana, y se elige el{" "}
 
-          un máximo de diez activas. Desde la migration 0043, la app{" "}
+          <strong className="text-foreground">inventario de tareas de la
+
+          semana</strong> (unas diez, con su día). Desde la migration 0043, la app{" "}
 
           <strong className="text-foreground">ya puede representar (y
 
@@ -2798,7 +2800,9 @@ export default function DocsPage() {
 
           </code>
 
-          : un asistente de 4 pasos (proyectos → metas → 3 WIGs → KRs) con
+          : un asistente de 5 pasos (proyectos → metas → 3 WIGs → KRs →
+
+          tareas) con
 
           temporizador por paso y <strong>borrador reanudable</strong> (puedes
 
@@ -2806,9 +2810,7 @@ export default function DocsPage() {
 
           escribe al pulsar «Guardar y continuar», así que rectificar no
 
-          ensucia los datos. Lo que queda para el issue #89 es el paso 5: el
-
-          inventario de tareas con su cupo de 10 y las 3 tareas de cada día.
+          ensucia los datos.
 
         </p>
 
@@ -2896,7 +2898,9 @@ export default function DocsPage() {
 
             <span>
 
-              <strong className="text-foreground">Tarea: En espera ≠ Cancelada, y cupo de 10.</strong>{" "}
+              <strong className="text-foreground">Tarea: En espera ≠ Cancelada, y un
+
+              objetivo de ~10 activas.</strong>{" "}
 
               Las activas son pendiente / en progreso / bloqueada.{" "}
 
@@ -2914,13 +2918,17 @@ export default function DocsPage() {
 
               </code>{" "}
 
-              dice que no la harás. Ninguna de las dos cuenta como activa, y
+              dice que no la harás. Ninguna de las dos cuenta como activa. Las{" "}
 
-              el <strong>límite de 10 activas lo impone la base de datos</strong>{" "}
+              <strong>~10 activas de la semana son un objetivo, no un tope</strong>:
 
-              (trigger de la 0043): ningún cliente, script ni ETL puede
+              lo avisa la pantalla del ritual (issue #96) y{" "}
 
-              saltárselo.
+              <strong>la base de datos ya no lo impone</strong> (la migration
+
+              0046 quita el trigger global de la 0043, que además bloqueaba
+
+              activar tareas con un inventario heredado grande).
 
             </span>
 
@@ -3050,37 +3058,78 @@ export default function DocsPage() {
 
             <span>
 
-              <strong className="text-foreground">Las tareas: inventario,
+              <strong className="text-foreground">Las tareas de la semana:</strong>
 
-              cobertura y las 3 del día.</strong> (a) El{" "}
+              el inventario que eliges aquí y{" "}
 
-              <strong>inventario</strong>: marcas lo que ya está hecho, bajas
+              <strong>su reparto por días</strong>. (a) El{" "}
 
-              a <em>En espera</em> lo que no quieres esta semana y{" "}
+              <strong>inventario</strong>: la lista corta de la semana. Las
 
-              <em>Cancelas</em> lo que no vas a hacer. El{" "}
+              candidatas son las tareas de tus KRs en foco, las WIG de tarea y
 
-              <strong>cupo de 10 activas</strong> lo impone la base de datos
+              las críticas o urgentes —no el inventario entero—, más un
 
-              (trigger), no la pantalla: la UI solo informa. (b) La{" "}
+              buscador para añadir cualquier otra. Eliges el día de cada una y
+
+              con eso la semana queda montada. Sobre cada tarea: Completar,{" "}
+
+              <em>En espera</em> (la apartas, vuelve) o <em>Cancelada</em> (no
+
+              la harás). Las ~10 activas son un{" "}
+
+              <strong>objetivo, no un tope</strong>: la pantalla avisa y ya. (b)
+
+              La{" "}
 
               <strong>cobertura</strong>: de tus KRs en foco, cuáles se han
 
-              quedado sin ninguna tarea esta semana (un KR en foco sin
+              quedado sin ninguna tarea en la semana (un KR en foco sin
 
-              tareas es foco que no empuja nada). (c) La rejilla de{" "}
+              tareas es foco que no empuja nada). Se mide sobre lo que eliges
 
-              <strong>las 3 del día</strong>: de lo que ya tienes repartido
+              aquí. (c) La rejilla de{" "}
 
-              en /semana, con cuáles te comprometes cada día. Lo demás queda
+              <strong>las 3 del día</strong>: de las tareas de la semana, con
 
-              “de apoyo”. El tope de 3 por día lo impone la base de datos.
+              cuáles te comprometes cada día. Lo demás queda “de apoyo”. El
+
+              tope de 3 por día lo impone la base de datos.
 
             </span>
 
           </li>
 
         </ul>
+
+
+
+        <p className="mt-4 rounded-lg border border-border bg-muted/30 p-3 text-xs leading-relaxed text-muted-foreground">
+
+          <strong className="text-foreground">La dirección: el ritual elige, /semana afina.</strong>{" "}
+
+          El paso 5 es el que decide{" "}
+
+          <strong className="text-foreground">qué tareas forman la semana y en
+
+          qué día</strong>: se escribe en{" "}
+
+          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">plan_semanal_tareas</code>
+
+          .{" "}
+
+          <Link href="/semana" className="underline underline-offset-4">
+
+            /semana
+          </Link>{" "}
+
+          parte de ahí: mueve, arrastra y afina el reparto, y su backlog
+
+          sigue siendo el sitio donde aparecen las tareas activas que no
+
+          has puesto en la semana. El flujo nunca es al revés (issue #96).
+
+        </p>
 
 
 
@@ -3837,6 +3886,78 @@ export default function DocsPage() {
 
 
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
+
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+
+              2026-11-26
+            </span>
+
+            <span className="text-muted-foreground">
+
+              <strong className="text-foreground">
+
+                El paso 5 del ritual semanal elige el inventario de la semana
+
+                (y /semana lo afina).
+              </strong>{" "}
+
+              Issue #96: el paso 5 volcaba el inventario entero (unas 230
+
+              tareas) para “elegir 10”, y las dos capas que vienen después
+
+              (cobertura y 3 del día) se medían sobre lo que ya estaba
+
+              repartido en /semana: el ritual asumía que venías *de* /semana.
+
+              Ahora el{" "}
+
+              <strong className="text-foreground">ritual elige la semana</strong>{" "}
+
+              y /semana la afina. (a) Las{" "}
+
+              <strong className="text-foreground">candidatas</strong> son las
+
+              tareas de tus KRs en foco, las WIG de tarea y las críticas o
+
+              urgentes —no las 230—, más un buscador para añadir cualquier
+
+              otra; eliges el día de cada una y la semana queda repartida
+
+              (se escribe en{" "}
+
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">plan_semanal_tareas</code>).
+
+              (b) La{" "}
+
+              <strong className="text-foreground">cobertura</strong> se mide
+
+              sobre lo elegido aquí, no sobre /semana. (c) Las{" "}
+
+              <strong className="text-foreground">3 del día</strong> se eligen
+
+              entre las tareas de la semana. Y las ~10 activas son un{" "}
+
+              <strong className="text-foreground">objetivo, no un tope</strong>:{" "}
+
+              la nueva migration{" "}
+
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">0046_cupo_tareas_orientativo.sql</code>{" "}
+
+              quita el trigger global de la 0043, que además bloqueaba activar
+
+              cualquier tarea con un inventario heredado grande. Sin tablas
+
+              nuevas: el conjunto de la semana es{" "}
+
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">plan_semanal_tareas</code>
+
+              . FEATURES y la sección 2.c de esta página actualizadas.
+
+            </span>
+
+          </li>
 
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
 

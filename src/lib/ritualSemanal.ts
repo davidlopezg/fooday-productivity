@@ -3,30 +3,21 @@
 // ----------------------------------------------------------------------------
 // QUÉ ES
 //   Funciones PURAS (sin red, sin React) que el ritual semanal necesita:
-//   qué estados cuentan como "tarea activa", cuál es el cupo, qué fases
-//   existen y cómo se serializa una fila de la bitácora.
+//   qué fases de meta existen y cómo se serializa una fila de la bitácora.
 //
 // POR QUÉ ES UN FICHERO APARTE
-//   El cupo y los estados son REGLAS DE NEGOCIO, no detalles de pantalla:
-//   si viven en un componente, dos pantallas los aplican distinto. Aquí
+//   Las fases y la bitácora son REGLAS DE NEGOCIO, no detalles de pantalla:
+//   si viven en un componente, dos pantallas las aplican distinto. Aquí
 //   viven en un sitio y se testean (src/lib/ritualSemanal.test.mjs).
 //
 // LO QUE NO HACE
 //   No escribe en BD (eso es src/lib/mutations.ts) ni decide por la
-//   persona: el cupo avisa, la BD lo impone (trigger de 0043).
+//   persona: el cupo de tareas activas avisa, no lo impone (issue #96).
 // ============================================================================
 
-import type { EstadoTarea, Tarea } from "@/lib/types";
-
-/** Estados en los que una tarea CUENTA como activa (cupo de 10). */
-export const ESTADOS_ACTIVOS_TAREA: readonly EstadoTarea[] = [
-  "pendiente",
-  "en_progreso",
-  "bloqueada",
-];
-
-/** Cupo de tareas activas del ritual semanal. Lo impone la BD (0043). */
-export const CUPO_TAREAS_ACTIVAS = 10;
+// El "cupo" de tareas activas del ritual vive en src/lib/ritual/semana.ts
+// (OBJETIVO_TAREAS_SEMANA): desde la migration 0046 es ORIENTATIVO, no un
+// límite que imponga la BD.
 
 /**
  * Catálogo de fases de meta por defecto. Editable en /configuracion
@@ -42,39 +33,6 @@ export const FASES_META_POR_DEFECTO: readonly string[] = [
 
 /** Clave de la lista configurable de fases. */
 export const CLAVE_FASES_META = "fases_meta";
-
-/** ¿Esta tarea cuenta como activa (ocupa plaza del cupo)? */
-export function tareaEsActiva(t: Pick<Tarea, "estado">): boolean {
-  return ESTADOS_ACTIVOS_TAREA.includes(t.estado);
-}
-
-/** Nº de tareas activas de una lista. */
-export function contarActivas(tareas: Array<Pick<Tarea, "estado">>): number {
-  return tareas.filter(tareaEsActiva).length;
-}
-
-/**
- * Estado del cupo: cuántas activas hay, cuántas quedan y qué dice.
- * `excedido` solo puede aparecer si alguien escribió por fuera de la app:
- * la BD lo impide (trigger de 0043), pero la UI tiene que poder contarlo.
- */
-export function estadoCupo(tareas: Array<Pick<Tarea, "estado">>): {
-  activas: number;
-  cupo: number;
-  libres: number;
-  excedido: boolean;
-  mensaje: string;
-} {
-  const activas = contarActivas(tareas);
-  const libres = Math.max(0, CUPO_TAREAS_ACTIVAS - activas);
-  const excedido = activas > CUPO_TAREAS_ACTIVAS;
-  const mensaje = excedido
-    ? `Hay ${activas} tareas activas: el cupo es ${CUPO_TAREAS_ACTIVAS}.`
-    : libres === 0
-      ? `Cupo lleno (${activas}/${CUPO_TAREAS_ACTIVAS}). Para activar otra, baja alguna a En espera.`
-      : `${activas}/${CUPO_TAREAS_ACTIVAS} activas · te quedan ${libres}.`;
-  return { activas, cupo: CUPO_TAREAS_ACTIVAS, libres, excedido, mensaje };
-}
 
 /**
  * Clave de comparación: sin acentos y en minúsculas, para que

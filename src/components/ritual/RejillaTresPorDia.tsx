@@ -60,7 +60,7 @@ export function RejillaTresPorDia({
           🎯 Las 3 de cada día
         </h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          De lo que ya tienes repartido en <strong>/semana</strong>, elige con
+          De las tareas que has puesto en la semana (las de arriba), elige con
           cuáles te comprometes. Las demás quedan de apoyo: puedes hacerlas,
           pero no te comprometes.
         </p>
@@ -158,7 +158,8 @@ export function RejillaTresPorDia({
 
               {candidatas.length === 0 && (
                 <p className="mt-2 text-xs text-muted-foreground">
-                  No hay tareas repartidas en este día. Repártelas en /semana.
+                  No hay tareas en este día. Ponle alguna desde el paso 5
+                  (“Las tareas de esta semana”).
                 </p>
               )}
             </section>

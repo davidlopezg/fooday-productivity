@@ -32,7 +32,7 @@ export type PasoId = (typeof PASOS)[number]["id"];
 
 /** Versión del formato del draft. Si cambia, los borradores viejos se
  *  descartan en silencio (mejor perder un draft que romper la app). */
-export const VERSION_DRAFT = 2;
+export const VERSION_DRAFT = 3;
 
 /** Decisión del ritual sobre una tarea (paso 5). */
 export type DecisionTarea = "hecha" | "en_espera" | "cancelada" | "activa";
@@ -84,6 +84,13 @@ export interface DraftRitual {
   tareas: Record<string, DecisionTarea>;
   /** Paso 5: las 3 del día por día (día ISO → ids de tareas). */
   tresDelDia: Record<string, string[]>;
+  /**
+   * Paso 5: el reparto por días de la semana (tarea_id → día ISO 1..7).
+   * `null` = la tarea se queda FUERA de la semana (la quitas del reparto).
+   * Es lo que el ritual escribe en `plan_semanal_tareas`: el ritual decide el
+   * inventario de la semana y /semana lo afina (issue #96).
+   */
+  plan: Record<string, number | null>;
   /** Pasos que has saltado (noObligatorios). */
   saltados: PasoId[];
 }
@@ -102,6 +109,7 @@ export function draftVacio(anio: number, semana_iso: number): DraftRitual {
     espejo: true,
     tareas: {},
     tresDelDia: {},
+    plan: {},
     saltados: [],
   };
 }
@@ -137,6 +145,7 @@ export function leerDraft(
       espejo: d.espejo !== false,
       tareas: d.tareas ?? {},
       tresDelDia: d.tresDelDia ?? {},
+      plan: d.plan ?? {},
       saltados: Array.isArray(d.saltados) ? d.saltados : [],
       paso: esPaso(d.paso) ? d.paso : "proyectos",
     } as DraftRitual;
