@@ -66,6 +66,10 @@ import {
 } from "@/lib/ritual/semana";
 import { redactarSituacionIA } from "@/lib/ritual/situacionIA";
 import {
+  clasificarMetasRitual,
+  estadoProyectoEnRitual,
+} from "@/lib/ritual/metasVisibles";
+import {
   draftVacio,
   leerDraft,
   PASOS,
@@ -190,33 +194,28 @@ export function WizardRitual({
     [metas],
   );
 
-  const proyectosVivos = useMemo(() => {
-    const ids = new Set<string>();
-    for (const p of proyectos ?? []) {
-      const estado = draft.proyectos[p.id]?.estado ?? p.estado ?? "vivo";
-      if (estado !== "muerto") ids.add(p.id);
+  // Las metas que compiten en el paso 2 dependen de lo que has decidido en
+  // el paso 1 (proyecto vivo / en pausa / muerto) — y de lo que hay en la BD.
+  const { visibles: metasVivas, excluidas: metasExcluidas } = useMemo(
+    () => clasificarMetasRitual(metas ?? [], proyectos ?? [], draft),
+    [metas, proyectos, draft],
+  );
+
+  // Estado del proyecto de cada meta (para marcar las de un proyecto en
+  // pausa: se revisan, pero no compiten por delante).
+  const estadoProyectoDeMeta = useMemo(() => {
+    const m = new Map<string, { nombre: string; estado: string }>();
+    for (const meta of metas ?? []) {
+      if (!meta.proyecto_id) continue;
+      const p = proyectosPorId.get(meta.proyecto_id);
+      if (!p) continue;
+      m.set(meta.id, {
+        nombre: p.nombre,
+        estado: estadoProyectoEnRitual(p, draft),
+      });
     }
-    return ids;
-  }, [proyectos, draft.proyectos]);
-
-  const metasVivas = useMemo(() => {
-    return (metas ?? []).filter((m) => {
-      if (m.estado === "archivada") return false;
-      if (draft.metas[m.id]?.estado === "archivada") return false;
-      if (m.proyecto_id && !proyectosVivos.has(m.proyecto_id)) return false;
-      return true;
-    });
-  }, [metas, draft.metas, proyectosVivos]);
-
-  const metasDeProyectosMuertos = useMemo(() => {
-    return (metas ?? []).filter(
-      (m) =>
-        m.estado !== "archivada" &&
-        m.proyecto_id !== null &&
-        m.proyecto_id !== undefined &&
-        !proyectosVivos.has(m.proyecto_id),
-    );
-  }, [metas, proyectosVivos]);
+    return m;
+  }, [metas, proyectosPorId, draft]);
 
   const krsDeWigs = useMemo(() => {
     const ids = new Set(draft.wigsMeta);
@@ -644,7 +643,8 @@ export function WizardRitual({
         {draft.paso === "metas" && (
           <PasoMetas
             metas={metasVivas}
-            metasDeProyectosMuertos={metasDeProyectosMuertos}
+            metasExcluidas={metasExcluidas}
+            estadoProyectoDeMeta={estadoProyectoDeMeta}
             fases={fases}
             draft={draft}
             onChange={cambiar}
