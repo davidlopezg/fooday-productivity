@@ -48,6 +48,7 @@ import {
   IconTrash,
 } from "@/components/icons";
 import { EditarMetaModal } from "@/components/EditarMetaModal";
+import { EditarModal } from "@/components/TareaModal";
 import { RecurrenciaTag } from "@/components/RecurrenciaChip";
 
 const ESTADO_META: Record<string, string> = {
@@ -770,6 +771,7 @@ function ResultadoCard({
                 else await marcarHecha(t.id);
                 await onChanged();
               }}
+              onChanged={onChanged}
             />
           ))}
         </ul>
@@ -862,10 +864,13 @@ function ResultadoCard({
 function TareaRow({
   tarea,
   onToggle,
+  onChanged,
 }: {
   tarea: Tarea;
   onToggle: () => Promise<void> | void;
+  onChanged: () => Promise<void> | void;
 }) {
+  const [editando, setEditando] = useState(false);
   const hecha = tarea.estado === "hecha";
   return (
     <li className="flex items-center gap-2 py-1.5 text-sm">
@@ -876,18 +881,38 @@ function TareaRow({
       >
         {hecha ? "✅" : ""}
       </button>
-      <span className={`min-w-0 flex-1 ${hecha ? "text-muted-foreground line-through" : ""}`}>
-        {tarea.titulo}
+      {/* Issue #99: el título es un botón que abre el DETALLE de la tarea
+          (el mismo modal de edición que en /tareas). Antes era texto
+          plano: dentro de una meta no había forma de abrir una tarea. */}
+      <button
+        type="button"
+        onClick={() => setEditando(true)}
+        className={`flex min-h-10 min-w-0 flex-1 items-center text-left hover:underline hover:underline-offset-4 ${
+          hecha ? "text-muted-foreground line-through" : ""
+        }`}
+        title="Abrir el detalle de la tarea"
+      >
+        <span className="min-w-0 break-words">{tarea.titulo}</span>
         {tarea.recurrencia_tipo && (
           <span className="ml-2 inline-flex align-middle">
             <RecurrenciaTag tarea={tarea} />
           </span>
         )}
-      </span>
+      </button>
       {tarea.prioridad && (
         <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground">
           {tarea.prioridad}
         </span>
+      )}
+      {editando && (
+        <EditarModal
+          tarea={tarea}
+          onClose={() => setEditando(false)}
+          onChanged={() => {
+            setEditando(false);
+            void onChanged();
+          }}
+        />
       )}
     </li>
   );

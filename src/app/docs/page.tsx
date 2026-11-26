@@ -3911,6 +3911,28 @@ export default function DocsPage() {
             </span>
             <span className="text-muted-foreground">
               <strong className="text-foreground">
+                Dentro de una meta, una tarea se abre con un clic (issue #99).
+              </strong>{" "}
+              En /metas/detalle, las tareas de cada KR eran texto plano: solo
+              se podían marcar como hechas. Para ver o cambiar su
+              descripción, su prioridad, su fecha o sus subtareas había que
+              ir a /tareas y buscarlas allí. Ahora el título de cada tarea es
+              un botón que abre su{" "}
+              <strong className="text-foreground">detalle</strong> (el mismo
+              modal de edición que en /tareas, con el mismo orden y el mismo
+              filtrado por proyecto), y al guardar se recarga la meta. Sin
+              migración: solo cambia lo que se ve. FEATURES (fila
+              /metas/detalle) y la lista “Aplicación en la app” del Pilar 2
+              actualizadas.
+            </span>
+          </li>
+
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-11-26
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
                 En /tareas solo sale el panel de WIGs de TAREAS (issue #95).
               </strong>{" "}
               Arriba de la tabla de tareas se apilaban los tres paneles de
@@ -10637,6 +10659,7 @@ function AplicacionEnApp({ pilar }: { pilar: 1 | 2 | 3 | 4 | 5 }) {
       "Cada capa dice en qué eje temporal vive (issue #59): el foco semanal se llama “KRs en foco — esta semana (máx 3)” IGUAL en la home, en /krs y en /semana, y el WIG de KR del ciclo se llama “WIGs — KRs del ciclo (máx 3)”. Antes la capa semanal se llamaba “KR’s Enormemente Importantes” en tres páginas y “KRs en foco — esta semana” en /semana, y el nombre “Enormemente Importantes” (la marca de las capas 4DX de meta y tarea) se confundía con el WIG de KR del ciclo, que vive justo debajo en /krs",
 
       "Las tareas de un KR se ven en las DOS pantallas (issue #98): en /metas/detalle, dentro de la tarjeta del KR, y en /tareas, con el filtro por KR (el chip 🪟 de cada fila es un enlace a /tareas?kr=<id> y cada KR tiene su “ver en /tareas”). Con el filtro por KR se ven TODOS sus estados, porque la vista del KR enseña también las completadas y con el filtro «Activas» no aparecían: parecían perdidas. Si el filtro activo esconde tareas, un aviso ámbar dice cuántas esconde y cuántas están dentro de un KR",
+      "Desde dentro de la meta, una tarea se abre con un clic (issue #99): el título de cada tarea de un KR es un botón que abre su detalle (el mismo modal de edición que en /tareas: descripción, criterio de terminación, prioridad, estado, ámbito, tags, proyecto, meta/KR, subtareas, adjuntos y comentarios). Antes era texto plano: dentro de la meta no había forma de abrir una tarea, solo de marcarla hecha",
       "Semáforo verde/amarillo/rojo en planes diarios",
 
       "Estados de meta (sin_empezar → en_progreso → completada) con feedback visible — y el estado se DERIVA del trabajo: al completar todas las tareas vivas de una meta, la meta se completa sola (y al reabrir una, vuelve a en progreso). La barra de metas de /proyectos se mueve con ese estado real",
