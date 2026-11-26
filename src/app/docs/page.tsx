@@ -3906,6 +3906,32 @@ export default function DocsPage() {
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
 
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-11-26
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
+                En /tareas solo sale el panel de WIGs de TAREAS (issue #95).
+              </strong>{" "}
+              Arriba de la tabla de tareas se apilaban los tres paneles de
+              foco (WIGs de META en violeta, “KRs en foco — esta semana” en
+              celeste y WIGs de TAREAS en fucsia). Los dos primeros ya se
+              ven en las pantallas donde se eligen: /metas, /krs, /semana y
+              la home. En /tareas quedaban solo de decoración y empujaban
+              hacia abajo la lista que es lo que se va a usar. Ahora, en esa
+              pantalla,{" "}
+              <strong className="text-foreground">
+                el único panel de arriba es “WIGs — Tareas foco (máx 3)”
+              </strong>
+              : la capa de ejecución, la de las 3 tareas concretas a las
+              que dedicas energía disproportionate ahora. Sin migración:
+              solo cambia lo que se ve. FEATURES (filas /tareas, /metas y
+              /krs), la sección “Dónde se ven y cómo se marcan en la app”
+              del Pilar 2 y la lista “Aplicación en la app” actualizadas.
+            </span>
+          </li>
+
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
 
             <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
 
@@ -10602,13 +10628,13 @@ function AplicacionEnApp({ pilar }: { pilar: 1 | 2 | 3 | 4 | 5 }) {
 
       "Scorecard de KRs con proyección lineal (/metas/plan)",
 
-      "Tabla global de KRs (/krs): una fila por Key Result con su META, su PROYECTO, su entrega y su progreso — el inventario completo del sistema en una pantalla, con el valor actual editable en línea. Encima, el panel de KRs (máx 3): los KRs en foco de la semana —en los que pones horas ahora—, con su meta, su entrega y su progreso; el mismo panel que en la home, en /tareas y en /semana",
+      "Tabla global de KRs (/krs): una fila por Key Result con su META, su PROYECTO, su entrega y su progreso — el inventario completo del sistema en una pantalla, con el valor actual editable en línea. Encima, el panel de KRs (máx 3): los KRs en foco de la semana —en los que pones horas ahora—, con su meta, su entrega y su progreso; el mismo panel que en la home y en /semana",
 
       "WIGs de KR (/krs, issue #49): cada fila de la tabla de KRs lleva el mismo botón 🎯 que tienen las metas y las tareas, para marcar el KR como Enormemente Importante del ciclo; arriba, el panel “WIGs — KRs del ciclo (máx 3)” con su contador. Es la capa que faltaba entre los WIGs de meta (violeta) y los WIGs de tarea (fucsia): el resultado MEDIBLE que manda. El cap de 3 lo impone la BD (RPC toggle_kr_wig, migration 0038). No es lo mismo que el foco semanal (celeste, “KRs en foco — esta semana (máx 3)”): ese dice dónde pones horas ESTA semana y rota solo",
 
       "Tres capas de foco en la home (/): WIGs de META (violeta, “Metas Enormemente Importantes”) → KRs en foco de la semana (celeste, “KRs en foco — esta semana (máx 3)”, el foco de /semana) → WIGs de TAREA (fucsia, “Tareas Enormemente Importantes”). La cascada meta → KR → tarea completa, visible de un vistazo. El panel de KRs se pinta siempre: si la semana no tiene foco elegido, lo dice y enlaza a /semana en vez de desaparecer",
 
-      "Cada capa dice en qué eje temporal vive (issue #59): el foco semanal se llama “KRs en foco — esta semana (máx 3)” IGUAL en la home, en /tareas, en /krs y en /semana, y el WIG de KR del ciclo se llama “WIGs — KRs del ciclo (máx 3)”. Antes la capa semanal se llamaba “KR’s Enormemente Importantes” en tres páginas y “KRs en foco — esta semana” en /semana, y el nombre “Enormemente Importantes” (la marca de las capas 4DX de meta y tarea) se confundía con el WIG de KR del ciclo, que vive justo debajo en /krs",
+      "Cada capa dice en qué eje temporal vive (issue #59): el foco semanal se llama “KRs en foco — esta semana (máx 3)” IGUAL en la home, en /krs y en /semana, y el WIG de KR del ciclo se llama “WIGs — KRs del ciclo (máx 3)”. Antes la capa semanal se llamaba “KR’s Enormemente Importantes” en tres páginas y “KRs en foco — esta semana” en /semana, y el nombre “Enormemente Importantes” (la marca de las capas 4DX de meta y tarea) se confundía con el WIG de KR del ciclo, que vive justo debajo en /krs",
 
       "Las tareas de un KR se ven en las DOS pantallas (issue #98): en /metas/detalle, dentro de la tarjeta del KR, y en /tareas, con el filtro por KR (el chip 🪟 de cada fila es un enlace a /tareas?kr=<id> y cada KR tiene su “ver en /tareas”). Con el filtro por KR se ven TODOS sus estados, porque la vista del KR enseña también las completadas y con el filtro «Activas» no aparecían: parecían perdidas. Si el filtro activo esconde tareas, un aviso ámbar dice cuántas esconde y cuántas están dentro de un KR",
       "Semáforo verde/amarillo/rojo en planes diarios",
@@ -10629,7 +10655,7 @@ function AplicacionEnApp({ pilar }: { pilar: 1 | 2 | 3 | 4 | 5 }) {
 
       "Panel “🎯 3 KRs de la semana” en /semana (migration 0033): la capa intermedia entre la meta y la tarea. ✨ Sugerir 3 KRs por IA elige por riesgo real (los que van por debajo del ritmo y tienen menos días restantes). Solo entran KRs con entrega en marcha (regla de contención en BD). El trimestre sigue mandando en la entrega; la semana manda en el esfuerzo",
 
-      "El panel de WIGs de /metas muestra solo las 3 metas WIG, sin los KRs debajo (issue #47): se quedaba enorme sin aportar nada y los KRs ya se consultan al abrir la meta. En /tareas el panel sí conserva sus KRs, porque es donde se ejecuta y hay que ver el KR que estás moviendo",
+      "El panel de WIGs de /metas muestra solo las 3 metas WIG, sin los KRs debajo (issue #47): se quedaba enorme sin aportar nada y los KRs ya se consultan al abrir la meta. En /tareas sale SOLO el panel de WIGs de TAREAS (fucsia, issue #95): antes esa pantalla repetía arriba las capas de META y de KRs, que ya se ven en /metas, /krs, /semana y en la home. /tareas es la capa de ejecución: se ejecuta la tarea, no se elige el foco",
 
       "Al crear o EDITAR una tarea, las metas que se ofrecen están FILTRADAS por el proyecto elegido (issue #75): primero eliges el proyecto y luego solo ves sus metas (si no hay proyecto, se ven todas). El proyecto es el ancla y sigue editable: si la meta elegida deja de encajar, se limpian la meta y su KR. La tarea hereda el proyecto de su meta: proyecto → meta → KR → tarea",
 
