@@ -737,8 +737,20 @@ function ResultadoCard({
       </header>
 
       <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground">
-        <span>
-          {hechas}/{total} tareas hechas
+        <span className="flex flex-wrap items-center gap-2">
+          <span>
+            {hechas}/{total} tareas hechas
+          </span>
+          {/* Issue #98: el KR y sus tareas se ven en las DOS pantallas.
+              Aquí las tienes a la vista; en /tareas están en la lista
+              (con el filtro por KR) y se editan igual. */}
+          <Link
+            href={`/tareas?kr=${resultado.id}`}
+            className="underline underline-offset-4 hover:no-underline"
+            title="Ver estas tareas en la lista de tareas"
+          >
+            ver en /tareas
+          </Link>
         </span>
         <span className="tabular-nums">{Math.round(prog * 100)}%</span>
       </div>

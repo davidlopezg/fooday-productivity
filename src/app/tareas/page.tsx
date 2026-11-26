@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   fetchAdjuntosCount,
   fetchKRsFocoSemanal,
@@ -30,6 +31,7 @@ import { IconSparkles } from "@/components/icons";
 import type { KrFocoConDetalle, MetaConPlan, Proyecto, Tarea } from "@/lib/types";
 
 export default function TareasPage() {
+  const searchParams = useSearchParams();
   const { data: tareas, loading, error, reload } = useData<Tarea[]>(fetchTareas, []);
 
   // Estado del panel WIG — separado del de TasksTable a propósito:
@@ -362,6 +364,12 @@ export default function TareasPage() {
         </p>
       )}
       <TasksTable
+        // Issue #98: la `key` incluye el KR de la URL para que, al
+        // navegar a otro KR (el chip 🪟 de otra fila), la tabla se
+        // monte de nuevo y tome el filtro del KR nuevo. Con un cambio
+        // de query la página NO se desmonta, así que sin esto el filtro
+        // se quedaría en el KR anterior.
+        key={`kr:${searchParams.get("kr") ?? ""}`}
         tareas={tareas}
         adjuntosCount={adjuntosCount ?? new Map()}
         onChanged={reload}

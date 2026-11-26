@@ -361,6 +361,28 @@ export default function MetodologiaPage() {
               <li className="flex gap-2">
                 <span className="text-fuchsia-500">·</span>
                 <span>
+                  <strong className="text-foreground">Una tarea dentro de un KR se ve en las DOS pantallas (issue #98).</strong>{" "}
+                  El KR es la capa medible y sus tareas son tareas normales
+                  (misma tabla, mismos estados, se editan igual): se ven en
+                  la tarjeta del KR dentro de{" "}
+                  <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">/metas/detalle</code>{" "}
+                  y también en la lista de{" "}
+                  <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">/tareas</code>.
+                  Para que ninguna se esconda, el chip{" "}
+                  <span className="text-foreground">🪟</span> de cada fila
+                  es un enlace a{" "}
+                  <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">/tareas?kr=&lt;id&gt;</code>{" "}
+                  (la lista filtrada por ese KR) y cada KR tiene su «ver en
+                  /tareas». Al filtrar por un KR se ven{" "}
+                  <strong className="text-foreground">TODOS sus estados</strong>
+                  , porque la vista del KR enseña también las completadas: el
+                  filtro «Activas» de la lista las escondía y hacía creer que
+                  faltaban.
+                </span>
+              </li>
+              <li className="flex gap-2">
+                <span className="text-fuchsia-500">·</span>
+                <span>
                   <strong className="text-foreground">Estado de una meta DERIVADO de su trabajo (issue #35).</strong>{" "}
                   <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">metas.estado</code>{" "}
                   ya no depende de que te acuerdes de cambiarlo: cuando terminas{" "}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { Meta, Proyecto, ResultadoPeriodo, Subtarea, Tarea } from "@/lib/types";
 import {
@@ -15,7 +16,11 @@ import {
 } from "@/lib/mutations";
 import { fetchMetas, fetchProyectos, fetchResultadosPeriodo } from "@/lib/queries";
 import { useData } from "@/lib/useData";
-import { proyectoEfectivoDeTarea } from "@/lib/proyectos";
+import {
+  contarOcultas,
+  filtrarTareas,
+  type FiltrosTareas,
+} from "@/lib/tareas/filtros";
 import {
   IconArchive,
   IconCheck,
@@ -157,14 +162,20 @@ function JerarquiaChips({
     </span>
   ) : null;
 
+  // El chip del KR es un ENLACE a la lista filtrada por ese KR
+  // (issue #98): desde la tarea se llega a todas las tareas del KR —las
+  // que la vista de la meta enseña, incluidas las completadas— y desde
+  // el KR se vuelve a la lista. Antes solo era un texto: la tarea
+  // "desaparecía" dentro de una lista plana.
   const krChip = kr ? (
-    <span
+    <Link
       key="kr"
-      className="inline-flex items-center gap-0.5 rounded-full border border-sky-500/30 bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-medium text-sky-700 dark:text-sky-300"
-      title={kr.titulo}
+      href={`/tareas?kr=${kr.id}`}
+      className="inline-flex items-center gap-0.5 rounded-full border border-sky-500/30 bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-medium text-sky-700 hover:bg-sky-500/20 dark:text-sky-300"
+      title={`Ver todas las tareas del KR «${kr.titulo}»`}
     >
       🪟 {kr.titulo}
-    </span>
+    </Link>
   ) : null;
 
   const all = [proyectoChip, metaChip, krChip].filter(Boolean) as React.ReactNode[];
@@ -287,13 +298,23 @@ export function TasksTable({
 }) {
   const searchParams = useSearchParams();
   const proyectoFiltroQS = searchParams.get("proyecto");
+  // Issue #98: /tareas?kr=<id> = "las tareas de ESTE KR". Es el enlace que
+  // cierra el círculo: el chip 🪟 de cada fila y el botón "ver en /tareas"
+  // de cada KR en /metas/detalle.
+  const krFiltroQS = searchParams.get("kr");
   const [pending, startTransition] = useTransition();
   const [q, setQ] = useState("");
   // Si entramos con ?proyecto=X (vista de un proyecto concreto) abrimos
   // el filtro en "todas" para que las tareas hechas/archivadas de ese
   // proyecto no desaparezcan — son parte legítima del proyecto y suele
   // ser el caso común en proyectos ya cerrados o arrastrados.
-  const [estado, setEstado] = useState(proyectoFiltroQS ? "todas" : "activas");
+  // Lo mismo con ?kr=<id>: la vista de un KR en /metas/detalle enseña
+  // TODAS sus tareas (hechas incluidas), así que la lista debe enseñarlas
+  // también — si no, el usuario ve sus tareas en el KR y no las encuentra.
+  const [estado, setEstado] = useState(
+    proyectoFiltroQS || krFiltroQS ? "todas" : "activas",
+  );
+  const [krId, setKrId] = useState<string | null>(krFiltroQS);
   const [prioridad, setPrioridad] = useState("todas");
   const [capa, setCapa] = useState("todas");
   const [ambito, setAmbito] = useState<FiltroAmbit>("todas");
@@ -334,29 +355,49 @@ export function TasksTable({
     return Array.from(s).sort((a, b) => a.localeCompare(b, "es"));
   }, [tareas]);
 
-  const filtradas = useMemo(() => {
-    return tareas.filter((t) => {
-      if (estado === "activas" && !["pendiente", "en_progreso", "bloqueada"].includes(t.estado))
-        return false;
-      if (estado !== "activas" && estado !== "todas" && t.estado !== estado)
-        return false;
-      if (prioridad !== "todas" && t.prioridad !== prioridad) return false;
-      if (capa !== "todas" && t.capa !== capa) return false;
-      if (proyectoFiltroQS && proyectoEfectivoDeTarea(t, metaById) !== proyectoFiltroQS)
-        return false;
-      if (ambito !== "todas" && t.ambito !== ambito) return false;
-      if (
-        tagsSel.size > 0 &&
-        !(t.tags ?? []).some((tg) => tagsSel.has(tg))
-      )
-        return false;
-      if (q) {
-        const s = `${t.titulo} ${t.codigo ?? ""} ${t.descripcion ?? ""}`.toLowerCase();
-        if (!s.includes(q.toLowerCase())) return false;
-      }
-      return true;
+  /** Los filtros de la tabla, en un solo objeto (src/lib/tareas/filtros.ts).
+   *  La lista y el contador de "ocultas" usan la MISMA regla: si no, el
+   *  contador mentiría. */
+  const filtros: FiltrosTareas = useMemo(
+    () => ({
+      estado,
+      prioridad,
+      capa,
+      ambito,
+      q,
+      tags: Array.from(tagsSel),
+      krId,
+      proyectoId: proyectoFiltroQS,
+    }),
+    [estado, prioridad, capa, ambito, q, tagsSel, krId, proyectoFiltroQS],
+  );
+
+  const filtradas = useMemo(
+    () => filtrarTareas(tareas, filtros, metaById),
+    [tareas, filtros, metaById],
+  );
+
+  /** Qué esconde el filtro actual (issue #98). Con el filtro «Activas»
+   *  desaparecen las completadas — incluidas las de los KRs, que el
+   *  usuario ve en /metas/detalle y no encontraba aquí. */
+  const ocultas = useMemo(
+    () => contarOcultas(tareas, filtros, metaById),
+    [tareas, filtros, metaById],
+  );
+
+  /** KRs ordenados por meta (y dentro de la meta, por su orden). */
+  const krsOrdenados = useMemo(() => {
+    const metasOrden = new Map((metas ?? []).map((m, i) => [m.id, i]));
+    return (resultados ?? []).slice().sort((a, b) => {
+      const ma = metasOrden.get(a.meta_id) ?? 999;
+      const mb = metasOrden.get(b.meta_id) ?? 999;
+      if (ma !== mb) return ma - mb;
+      return (a.orden ?? 0) - (b.orden ?? 0);
     });
-  }, [tareas, estado, prioridad, capa, q, proyectoFiltroQS, ambito, tagsSel, metaById]);
+  }, [resultados, metas]);
+
+  /** El KR filtrado (para el banner). */
+  const krFiltrado = krId ? resultadoById.get(krId) ?? null : null;
 
   function toggleTag(t: string) {
     setTagsSel((prev) => {
@@ -456,6 +497,33 @@ export function TasksTable({
           <option value="personal">👤 Personal</option>
           <option value="profesional">💼 Profesional</option>
         </select>
+        {/* Filtro por KR (issue #98). Al elegir un KR se abren TODOS sus
+            estados: la vista del KR en /metas/detalle enseña sus tareas
+            hechas también, y si la lista las esconde el usuario no las
+            encuentra (era el problema que reportó el issue). */}
+        <select
+          value={krId ?? ""}
+          onChange={(e) => {
+            const v = e.target.value || null;
+            setKrId(v);
+            if (v && estado === "activas") setEstado("todas");
+          }}
+          className={`${inputCls} max-w-[280px]`}
+          aria-label="Filtrar por resultado clave (KR)"
+        >
+          <option value="">Todos los KRs</option>
+          {krsOrdenados.map((kr) => {
+            const meta = metaById.get(kr.meta_id);
+            const etiqueta = meta?.codigo
+              ? `${meta.codigo} · ${kr.titulo}`
+              : kr.titulo;
+            return (
+              <option key={kr.id} value={kr.id}>
+                🪟 {etiqueta}
+              </option>
+            );
+          })}
+        </select>
         <span className="ml-auto text-xs text-muted-foreground">
           {filtradas.length} / {tareas.length}
         </span>
@@ -501,6 +569,49 @@ export function TasksTable({
               limpiar ({tagsSel.size})
             </button>
           )}
+        </div>
+      )}
+
+      {/* Lo que esconde el filtro (issue #98). Sin esto, el usuario ve sus
+          tareas en el KR de la meta y no las encuentra en la lista, sin
+          saber que el filtro «Activas» las estaba dejando fuera. Solo se
+          avisa del filtro por defecto: si has pedido otro estado a mano,
+          es tu decisión y no hay que dar la nota. */}
+      {estado === "activas" && !krId && ocultas.enKRs > 0 && (
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
+          <span>
+            El filtro «Activas» esconde {ocultas.total} tarea
+            {ocultas.total === 1 ? "" : "s"}, {ocultas.enKRs} de ellas
+            dentro de un KR (en la tarjeta del KR de su meta las ves todas).
+          </span>
+          <button
+            type="button"
+            onClick={() => setEstado("todas")}
+            className="underline underline-offset-4 hover:no-underline"
+          >
+            Verlas todas
+          </button>
+        </p>
+      )}
+
+      {/* Banner del filtro por KR: estás viendo las tareas de UN resultado,
+          con su meta, y el enlace para volver a la lista completa. */}
+      {krFiltrado && (
+        <div className="flex flex-wrap items-center gap-2 rounded-md border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs text-sky-800 dark:text-sky-200">
+          <span>
+            Filtrando por el KR <strong>🪟 {krFiltrado.titulo}</strong>
+            {metaById.get(krFiltrado.meta_id)?.titulo
+              ? ` · ${metaById.get(krFiltrado.meta_id)?.titulo}`
+              : ""}
+            {" — "}
+            {filtradas.length} tarea{filtradas.length === 1 ? "" : "s"}.
+          </span>
+          <Link
+            href="/tareas"
+            className="ml-auto inline-flex items-center justify-center min-h-10 rounded px-2 py-0.5 underline underline-offset-4 hover:no-underline"
+          >
+            quitar filtro
+          </Link>
         </div>
       )}
 

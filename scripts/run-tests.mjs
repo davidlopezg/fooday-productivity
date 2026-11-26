@@ -39,6 +39,7 @@ const TESTS = [
   "src/lib/wig.test.mjs",
   "src/lib/estatusRevision.test.mjs",
   "src/lib/krsLectura.test.mjs",
+  "src/lib/tareas/filtros.test.mjs",
   "src/lib/recuperacion/feedback.test.mjs",
   "src/lib/escenarios/hipotesis.test.mjs",
   "src/lib/pagos/parser-pdf.test.mjs",
