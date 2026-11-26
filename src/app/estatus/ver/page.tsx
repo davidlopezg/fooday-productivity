@@ -27,6 +27,11 @@ import { CierreCognitivo } from "@/components/CierreCognitivo";
 import { ComidasList } from "@/components/ComidasEditor";
 import { HABITOS_META } from "@/lib/types";
 import {
+  CHECKLIST_REVISION,
+  resumenRevision,
+  valorRevision,
+} from "@/lib/estatusRevision";
+import {
   IconClipboardCheck,
   IconPencil,
   IconTrash,
@@ -89,7 +94,8 @@ function EstatusDetalleInner() {
     const micro = elegirMicroAccion(estatus, rachas, patron, scoreObj.score);
     const audit = evaluarAuditoria20_80(estatus);
     const coherencia = validarCoherenciaCierre(estatus);
-    return { scoreObj, cmp, rachas, patron, micro, audit, coherencia };
+    const revision = resumenRevision(estatus);
+    return { scoreObj, cmp, rachas, patron, micro, audit, coherencia, revision };
   }, [estatus, historico]);
 
   async function onEliminar() {
@@ -146,7 +152,7 @@ function EstatusDetalleInner() {
   }
 
   if (!calculos) return null;
-  const { scoreObj, cmp, rachas, patron, micro, audit, coherencia } = calculos;
+  const { scoreObj, cmp, rachas, patron, micro, audit, coherencia, revision } = calculos;
 
   return (
     <div className="space-y-6">
@@ -218,6 +224,61 @@ function EstatusDetalleInner() {
           <CampoSimple label="Tareas nuevas que entraron" v={estatus.tareas_nuevas} />
           <CampoSimple label="Correos/mensajes importantes" v={estatus.correos_importantes} />
           <CampoSimple label="Tareas que no pudiste terminar" v={estatus.tareas_no_terminadas} />
+        </div>
+      </Seccion>
+
+      {/* === 2-bis. Revisión diaria (issue #85) === */}
+      <Seccion emoji="🧾" titulo="Revisión diaria">
+        <p className="mb-3 text-xs text-muted-foreground">
+          {revision.respondidos === 0
+            ? "Sin responder."
+            : `${revision.cumplidos} de ${revision.respondidos} afirmaciones cumplidas (${revision.porcentaje}%).`}
+          {revision.pendientes.length > 0 && (
+            <> Quedan {revision.pendientes.length} sin responder.</>
+          )}
+        </p>
+        <div className="space-y-4">
+          {CHECKLIST_REVISION.map((grupo) => (
+            <div key={grupo.titulo}>
+              <h3 className="mb-2 text-sm font-semibold">
+                <span className="mr-1.5">{grupo.emoji}</span>
+                {grupo.titulo}
+              </h3>
+              <ul className="space-y-1.5">
+                {grupo.items.map((item) => {
+                  const v = valorRevision(estatus, item.campo);
+                  return (
+                    <li key={item.campo} className="flex items-start gap-2 text-sm">
+                      <span
+                        aria-hidden
+                        className={
+                          v === true
+                            ? "font-semibold text-emerald-600 dark:text-emerald-400"
+                            : v === false
+                              ? "font-semibold text-red-600 dark:text-red-400"
+                              : "text-muted-foreground"
+                        }
+                      >
+                        {v === true ? "✓" : v === false ? "✗" : "—"}
+                      </span>
+                      <span className={v === null ? "text-muted-foreground" : undefined}>
+                        {item.texto}
+                      </span>
+                      <span className="sr-only">
+                        {v === true ? "Sí" : v === false ? "No" : "Sin responder"}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
+        </div>
+        <div className="mt-4">
+          <CampoSimple
+            label="Una cosa que quiero mejorar mañana"
+            v={estatus.rev_mejora_manana}
+          />
         </div>
       </Seccion>
 

@@ -288,7 +288,8 @@ export const RITUALES: {
     {
       cuando: "Final del día",
       pantallas: [{ texto: "/estatus", ruta: "/estatus" }],
-      que: "Marcar los 9 hábitos + cierre cognitivo 5 preguntas. Esto es sagrado: si no se hace, el sistema pierde valor al día siguiente.",
+      que: "Marcar los 9 hábitos + la REVISIÓN DIARIA (9 afirmaciones de Trabajo, Atención y Vida personal + «una cosa que quiero mejorar mañana») + cierre cognitivo 5 preguntas. Esto es sagrado: si no se hace, el sistema pierde valor al día siguiente.",
+      nota: "La revisión diaria es un checklist de sí / no / sin responder: cada afirmación es una columna (migration 0044), así que se puede comparar un día con otro y ver de un vistazo qué se cumple y qué no. «Sin responder» no es «no»: el dato ausente y el incumplimiento son cosas distintas.",
     },
     {
       cuando: "Cuando quieras saber dónde estás",
@@ -674,7 +675,7 @@ export const FEATURES: Feature[] = [
   // ── Núcleo diario ──
   { ruta: "/", proposito: "Hoy: semáforo del día + plan diario + contadores + TRES capas de foco, una por panel y con nombre propio: ‘Metas Enormemente Importantes’ (violeta) → ‘KRs en foco — esta semana (máx 3)’ (celeste, los KRs en foco de la semana; el panel se pinta SIEMPRE, y si esta semana no hay foco elegido dice cuál es el siguiente paso en vez de desaparecer) → ‘Tareas Enormemente Importantes’ (fucsia, solo tareas VIVAS: al completarse una sale del panel y libera su plaza, issue #80) + panel ‘Tareas con fecha’ entre los WIGs-tareas y el Plan de hoy, con check inline para marcarlas hechas sin navegar. El panel ordena por fecha REAL (fecha_fin): las vencidas arriba, luego HOY, luego futuras; las tareas cuyo deadline es solo una nota de texto (‘esta semana’) van al final, con su nota tal cual, y nunca con ‘en NaNd’", docs: "Rituales §1 (mañana 1ª hora) · HelpDrawer" },
   { ruta: "/captura", proposito: "Inbox rápido para vaciar la cabeza (efecto Zeigarnik)", docs: "Pilar 4 · Rituales §1 · HelpDrawer" },
-  { ruta: "/estatus", proposito: "9 hábitos + auditoría 20/80 + cierre cognitivo", docs: "Pilar 4 · Rituales §1 (final del día) · HelpDrawer" },
+  { ruta: "/estatus", proposito: "9 hábitos + REVISIÓN DIARIA (issue #85) + auditoría 20/80 + cierre cognitivo. La REVISIÓN DIARIA es el checklist de cierre del día: 9 afirmaciones de sí / no / sin responder, agrupadas en Trabajo (avanzé en mi tarea principal · evité abrir proyectos nuevos · cerré el trabajo a una hora razonable), Atención (evité el consumo automático del móvil · trabajé sin interrupciones importantes) y Vida personal (tiempo de calidad con la familia · leí 30 minutos · caminé o hice ejercicio · tuve un momento de descanso real), más «una cosa que quiero mejorar mañana». Cada afirmación es una columna propia (migration 0044): se pueden comparar días y ver qué se cumple. «Sin responder» (null) NO es «no lo hice» (false): el dato ausente y el incumplimiento son cosas distintas. La revisión se rellena en /estatus/nuevo o /estatus/editar y se lee en /estatus/ver con el recuento (X de Y cumplidas) y los pendientes", docs: "Pilar 4 · Rituales §1 (final del día) · HelpDrawer" },
   { ruta: "/estatus/nuevo", proposito: "Crear nueva entrada de Estatus (1 por día)", docs: "Sub-ruta de /estatus" },
   { ruta: "/estatus/editar", proposito: "Editar entrada existente (1 por día)", docs: "Sub-ruta de /estatus" },
   { ruta: "/estatus/ver", proposito: "Ver una entrada en detalle (racha + micro-acción)", docs: "Sub-ruta de /estatus" },

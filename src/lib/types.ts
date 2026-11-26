@@ -697,6 +697,19 @@ export interface EstatusDiario {
   // Salida emocional / micro-acción
   podes_soltar: string | null;
   micro_accion_manana: string | null;
+  // Revisión diaria (issue #85) — checklist de cierre: 9 afirmaciones
+  // (Trabajo / Atención / Vida personal) + la mejora de mañana.
+  // NULL = no respondido; FALSE = no lo hice.
+  rev_trabajo_avance: boolean | null;
+  rev_trabajo_sin_nuevos: boolean | null;
+  rev_trabajo_cierre_razonable: boolean | null;
+  rev_atencion_movil: boolean | null;
+  rev_atencion_sin_interrupciones: boolean | null;
+  rev_vida_familia: boolean | null;
+  rev_vida_lectura: boolean | null;
+  rev_vida_ejercicio: boolean | null;
+  rev_vida_descanso: boolean | null;
+  rev_mejora_manana: string | null;
   // Semáforo
   semaforo: Semaforo | null;
   // Veredicto narrativo del agente LLM (opcional)
