@@ -3916,6 +3916,75 @@ export default function DocsPage() {
 
               <strong className="text-foreground">
 
+                Las tareas de un KR ya no desaparecen de la lista (issue #98).
+
+              </strong>{" "}
+
+              Las tareas que viven dentro de un KR se veían en la tarjeta del
+
+              KR (en /metas/detalle) pero no se encontraban en la lista de
+
+              tareas: el filtro por defecto de /tareas es «Activas», y las
+
+              completadas de un KR quedaban fuera —8 KRs tenían TODAS sus
+
+              tareas completadas, así que en la lista no se veía ninguna—.
+
+              Además el chip 🪟 de cada fila era un texto muerto: no había
+
+              forma de llegar de la tarea a sus hermanas de KR. Ahora: (a) el
+
+              chip 🪟 es un enlace a{" "}
+
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/tareas?kr=&lt;id&gt;</code>{" "}
+
+              y cada KR de /metas/detalle tiene su «ver en /tareas»; (b) hay
+
+              un desplegable que filtra la lista por KR, y al filtrar por un
+
+              KR se ven{" "}
+
+              <strong className="text-foreground">TODOS sus estados</strong>{" "}
+
+              (la vista del KR enseña también las completadas, y la lista
+
+              tiene que enseñar lo mismo); (c) si el filtro activo esconde
+
+              tareas, un aviso ámbar dice cuántas esconde y cuántas están
+
+              dentro de un KR, con un botón para verlas. El filtro de la
+
+              tabla se ha extraído a{" "}
+
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">src/lib/tareas/filtros.ts</code>{" "}
+
+              (función pura, con test) para que la lista y el contador de
+
+              «cuántas me faltan» usen{" "}
+
+              <strong className="text-foreground">la misma regla</strong>. Sin
+
+              migración: solo cambia lo que se ve. FEATURES (filas /tareas y
+
+              /metas/detalle), la sección “Aplicación en la app” del Pilar 2,
+
+              /metodologia y el HelpDrawer de /tareas actualizados.
+
+            </span>
+
+          </li>
+
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+
+              2026-11-26
+            </span>
+
+            <span className="text-muted-foreground">
+
+              <strong className="text-foreground">
+
                 El paso 2 del ritual semanal solo te enseña las metas que
 
                 compiten.
@@ -10541,6 +10610,7 @@ function AplicacionEnApp({ pilar }: { pilar: 1 | 2 | 3 | 4 | 5 }) {
 
       "Cada capa dice en qué eje temporal vive (issue #59): el foco semanal se llama “KRs en foco — esta semana (máx 3)” IGUAL en la home, en /tareas, en /krs y en /semana, y el WIG de KR del ciclo se llama “WIGs — KRs del ciclo (máx 3)”. Antes la capa semanal se llamaba “KR’s Enormemente Importantes” en tres páginas y “KRs en foco — esta semana” en /semana, y el nombre “Enormemente Importantes” (la marca de las capas 4DX de meta y tarea) se confundía con el WIG de KR del ciclo, que vive justo debajo en /krs",
 
+      "Las tareas de un KR se ven en las DOS pantallas (issue #98): en /metas/detalle, dentro de la tarjeta del KR, y en /tareas, con el filtro por KR (el chip 🪟 de cada fila es un enlace a /tareas?kr=<id> y cada KR tiene su “ver en /tareas”). Con el filtro por KR se ven TODOS sus estados, porque la vista del KR enseña también las completadas y con el filtro «Activas» no aparecían: parecían perdidas. Si el filtro activo esconde tareas, un aviso ámbar dice cuántas esconde y cuántas están dentro de un KR",
       "Semáforo verde/amarillo/rojo en planes diarios",
 
       "Estados de meta (sin_empezar → en_progreso → completada) con feedback visible — y el estado se DERIVA del trabajo: al completar todas las tareas vivas de una meta, la meta se completa sola (y al reabrir una, vuelve a en progreso). La barra de metas de /proyectos se mueve con ese estado real",
