@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   fetchTareas,
   fetchTareasActivas,
+  fetchTareasDiaRitualPorFecha,
   fetchHistorialEmocional,
   fetchPlanSemanal,
   fetchKRsFocoSemanal,
@@ -39,6 +40,7 @@ import type {
   PlanDiario,
   PlanGeneradoSimple,
   PlanSemanalTarea,
+  RitualTareaDia,
   Tarea,
 } from "@/lib/types";
 import type { Pago } from "@/lib/pagos/types";
@@ -166,9 +168,22 @@ export default function PlanDiarioPage() {
     return tareasQ.data.filter((t) => ids.has(t.id));
   }, [planSemanalQ.data, tareasQ.data, today]);
 
+  // Las 3 del día: el COMPROMISO de la semana (ritual semanal, issue #89).
+  // No es la propuesta de la IA (esta pantalla) ni el WIG de tarea (ciclo):
+  // son las 3 tareas con las que te comprometiste en el ritual del domingo.
+  const tresDelDiaQ = useData<RitualTareaDia[]>(
+    () => fetchTareasDiaRitualPorFecha(HOY()),
+    [],
+  );
+  const tresDelDia = useMemo<Tarea[]>(() => {
+    const porId = new Map((tareasQ.data ?? []).map((t) => [t.id, t]));
+    return (tresDelDiaQ.data ?? [])
+      .map((r) => porId.get(r.tarea_id))
+      .filter((t): t is Tarea => !!t);
+  }, [tresDelDiaQ.data, tareasQ.data]);
+
   // Tareas activas cuya fecha_fin es HOY (no requieren asignación manual).
-  const tareasVencenHoy = useMemo<Tarea[]>(() => {
-    const hoy = HOY();
+  const tareasVencenHoy = useMemo<Tarea[]>(() => {    const hoy = HOY();
     return tareasQ.data.filter(
       (t) =>
         t.fecha_fin === hoy &&
@@ -909,6 +924,58 @@ export default function PlanDiarioPage() {
             </ul>
           </div>
         )}
+
+        {/* 1D — Las 3 del día: el compromiso de la semana (issue #89) */}
+        <div className="mt-5">
+          <div className="mb-1 flex items-center gap-2 text-sm font-medium">
+            <span>🎯 Las 3 de hoy</span>
+            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              Compromiso de la semana
+            </span>
+          </div>
+          <p className="mb-2 text-xs text-muted-foreground">
+            Con esto te comprometiste en el ritual del domingo. No es la
+            propuesta de la IA de esta pantalla (eso es el plan) ni el WIG de
+            tarea (🎯, la capa de ciclo): es tu compromiso diario.
+          </p>
+          {tresDelDiaQ.loading ? (
+            <div className="rounded-md border border-dashed border-border bg-muted/30 px-3 py-3 text-xs text-muted-foreground">
+              Cargando…
+            </div>
+          ) : tresDelDia.length === 0 ? (
+            <div className="rounded-md border border-dashed border-border bg-muted/30 px-3 py-3 text-xs text-muted-foreground">
+              Hoy no te has comprometido con ninguna tarea. Eliges las 3 en el{" "}
+              <Link
+                href="/ritual-semanal"
+                className="font-medium text-foreground underline underline-offset-4"
+              >
+                ritual semanal
+              </Link>{" "}
+              (paso “Tareas”).
+            </div>
+          ) : (
+            <ul className="space-y-1.5">
+              {tresDelDia.map((t, i) => (
+                <li
+                  key={t.id}
+                  className="flex items-center justify-between gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm"
+                >
+                  <span className="min-w-0 truncate">
+                    <span className="mr-1.5 text-muted-foreground">{i + 1}.</span>
+                    {t.titulo}
+                  </span>
+                  <Link
+                    href="/semana"
+                    className="shrink-0 rounded p-1 text-xs text-muted-foreground hover:bg-background hover:text-foreground"
+                    title="Cambiar el reparto en /semana"
+                  >
+                    ↗
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
         {/* 1D — Tareas programadas para HOY (read-only, vienen de /semana) */}
         <div className="mt-5">

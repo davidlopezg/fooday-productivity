@@ -34,7 +34,7 @@ import { errorMessage } from "@/lib/errors";
 
 const CAPAS = ["CAPA 1", "CAPA 2", "CAPA 3"];
 const PRIORIDADES = ["critica", "urgente", "alta", "media", "baja"];
-const ESTADOS = ["pendiente", "en_progreso", "bloqueada", "hecha", "archivada"];
+const ESTADOS = ["pendiente", "en_progreso", "bloqueada", "en_espera", "hecha", "cancelada", "archivada"];
 
 const TONO_PRIORIDAD: Record<string, string> = {
   critica: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20",
@@ -50,6 +50,9 @@ const TONO_ESTADO: Record<string, string> = {
   en_progreso:
     "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
   bloqueada: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20",
+  en_espera:
+    "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20",
+  cancelada: "bg-muted text-muted-foreground border-border line-through",
   hecha:
     "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
   archivada: "bg-muted text-muted-foreground border-border",

@@ -31,6 +31,7 @@ import type {
   ResultadoConTareas,
   ResultadoPeriodo,
   Ritual,
+  RitualTareaDia,
   RitualSemanal,
   Tarea,
   TareaAdjunto,
@@ -71,9 +72,9 @@ export async function fetchTareasActivas(): Promise<TareaCandidata[]> {
   const { data, error } = await createClient()
     .from("tareas")
     .select("id,titulo,estado,prioridad,es_wig,fecha_fin,deadline")
-    .neq("estado", "hecha")
-    .neq("estado", "descartada")
-    .neq("estado", "archivada")
+    // Solo las 3 estados activos (migration 0043): `en_espera` y
+    // `cancelada` NO son activas (apartadas o matadas por el ritual).
+    .in("estado", ["pendiente", "en_progreso", "bloqueada"])
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as TareaCandidata[];
@@ -1959,6 +1960,35 @@ export async function fetchRitualSemanal(
     .maybeSingle();
   if (error) throw error;
   return (data ?? null) as RitualSemanal | null;
+}
+
+/** Las 3 del día de una semana (migration 0045), ordenadas por día y hueco. */
+export async function fetchTareasDiaRitual(
+  anio: number,
+  semana_iso: number,
+): Promise<RitualTareaDia[]> {
+  const { data, error } = await createClient()
+    .from("ritual_tareas_dia")
+    .select("*")
+    .eq("anio", anio)
+    .eq("semana_iso", semana_iso)
+    .order("dia_semana", { ascending: true })
+    .order("orden", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as RitualTareaDia[];
+}
+
+/** Las 3 del día de UNA fecha concreta (lo que se ve en /plan-diario). */
+export async function fetchTareasDiaRitualPorFecha(
+  fecha: string,
+): Promise<RitualTareaDia[]> {
+  const { data, error } = await createClient()
+    .from("ritual_tareas_dia")
+    .select("*")
+    .eq("fecha", fecha)
+    .order("orden", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as RitualTareaDia[];
 }
 
 /** Una lista configurable por clave (p.ej. "fases_meta"). [] si no existe. */

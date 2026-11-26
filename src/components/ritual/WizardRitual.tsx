@@ -30,21 +30,26 @@ import Link from "next/link";
 import {
   fetchFasesMeta,
   fetchIdsKRsFocoSemanal,
+  fetchKRsFocoSemanal,
   fetchKrsOverview,
   fetchMetas,
+  fetchPlanSemanal,
   fetchProyectos,
   fetchProyectosEventos,
   fetchRitualSemanal,
   fetchTareas,
+  fetchTareasDiaRitual,
 } from "@/lib/queries";
 import {
   actualizarEstadoProyecto,
   actualizarEstadoMeta,
   actualizarFaseMeta,
   actualizarMeta,
+  actualizarTarea,
   crearEventoProyecto,
   guardarRitualSemanal,
   guardarSituacionMeta,
+  guardarTresDelDia,
   guardarWigsMeta,
   marcarKrFocoSemanal,
   marcarKrWig,
@@ -59,14 +64,16 @@ import {
   leerDraft,
   PASOS,
   serializarDraft,
+  type DecisionTarea,
   type DraftRitual,
   type PasoId,
 } from "@/lib/ritual/draft";
-import { isoWeekToMonday, localYMD, shiftISOWeek } from "@/lib/semana";
+import { DIAS_SEMANA, isoWeekToMonday, localYMD, shiftISOWeek } from "@/lib/semana";
 import { PasoProyectos } from "@/components/ritual/PasoProyectos";
 import { PasoMetas } from "@/components/ritual/PasoMetas";
 import { PasoWigMetas } from "@/components/ritual/PasoWigMetas";
 import { PasoKrs } from "@/components/ritual/PasoKrs";
+import { PasoTareas } from "@/components/ritual/PasoTareas";
 import { TemporizadorPaso } from "@/components/ritual/TemporizadorPaso";
 
 const CLAVE_DRAFT = "fooday.ritual-semanal.draft";
@@ -101,7 +108,25 @@ export function WizardRitual({
     [],
     [anio, semana_iso],
   );
+  const { data: focoKRs } = useData(
+    () => fetchKRsFocoSemanal(anio, semana_iso),
+    [],
+    [anio, semana_iso],
+  );
   const { data: eventos } = useData(() => fetchProyectosEventos(), []);
+
+  // Paso 5: el reparto por días de esta semana (de ahí salen las
+  // candidatas de las 3 del día) y lo que ya está comprometido.
+  const { data: planSemanal } = useData(
+    () => fetchPlanSemanal({ anio, semana_iso }),
+    [],
+    [anio, semana_iso],
+  );
+  const { data: tresDelDiaGuardadas } = useData(
+    () => fetchTareasDiaRitual(anio, semana_iso),
+    [],
+    [anio, semana_iso],
+  );
 
   // La bitácora de la semana PASADA: de dónde salen las WIGs que el ritual
   // sugiere repetir ("Continuar igual").
@@ -197,6 +222,69 @@ export function WizardRitual({
     [],
     [metas?.length],
   );
+
+  // ── Paso 5: inventario, cobertura y las 3 del día ──────────────────────
+  // Los 7 días de la semana (con su fecha concreta).
+  const diasSemana = useMemo(() => {
+    const lunes = isoWeekToMonday(anio, semana_iso);
+    const hoy = localYMD(new Date());
+    return DIAS_SEMANA.map((d) => {
+      const fecha = new Date(lunes);
+      fecha.setDate(lunes.getDate() + (d.id - 1));
+      const ymd = localYMD(fecha);
+      return { dia: d.id, nombre: d.nombre, fecha: ymd, hoy: ymd === hoy };
+    });
+  }, [anio, semana_iso]);
+
+  // Candidatas de cada día: las tareas ya repartidas en /semana.
+  const candidatasPorDia = useMemo(() => {
+    const porId = new Map((tareas ?? []).map((t) => [t.id, t]));
+    const m = new Map<number, { id: string; titulo: string }[]>();
+    for (const d of DIAS_SEMANA) m.set(d.id, []);
+    for (const a of planSemanal ?? []) {
+      const t = porId.get(a.tarea_id);
+      if (!t) continue;
+      const arr = m.get(a.dia_semana);
+      if (!arr) continue;
+      arr.push({ id: t.id, titulo: t.titulo });
+    }
+    return m;
+  }, [planSemanal, tareas]);
+
+  // Lo ya comprometido (BD) + lo que se ha tocado en este draft.
+  const seleccionPorDia = useMemo(() => {
+    const guardada: Record<number, string[]> = {};
+    for (const r of tresDelDiaGuardadas ?? []) {
+      const arr = guardada[r.dia_semana] ?? [];
+      arr.push(r.tarea_id);
+      guardada[r.dia_semana] = arr;
+    }
+    // El draft manda: si has tocado un día, se ve el draft.
+    for (const [dia, ids] of Object.entries(draft.tresDelDia)) {
+      guardada[Number(dia)] = ids;
+    }
+    return guardada;
+  }, [tresDelDiaGuardadas, draft.tresDelDia]);
+
+  const krsEnFoco = useMemo(
+    () =>
+      (focoKRs ?? []).map((f) => ({ id: f.kr.id, titulo: f.kr.titulo })),
+    [focoKRs],
+  );
+
+  function onDecisionTarea(tareaId: string, decision: DecisionTarea) {
+    cambiar({
+      ...draft,
+      tareas: { ...draft.tareas, [tareaId]: decision },
+    });
+  }
+
+  function onSeleccionTresDelDia(dia: number, seleccion: string[]) {
+    cambiar({
+      ...draft,
+      tresDelDia: { ...draft.tresDelDia, [String(dia)]: seleccion },
+    });
+  }
 
   // ── IA: redactar situación ───────────────────────────────────────────────
   async function onRedactar(objetivo: string, tipo: "proyecto" | "meta") {
@@ -336,6 +424,32 @@ export function WizardRitual({
         }
       }
 
+      if (paso === "tareas") {
+        // 5a) El inventario: completar / En espera / Cancelada.
+        // El cupo de 10 lo impone la BD (trigger de la migration 0043):
+        // si no cabe, el error sale de la propia BD y se muestra tal cual.
+        for (const [tareaId, decision] of Object.entries(draft.tareas)) {
+          const estado = decision === "activa" ? "pendiente" : decision;
+          await actualizarTarea({ id: tareaId, estado });
+        }
+        // 5c) Las 3 del día: solo se escribe lo que ha cambiado.
+        for (const d of diasSemana) {
+          const seleccion = draft.tresDelDia[String(d.dia)];
+          if (seleccion === undefined) continue;
+          const guardada = (tresDelDiaGuardadas ?? [])
+            .filter((r) => r.dia_semana === d.dia)
+            .map((r) => r.tarea_id);
+          if (sonIguales(seleccion, guardada)) continue;
+          await guardarTresDelDia({
+            anio,
+            semana_iso,
+            dia_semana: d.dia,
+            fecha: d.fecha,
+            tarea_ids: seleccion,
+          });
+        }
+      }
+
       const siguiente = PASOS[PASOS.findIndex((p) => p.id === paso) + 1];
       if (siguiente) {
         cambiar({ ...draft, paso: siguiente.id });
@@ -365,7 +479,11 @@ export function WizardRitual({
         metas_pausadas: Object.entries(draft.metas)
           .filter(([, v]) => v.estado === "pausada")
           .map(([k]) => k),
-        tareas_activas: estadoCupo(tareas ?? []).activas,
+        tareas_activas: estadoCupo(
+          (tareas ?? []).map((t) => ({
+            estado: (draft.tareas[t.id] ?? t.estado) as Tarea["estado"],
+          })),
+        ).activas,
         notas: null,
       });
       if (typeof window !== "undefined") {
@@ -401,8 +519,8 @@ export function WizardRitual({
               Ritual semanal · {anio} · semana {semana_iso}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              4 pasos: proyectos → metas → 3 WIGs → KRs de la semana. Puedes
-              parar y seguir: el borrador se guarda en este navegador.
+              5 pasos: proyectos → metas → 3 WIGs → KRs de la semana → tareas.
+              Puedes parar y seguir: el borrador se guarda en este navegador.
             </p>
           </div>
           <TemporizadorPaso key={pasoActual.id} objetivoMin={pasoActual.minutos} />
@@ -496,6 +614,19 @@ export function WizardRitual({
             domingo={LUNES_Y_DOMINGO(anio, semana_iso).domingo}
           />
         )}
+        {draft.paso === "tareas" && (
+          <PasoTareas
+            tareas={tareas ?? []}
+            planSemanal={planSemanal ?? []}
+            krsEnFoco={krsEnFoco}
+            decisiones={draft.tareas}
+            onDecision={onDecisionTarea}
+            dias={diasSemana}
+            candidatasPorDia={candidatasPorDia}
+            seleccionPorDia={seleccionPorDia}
+            onSeleccion={onSeleccionTresDelDia}
+          />
+        )}
       </section>
 
       {/* ── Pie: aplicar / saltar ── */}
@@ -528,12 +659,12 @@ export function WizardRitual({
           Cerrar la semana (guardar bitácora)
         </button>
         <span className="ml-auto text-[11px] text-muted-foreground">
-          Nada se escribe hasta que pulsas “Guardar”. Los pasos 5 (tareas) y el
-          reparto por días viven en{" "}
+          Nada se escribe hasta que pulsas “Guardar”. El reparto por días
+          vive en{" "}
           <Link href="/semana" className="underline underline-offset-4">
             /semana
           </Link>
-          .
+          : el paso 5 usa las tareas que ya están repartidas ahí.
         </span>
       </footer>
     </div>
@@ -541,6 +672,11 @@ export function WizardRitual({
 }
 
 // ── helpers ────────────────────────────────────────────────────────────────
+
+/** Dos listas de ids son iguales si tienen los mismos ids en el mismo orden. */
+function sonIguales(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((x, i) => x === b[i]);
+}
 
 /** Último texto de situación registrado de un proyecto. */
 function ultimaSituacion(

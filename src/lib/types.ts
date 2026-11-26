@@ -478,6 +478,20 @@ export interface Ritual {
   activo: boolean;
 }
 
+/** Una fila de `ritual_tareas_dia` (migration 0045): una de las 3 tareas
+ *  con las que te comprometes un día de la semana. */
+export interface RitualTareaDia {
+  id: string;
+  anio: number;
+  semana_iso: number;
+  dia_semana: number; // ISO 1=lunes .. 7=domingo
+  orden: number; // 1..3
+  tarea_id: string;
+  fecha: string; // YYYY-MM-DD del día concreto
+  created_at: string;
+  updated_at: string;
+}
+
 /**
  * Asignación de una tarea a un día de una semana concreta.
  * Una tarea solo puede aparecer una vez por semana (constraint UNIQUE).

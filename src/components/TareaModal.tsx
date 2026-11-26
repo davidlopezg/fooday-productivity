@@ -46,7 +46,7 @@ import { errorMessage } from "@/lib/errors";
 export type PendingFile = { file: File; status: "pendiente" };
 
 const PRIORIDADES = ["critica", "urgente", "alta", "media", "baja"];
-const ESTADOS = ["pendiente", "en_progreso", "bloqueada", "hecha", "archivada"];
+const ESTADOS = ["pendiente", "en_progreso", "bloqueada", "en_espera", "hecha", "cancelada", "archivada"];
 const DIAS_SEMANA_LBL = ["D", "L", "M", "X", "J", "V", "S"];
 
 // ============================================================================

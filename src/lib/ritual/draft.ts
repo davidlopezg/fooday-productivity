@@ -19,19 +19,23 @@
 
 import type { EstadoMeta, Periodo, ProyectoEstado } from "@/lib/types";
 
-/** Los 4 pasos del ritual, en orden. */
+/** Los 5 pasos del ritual, en orden. */
 export const PASOS = [
   { id: "proyectos", titulo: "Proyectos", minutos: 10 },
   { id: "metas", titulo: "Metas", minutos: 10 },
   { id: "wigs", titulo: "WIGs de meta", minutos: 10 },
   { id: "krs", titulo: "KRs de la semana", minutos: 10 },
+  { id: "tareas", titulo: "Tareas", minutos: 15 },
 ] as const;
 
 export type PasoId = (typeof PASOS)[number]["id"];
 
 /** Versión del formato del draft. Si cambia, los borradores viejos se
  *  descartan en silencio (mejor perder un draft que romper la app). */
-export const VERSION_DRAFT = 1;
+export const VERSION_DRAFT = 2;
+
+/** Decisión del ritual sobre una tarea (paso 5). */
+export type DecisionTarea = "hecha" | "en_espera" | "cancelada" | "activa";
 
 export interface DraftProyecto {
   /** 'vivo' | 'pausado' | 'muerto'. */
@@ -76,6 +80,10 @@ export interface DraftRitual {
   krs: Record<string, DraftKr>;
   /** Espejo: marcar WIG de KR marca también el foco semanal (y al revés). */
   espejo: boolean;
+  /** Paso 5: decisión sobre cada tarea tocada (completar / en espera / …). */
+  tareas: Record<string, DecisionTarea>;
+  /** Paso 5: las 3 del día por día (día ISO → ids de tareas). */
+  tresDelDia: Record<string, string[]>;
   /** Pasos que has saltado (noObligatorios). */
   saltados: PasoId[];
 }
@@ -92,6 +100,8 @@ export function draftVacio(anio: number, semana_iso: number): DraftRitual {
     wigsMeta: [],
     krs: {},
     espejo: true,
+    tareas: {},
+    tresDelDia: {},
     saltados: [],
   };
 }
@@ -125,6 +135,8 @@ export function leerDraft(
       wigsMeta: Array.isArray(d.wigsMeta) ? d.wigsMeta : [],
       krs: d.krs ?? {},
       espejo: d.espejo !== false,
+      tareas: d.tareas ?? {},
+      tresDelDia: d.tresDelDia ?? {},
       saltados: Array.isArray(d.saltados) ? d.saltados : [],
       paso: esPaso(d.paso) ? d.paso : "proyectos",
     } as DraftRitual;
