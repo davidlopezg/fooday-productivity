@@ -14,10 +14,11 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { fetchMetas, fetchTareas } from "@/lib/queries";
+import { fetchContextoEjecucion, fetchMetas, fetchTareas } from "@/lib/queries";
 import { actualizarTarea } from "@/lib/mutations";
 import { useData } from "@/lib/useData";
 import { localYMD } from "@/lib/semana";
+import { secuenciaEjecucion, contextoEjecucionVacio, type ContextoEjecucion } from "@/lib/orden";
 import type { EstadoTarea, Meta, Prioridad, Tarea } from "@/lib/types";
 import { useConfig } from "@/lib/configStore";
 import { IconBolt, IconSparkles } from "@/components/icons";
@@ -151,6 +152,12 @@ export default function PipelinePage() {
     setData,
   } = useData<Tarea[]>(fetchTareas, []);
   const metasQ = useData<Meta[]>(fetchMetas, []);
+  // ORDEN DE EJECUCIÓN (issue #105): el árbol proyecto → meta → KR → tarea
+  // para que la priorización respete el orden manual.
+  const ctxEjecucionQ = useData<ContextoEjecucion>(
+    () => fetchContextoEjecucion(),
+    contextoEjecucionVacio(),
+  );
   const cfg = useConfig();
   const [verTodas, setVerTodas] = useState(false);
   const [arrastrada, setArrastrada] = useState<Tarea | null>(null);
@@ -253,6 +260,10 @@ export default function PipelinePage() {
           fecha,
           horaLocal,
           diaSemana,
+          // ORDEN DE EJECUCIÓN (issue #105): desempate con el orden manual.
+          secuenciaEjecucion: Object.fromEntries(
+            secuenciaEjecucion(tareasActivas, ctxEjecucionQ.data),
+          ),
         },
       );
       setPrioridadIA(resultado);

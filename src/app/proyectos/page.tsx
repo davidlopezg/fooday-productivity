@@ -8,6 +8,7 @@ import {
   archivarProyectoEnCascada,
   crearProyecto,
   eliminarProyecto,
+  reordenarMetasDeProyecto,
 } from "@/lib/mutations";
 import { cargarDatosProyectoParaReporte } from "@/lib/exportarProyecto";
 import { tareasPorProyectoEfectivo, mapaMetas } from "@/lib/proyectos";
@@ -18,6 +19,7 @@ import { IconArchive, IconFile, IconFolder, IconPencil, IconTarget, IconTrash, I
 import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
 import ProyectoReport from "@/components/ProyectoReport";
 import { EditarProyectoModal } from "@/components/EditarProyectoModal";
+import { ListaOrdenable } from "@/components/ListaOrdenable";
 
 type DatosReporte = {
   proyecto: Proyecto;
@@ -164,7 +166,7 @@ export default function ProyectosPage() {
   // Metas hijas de cada proyecto. Una sola query, agrupamos en cliente
   // por proyecto_id. Migration 0024: metas.proyecto_id nullable; las
   // metas sin proyecto se ignoran aquí (viven solo en /metas).
-  const { data: metas } = useData<Meta[]>(fetchMetas, []);
+  const { data: metas, reload: reloadMetas } = useData<Meta[]>(fetchMetas, []);
   // Mapa id → meta: para derivar el proyecto EFECTIVO de cada tarea (las
   // que viven en un KR no llevan `proyecto_id`).
   const metaPorId = useMemo(() => mapaMetas(metas ?? []), [metas]);
@@ -318,6 +320,20 @@ export default function ProyectosPage() {
     }
   }
   const metasHuerfanasArchivadas = metasHuerfanasTodas.length - metasHuerfanas.length;
+
+  // ORDEN DE EJECUCIÓN (issue #105): las metas de un proyecto se ven en el
+  // orden en que hay que ejecutarlas (`metas.orden_ejecucion`), no por
+  // código. Las metas sin posición (0) van al final.
+  for (const arr of metasPorProyecto.values()) {
+    arr.sort((a, b) => {
+      const oa = a.orden_ejecucion ?? 0;
+      const ob = b.orden_ejecucion ?? 0;
+      if ((oa > 0 ? oa : Infinity) !== (ob > 0 ? ob : Infinity)) {
+        return (oa > 0 ? oa : Infinity) - (ob > 0 ? ob : Infinity);
+      }
+      return (a.codigo ?? "").localeCompare(b.codigo ?? "", "es");
+    });
+  }
 
   return (
     <div className="space-y-6">
@@ -669,45 +685,63 @@ export default function ProyectosPage() {
                         <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                           Metas hijas ({metasDelProyecto.length})
                         </p>
-                        <ul className="mt-1.5 space-y-1">
-                          {metasDelProyecto.map((m) => {
-                            const dotClass: Record<string, string> = {
-                              sin_empezar: "bg-slate-400",
-                              en_progreso: "bg-amber-500",
-                              bloqueada: "bg-red-500",
-                              completada: "bg-emerald-500",
-                              archivada: "bg-slate-300",
-                            };
-                            return (
-                              <li key={m.id} className="flex items-center gap-2 text-xs">
-                                <span
-                                  className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${
-                                    dotClass[m.estado] ?? "bg-slate-400"
-                                  }`}
-                                  aria-hidden
-                                />
-                                <Link
-                                  href={`/metas/detalle?id=${m.id}`}
-                                  className="min-w-0 flex-1 truncate text-foreground hover:underline"
-                                  title={m.titulo}
-                                >
-                                  {m.codigo ? (
-                                    <span className="mr-1 font-mono text-[10px] text-muted-foreground">
-                                      {m.codigo}
-                                    </span>
-                                  ) : null}
-                                  {m.titulo}
-                                </Link>
-                                {m.es_wig && (
-                                  <IconTarget
-                                    className="h-3 w-3 shrink-0 text-violet-500"
-                                    aria-label="WIG activo"
+                        <p className="mt-0.5 text-[10px] text-muted-foreground/70">
+                          Orden de ejecución: arrastra o usa ▲▼.
+                        </p>
+                        <div className="mt-1.5">
+                          <ListaOrdenable
+                            items={metasDelProyecto}
+                            etiquetaLista={`Metas del proyecto ${p.nombre}`}
+                            onReordenado={async (idsEnOrden) => {
+                              try {
+                                await reordenarMetasDeProyecto(idsEnOrden);
+                                await Promise.all([reload(), reloadMetas()]);
+                              } catch (e) {
+                                alert(
+                                  `No se pudo guardar el orden: ${(e as Error).message}`,
+                                );
+                                return false;
+                              }
+                            }}
+                            renderItem={(m) => {
+                              const dotClass: Record<string, string> = {
+                                sin_empezar: "bg-slate-400",
+                                en_progreso: "bg-amber-500",
+                                bloqueada: "bg-red-500",
+                                completada: "bg-emerald-500",
+                                archivada: "bg-slate-300",
+                              };
+                              return (
+                                <div className="flex items-center gap-2 text-xs">
+                                  <span
+                                    className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${
+                                      dotClass[m.estado] ?? "bg-slate-400"
+                                    }`}
+                                    aria-hidden
                                   />
-                                )}
-                              </li>
-                            );
-                          })}
-                        </ul>
+                                  <Link
+                                    href={`/metas/detalle?id=${m.id}`}
+                                    className="min-w-0 flex-1 truncate text-foreground hover:underline"
+                                    title={m.titulo}
+                                  >
+                                    {m.codigo ? (
+                                      <span className="mr-1 font-mono text-[10px] text-muted-foreground">
+                                        {m.codigo}
+                                      </span>
+                                    ) : null}
+                                    {m.titulo}
+                                  </Link>
+                                  {m.es_wig && (
+                                    <IconTarget
+                                      className="h-3 w-3 shrink-0 text-violet-500"
+                                      aria-label="WIG activo"
+                                    />
+                                  )}
+                                </div>
+                              );
+                            }}
+                          />
+                        </div>
                       </div>
                     )}
                 </div>

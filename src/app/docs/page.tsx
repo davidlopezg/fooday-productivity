@@ -3911,6 +3911,41 @@ export default function DocsPage() {
             </span>
             <span className="text-muted-foreground">
               <strong className="text-foreground">
+                Orden de ejecución en los tres niveles (issue #105).
+              </strong>{" "}
+              Nuevo punto del Pilar 2:{" "}
+              <strong className="text-foreground">
+                “El orden de ejecución: primero esto, después esto”
+              </strong>
+              . Antes el orden era implícito: las metas de un proyecto se veían
+              por código, los KRs tenían un <code className="rounded bg-muted px-1.5 py-0.5 text-xs">orden</code>{" "}
+              que nadie editaba y las tareas de un KR salían por fecha de
+              creación. Ahora el orden es MANUAL y explícito en los cuatro
+              niveles (proyecto → meta → KR → tarea → subtarea): en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/proyectos</code>{" "}
+              las metas de cada proyecto se reordenan arrastrándolas o con los
+              botones ▲▼ (el número de posición se ve a la vista); en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/metas/detalle</code>{" "}
+              los KRs de la meta y las tareas de cada KR; y las subtareas se
+              ordenan en el editor de la tarea (también en el alta, que antes
+              no dejaba moverlas). El planificador diario y la priorización
+              RESPETAN ese orden: a igualdad de prioridad y deadline, va
+              antes la tarea que va antes en él. Las metas sueltas (sin
+              proyecto) no tienen orden, por decisión propia. Migration{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">0047</code>{" "}
+              (<code className="rounded bg-muted px-1.5 py-0.5 text-xs">metas.orden_ejecucion</code>,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">tareas.orden_ejecucion</code>). FEATURES
+              actualizadas (filas /proyectos, /metas/detalle, /tareas,
+              /plan-diario y /pipeline) y nota en /metodologia.
+            </span>
+          </li>
+
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-11-26
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
                 Dentro de una meta, una tarea se abre con un clic (issue #99).
               </strong>{" "}
               En /metas/detalle, las tareas de cada KR eran texto plano: solo

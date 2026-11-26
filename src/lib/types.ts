@@ -112,6 +112,9 @@ export interface Meta {
   created_at?: string;
   /** Migration 0024: proyecto al que pertenece la meta. Null = meta suelta. */
   proyecto_id?: string | null;
+  /** Migration 0047: orden de ejecución de la meta DENTRO de su proyecto
+   *  (1..N). 0 = sin orden (meta suelta o sin posición). */
+  orden_ejecucion?: number;
   /** Migration 0024: fecha objetivo real (la que el agente sugiere).
    *  Distinta de `plazo` (text libre) — esta es operativa.
    *  A partir de migration 0025 también actúa como `fecha_fin` del rango
@@ -450,6 +453,9 @@ export interface Tarea {
   recurrencia_dia_mes: number | null;
   /** Última fecha en la que se generó la siguiente copia. */
   recurrencia_ultima_generada: string | null;
+  /** Migration 0047: orden de ejecución de la tarea DENTRO de su KR (1..N).
+   *  0 = sin orden (tarea suelta, sin KR). */
+  orden_ejecucion?: number;
   /** FK opcional a `resultados_periodo` (migration 0015) — apunta al KR.
    *  Migration 0028: la tabla `resultados_periodo` ya NO tiene
    *  `periodo_id`; este FK apunta al KR directamente. Null = bandeja

@@ -687,6 +687,12 @@ export const AYUDA_POR_RUTA: Record<
         pilar: 2,
       },
       {
+        titulo: "Orden de ejecución",
+        cuerpo:
+          "Las metas hijas de cada proyecto se ven en el orden en que hay que ejecutarlas. Para cambiarlo: arrastra la meta con el asa de la izquierda o usa los botones ▲▼. El número de posición se ve junto a cada meta. Ese orden lo respeta el planificador diario: a igualdad de prioridad, va antes la meta que va antes.",
+        pilar: 2,
+      },
+      {
         titulo: "Archivar en cascada es reversible",
         cuerpo:
           "El botón de archivar arrastra metas y tareas, y antes te enseña exactamente cuántos son. Si te arrepentiste, vuelve a archivar el proyecto y se desarchiva todo (las filas NO se borran: se desvinculan).",

@@ -528,6 +528,14 @@ is una de las tres respuestas posibles a la pregunta
                 Las tareas sin meta (inbox) sí pueden tener un proyecto directo para agrupación
                 operativa sin necesidad de crear una meta.
               </p>
+              <p className="mt-2">
+                <strong className="text-foreground">Orden de ejecución (migration 0047 · issue #105)</strong>:{" "}
+                la jerarquía además se puede ORDENAR. En cada nivel —proyecto → meta → KR → tarea → subtarea—
+                las piezas se ordenan a mano (arrastrando o con ▲▼) y el número de posición se ve a la
+                vista. El planificador diario y la priorización lo respetan: a igualdad de prioridad y
+                deadline, va antes la tarea que va antes en ese orden. Las metas sueltas (sin proyecto)
+                no tienen orden.
+              </p>
             </div>
           </div>
         }

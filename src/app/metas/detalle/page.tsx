@@ -12,6 +12,8 @@ import {
   ensurePeriodosAnio,
   marcarHecha,
   reabrirTarea,
+  reordenarKrsDeMeta,
+  reordenarTareasDeKr,
 } from "@/lib/mutations";
 import {
   fetchAreas,
@@ -50,6 +52,7 @@ import {
 import { EditarMetaModal } from "@/components/EditarMetaModal";
 import { EditarModal } from "@/components/TareaModal";
 import { RecurrenciaTag } from "@/components/RecurrenciaChip";
+import { ListaOrdenable } from "@/components/ListaOrdenable";
 
 const ESTADO_META: Record<string, string> = {
   sin_empezar: "bg-muted text-muted-foreground border-border",
@@ -477,20 +480,38 @@ export default function MetaDetallePage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {plan.resultados.map((r) => (
-                  <ResultadoCard
-                    key={r.id}
-                    resultado={r}
-                    inbox={inboxQ.data ?? []}
-                    metaId={plan.meta.id}
-                    cfg={cfg}
-                    contextoProyecto={contextoProyecto}
-                    onChanged={async () => {
+                <p className="text-[11px] text-muted-foreground">
+                  Orden de ejecución de los KRs: arrastra o usa ▲▼.
+                </p>
+                <ListaOrdenable
+                  items={plan.resultados}
+                  etiquetaLista={`KRs de ${plan.meta.titulo}`}
+                  onReordenado={async (idsEnOrden) => {
+                    try {
+                      await reordenarKrsDeMeta(idsEnOrden);
                       await planQ.reload();
-                      await inboxQ.reload();
-                    }}
-                  />
-                ))}
+                    } catch (e) {
+                      alert(
+                        `No se pudo guardar el orden de los KRs: ${(e as Error).message}`,
+                      );
+                      return false;
+                    }
+                  }}
+                  renderItem={(r) => (
+                    <ResultadoCard
+                      key={r.id}
+                      resultado={r}
+                      inbox={inboxQ.data ?? []}
+                      metaId={plan.meta.id}
+                      cfg={cfg}
+                      contextoProyecto={contextoProyecto}
+                      onChanged={async () => {
+                        await planQ.reload();
+                        await inboxQ.reload();
+                      }}
+                    />
+                  )}
+                />
               </div>
             )}
 
@@ -759,22 +780,41 @@ function ResultadoCard({
         <MiniBar value={prog} />
       </div>
 
-      {/* Lista de tareas */}
+      {/* Lista de tareas — ORDEN DE EJECUCIÓN (issue #105): las tareas de un
+          KR se ejecutan en el orden en que las pone la persona. */}
       {resultado.tareas.length > 0 && (
-        <ul className="mt-3 divide-y divide-border/60">
-          {resultado.tareas.map((t) => (
-            <TareaRow
-              key={t.id}
-              tarea={t}
-              onToggle={async () => {
-                if (t.estado === "hecha") await reabrirTarea(t.id);
-                else await marcarHecha(t.id);
+        <div className="mt-3">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Tareas · orden de ejecución
+          </p>
+          <ListaOrdenable
+            className="mt-1 divide-y divide-border/60"
+            items={resultado.tareas}
+            etiquetaLista={`Tareas de ${resultado.titulo}`}
+            onReordenado={async (idsEnOrden) => {
+              try {
+                await reordenarTareasDeKr(idsEnOrden);
                 await onChanged();
-              }}
-              onChanged={onChanged}
-            />
-          ))}
-        </ul>
+              } catch (e) {
+                alert(
+                  `No se pudo guardar el orden de las tareas: ${(e as Error).message}`,
+                );
+                return false;
+              }
+            }}
+            renderItem={(t) => (
+              <TareaRow
+                tarea={t}
+                onToggle={async () => {
+                  if (t.estado === "hecha") await reabrirTarea(t.id);
+                  else await marcarHecha(t.id);
+                  await onChanged();
+                }}
+                onChanged={onChanged}
+              />
+            )}
+          />
+        </div>
       )}
 
       <div className="mt-3 flex flex-wrap gap-2">
@@ -873,7 +913,7 @@ function TareaRow({
   const [editando, setEditando] = useState(false);
   const hecha = tarea.estado === "hecha";
   return (
-    <li className="flex items-center gap-2 py-1.5 text-sm">
+    <div className="flex items-center gap-2 py-1.5 text-sm">
       <button
         onClick={() => onToggle()}
         className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-border hover:border-primary"
@@ -914,7 +954,7 @@ function TareaRow({
           }}
         />
       )}
-    </li>
+    </div>
   );
 }
 

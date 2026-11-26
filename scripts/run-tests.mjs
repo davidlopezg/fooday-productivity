@@ -27,6 +27,7 @@ const TESTS = [
   "src/lib/llm-retry.test.mjs",
   "src/lib/proyectos.test.mjs",
   "src/lib/metas.test.mjs",
+  "src/lib/orden.test.mjs",
   "src/lib/ritualSemanal.test.mjs",
   "src/lib/ritual/draft.test.mjs",
   "src/lib/ritual/cobertura.test.mjs",

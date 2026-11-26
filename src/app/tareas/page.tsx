@@ -24,6 +24,7 @@ import {
 } from "@/components/SugerenciasTareasModal";
 import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
 import { IconSparkles } from "@/components/icons";
+import { contextoEjecucionVacio, secuenciaEjecucion } from "@/lib/orden";
 import type { MetaConPlan, Proyecto, Tarea } from "@/lib/types";
 
 export default function TareasPage() {
@@ -46,6 +47,28 @@ export default function TareasPage() {
   const [errorSugIA, setErrorSugIA] = useState<string | null>(null);
   // Modal "Buscar duplicadas" — abierta/cerrada.
   const [dedupeAbierto, setDedupeAbierto] = useState(false);
+
+  // ORDEN DE EJECUCIÓN (issue #105): la lista de tareas se pinta en el
+  // orden en que hay que ejecutarlas (proyecto → meta → KR → tarea), no
+  // por fecha de creación. Las tareas sueltas (sin meta ni KR) van al
+  // final.
+  const tareasEnOrden = useMemo(() => {
+    const lista = tareas ?? [];
+    const ctx = contextoEjecucionVacio();
+    for (const p of proyectosQ.data ?? []) ctx.ordenProyecto.set(p.id, p.orden ?? 0);
+    for (const mp of metasQ.data ?? []) {
+      ctx.proyectoDeMeta.set(mp.meta.id, mp.meta.proyecto_id ?? null);
+      ctx.ordenMeta.set(mp.meta.id, mp.meta.orden_ejecucion ?? 0);
+      for (const r of mp.resultados) {
+        ctx.metaDeKr.set(r.id, r.meta_id ?? mp.meta.id);
+        ctx.ordenKr.set(r.id, r.orden ?? 0);
+      }
+    }
+    const seq = secuenciaEjecucion(lista, ctx);
+    return lista
+      .slice()
+      .sort((a, b) => (seq.get(a.id) ?? 0) - (seq.get(b.id) ?? 0));
+  }, [tareas, metasQ.data, proyectosQ.data]);
 
   // Tareas marcadas como WIG (4DX), ordenadas por wig_orden (1, 2, 3).
   const wigTareas = useMemo(
@@ -309,7 +332,7 @@ export default function TareasPage() {
         // de query la página NO se desmonta, así que sin esto el filtro
         // se quedaría en el KR anterior.
         key={`kr:${searchParams.get("kr") ?? ""}`}
-        tareas={tareas}
+        tareas={tareasEnOrden}
         adjuntosCount={adjuntosCount ?? new Map()}
         onChanged={reload}
       />

@@ -11,6 +11,7 @@ import {
   fetchKRsFocoSemanal,
   fetchMetas,
   fetchPlanHoy,
+  fetchContextoEjecucion,
 } from "@/lib/queries";
 import { fetchPagosConUrgencia } from "@/lib/pagos/queries";
 import {
@@ -28,6 +29,7 @@ import {
 import { useData } from "@/lib/useData";
 import { useConfig } from "@/lib/configStore";
 import { generarPlanSimple } from "@/lib/planSimple";
+import { contextoEjecucionVacio, secuenciaEjecucion, type ContextoEjecucion } from "@/lib/orden";
 import type { EstadoEmocional } from "@/lib/plan";
 import { getCurrentISOWeek, BLOQUE_HORARIO, localYMD } from "@/lib/semana";
 import { calcularPropuestaShadow, type PropuestaShadow } from "@/lib/recuperacion/shadow";
@@ -224,6 +226,24 @@ export default function PlanDiarioPage() {
   const [shadowError, setShadowError] = useState<string | null>(null);
 
   const metasQ = useData<Meta[]>(() => fetchMetas(), []);
+  // ORDEN DE EJECUCIÓN (issue #105): el árbol proyecto → meta → KR → tarea
+  // para que el planificador respete el orden manual.
+  const ctxEjecucionQ = useData<ContextoEjecucion>(
+    () => fetchContextoEjecucion(),
+    contextoEjecucionVacio(),
+  );
+
+  // ORDEN DE EJECUCIÓN (issue #105): posición global de cada tarea en el
+  // orden manual (proyecto → meta → KR → tarea). El planificador la usa
+  // como desempate: a igualdad de prioridad, va antes la que va antes en
+  // ese orden.
+  const secuenciaEjecucionTareas = useMemo<Record<string, number>>(() => {
+    const ctx = ctxEjecucionQ.data;
+    if (!ctx) return {};
+    const todas = [...(tareasQ.data ?? []), ...tareasProgramadasHoy];
+    const seq = secuenciaEjecucion(todas, ctx);
+    return Object.fromEntries(seq);
+  }, [ctxEjecucionQ.data, tareasQ.data, tareasProgramadasHoy]);
   const pagosQ = useData<Pago[]>(() => fetchPagosConUrgencia(), []);
   const planHoyQ = useData(() => fetchPlanHoy(), null);
 
@@ -599,6 +619,9 @@ export default function PlanDiarioPage() {
           // Migration 0032: el perfil va en la tabla `configuracion`, no
           // hardcodeado en el prompt.
           perfil: config.data,
+          // ORDEN DE EJECUCIÓN (issue #105): el backlog se presenta en el
+          // orden manual y, a igualdad de prioridad, manda ese orden.
+          secuenciaEjecucion: secuenciaEjecucionTareas,
         },
       );
 
