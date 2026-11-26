@@ -268,6 +268,28 @@ export async function fetchRituales(): Promise<Ritual[]> {
   return (data ?? []) as Ritual[];
 }
 
+/** Reconcilia el plan con el estado real de sus tareas (issue #23).
+ *
+ *  La RPC `marcar_tarea_y_plan` (migration 0042) escribe la tarea y su
+ *  reflejo en el plan en una sola transacción, así que el descuadre ya no
+ *  debería pasar. Esta función es la red de seguridad para los datos que
+ *  quedaron a medias (por ejemplo, escritos por una versión anterior de la
+ *  app o por un corte de red): al leer el plan, se alinea con el estado
+ *  real de `tareas`.
+ *
+ *  Es idempotente: si no hay nada que corregir no toca nada.
+ *  `planId` opcional: sin él, reconcilia todos los planes del owner. */
+export async function reconciliarPlan(planId?: string): Promise<void> {
+  const { error } = await createClient().rpc("reconciliar_plan_diario", {
+    p_plan_diario_id: planId ?? null,
+  });
+  if (!error) return;
+  // Si la migration 0042 todavía no está aplicada, la RPC no existe: no es un
+  // error que haya que repetir en cada carga de la página.
+  if (/PGRST202|42883|does not exist/i.test(error.message)) return;
+  console.warn("[reconciliarPlan] no se pudo reconciliar el plan:", error.message);
+}
+
 export async function fetchPlanHoy(): Promise<
   (PlanDiario & { tareas: PlanDiarioTarea[] }) | null
 > {
@@ -281,6 +303,8 @@ export async function fetchPlanHoy(): Promise<
     .limit(1);
   const plan = planes?.[0];
   if (!plan) return null;
+  // Antes de leer las filas: si alguna quedó descuadrada, se arregla (issue #23).
+  await reconciliarPlan(plan.id);
   const { data: tareas } = await supabase
     .from("plan_diario_tareas")
     .select("*")
@@ -369,6 +393,8 @@ export async function fetchPlanCompleto(
   const supabase = createClient();
   const { data: plan } = await supabase.from("planes_diarios").select("*").eq("id", id).maybeSingle();
   if (!plan) return null;
+  // Antes de leer las filas: si alguna quedó descuadrada, se arregla (issue #23).
+  await reconciliarPlan(id);
   const { data: tareas } = await supabase
     .from("plan_diario_tareas")
     .select("*, subtareas:plan_diario_subtareas(*), borradores:plan_diario_borradores(*)")
@@ -411,6 +437,9 @@ export async function fetchPlanes(opts?: { desde?: string; hasta?: string; limit
   if (opts?.hasta) q2 = q2.lte("fecha", opts.hasta);
   const { data: planes } = await q2;
   if (!planes || planes.length === 0) return [];
+  // Antes de contar: reconcilia los planes con el estado real de las tareas
+  // para que el histórico nunca muestre un progreso incompatible (issue #23).
+  await reconciliarPlan();
   // Trae tareas para conteo + estructura de bloques (timeblocking 1-4).
   const ids = planes.map((p) => p.id);
   const { data: conteos } = await supabase
