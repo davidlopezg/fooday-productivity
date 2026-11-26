@@ -75,6 +75,7 @@ const EXEC_ITEMS: NavItem[] = [
 
 // Bloque 4 — Revisión, Bienestar y Sistema
 const REVIEW_ITEMS: NavItem[] = [
+  { href: "/ritual-semanal", label: "Ritual semanal", Icon: IconRepeat },
   { href: "/tareas/completadas", label: "Completadas", Icon: IconCheck },
   { href: "/calendario", label: "Calendario", Icon: IconCalendar },
   { href: "/focus", label: "Focus", Icon: IconBolt },

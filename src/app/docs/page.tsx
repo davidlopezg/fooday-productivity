@@ -1308,12 +1308,17 @@ export default function DocsPage() {
           los KRs de la semana, y se deja el inventario de tareas limpio con
           un máximo de diez activas. Desde la migration 0043, la app{" "}
           <strong className="text-foreground">ya puede representar (y
-          guardar) cada una de esas decisiones</strong>. La pantalla{" "}
+          guardar) cada una de esas decisiones</strong>, y desde el issue #88
+          las recorre en la pantalla{" "}
           <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
             /ritual-semanal
-          </code>{" "}
-          que las recorre en 4 pasos llega en los issues #88 y #89; por ahora
-          lo que existe es el modelo que las sostiene:
+          </code>
+          : un asistente de 4 pasos (proyectos → metas → 3 WIGs → KRs) con
+          temporizador por paso y <strong>borrador reanudable</strong> (puedes
+          parar a mitad y seguir: se guarda en tu navegador). Cada paso se
+          escribe al pulsar «Guardar y continuar», así que rectificar no
+          ensucia los datos. Lo que queda para el issue #89 es el paso 5: el
+          inventario de tareas con su cupo de 10 y las 3 tareas de cada día.
         </p>
         <ul className="mt-3 space-y-2 text-sm leading-relaxed text-muted-foreground">
           <li className="flex gap-2">
@@ -1381,6 +1386,54 @@ export default function DocsPage() {
               meta, KRs en foco y cuántas tareas activas quedaron. Es lo que
               permitirá comparar “la semana pasada con esta” en vez de
               fiarse de la memoria.
+            </span>
+          </li>
+        </ul>
+
+        <h3 className="mt-6 text-base font-semibold">
+          🪜 2.c. Los 4 pasos del asistente (/ritual-semanal)
+        </h3>
+        <ul className="mt-3 space-y-2 text-sm leading-relaxed text-muted-foreground">
+          <li className="flex gap-2">
+            <span className="text-rose-500">1.</span>
+            <span>
+              <strong className="text-foreground">Proyectos.</strong> ¿Vivo, en
+              pausa o muere? + la <strong>situación</strong> de cada uno (un
+              evento en la capa de Escenarios). La IA puede redactar el
+              borrador, pero el texto lo escribes tú. Los proyectos van
+              <strong> antes</strong> que las metas: un proyecto muerto
+              arrastra las suyas.
+            </span>
+          </li>
+          <li className="flex gap-2">
+            <span className="text-rose-500">2.</span>
+            <span>
+              <strong className="text-foreground">Metas.</strong> ¿Viva, en
+              pausa o muere? ¿En qué fase? ¿Bloqueada y por qué? Y la
+              situación actual: el “Status Meta”, que se guarda{" "}
+              <strong>con historial</strong>. El semáforo que ves es{" "}
+              <strong>derivado</strong>: no se guarda, se calcula.
+            </span>
+          </li>
+          <li className="flex gap-2">
+            <span className="text-rose-500">3.</span>
+            <span>
+              <strong className="text-foreground">Las 3 WIGs de meta.</strong>{" "}
+              El orden es la prioridad (1-2-3). Con el botón «Continuar igual»
+              repites las de la semana pasada en un clic. El tope de 3 lo
+              impone la base de datos.
+            </span>
+          </li>
+          <li className="flex gap-2">
+            <span className="text-rose-500">4.</span>
+            <span>
+              <strong className="text-foreground">Los KRs de la semana, con
+              las dos capas a la vista.</strong> ⭐ WIG del ciclo (el
+              trimestre, máx 3) y 📅 foco de esta semana (máx 3, rota sola).
+              La diferencia está explicada en la propia pantalla y un{" "}
+              <strong>espejo</strong> los mantiene iguales por defecto. Los
+              KRs cuya entrega no cae en esta semana salen deshabilitados y
+              con el motivo: la base de datos los rechazaría.
             </span>
           </li>
         </ul>
@@ -1751,6 +1804,35 @@ export default function DocsPage() {
         </header>
 
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-11-26
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
+                El ritual semanal ya es una pantalla: /ritual-semanal.
+              </strong>{" "}
+              Issue #88: la capa de datos (#87) ya existía, pero las decisiones
+              se tomaban fuera de la app. Ahora hay un asistente de 4 pasos:{" "}
+              <strong className="text-foreground">proyectos → metas → 3 WIGs
+              → KRs</strong>. Los proyectos van primero (estructura antes que
+              foco); en el paso 2 la situación de cada meta es el “Status
+              Meta” y se guarda con historial; en el paso 3 las 3 WIGs se
+              eligen con orden = prioridad y con «Continuar igual» (pueden
+              ser las mismas que la semana pasada); en el paso 4 los KRs
+              muestran las DOS capas (⭐ WIG del ciclo y 📅 foco semanal) con
+              la diferencia explicada y un espejo que las mantiene iguales
+              por defecto (los KRs fuera de ventana salen deshabilitados con
+              el motivo). El borrador se guarda en el navegador (se puede
+              parar y seguir) y cada paso se escribe al pulsar «Guardar y
+              continuar», nada antes. La IA solo redacta borradores de
+              situación: proponer no es decidir. FEATURES incluye la nueva
+              pantalla, el ritual semanal aparece en la chuleta de la sección
+              “Cuándo usar cada pantalla” y se documentan los 4 pasos en la
+              sección 2.c. El paso 5 (inventario de tareas con cupo de 10 y
+              las 3 del día) es el issue #89.
+            </span>
+          </li>
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
               2026-11-26
