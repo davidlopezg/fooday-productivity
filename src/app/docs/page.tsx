@@ -114,7 +114,7 @@ export default function DocsPage() {
 
           app. Si una feature no contribuye a ninguno, no debería existir.
 
-          Cada botón "Por qué existe esto" en las pantallas apunta aquí.
+          Cada botón &quot;Por qué existe esto&quot; en las pantallas apunta aquí.
 
         </p>
 
@@ -216,7 +216,7 @@ export default function DocsPage() {
 
           <p className="font-semibold text-emerald-800 dark:text-emerald-200">
 
-            🧠 ¿Cómo encaja esto con el botón "IA" de cada capa?
+            🧠 ¿Cómo encaja esto con el botón &quot;IA&quot; de cada capa?
 
           </p>
 
@@ -10301,7 +10301,7 @@ export default function DocsPage() {
 
       <footer className="rounded-2xl border border-dashed border-border bg-muted/30 p-6 text-center text-sm text-muted-foreground">
 
-        ¿Falta algo? Cada botón "Por qué existe esto" en las pantallas de la
+        ¿Falta algo? Cada botón &quot;Por qué existe esto&quot; en las pantallas de la
 
         app apunta a esta página. La metodología no es dogma: si algo no
 
