@@ -6,6 +6,8 @@ export type EstadoMeta =
   | "sin_empezar"
   | "en_progreso"
   | "bloqueada"
+  /** Migration 0043: viva pero en pausa. Distinto de `archivada`. */
+  | "pausada"
   | "completada"
   | "archivada";
 
@@ -13,8 +15,12 @@ export type EstadoTarea =
   | "pendiente"
   | "en_progreso"
   | "bloqueada"
+  /** Migration 0043: la aparto del foco de esta semana (vuelve). */
+  | "en_espera"
   | "hecha"
   | "descartada"
+  /** Migration 0043: no la haré. */
+  | "cancelada"
   | "archivada";
 
 export type Prioridad = "critica" | "urgente" | "alta" | "media" | "baja";
@@ -38,7 +44,12 @@ export interface Proyecto {
   archivado: boolean;
   /** Migration 0024: área a la que pertenece el proyecto. Null = huérfano. */
   area_id?: string | null;
+  /** Migration 0043: ciclo de vida en el ritual semanal. */
+  estado?: ProyectoEstado;
 }
+
+/** Migration 0043: el proyecto vive, está en pausa o ha muerto. */
+export type ProyectoEstado = "vivo" | "pausado" | "muerto";
 
 export type RecurrenciaTipo = "diaria" | "semanal" | "mensual" | null;
 
@@ -110,6 +121,10 @@ export interface Meta {
   contexto?: string | null;
   /** Migration 0024: situación actual (dónde estoy hoy con esta meta). */
   situacion_actual?: string | null;
+  /** Migration 0043: fase actual de la meta (catálogo en /configuracion). */
+  fase?: string | null;
+  /** Migration 0043: última escritura de la situación ("Status Meta"). */
+  situacion_actualizada_at?: string | null;
   /** Migration 0025: fecha en que David puede empezar a trabajar esta meta.
    *  Si null, el planificador asume "hoy". */
   fecha_inicio_meta?: string | null;
@@ -123,6 +138,42 @@ export interface Meta {
    *  — sustituye al proxy `updated_at` en /informes.
    *  NULL si la meta nunca se ha cerrado. */
   fecha_cierre?: string | null;
+}
+
+// ============================================================================
+// Ritual semanal (migration 0043)
+// ============================================================================
+
+/** Una entrada del historial del "Status Meta" (la situación actual). */
+export interface MetaSituacion {
+  id: string;
+  meta_id: string;
+  situacion: string;
+  /** 'manual' | 'ia' | 'wizard'. */
+  origen: string;
+  creada_en: string;
+}
+
+/** Una fila de la bitácora del ritual semanal (una por semana ISO). */
+export interface RitualSemanal {
+  id: string;
+  anio: number;
+  semana_iso: number;
+  metas_vivas: string[];
+  wigs_meta: string[];
+  krs_foco: string[];
+  metas_pausadas: string[];
+  tareas_activas: number;
+  notas: string | null;
+  cerrado_en: string | null;
+  created_at: string;
+}
+
+/** Lista configurable por el usuario (p.ej. el catálogo de fases de meta). */
+export interface ConfigLista {
+  id: string;
+  clave: string;
+  valores: string[];
 }
 
 // ============================================================================

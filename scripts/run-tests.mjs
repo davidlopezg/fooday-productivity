@@ -27,6 +27,7 @@ const TESTS = [
   "src/lib/llm-retry.test.mjs",
   "src/lib/proyectos.test.mjs",
   "src/lib/metas.test.mjs",
+  "src/lib/ritualSemanal.test.mjs",
   "src/lib/configStore.test.mjs",
   "src/lib/perfilIA.test.mjs",
   "src/lib/schema-queries.test.mjs",

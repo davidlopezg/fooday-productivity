@@ -1298,6 +1298,95 @@ export default function DocsPage() {
 
         <hr className="my-6 border-border" />
 
+        {/* ── 2.b. La capa de datos del ritual semanal (issue #87) ── */}
+        <h3 className="text-base font-semibold">
+          🗂️ 2.b. Lo que el ritual semanal ya puede escribir (la capa de datos)
+        </h3>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          El ritual semanal se hace en una hoja: una mañana de lunes se
+          revisan metas y proyectos, se eligen tres WIGs, de ellas se eligen
+          los KRs de la semana, y se deja el inventario de tareas limpio con
+          un máximo de diez activas. Desde la migration 0043, la app{" "}
+          <strong className="text-foreground">ya puede representar (y
+          guardar) cada una de esas decisiones</strong>. La pantalla{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+            /ritual-semanal
+          </code>{" "}
+          que las recorre en 4 pasos llega en los issues #88 y #89; por ahora
+          lo que existe es el modelo que las sostiene:
+        </p>
+        <ul className="mt-3 space-y-2 text-sm leading-relaxed text-muted-foreground">
+          <li className="flex gap-2">
+            <span className="text-rose-500">·</span>
+            <span>
+              <strong className="text-foreground">Proyecto: vivo / en pausa / muerto.</strong>{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                proyectos.estado
+              </code>
+              . Los proyectos van <strong>antes</strong> que las metas: un
+              proyecto muerto arrastra sus metas y no debe competir por un
+              WIG.
+            </span>
+          </li>
+          <li className="flex gap-2">
+            <span className="text-rose-500">·</span>
+            <span>
+              <strong className="text-foreground">Meta: pausa, fase y situación.</strong>{" "}
+              El estado <code className="rounded bg-muted px-1.5 py-0.5 text-xs">pausada</code>{" "}
+              (vuelve) es distinto de <em>archivada</em> (se cierra); la{" "}
+              <strong className="text-foreground">fase</strong> sale del
+              catálogo editable en{" "}
+              <Link
+                href="/configuracion"
+                className="font-medium text-foreground underline underline-offset-4"
+              >
+                /configuracion
+              </Link>{" "}
+              (por defecto: exploración, construcción, lanzamiento,
+              consolidación) y la{" "}
+              <strong className="text-foreground">situación actual</strong>{" "}
+              es el “Status Meta”: un texto que se escribe a mano y se guarda{" "}
+              <strong>con historial</strong> ({" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                meta_situaciones
+              </code>
+              ), para que el valor anterior nunca se pierda. El semáforo que
+              se ve en pantalla se deriva: no se guarda.
+            </span>
+          </li>
+          <li className="flex gap-2">
+            <span className="text-rose-500">·</span>
+            <span>
+              <strong className="text-foreground">Tarea: En espera ≠ Cancelada, y cupo de 10.</strong>{" "}
+              Las activas son pendiente / en progreso / bloqueada.{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                en_espera
+              </code>{" "}
+              aparta la tarea del foco de la semana (vuelve),{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                cancelada
+              </code>{" "}
+              dice que no la harás. Ninguna de las dos cuenta como activa, y
+              el <strong>límite de 10 activas lo impone la base de datos</strong>{" "}
+              (trigger de la 0043): ningún cliente, script ni ETL puede
+              saltárselo.
+            </span>
+          </li>
+          <li className="flex gap-2">
+            <span className="text-rose-500">·</span>
+            <span>
+              <strong className="text-foreground">Bitácora semanal.</strong>{" "}
+              Una fila por semana ISO (<code className="rounded bg-muted px-1.5 py-0.5 text-xs">ritual_semanales</code>)
+              con lo que se decidió: metas vivas, metas en pausa, WIGs de
+              meta, KRs en foco y cuántas tareas activas quedaron. Es lo que
+              permitirá comparar “la semana pasada con esta” en vez de
+              fiarse de la memoria.
+            </span>
+          </li>
+        </ul>
+
+        <hr className="my-6 border-border" />
+
         {/* ── 3. Ritual mensual ── */}
         <h3 className="text-base font-semibold">
           🗓️ 3. Ritual mensual (1 vez al mes, ~60-90 min)
@@ -1668,6 +1757,61 @@ export default function DocsPage() {
             </span>
             <span className="text-muted-foreground">
               <strong className="text-foreground">
+                El ritual semanal ya tiene dónde escribir (la capa de datos).
+              </strong>{" "}
+              Issue #87: el modelo solo/contemplaba el flujo de ejecución
+              (hacer, descartar, archivar), así que el ritual semanal se
+              hacía fuera de la app. La migration 0043 amplía el modelo:{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                metas.estado
+              </code>{" "}
+              admite <em>pausada</em> (vuelve; no es archivar),{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                metas.fase
+              </code>{" "}
+              guarda la fase (catálogo editable en /configuracion) y{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                metas.situacion_actual
+              </code>{" "}
+              —el “Status Meta”— se guarda{" "}
+              <strong className="text-foreground">con historial</strong>{" "}
+              en la tabla nueva <code className="rounded bg-muted px-1.5 py-0.5 text-xs">meta_situaciones</code>{" "}
+              (el valor anterior nunca se pierde).{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                proyectos.estado
+              </code>{" "}
+              añade vivo/pausado/muerto (los proyectos van antes que las metas
+              en el ritual).{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                tareas.estado
+              </code>{" "}
+              admite <em>en_espera</em> y <em>cancelada</em> (apartar ≠
+              matar) y el <strong className="text-foreground">cupo de 10
+              tareas activas lo impone un trigger de la BD</strong>, no la
+              interfaz: ningún cliente ni ETL puede saltárselo. Se añade{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                ritual_semanales
+              </code>{" "}
+              (bitácora: una fila por semana ISO) y{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                config_listas
+              </code>{" "}
+              (catálogos editables). Nueva sección “2.b. Lo que el ritual
+              semanal ya puede escribir”, tres entradas nuevas en el
+              glosario (pausa, Status Meta, En espera ≠ Cancelada) y la
+              fila de /configuracion actualizada. La pantalla{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                /ritual-semanal
+              </code>{" "}
+              que recorre el ritual en 4 pasos llega en los issues #88 y #89.
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-11-26
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
                 Nueva sección: el Marco Personal de Vida vive en /norte.
               </strong>{" "}
               Issue #83: la página{" "}
@@ -1698,6 +1842,7 @@ export default function DocsPage() {
                 src/app/norte/MarcoPersonal.tsx
               </code>
               .
+
             </span>
           </li>
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">

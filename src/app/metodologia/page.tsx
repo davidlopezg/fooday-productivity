@@ -383,6 +383,37 @@ export default function MetodologiaPage() {
                   se mueva sola.
                 </span>
               </li>
+              <li className="flex gap-2">
+                <span className="text-fuchsia-500">·</span>
+                <span>
+                  <strong className="text-foreground">El modelo del ritual semanal (migration 0043).</strong>{" "}
+                  La derivación de arriba (“el estado de la meta lo deducen sus
+                  tareas”) es una de las tres respuestas posibles a la pregunta
+                  del ritual: <strong className="text-foreground">viva</strong>,{" "}
+                  <strong className="text-foreground">en pausa</strong> o{" "}
+                  <strong className="text-foreground">archivada</strong>. La pausa
+                  es una decisión explícita del usuario y{" "}
+                  <code className="rounded bg-muted px-1 py-0.5 text-[10px] font-mono">estado = pausada</code>{" "}
+                  nunca se deduce: el motor de issue #35 no pausa ni despausa
+                  nada por su cuenta. Junto a ella, la meta lleva{" "}
+                  <strong className="text-foreground">fase</strong> (catálogo
+                  editable en{" "}
+                  <Link href="/configuracion" className="font-medium text-foreground underline underline-offset-4">
+                    /configuracion
+                  </Link>
+                  ) y <strong className="text-foreground">situación actual</strong>:{" "}
+                  el “Status Meta” es ese texto, y se guarda{" "}
+                  <strong className="text-foreground">con historial</strong>{" "}
+                  (<code className="rounded bg-muted px-1 py-0.5 text-[10px] font-mono">meta_situaciones</code>),
+                  igual que en la capa de Escenarios: el estado se deriva, la
+                  situación se escribe. En las tareas, el ritual añade{" "}
+                  <em>en espera</em> (la aparto, vuelve) frente a{" "}
+                  <em>cancelada</em> (no la haré) y un{" "}
+                  <strong className="text-foreground">cupo de 10 tareas
+                  activas</strong> que impone un trigger de la BD, no la
+                  interfaz.
+                </span>
+              </li>
             </ul>
           </div>
         }

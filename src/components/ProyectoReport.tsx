@@ -38,6 +38,7 @@ const ESTADO_META_LABEL: Record<Meta["estado"], string> = {
   sin_empezar: "Sin empezar",
   en_progreso: "En progreso",
   bloqueada: "Bloqueada",
+  pausada: "En pausa",
   completada: "Completada",
   archivada: "Archivada",
 };
@@ -46,8 +47,10 @@ const ESTADO_TAREA_LABEL: Record<Tarea["estado"], string> = {
   pendiente: "Pendiente",
   en_progreso: "En progreso",
   bloqueada: "Bloqueada",
+  en_espera: "En espera",
   hecha: "Hecha",
   descartada: "Descartada",
+  cancelada: "Cancelada",
   archivada: "Archivada",
 };
 
@@ -63,8 +66,10 @@ const ESTADO_TAREA_ORDEN: Record<Tarea["estado"], number> = {
   bloqueada: 1,
   pendiente: 2,
   hecha: 3,
-  descartada: 4,
-  archivada: 5,
+  en_espera: 4,
+  descartada: 5,
+  cancelada: 6,
+  archivada: 7,
 };
 
 const RECURRENCIA_LABEL: Record<NonNullable<Tarea["recurrencia_tipo"]>, string> = {
