@@ -3973,6 +3973,15 @@ export default function DocsPage() {
               </code>{" "}
 
               lo cuentan.
+            </span>
+          </li>
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-11-26
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
+
 
                 El ritual semanal tiene paso 5: las tareas (inventario,
 
