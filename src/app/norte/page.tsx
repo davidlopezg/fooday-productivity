@@ -2,6 +2,8 @@
 
 import { fetchNorte } from "@/lib/queries";
 import { useData } from "@/lib/useData";
+import MarcoPersonal from "./MarcoPersonal";
+import RecordatorioMarco from "./RecordatorioMarco";
 
 type Norte = {
   propositos: { id: string; texto: string }[];
@@ -22,8 +24,13 @@ export default function NortePage() {
         <h1 className="text-2xl font-bold tracking-tight">Norte</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Propósito, valores y visión: la brújula que da sentido a las metas.
+          Aquí vive también el{" "}
+          <strong className="text-foreground">Marco Personal de Vida</strong>: los
+          límites, prioridades y compromisos que no se negocian.
         </p>
       </header>
+
+      <RecordatorioMarco />
 
       <section className="rounded-xl border border-border bg-card p-6">
         <h2 className="mb-4 font-semibold tracking-tight">🎯 Propósito</h2>
@@ -74,6 +81,8 @@ export default function NortePage() {
           )}
         </ul>
       </section>
+
+      <MarcoPersonal />
     </div>
   );
 }

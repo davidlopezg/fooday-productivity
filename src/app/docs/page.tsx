@@ -338,6 +338,158 @@ export default function DocsPage() {
         </p>
       </section>
 
+      {/* =====================================================================
+          Complemento · Marco Personal de Vida
+          El documento de principios, límites y compromisos que vive en /norte
+          (issue #83). Es la referencia que se relee cuando se pierde el rumbo.
+          ===================================================================== */}
+      <section
+        id="marco-personal"
+        className="scroll-mt-20 rounded-2xl border-2 border-primary/30 bg-gradient-to-br from-primary/5 to-transparent p-6 sm:p-8"
+      >
+        <header>
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Complemento · Identidad y horizonte
+          </div>
+          <h2 className="mt-1 text-2xl font-bold tracking-tight">
+            🧭 Marco Personal de Vida
+          </h2>
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+            El <strong className="text-foreground">/norte</strong> guarda el
+            propósito, los valores y la visión: el rumbo. Y guarda también el{" "}
+            <strong className="text-foreground">Marco Personal de Vida</strong>:
+            un documento personal de principios, límites y compromisos que dice
+            qué NO quieres (movil, preocupación permanente, trabajar sin
+            descanso, dispersarte, regalar tu tiempo, descuidar la salud,
+            vivir solo para mejorar) y qué SÍ quieres (familia presente, vida
+            intelectual, control de tu tiempo, tranquilidad económica,
+            proyectos que aporten valor, salud, cosas sencillas, libertad y
+            confianza personal).
+          </p>
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+            No es una lista de exigencias ni una meta en la base de datos: es
+            una{" "}
+            <strong className="text-foreground">referencia estática</strong>{" "}
+            (10 secciones numeradas) que se relee cuando aparecen obligaciones
+            nuevas, cuando llega una oportunidad que no encaja o cuando se
+            caen los hábitos. El texto vive en{" "}
+            <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+              src/lib/norte/marcoPersonal.ts
+            </code>{" "}
+            y se pinta en{" "}
+            <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+              src/app/norte/MarcoPersonal.tsx
+            </code>
+            .
+          </p>
+        </header>
+
+        <h3 className="mt-6 text-base font-semibold">Cuándo se lee</h3>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          La página{" "}
+          <Link
+            href="/norte"
+            className="font-mono text-slate-700 dark:text-slate-300 underline-offset-4 hover:underline"
+          >
+            /norte
+          </Link>{" "}
+          abre con un cuadro recordatorio que fija el ritmo de lectura. No se
+          lee de un tirón: hay lecturas breves y una lectura profunda.
+        </p>
+        <div className="mt-3 overflow-x-auto rounded-lg border border-border">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-muted/50">
+              <tr>
+                {["Cuándo", "Cuánto", "En qué momento", "Qué leer"].map((c) => (
+                  <th
+                    key={c}
+                    className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
+                  >
+                    {c}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                [
+                  "Cada día",
+                  "2 min",
+                  "Al despertar, antes de mirar el móvil",
+                  "El propósito (§1) y las prioridades del día (§5).",
+                ],
+                [
+                  "Cada semana",
+                  "15 min",
+                  "Revisión semanal",
+                  "Límites no negociables (§4) y señales de alerta (§7).",
+                ],
+                [
+                  "Cada mes",
+                  "30 min",
+                  "Revisión mensual",
+                  "Compromiso de 90 días (§8) y medición (§9).",
+                ],
+                [
+                  "Cada trimestre",
+                  "45 min",
+                  "Revisión trimestral",
+                  "El documento completo: ¿el Norte sigue siendo el tuyo?",
+                ],
+                [
+                  "Antes de decidir",
+                  "5 min",
+                  "Antes de aceptar un proyecto, cliente o compromiso",
+                  "Las 8 preguntas de §6 y los límites de §4.",
+                ],
+              ].map((fila) => (
+                <tr key={fila[0]} className="border-t border-border">
+                  {fila.map((celda, i) => (
+                    <td
+                      key={i}
+                      className={`px-3 py-2 align-top leading-relaxed ${
+                        i === 0
+                          ? "font-medium text-foreground"
+                          : "text-muted-foreground"
+                      }`}
+                    >
+                      {celda}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+          El botón <strong className="text-foreground">"Marcar lectura de hoy"</strong>{" "}
+          guarda solo la fecha en el navegador (localStorage): no escribe nada
+          en la base de datos, pero permite que la propia página te diga si ya
+          toca la revisión semanal, mensual o trimestral.
+        </p>
+
+        <h3 className="mt-6 text-base font-semibold">Cómo se relaciona con los pilares</h3>
+        <ul className="mt-2 space-y-2 text-sm leading-relaxed text-muted-foreground">
+          <li>
+            <strong className="text-foreground">Pilar 2 (identidad y horizonte)</strong>
+            : el propósito y los valores son la versión corta y editable del
+            marco; el marco es la versión larga con los límites concretos y
+            el compromiso de 90 días.
+          </li>
+          <li>
+            <strong className="text-foreground">Pilar 1 (rituales)</strong>: el
+            cuadro recordatorio convierte el documento en un ritual con
+            frecuencia (diario, semanal, mensual, trimestral) en lugar de
+            dejarlo como un texto que se lee una vez y se olvida.
+          </li>
+          <li>
+            <strong className="text-foreground">Pilar 4 (energía y salud)</strong>:
+            los límites sobre móvil, sueño, movimiento y descanso alimentan
+            los hábitos y el dashboard emocional.
+          </li>
+        </ul>
+      </section>
+
       {PILARES.map((p) => (
         <section
           key={p.num}
@@ -1510,6 +1662,44 @@ export default function DocsPage() {
         </header>
 
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-11-26
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
+                Nueva sección: el Marco Personal de Vida vive en /norte.
+              </strong>{" "}
+              Issue #83: la página{" "}
+              <Link
+                href="/norte"
+                className="font-mono text-slate-700 dark:text-slate-300 underline-offset-4 hover:underline"
+              >
+                /norte
+              </Link>{" "}
+              abre con un{" "}
+              <strong className="text-foreground">
+                cuadro recordatorio de lectura
+              </strong>{" "}
+              (diaria 2 min · semanal 15 min · mensual 30 min · trimestral 45
+              min · y antes de aceptar un compromiso) y debajo, el{" "}
+              <strong className="text-foreground">
+                Marco Personal de Vida
+              </strong>
+              : 10 secciones numeradas con los límites no negociables, las 8
+              preguntas para decidir, las señales de alerta y el compromiso de
+              90 días. El botón "Marcar lectura de hoy" guarda solo la fecha
+              en el navegador (localStorage, sin base de datos). Texto en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                src/lib/norte/marcoPersonal.ts
+              </code>
+              , render en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                src/app/norte/MarcoPersonal.tsx
+              </code>
+              .
+            </span>
+          </li>
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
               2026-11-24
