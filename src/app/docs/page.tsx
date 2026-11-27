@@ -3177,6 +3177,143 @@ export default function DocsPage() {
 
 
 
+        {/* ── 2.c. La improductividad: ¿hiciste la principal? (issue #65) ── */}
+
+        <h3 className="text-base font-semibold">
+
+          📉 2.c. La improductividad: principal, secundarias o nada
+
+        </h3>
+
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+
+          El plan diario dice qué ibas a hacer hoy: la{" "}
+
+          <strong className="text-foreground">primera tarea del plan</strong>{" "}
+
+          es la <strong className="text-foreground">principal</strong> y las
+
+          demás son <strong className="text-foreground">secundarias</strong>.
+
+          La regla del producto es una sola:{" "}
+
+          <strong className="text-foreground">
+
+            todos los días hay que hacer aunque sea una principal
+
+          </strong>
+
+          . Un día en el que solo se hacen secundarias —o nada del plan— es un
+
+          día improductivo, por mucho trabajo que se haya hecho ese día. Por
+
+          eso el informe mide el plan, no el volumen.
+
+        </p>
+
+        <ul className="mt-3 space-y-2 text-sm leading-relaxed text-muted-foreground">
+
+          <li className="flex gap-2">
+
+            <span className="text-rose-500">·</span>
+
+            <span>
+
+              <strong className="text-foreground">Con principal</strong>: se
+
+              hizo la primera tarea del plan de ese día. Da igual que además
+
+              se hicieran secundarias: la principal va primero.
+
+            </span>
+
+          </li>
+
+          <li className="flex gap-2">
+
+            <span className="text-rose-500">·</span>
+
+            <span>
+
+              <strong className="text-foreground">Solo secundarias</strong>:
+
+              no se hizo la principal, pero sí alguna de las secundarias del
+
+              plan. Es el día «ocupado pero sin avance»: el trabajo importa
+
+              menos que la principal.
+
+            </span>
+
+          </li>
+
+          <li className="flex gap-2">
+
+            <span className="text-rose-500">·</span>
+
+            <span>
+
+              <strong className="text-foreground">En blanco</strong>: no se
+
+              hizo ninguna tarea del plan.
+
+            </span>
+
+          </li>
+
+          <li className="flex gap-2">
+
+            <span className="text-rose-500">·</span>
+
+            <span>
+
+              Los <strong className="text-foreground">días sin plan</strong>{" "}
+
+              no cuentan ni en contra ni a favor: no había compromiso que
+
+              cumplir. Si no hay plan, no hay día que juzgar.
+
+            </span>
+
+          </li>
+
+        </ul>
+
+        <p className="mt-4 rounded-lg border border-border bg-muted/30 p-3 text-xs leading-relaxed text-muted-foreground">
+
+          Dónde se ve: en{" "}
+
+          <code className="rounded bg-muted px-1.5 py-0.5 text-[11px]">
+
+            /informes
+
+          </code>
+
+          , bloque «Improductividad: ¿hiciste la principal?», con los cuatro
+
+          contadores (con principal / solo secundarias / en blanco / días sin
+
+          plan), el % de días con principal y el detalle día a día: fecha,
+
+          estado, título de la principal y cuántas tareas se cerraron ese día.
+
+          La lectura encaja en el ritual del{" "}
+
+          <strong className="text-foreground">viernes</strong>: si el % de
+
+          días con principal cae, el problema no es de esfuerzo, es de
+
+          orden — se está empezando el día por las secundarias.
+
+        </p>
+
+
+
+        <hr className="my-6 border-border" />
+
+
+
+
         {/* ── 3. Ritual mensual ── */}
 
         <h3 className="text-base font-semibold">
@@ -3904,6 +4041,50 @@ export default function DocsPage() {
 
 
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
+
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-11-27
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
+                La improductividad, contabilizada (issue #65).
+              </strong>{" "}
+              Nuevo bloque en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/informes</code>:{" "}
+              <strong className="text-foreground">
+                «Improductividad: ¿hiciste la principal?»
+              </strong>
+              . La regla del producto —«siempre hay que hacer aunque sea una
+              principal»— se mide contra el plan de cada día: la{" "}
+              <strong className="text-foreground">primera tarea del plan</strong>{" "}
+              es la principal y las demás son secundarias. Cada día con plan
+              queda en uno de tres estados:{" "}
+              <strong className="text-foreground">Con principal</strong> (se
+              hizo la primera),{" "}
+              <strong className="text-foreground">Solo secundarias</strong> (no
+              se hizo la principal, pero sí alguna secundaria) o{" "}
+              <strong className="text-foreground">En blanco</strong> (nada del
+              plan). Arriba, cuatro contadores (con principal / solo
+              secundarias / en blanco / días sin plan) y el % de días con
+              principal; abajo, el detalle día a día con la fecha, el estado,
+              el título de la principal y cuántas tareas se cerraron ese día
+              (para ver el día «ocupado pero sin avance»). Los días SIN plan
+              no cuentan: no había compromiso que cumplir. Sin migración: se
+              leen{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">planes_diarios</code>{" "}
+              y{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">plan_diario_tareas</code>
+              , y si un día tiene varias generaciones del plan cuenta la
+              última. La lógica vive en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                src/lib/informes/improductividad.ts
+              </code>{" "}
+              (módulo puro, con su test). Nueva sección 2.c de esta página
+              («La improductividad: principal, secundarias o nada») y FEATURES
+              (fila /informes) y el ritual del viernes actualizados.
+            </span>
+          </li>
 
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
