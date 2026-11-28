@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 import { leerKrsConRespaldo } from "@/lib/krsLectura";
+import { esEsquemaAusente } from "@/lib/supabase/esquema";
 import { localYMD, isoWeekToMonday } from "@/lib/semana";
 import { proyectoEfectivoDeTarea } from "@/lib/proyectos";
 import { CLAVE_FASES_META, fasesDisponibles } from "@/lib/ritualSemanal";
@@ -1426,23 +1427,60 @@ export async function fetchKrsOverview(): Promise<{
  *  (placeholder), así que el contador de trimestres de la tarjeta era
  *  incorrecto. */
 export async function fetchMetasConProgreso(): Promise<MetaConPlan[]> {
+  const { metas } = await fetchMetasConProgresoConAviso();
+  return metas;
+}
+
+/**
+ * Igual que `fetchMetasConProgreso`, pero además devuelve el aviso de que
+ * la base de datos va por detrás (issue #108).
+ *
+ * AVISO: los KRs se leen con `fecha_cierre` (migration 0048) y `updated_at`.
+ * Antes no se pedía `updated_at`, así que /informes NO PODÍA contar los KRs
+ * cerrados (el filtro por fecha no tenía con qué trabajar y salía 0).
+ */
+export async function fetchMetasConProgresoConAviso(): Promise<{
+  metas: MetaConPlan[];
+  aviso: string | null;
+}> {
   const supabase = createClient();
-  const [metasRes, krsRes, tareasRes] = await Promise.all([
+  const [metasRes, tareasRes] = await Promise.all([
     supabase.from("metas").select("*").order("codigo", { ascending: true, nullsFirst: false }),
-    supabase
-      .from("resultados_periodo")
-      .select("id,meta_id,titulo,descripcion,metrica,valor_objetivo,valor_actual,unidad,estado,peso,orden"),
     supabase
       .from("tareas")
       .select("id,meta_id,resultado_periodo_id,estado")
       .not("resultado_periodo_id", "is", null),
   ]);
+
+  // KRs: con `fecha_cierre` (migration 0048) y `updated_at`. Si la BD aún no
+  // tiene la 0048, se leen SIN `fecha_cierre` y se avisa: la app degrada en
+  // vez de reventar la pantalla entera.
+  const KRS_CON_CIERRE =
+    "id,meta_id,titulo,descripcion,metrica,valor_objetivo,valor_actual,unidad,estado,peso,orden,updated_at,fecha_cierre";
+  const KRS_SIN_CIERRE =
+    "id,meta_id,titulo,descripcion,metrica,valor_objetivo,valor_actual,unidad,estado,peso,orden,updated_at";
+  let aviso: string | null = null;
+  let krs: ResultadoPeriodo[] = [];
+  const conCierre = await supabase
+    .from("resultados_periodo")
+    .select(KRS_CON_CIERRE);
+  if (!conCierre.error) {
+    krs = (conCierre.data ?? []) as ResultadoPeriodo[];
+  } else if (esEsquemaAusente(conCierre.error)) {
+    const sinCierre = await supabase
+      .from("resultados_periodo")
+      .select(KRS_SIN_CIERRE);
+    if (sinCierre.error) throw sinCierre.error;
+    krs = (sinCierre.data ?? []) as ResultadoPeriodo[];
+    aviso =
+      "Falta aplicar la migración 0048 en Supabase (resultados_periodo.fecha_cierre): los KRs cerrados se cuentan, pero con la última modificación como fecha de cierre.";
+  } else {
+    throw conCierre.error;
+  }
   if (metasRes.error) throw metasRes.error;
-  if (krsRes.error) throw krsRes.error;
   if (tareasRes.error) throw tareasRes.error;
 
   const metas = (metasRes.data ?? []) as Meta[];
-  const krs = (krsRes.data ?? []) as ResultadoPeriodo[];
   const tareas = (tareasRes.data ?? []) as Array<
     Pick<Tarea, "id" | "meta_id" | "resultado_periodo_id" | "estado">
   >;
@@ -1504,7 +1542,7 @@ export async function fetchMetasConProgreso(): Promise<MetaConPlan[]> {
     }
   }
 
-  return metas.map((m) => {
+  const resultadoPorMeta: MetaConPlan[] = metas.map((m) => {
     const krsDeMeta = krsPorMeta.get(m.id) ?? [];
     const esqueletos: ResultadoConTareas[] = krsDeMeta.map((r) => {
       const periodos = periodosPorKr.get(r.id) ?? [];
@@ -1543,6 +1581,7 @@ export async function fetchMetasConProgreso(): Promise<MetaConPlan[]> {
       progreso: calcularProgreso(esqueletos),
     };
   });
+  return { metas: resultadoPorMeta, aviso };
 }
 
 /** Plan trimestral de un año: los 4 trimestres con TODOS los KRs que

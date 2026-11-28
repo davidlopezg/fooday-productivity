@@ -40,6 +40,7 @@ const TESTS = [
   "src/lib/wig.test.mjs",
   "src/lib/estatusRevision.test.mjs",
   "src/lib/informes/improductividad.test.mjs",
+  "src/lib/informes/cierres.test.mjs",
   "src/lib/krsLectura.test.mjs",
   "src/lib/tareas/filtros.test.mjs",
   "src/lib/recuperacion/feedback.test.mjs",

@@ -252,6 +252,11 @@ export interface ResultadoPeriodo {
   wig_orden?: number | null;
   /** Trigger `set_updated_at` (migration 0015). */
   updated_at?: string;
+  /** Cuándo se cerró el KR (estado pasó a 'completado'). La fija el trigger
+   *  `trg_resultados_periodo_fecha_cierre` (migration 0048) y se limpia si
+   *  el KR se reabre. Es la fuente de verdad de "cuándo cerraste esto" en
+   *  /informes; `updated_at` solo es un respaldo. */
+  fecha_cierre?: string | null;
   created_at?: string;
 }
 
