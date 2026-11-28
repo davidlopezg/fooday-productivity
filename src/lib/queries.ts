@@ -2192,6 +2192,20 @@ export async function fetchTareasDiaRitual(
   return (data ?? []) as RitualTareaDia[];
 }
 
+/** TODAS las «3 del día» de todas las semanas (para el historial: son pocas
+ *  filas y así el historial no hace una consulta por semana). */
+export async function fetchTareasDiaRitualTodas(): Promise<RitualTareaDia[]> {
+  const { data, error } = await createClient()
+    .from("ritual_tareas_dia")
+    .select("*")
+    .order("anio", { ascending: false })
+    .order("semana_iso", { ascending: false })
+    .order("dia_semana", { ascending: true })
+    .order("orden", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as RitualTareaDia[];
+}
+
 /** Las 3 del día de UNA fecha concreta (lo que se ve en /plan-diario). */
 export async function fetchTareasDiaRitualPorFecha(
   fecha: string,

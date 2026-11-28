@@ -4233,7 +4233,8 @@ export default function DocsPage() {
               <Link href="/ritual-semanal/historial" className="underline underline-offset-4">
                 /ritual-semanal/historial
               </Link>{" "}
-              (una entrada por semana, con el detalle desplegable) y{" "}
+              (una tarjeta por semana, con la cabecera, los recuentos y el
+              detalle desplegable) y{" "}
               <Link href="/ritual-semanal/informe" className="underline underline-offset-4">
                 /ritual-semanal/informe
               </Link>{" "}
@@ -4244,7 +4245,13 @@ export default function DocsPage() {
               lunes a domingo con las 3 tareas de cada día). El informe se
               guarda <strong className="text-foreground">a medida que
               avanzas</strong> en los pasos, así que no hace falta cerrar la
-              semana para que quede registrada.
+              semana para que quede registrada. Si una semana se guardó{" "}
+              <strong className="text-foreground">sin informe</strong> (o la
+              base de datos todavía no tiene la migration 0049), el
+              historial{" "}
+              <strong className="text-foreground">no la deja en blanco</strong>:
+              la reconstruye con los ids de la bitácora y los nombres de
+              ahora, y avisa de que está reconstruida.
             </span>
           </li>
 

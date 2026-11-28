@@ -24,7 +24,7 @@
 //   query y, si no viene, se usa la semana en curso.
 // ============================================================================
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -180,7 +180,9 @@ export default function InformeSemanalPage() {
           </p>
           <p className="text-xs text-muted-foreground">
             {informe
-              ? "Pulsa «Guardar PDF» y elige «Guardar como PDF» en el diálogo del navegador."
+              ? fila?.informe
+                ? "Pulsa «Guardar PDF» y elige «Guardar como PDF» en el diálogo del navegador."
+                : "Semana sin informe guardado: se ha reconstruido con los datos de ahora."
               : "Esta semana todavía no tiene ritual guardado."}
           </p>
         </div>
