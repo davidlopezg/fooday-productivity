@@ -31,6 +31,7 @@ import {
   normalizarFases,
   type BitacoraSemanal,
 } from "@/lib/ritualSemanal";
+import type { InformeRitual } from "@/lib/ritual/informe";
 
 declare global {
   interface Window {
@@ -2779,9 +2780,11 @@ export async function setEstadoTarea(
   }
 }
 
-/** Guarda (o sobrescribe) la fila de la bitácora de una semana. */
+/** Guarda (o sobrescribe) la fila de la bitácora de una semana.
+ *  `informe` es el documento de la semana (migration 0049): lo que se
+ *  consulta en el historial y lo que se descarga en PDF. */
 export async function guardarRitualSemanal(
-  datos: BitacoraSemanal & { notas?: string | null },
+  datos: BitacoraSemanal & { notas?: string | null; informe?: InformeRitual | null },
 ): Promise<void> {
   const b = normalizarBitacora(datos);
   const supabase = createClient();
@@ -2797,12 +2800,53 @@ export async function guardarRitualSemanal(
         metas_pausadas: b.metas_pausadas,
         tareas_activas: b.tareas_activas,
         notas: b.notas ?? null,
+        informe: datos.informe ?? null,
         cerrado_en: new Date().toISOString(),
       },
       { onConflict: "owner_id,anio,semana_iso" },
     );
   if (error)
     throw new Error(`No se pudo guardar la bitácora: ${error.message}`);
+}
+
+/**
+ * Guarda SOLO el INFORME de una semana (migration 0049), sin tocar el resto
+ * de la bitácora (metas_vivas, WIGs, cerrar…). Es lo que hace el wizard
+ * mientras la semana está en curso: el informe se va guardando a medida que
+ * se avanza, aunque todavía no se cierre.
+ */
+export async function guardarInformeSemanal(
+  anio: number,
+  semana_iso: number,
+  informe: InformeRitual | null,
+): Promise<void> {
+  const supabase = createClient();
+  const { data: existente, error: errSel } = await supabase
+    .from("ritual_semanales")
+    .select("id")
+    .eq("anio", anio)
+    .eq("semana_iso", semana_iso)
+    .maybeSingle();
+  if (errSel)
+    throw new Error(`No se pudo leer la bitácora: ${errSel.message}`);
+
+  if (existente) {
+    const { error } = await supabase
+      .from("ritual_semanales")
+      .update({ informe })
+      .eq("id", (existente as { id: string }).id);
+    if (error)
+      throw new Error(`No se pudo guardar el informe: ${error.message}`);
+    return;
+  }
+
+  const { error } = await supabase.from("ritual_semanales").insert({
+    anio,
+    semana_iso,
+    informe,
+  });
+  if (error)
+    throw new Error(`No se pudo guardar el informe: ${error.message}`);
 }
 
 /**

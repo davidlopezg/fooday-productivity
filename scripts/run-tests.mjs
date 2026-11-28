@@ -34,6 +34,7 @@ const TESTS = [
   "src/lib/ritual/semana.test.mjs",
   "src/lib/ritual/situacionIA.test.mjs",
   "src/lib/ritual/metasVisibles.test.mjs",
+  "src/lib/ritual/informe.test.mjs",
   "src/lib/configStore.test.mjs",
   "src/lib/perfilIA.test.mjs",
   "src/lib/schema-queries.test.mjs",

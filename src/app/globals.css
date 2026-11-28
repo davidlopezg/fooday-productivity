@@ -195,10 +195,13 @@ textarea:focus-visible {
   /* Oculta toda la UI de la app y el chrome del propio modal al
      imprimir: toolbar con "Imprimir", backdrop, scroll del modal…
      Solo el reporte queda visible. */
-  body > *:not(.proyecto-report-portal),
+  /* La app (el shell y sus hijos) se oculta al imprimir, salvo el
+     documento del ritual (que lleva su propio marcado en <body>). */
+  body:not([data-print="ritual"]) > *:not(.proyecto-report-portal),
   .proyecto-report-modal,
   .proyecto-report-modal__toolbar,
-  .proyecto-report-modal__scroll {
+  .proyecto-report-modal__scroll,
+  .ritual-informe-toolbar {
     display: none !important;
   }
   body {
@@ -562,4 +565,211 @@ textarea:focus-visible {
   color: #555;
   font-size: 11px;
   text-align: center;
+}
+
+/* ---------------------------------------------------------------------------
+   INFORME DEL RITUAL SEMANAL (/ritual-semanal/informe) — issue #111.
+   Mismo truco que el reporte de proyecto: "Guardar como PDF" del navegador
+   (window.print + @media print). En pantalla se ve como una hoja A4; al
+   imprimir solo queda el documento.
+--------------------------------------------------------------------------- */
+
+/* En pantalla: hoja centrada (lo que se ve antes de imprimir). */
+.ritual-informe-portal {
+  max-width: 820px;
+  margin: 24px auto;
+  padding: 32px;
+  background: #fff;
+  color: #111;
+  border: 1px solid hsl(var(--border));
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+@media print {
+  /* Con el <body data-print="ritual"> sale SOLO el documento: se oculta el
+     chrome de la app (sidebar, barra superior, widgets globales) y el
+     toolbar de la pantalla. El resto de la app sigue igual. */
+  body[data-print="ritual"] > *:not(.app-shell) {
+    display: none !important;
+  }
+  body[data-print="ritual"] .app-sidebar {
+    display: none !important;
+  }
+  body[data-print="ritual"] .app-main,
+  body[data-print="ritual"] .app-main > * {
+    padding: 0 !important;
+    max-width: none !important;
+  }
+  body[data-print="ritual"] .ritual-informe-page > *:not(.ritual-informe-portal) {
+    display: none !important;
+  }
+
+  /* El documento se imprime a ancho completo, sin caja ni sombra. */
+  .ritual-informe-portal {
+    position: static !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: #fff !important;
+    color: #111 !important;
+  }
+
+  .ritual-informe {
+    font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+    font-size: 11pt;
+    line-height: 1.45;
+    color: #111;
+  }
+  .ritual-informe h1,
+  .ritual-informe h2,
+  .ritual-informe h3 {
+    color: #111;
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+
+  .ritual-informe__portada {
+    border-bottom: 1.5pt solid #333;
+    padding-bottom: 8pt;
+    margin-bottom: 14pt;
+  }
+  .ritual-informe__portada h1 {
+    font-size: 20pt;
+    font-weight: 700;
+    margin: 0 0 4pt;
+  }
+  .ritual-informe__subtitulo {
+    font-size: 12pt;
+    margin: 0;
+  }
+  .ritual-informe__meta {
+    font-size: 9pt;
+    color: #555;
+    margin: 2pt 0 0;
+  }
+  .ritual-informe__h2 {
+    font-size: 14pt;
+    font-weight: 700;
+    margin: 14pt 0 6pt;
+    padding-bottom: 3pt;
+    border-bottom: 0.6pt solid #999;
+  }
+  .ritual-informe__h3 {
+    font-size: 12pt;
+    font-weight: 600;
+    margin: 0 0 2pt;
+  }
+  .ritual-informe__seccion {
+    margin-bottom: 14pt;
+  }
+  .ritual-informe__vacio {
+    font-style: italic;
+    color: #555;
+    margin: 0;
+  }
+
+  /* ── Listas ── */
+  .ritual-informe__lista,
+  .ritual-informe__wigs,
+  .ritual-informe__dias,
+  .ritual-informe__tareas {
+    list-style: none;
+    padding: 0;
+    margin: 4pt 0 0;
+  }
+  .ritual-informe__proyecto,
+  .ritual-informe__meta,
+  .ritual-informe__kr,
+  .ritual-informe__dia {
+    border: 0.5pt solid #999;
+    border-radius: 4pt;
+    padding: 6pt 8pt;
+    margin-bottom: 6pt;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  .ritual-informe__meta-head,
+  .ritual-informe__kr-head {
+    display: flex;
+    align-items: baseline;
+    gap: 6pt;
+    flex-wrap: wrap;
+    margin-bottom: 2pt;
+  }
+  .ritual-informe__meta-titulo,
+  .ritual-informe__kr-titulo {
+    font-weight: 600;
+  }
+  .ritual-informe__badge {
+    display: inline-block;
+    font-size: 9pt;
+    padding: 0 4pt;
+    border: 0.5pt solid #888;
+    border-radius: 3pt;
+    color: #333;
+  }
+  .ritual-informe__badge--wig {
+    background: #f3e8ff;
+    color: #6b21a8;
+    border-color: #c084fc;
+  }
+  .ritual-informe__badge--foco {
+    background: #e0f2fe;
+    color: #075985;
+    border-color: #7dd3fc;
+  }
+  .ritual-informe__contexto {
+    margin: 2pt 0 0;
+    font-size: 10.5pt;
+    white-space: pre-wrap;
+  }
+  .ritual-informe__meta-sub,
+  .ritual-informe__kr-meta {
+    margin: 2pt 0 0;
+    font-size: 9.5pt;
+    color: #444;
+  }
+  .ritual-informe__wig-num {
+    font-weight: 700;
+    color: #444;
+  }
+  .ritual-informe__fecha {
+    font-size: 9.5pt;
+    color: #555;
+    font-weight: 400;
+  }
+  .ritual-informe__tarea {
+    display: flex;
+    align-items: baseline;
+    gap: 5pt;
+    padding: 1.5pt 0;
+    font-size: 10.5pt;
+  }
+  .ritual-informe__check {
+    font-size: 11pt;
+    line-height: 1;
+  }
+  .ritual-informe__tarea-titulo {
+    flex: 1 1 auto;
+  }
+  .ritual-informe__tarea-estado {
+    font-size: 9pt;
+    color: #555;
+    white-space: nowrap;
+  }
+  .ritual-informe__footer {
+    margin-top: 24pt;
+    padding-top: 6pt;
+    border-top: 0.5pt dashed #888;
+    color: #555;
+    font-size: 9pt;
+    text-align: center;
+  }
 }

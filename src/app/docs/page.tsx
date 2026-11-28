@@ -2950,7 +2950,11 @@ export default function DocsPage() {
 
               permitirá comparar “la semana pasada con esta” en vez de
 
-              fiarse de la memoria.
+              fiarse de la memoria. Desde la migration 0049 esa fila guarda
+
+              además el <strong>informe</strong> de la semana (el documento
+
+              que se consulta en el historial y se descarga en PDF).
 
             </span>
 
@@ -3119,6 +3123,66 @@ export default function DocsPage() {
           </li>
 
         </ul>
+
+
+
+        <p className="mt-4 rounded-lg border border-border bg-muted/30 p-3 text-xs leading-relaxed text-muted-foreground">
+
+          <strong className="text-foreground">Cada semana queda guardada, y se
+
+          puede bajar en PDF (issue #111).</strong> Lo que decides en el
+
+          ritual se escribe en la bitácora semanal (una fila por semana ISO)
+
+          y, con ella, el <strong>informe</strong> de esa semana: los
+
+          proyectos que estaban{" "}
+
+          <strong className="text-foreground">vivos</strong> con el{" "}
+
+          <strong className="text-foreground">último contexto</strong> que
+
+          añadiste en el ritual, las metas que decidiste trabajar (con su
+
+          fase y su Status Meta), las <strong>3 WIGs</strong> de meta, los{" "}
+
+          <strong className="text-foreground">KRs</strong> (marcando cuáles
+
+          son WIG del ciclo y cuáles el foco de esa semana) y la{" "}
+
+          <strong className="text-foreground">semana de lunes a
+
+          domingo</strong> con las{" "}
+
+          <strong className="text-foreground">3 tareas comprometidas</strong>{" "}
+
+          de cada día. Se consulta en{" "}
+
+          <Link href="/ritual-semanal/historial" className="underline underline-offset-4">
+
+            /ritual-semanal/historial
+          </Link>{" "}
+
+          (una entrada por semana, con el detalle desplegable) y se{" "}
+
+          <strong className="text-foreground">descarga en PDF</strong> desde{" "}
+
+          <Link href="/ritual-semanal/informe" className="underline underline-offset-4">
+
+            /ritual-semanal/informe
+          </Link>{" "}
+
+          (el botón «Guardar PDF» abre el diálogo de impresión del
+
+          navegador, donde se elige «Guardar como PDF»). El informe se va
+
+          guardando <strong className="text-foreground">a medida que
+
+          avanzas</strong> en los pasos: no hace falta cerrar la semana para
+
+          que quede registrada.
+
+        </p>
 
 
 
@@ -4138,6 +4202,42 @@ export default function DocsPage() {
 
 
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
+
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-11-28
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
+                El ritual semanal se guarda semana a semana y se descarga en
+                PDF (issue #111).
+              </strong>{" "}
+              La bitácora (<code className="rounded bg-muted px-1.5 py-0.5 text-xs">ritual_semanales</code>)
+              solo guardaba{" "}
+              <strong className="text-foreground">identificadores</strong> (metas
+              vivas, WIGs, KRs en foco): con eso no se podía consultar una
+              semana pasada ni bajar un PDF de la semana. Ahora, cada semana
+              que haces el ritual queda registrada con su{" "}
+              <strong className="text-foreground">informe</strong> (una
+              columna <code className="rounded bg-muted px-1.5 py-0.5 text-xs">informe</code>{" "}
+              en JSON, migration 0049) y hay dos pantallas nuevas:{" "}
+              <Link href="/ritual-semanal/historial" className="underline underline-offset-4">
+                /ritual-semanal/historial
+              </Link>{" "}
+              (una entrada por semana, con el detalle desplegable) y{" "}
+              <Link href="/ritual-semanal/informe" className="underline underline-offset-4">
+                /ritual-semanal/informe
+              </Link>{" "}
+              (el documento para{" "}
+              <strong className="text-foreground">descargar en PDF</strong>:
+              los proyectos vivos con el último contexto del ritual, las
+              metas que se trabajaban, las 3 WIGs, los KRs y la semana de
+              lunes a domingo con las 3 tareas de cada día). El informe se
+              guarda <strong className="text-foreground">a medida que
+              avanzas</strong> en los pasos, así que no hace falta cerrar la
+              semana para que quede registrada.
+            </span>
+          </li>
 
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">

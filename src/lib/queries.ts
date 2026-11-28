@@ -2151,6 +2151,31 @@ export async function fetchRitualSemanal(
   return (data ?? null) as RitualSemanal | null;
 }
 
+/** Un subconjunto de tareas por id (para el informe del ritual: las 3 del día). */
+export async function fetchTareasPorIds(
+  ids: string[],
+): Promise<Array<{ id: string; titulo: string; estado: string }>> {
+  if (ids.length === 0) return [];
+  const { data, error } = await createClient()
+    .from("tareas")
+    .select("id,titulo,estado")
+    .in("id", ids);
+  if (error) throw error;
+  return (data ?? []) as Array<{ id: string; titulo: string; estado: string }>;
+}
+
+/** Todas las semanas con ritual guardado, de la más reciente a la más
+ *  antigua (es el HISTORIAL: lo que se hizo semana a semana). */
+export async function fetchRitualesSemanales(): Promise<RitualSemanal[]> {
+  const { data, error } = await createClient()
+    .from("ritual_semanales")
+    .select("*")
+    .order("anio", { ascending: false })
+    .order("semana_iso", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as RitualSemanal[];
+}
+
 /** Las 3 del día de una semana (migration 0045), ordenadas por día y hueco. */
 export async function fetchTareasDiaRitual(
   anio: number,

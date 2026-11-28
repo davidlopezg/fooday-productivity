@@ -27,6 +27,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   fetchFasesMeta,
   fetchIdsKRsFocoSemanal,
@@ -48,6 +49,7 @@ import {
   actualizarTarea,
   asignarTareaADia,
   crearEventoProyecto,
+  guardarInformeSemanal,
   guardarRitualSemanal,
   guardarSituacionMeta,
   guardarTresDelDia,
@@ -65,6 +67,7 @@ import {
   type PlanSemana,
 } from "@/lib/ritual/semana";
 import { redactarSituacionIA } from "@/lib/ritual/situacionIA";
+import { construirInforme, type InformeRitual } from "@/lib/ritual/informe";
 import {
   clasificarMetasRitual,
   estadoProyectoEnRitual,
@@ -96,6 +99,7 @@ export function WizardRitual({
   semana_iso: number;
 }) {
   const cfg = useConfig();
+  const router = useRouter();
   const hoy = localYMD(new Date());
 
   const [draft, setDraft] = useState<DraftRitual>(() =>
@@ -104,6 +108,7 @@ export function WizardRitual({
   const [cargadoDraft, setCargadoDraft] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [redactando, setRedactando] = useState<string | null>(null);
   const [cerrado, setCerrado] = useState(false);
@@ -291,6 +296,82 @@ export function WizardRitual({
     [focoKRs],
   );
 
+  // ── El INFORME de la semana (issue #111) ─────────────────────────────────
+  // Es lo que se consulta en el historial y lo que se descarga en PDF:
+  // los proyectos vivos con su último contexto, las metas, las 3 WIGs, los
+  // KRs y los 7 días con las 3 tareas comprometidas de cada uno.
+  // Lo que manda es lo DECIDIDO en el draft; si no has tocado algo, se usa
+  // lo que hay en la BD.
+  const informe: InformeRitual = useMemo(() => {
+    const contextoProyectos: Record<string, string> = {};
+    for (const p of proyectos ?? []) {
+      const escrito = (draft.proyectos[p.id]?.situacion ?? "").trim();
+      contextoProyectos[p.id] = escrito || ultimaSituacion(eventos ?? [], p.id);
+    }
+    const contextoMetas: Record<string, string> = {};
+    for (const m of metas ?? []) {
+      const escrito = (draft.metas[m.id]?.situacion ?? "").trim();
+      contextoMetas[m.id] = escrito || (m.situacion_actual ?? "");
+    }
+    const focoKrs = new Set<string>([
+      ...(focoIds ?? []),
+      ...Object.entries(draft.krs)
+        .filter(([, v]) => v.foco)
+        .map(([k]) => k),
+    ]);
+    return construirInforme({
+      proyectos: (proyectos ?? []).map((p) => ({
+        id: p.id,
+        nombre: p.nombre,
+        estado: draft.proyectos[p.id]?.estado ?? p.estado ?? "vivo",
+      })),
+      contextoProyectos,
+      metas: (metas ?? []).map((m) => ({
+        id: m.id,
+        titulo: m.titulo,
+        proyecto: m.proyecto_id
+          ? (proyectosPorId.get(m.proyecto_id)?.nombre ?? null)
+          : null,
+        estado: draft.metas[m.id]?.estado ?? m.estado,
+        fase: draft.metas[m.id]?.fase ?? m.fase ?? null,
+        situacion: m.situacion_actual ?? "",
+      })),
+      contextoMetas,
+      wigsMeta: draft.wigsMeta,
+      krs: (krs?.filas ?? []).map((f) => ({
+        id: f.kr.id,
+        titulo: f.kr.titulo,
+        meta: f.meta?.titulo ?? null,
+        wig: !!f.kr.es_wig,
+      })),
+      focoKrs: [...focoKrs],
+      dias: diasSemana.map((d) => ({
+        dia: d.dia,
+        nombre: d.nombre,
+        fecha: d.fecha,
+      })),
+      tareasDia: Object.fromEntries(
+        Object.entries(seleccionPorDia).map(([dia, ids]) => [dia, ids]),
+      ),
+      tareas: (tareas ?? []).map((t) => ({
+        id: t.id,
+        titulo: t.titulo,
+        estado: t.estado,
+      })),
+    });
+  }, [
+    proyectos,
+    metas,
+    krs,
+    tareas,
+    eventos,
+    focoIds,
+    draft,
+    diasSemana,
+    seleccionPorDia,
+    proyectosPorId,
+  ]);
+
   function onDecisionTarea(tareaId: string, decision: DecisionTarea) {
     cambiar({
       ...draft,
@@ -384,6 +465,22 @@ export function WizardRitual({
   }
 
   // ── Aplicar paso a paso ──────────────────────────────────────────────────
+  async function abrirInforme() {
+    setGuardando(true);
+    setError(null);
+    try {
+      await guardarInformeSemanal(anio, semana_iso, informe);
+      router.push(
+        `/ritual-semanal/informe?anio=${anio}&semana=${semana_iso}`,
+      );
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "No se pudo guardar el informe.",
+      );
+    } finally {
+      setGuardando(false);
+    }
+  }
   async function aplicarPaso(paso: PasoId) {
     setGuardando(true);
     setError(null);
@@ -496,6 +593,20 @@ export function WizardRitual({
         }
       }
 
+      // El INFORME de la semana se va guardando con cada paso (issue #111):
+      // aunque no cierres la semana, lo hecho queda registrado y se puede
+      // consultar y bajar en PDF.
+      // Si la columna `informe` no existe (migration 0049 sin aplicar), el
+      // paso YA está guardado: avisa, pero no rompe el ritual.
+      try {
+        await guardarInformeSemanal(anio, semana_iso, informe);
+        setAviso(null);
+      } catch {
+        setAviso(
+          "El paso está guardado, pero el informe de la semana no se ha podido guardar (¿aplicaste la migration 0049?).",
+        );
+      }
+
       const siguiente = PASOS[PASOS.findIndex((p) => p.id === paso) + 1];
       if (siguiente) {
         cambiar({ ...draft, paso: siguiente.id });
@@ -540,6 +651,7 @@ export function WizardRitual({
           );
         }).length,
         notas: null,
+        informe,
       });
       if (typeof window !== "undefined") {
         window.localStorage.removeItem(CLAVE_DRAFT);
@@ -616,6 +728,11 @@ export function WizardRitual({
       {mensaje && (
         <p className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-300">
           {mensaje}
+        </p>
+      )}
+      {aviso && (
+        <p className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300">
+          {aviso}
         </p>
       )}
       {cerrado && (
@@ -713,6 +830,14 @@ export function WizardRitual({
           className="rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-accent disabled:opacity-40"
         >
           Cerrar la semana (guardar bitácora)
+        </button>
+        <button
+          type="button"
+          onClick={abrirInforme}
+          disabled={guardando}
+          className="rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-accent disabled:opacity-40"
+        >
+          Informe de la semana (PDF)
         </button>
         <span className="ml-auto text-[11px] text-muted-foreground">
           Nada se escribe hasta que pulsas “Guardar”. En el paso 5 eliges las

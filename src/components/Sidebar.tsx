@@ -77,6 +77,11 @@ const EXEC_ITEMS: NavItem[] = [
 // Bloque 4 — Revisión, Bienestar y Sistema
 const REVIEW_ITEMS: NavItem[] = [
   { href: "/ritual-semanal", label: "Ritual semanal", Icon: IconRepeat },
+  {
+    href: "/ritual-semanal/historial",
+    label: "Historial del ritual",
+    Icon: IconHistory,
+  },
   { href: "/dias-malos", label: "Días malos", Icon: IconShield },
   { href: "/tareas/completadas", label: "Completadas", Icon: IconCheck },
   { href: "/calendario", label: "Calendario", Icon: IconCalendar },
@@ -254,7 +259,7 @@ export function Sidebar() {
   return (
     <>
       {/* Barra superior (móvil) */}
-      <div className="safe-t sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur md:hidden">
+      <div className="app-sidebar safe-t sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur md:hidden">
         <div className="flex h-14 items-center gap-3 px-4">
           <button
             onClick={() => setOpen(true)}
@@ -293,7 +298,7 @@ export function Sidebar() {
       )}
 
       {/* Sidebar (escritorio) */}
-      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-border bg-card/40 px-3 py-5 md:flex">
+      <aside className="app-sidebar sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-border bg-card/40 px-3 py-5 md:flex">
         <div className="mb-4 shrink-0 px-3 font-semibold tracking-tight">
           fooday<span className="text-muted-foreground">·productivity</span>
         </div>
