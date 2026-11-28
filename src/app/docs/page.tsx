@@ -3329,7 +3329,9 @@ export default function DocsPage() {
           <strong className="text-foreground">la real de cierre</strong>, no
           la última modificación: si reabres y reeditás una meta que
           cerraste hace seis meses, el informe sigue diciendo que la
-          cerraste hace seis meses.
+          cerraste hace seis meses. Las reglas de qué cuenta como cerrado
+          son tres, y cada una se apoya en un dato de la base de datos (no en
+          una interpretación de la app).
 
         </p>
         <ul className="mt-3 space-y-2 text-sm leading-relaxed text-muted-foreground">
@@ -3359,16 +3361,11 @@ export default function DocsPage() {
 
             <span>
 
-              <strong className="text-foreground">Un KR cuenta como
-              cerrado</strong> cuando su estado es{" "}
-              <code className="rounded bg-muted px-1 py-0.5 text-[11px]">
-                completado
-              </code>
-              , con la misma regla de fecha. Cerrar el KR es decisión tuya
-              (el cierre lo marcas tú); el informe solo lo cuenta y te dice{" "}
-              <strong className="text-foreground">cuántas de sus tareas están
-              hechas</strong>, para que se vea si el cierre cuenta lo que
-              dice.
+              <strong className="text-foreground">Una meta archivada se
+              cuenta como RETIRADA</strong>, no como logro: archivar es decir
+              «esto no lo voy a hacer». Aparece en la misma lista pero
+              con su propia etiqueta, porque también es información que
+              merecía verse: cuándo decidiste apartarla.
 
             </span>
           </li>
@@ -3379,11 +3376,22 @@ export default function DocsPage() {
 
             <span>
 
-              <strong className="text-foreground">Una meta archivada no
-              cuenta</strong> — ni ella ni sus KRs: archivar es decir «esto
-              no se va a hacer», así que no es un logro. Por eso el bloque
-              «con plan / sin plan» solo habla de las metas activas y su
-              total cuadra con la suma.
+              <strong className="text-foreground">Un KR cuenta como cerrado</strong>{" "}
+              de tres maneras, y el informe dice cuál: (1) lo has marcado{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-[11px]">
+                completado
+              </code>
+              ; (2){" "}
+              <strong className="text-foreground">tiene todas sus tareas
+              hechas</strong>; (3){" "}
+              <strong className="text-foreground">ha alcanzado su
+              objetivo</strong> ({" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-[11px]">
+                valor_actual ≥ valor_objetivo
+              </code>
+              , que es lo que un OKR mide de verdad: el resultado, no las
+              tareas). En la lista ves el motivo y cuántas de sus tareas
+              están hechas.
 
             </span>
           </li>
@@ -3397,7 +3405,8 @@ export default function DocsPage() {
           </code>
           , en los KPIs «Metas cerradas» y «OKRs (KRs) cerrados» y en las
           dos listas de cierres (cada una con su total histórico, para que
-          un 0 en la ventana no se lea como «no has cerrado nada nunca»). Es
+          un 0 en la ventana no se lea como «no has cerrado nada nunca»). El
+          KPI de metas desglosa «X cerradas · Y retiradas». Es
           el resumen de la semana que se mira el{" "}
           <strong className="text-foreground">viernes</strong>: no solo qué
           hiciste cada día, sino qué cerraste.
@@ -4155,10 +4164,21 @@ export default function DocsPage() {
               «OKRs (KRs) cerrados» y su lista salían siempre a 0. Además,
               la fecha de cierre salía de{" "}
               <code className="rounded bg-muted px-1.5 py-0.5 text-xs">updated_at</code>{" "}
-              (un proxy que se movía con cualquier edición posterior), las
+              (un proxy que se movía con cualquier edición posterior) y las
               metas <strong className="text-foreground">archivadas</strong>{" "}
-              contaban como activas y la lista de metas completadas enseñaba
-              la última modificación en vez del cierre. Arreglo: (1) nueva
+              se mezclaban con las activas. Arreglo: (1) las{" "}
+              <strong className="text-foreground">reglas de qué cuenta como
+              cierre</strong> (una meta{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">completada</code>{" "}
+              es un logro, una{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">archivada</code>{" "}
+              es una retirada y se cuenta aparte; un KR cuenta si lo marcaste{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">completado</code>
+              , si tiene{" "}
+              <strong className="text-foreground">todas sus tareas hechas</strong>{" "}
+              o si{" "}
+              <strong className="text-foreground">alcanzó su objetivo</strong>
+              ), cada una con su motivo visible; (2) nueva
               migration{" "}
               <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
                 0048_kr_fecha_cierre.sql

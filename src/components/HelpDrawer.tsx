@@ -736,7 +736,7 @@ export const AYUDA_POR_RUTA: Record<
       {
         titulo: "Lo que has cerrado: metas y KRs",
         cuerpo:
-          "Las metas y los KRs cerrados se cuentan con su fecha REAL de cierre, no con la última modificación: reeditar algo que ya cerraste no lo devuelve a la ventana de los últimos días. Y una meta archivada no cuenta (ni ella ni sus KRs): archivar es decir «esto no se va a hacer», no un logro. En la lista de KRs cerrados ves cuántas tareas están hechas de cada uno.",
+          "Las metas y los KRs cerrados se cuentan con su fecha REAL de cierre, no con la última modificación: reeditar algo que ya cerraste no lo devuelve a la ventana de los últimos días. Una meta «completada» es un logro; una «archivada» se cuenta aparte como RETIRADA (no es un logro, pero se ve cuándo la apartaste). Y un KR cuenta como cerrado si lo marcaste completado, si tiene TODAS sus tareas hechas o si ya alcanzó su objetivo — en la lista ves el motivo y cuántas tareas están hechas de cada uno.",
         pilar: 2,
       },
       {
