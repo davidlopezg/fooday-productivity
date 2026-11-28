@@ -733,6 +733,12 @@ export const AYUDA_POR_RUTA: Record<
           "“Con plan vs sin plan” mide madurez OKR: una meta sin Key Results no se mide, solo se desea. Si el grueso de tus metas está en “sin plan”, el cuello de botella no es de ejecución, es de diseño — vuelve a /metas y materializa los KRs (botón ✨ Generar plan con IA) antes de pedirte más foco.",
         pilar: 2,
       },
+      {
+        titulo: "Improductividad: ¿hiciste la principal?",
+        cuerpo:
+          "Cada día se mide contra tu plan: la primera tarea del plan es la PRINCIPAL y las demás son secundarias. La regla es hacer una principal todos los días, aunque solo sea una: un día en el que solo hiciste secundarias (o nada del plan) es un día improductivo, por mucho trabajo que se haya hecho. Los días sin plan no cuentan.",
+        pilar: 1,
+      },
     ],
   },
   "/matriz": {

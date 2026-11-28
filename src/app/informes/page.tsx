@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
+  fetchDiasConPlan,
   fetchMetasConProgreso,
   fetchPomodoroSesiones,
   fetchProyectosConConteo,
@@ -11,6 +12,12 @@ import {
 } from "@/lib/queries";
 import { useData } from "@/lib/useData";
 import { proyectoEfectivoDeTarea } from "@/lib/proyectos";
+import {
+  clasificarDia,
+  etiquetaEstado,
+  resumenImproductividad,
+  type DiaConPlan,
+} from "@/lib/informes/improductividad";
 import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
 import { localYMD } from "@/lib/semana";
 import { IconCheck, IconTarget } from "@/components/icons";
@@ -75,6 +82,19 @@ export default function InformesPage() {
     [dias],
   );
 
+  // ── IMPRODUCTIVIDAD (issue #65): los días con plan, para ver si se hizo
+  // la tarea principal o solo las secundarias (o nada).
+  const { data: diasConPlan, loading: l6 } = useData(
+    async () => {
+      const hoy = new Date();
+      const desdeD = new Date(hoy);
+      desdeD.setDate(desdeD.getDate() - dias);
+      return fetchDiasConPlan(localYMD(desdeD), localYMD(hoy));
+    },
+    [],
+    [dias],
+  );
+
   // Filtra tareas hechas a la ventana de tiempo
   const desde = useMemo(() => {
     const d = new Date();
@@ -132,6 +152,43 @@ export default function InformesPage() {
 
   const totalTareas = hechasEnRango.length;
   const totalSubtareas = subtareas.length;
+  // ── IMPRODUCTIVIDAD (issue #65): la regla del producto es "siempre hay
+  // que hacer aunque sea una principal". Un día en el que solo se hicieron
+  // secundarias (o nada del plan) es un día improductivo, por mucho trabajo
+  // que se haya hecho. El día se clasifica contra el PLAN de ese día: su
+  // primera tarea es la principal y las demás son secundarias.
+  const planPorDia = useMemo<DiaConPlan[]>(
+    () =>
+      (diasConPlan ?? []).map((d) => ({
+        fecha: d.fecha,
+        principal: {
+          orden: 0,
+          hecho: d.principal.hecha,
+          titulo: d.principal.titulo,
+        },
+        secundarias: d.secundarias.map((s, i) => ({
+          orden: i + 1,
+          hecho: s.hecha,
+          titulo: s.titulo,
+        })),
+      })),
+    [diasConPlan],
+  );
+  const improductividad = useMemo(
+    () => resumenImproductividad(planPorDia),
+    [planPorDia],
+  );
+  // Días de la ventana SIN plan: no hay compromiso que cumplir, así que no
+  // cuentan ni como improductivos ni como buenos.
+  const diasSinPlan = Math.max(0, dias - improductividad.diasConPlan);
+  // Tareas cerradas cada día (para verlo al lado del plan): el trabajo REAL del
+  // día, que puede ser mucho aunque la principal no se hiciera.
+  const tareasPorDia = useMemo(() => {
+    const mapa = new Map<string, number>();
+    for (const d of serie) mapa.set(d.fecha, d.tareas);
+    return mapa;
+  }, [serie]);
+
   const totalFoco = pomos.reduce((acc, p) => acc + p.duracion_seg, 0);
   const totalFocoMin = Math.round(totalFoco / 60);
 
@@ -563,6 +620,118 @@ export default function InformesPage() {
         )}
       </section>
 
+      {/* IMPRODUCTIVIDAD (issue #65): ¿se hizo la tarea principal del día? */}
+      <section className="rounded-xl border border-border bg-card p-5">
+        <header className="mb-3 flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              Improductividad: ¿hiciste la principal?
+            </h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Cada día se mide contra tu plan: la{" "}
+              <strong className="text-foreground">principal</strong> es la
+              primera tarea del plan de ese día y el resto son{" "}
+              <strong className="text-foreground">secundarias</strong>. La
+              regla es simple: aunque sea una principal, todos los días.
+            </p>
+          </div>
+          <span className="text-[11px] tabular-nums text-muted-foreground">
+            {loading || l6
+              ? "cargando…"
+              : `${improductividad.diasConPlan} días con plan`}
+          </span>
+        </header>
+
+        {planPorDia.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No hay planes guardados en este rango, así que no hay nada que
+            medir. Genera el plan del día en{" "}
+            <Link href="/plan-diario" className="underline underline-offset-4">
+              /plan-diario
+            </Link>
+            .
+          </p>
+        ) : (
+          <>
+            <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <Kpi
+                label="Con principal"
+                value={improductividad.conPrincipal.toString()}
+                sub={`${improductividad.pctPrincipal}% de los días con plan`}
+              />
+              <Kpi
+                label="Solo secundarias"
+                value={improductividad.soloSecundarias.toString()}
+                sub="no se hizo la principal"
+                accent="amber"
+              />
+              <Kpi
+                label="En blanco"
+                value={improductividad.nada.toString()}
+                sub="nada del plan"
+                accent="amber"
+              />
+              <Kpi
+                label="Días sin plan"
+                value={diasSinPlan.toString()}
+                sub="no cuentan"
+              />
+            </div>
+
+            <ul className="space-y-1.5">
+              {[...planPorDia].reverse().map((d) => {
+                const estado = clasificarDia(d);
+                const principal = d.principal.titulo ?? "Sin título";
+                const nTareas = tareasPorDia.get(d.fecha) ?? 0;
+                return (
+                  <li
+                    key={d.fecha}
+                    className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-background/60 px-3 py-2 text-sm"
+                  >
+                    <span className="font-mono text-xs tabular-nums text-muted-foreground">
+                      {d.fecha}
+                    </span>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                        estado === "principal"
+                          ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                          : estado === "secundarias"
+                            ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
+                            : "bg-rose-500/15 text-rose-700 dark:text-rose-300"
+                      }`}
+                    >
+                      {etiquetaEstado(estado)}
+                    </span>
+                    <span
+                      className={`min-w-0 flex-1 truncate ${
+                        estado === "principal"
+                          ? "text-muted-foreground line-through"
+                          : "font-medium"
+                      }`}
+                      title={principal}
+                    >
+                      {principal}
+                    </span>
+                    <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                      {nTareas} tarea{nTareas === 1 ? "" : "s"} cerrada
+                      {nTareas === 1 ? "" : "s"}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+            <p className="mt-3 text-xs text-muted-foreground">
+              Un día sin plan no se cuenta: no había compromiso que cumplir.
+              Los días con plan salen de{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-[11px]">
+                /plan-diario
+              </code>
+              , y el plan que cuenta es el último guardado de ese día.
+            </p>
+          </>
+        )}
+      </section>
+
       {/* Por proyecto */}
       <section className="rounded-xl border border-border bg-card p-5">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
@@ -972,14 +1141,16 @@ function Kpi({
   label: string;
   value: string;
   sub: string;
-  accent?: "violet";
+  accent?: "violet" | "amber";
 }) {
   return (
     <div
       className={`rounded-xl border bg-card p-4 ${
         accent === "violet"
           ? "border-violet-500/30 bg-gradient-to-br from-violet-500/5 to-fuchsia-500/5"
-          : "border-border"
+          : accent === "amber"
+            ? "border-amber-500/30 bg-gradient-to-br from-amber-500/5 to-orange-500/5"
+            : "border-border"
       }`}
     >
       <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -987,7 +1158,11 @@ function Kpi({
       </div>
       <div
         className={`mt-1 text-2xl font-bold tracking-tight ${
-          accent === "violet" ? "text-violet-700 dark:text-violet-300" : ""
+          accent === "violet"
+            ? "text-violet-700 dark:text-violet-300"
+            : accent === "amber"
+              ? "text-amber-700 dark:text-amber-300"
+              : ""
         }`}
       >
         {value}

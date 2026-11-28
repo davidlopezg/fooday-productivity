@@ -529,6 +529,106 @@ export async function fetchPlanes(opts?: { desde?: string; hasta?: string; limit
   }));
 }
 
+// ============================================================================
+// IMPRODUCTIVIDAD (issue #65)
+// ----------------------------------------------------------------------------
+// Los días con plan, para el informe de /informes. Solo se trae lo justo:
+// la cabecera del plan (fecha + generación) y las filas de
+// `plan_diario_tareas` (orden, hecho y título).
+//
+// Si un día tiene VARIAS generaciones del plan (se puede regenerar), se
+// queda con la ÚLTIMA (`num_generacion` más alto): el plan que ves al abrir
+// ese día es el último guardado, y es el que cuenta.
+//
+// Un día SIN plan no aparece: no hay compromiso que cumplir y, por tanto,
+// no se puede decir que ese día fue improductivo.
+// ============================================================================
+
+/** Un día con plan, con su tarea principal y sus secundarias. */
+export type DiaDelPlan = {
+  fecha: string;
+  principal: { titulo: string | null; hecha: boolean };
+  secundarias: Array<{ titulo: string | null; hecha: boolean }>;
+};
+
+export async function fetchDiasConPlan(
+  desde: string,
+  hasta: string,
+): Promise<DiaDelPlan[]> {
+  const supabase = createClient();
+  const { data: planes, error } = await supabase
+    .from("planes_diarios")
+    .select("id,fecha,num_generacion")
+    .gte("fecha", desde)
+    .lte("fecha", hasta);
+  if (error) {
+    console.warn("[fetchDiasConPlan] no se pudieron leer los planes:", error.message);
+    return [];
+  }
+  if (!planes || planes.length === 0) return [];
+
+  // Última generación por fecha.
+  const ultimoPorDia = new Map<string, { id: string; num: number }>();
+  for (const p of planes as Array<{
+    id: string;
+    fecha: string;
+    num_generacion: number | null;
+  }>) {
+    const num = p.num_generacion ?? 0;
+    const actual = ultimoPorDia.get(p.fecha);
+    if (!actual || num > actual.num) {
+      ultimoPorDia.set(p.fecha, { id: p.id, num });
+    }
+  }
+
+  const ids = Array.from(ultimoPorDia.values()).map((v) => v.id);
+  const { data: filas, error: eFilas } = await supabase
+    .from("plan_diario_tareas")
+    .select("plan_diario_id,orden,hecho,titulo_libre,tarea:tareas(titulo)")
+    .in("plan_diario_id", ids);
+  if (eFilas) {
+    console.warn("[fetchDiasConPlan] no se pudieron leer las tareas del plan:", eFilas.message);
+    return [];
+  }
+
+  type FilaPlan = {
+    plan_diario_id: string;
+    orden: number | null;
+    hecho: boolean | null;
+    titulo_libre: string | null;
+    // La relación embebida puede venir como objeto o como lista.
+    tarea: { titulo: string | null } | Array<{ titulo: string | null }> | null;
+  };
+
+  const porPlan = new Map<string, FilaPlan[]>();
+  for (const f of (filas ?? []) as unknown as FilaPlan[]) {
+    const arr = porPlan.get(f.plan_diario_id) ?? [];
+    arr.push(f);
+    porPlan.set(f.plan_diario_id, arr);
+  }
+
+  const out: DiaDelPlan[] = [];
+  for (const [fecha, v] of ultimoPorDia) {
+    const filasPlan = (porPlan.get(v.id) ?? []).sort(
+      (a, b) => (a.orden ?? 0) - (b.orden ?? 0),
+    );
+    if (filasPlan.length === 0) continue; // plan sin tareas: no es un día
+    const aTarea = (f: FilaPlan) => {
+      const t = Array.isArray(f.tarea) ? f.tarea[0] : f.tarea;
+      return {
+        titulo: f.titulo_libre ?? t?.titulo ?? null,
+        hecha: !!f.hecho,
+      };
+    };
+    out.push({
+      fecha,
+      principal: aTarea(filasPlan[0]),
+      secundarias: filasPlan.slice(1).map(aTarea),
+    });
+  }
+  return out.sort((a, b) => a.fecha.localeCompare(b.fecha));
+}
+
 /** Últimos N planes (para histórico emocional) — incluye los estados emocionales */
 export async function fetchHistorialEmocional(n: number): Promise<PlanDiario[]> {
   const { data } = await createClient()
