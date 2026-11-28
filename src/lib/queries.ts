@@ -1448,7 +1448,7 @@ export async function fetchMetasConProgresoConAviso(): Promise<{
     supabase.from("metas").select("*").order("codigo", { ascending: true, nullsFirst: false }),
     supabase
       .from("tareas")
-      .select("id,meta_id,resultado_periodo_id,estado")
+      .select("id,meta_id,resultado_periodo_id,estado,completada_at")
       .not("resultado_periodo_id", "is", null),
   ]);
 

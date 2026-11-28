@@ -24,7 +24,7 @@ import {
   fechaCierreKrTexto,
   fechaCierreMetaTexto,
   repartirPorPlan,
-  tareasDeKr,
+  textoMotivoKr,
 } from "@/lib/informes/cierres";
 import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
 import { localYMD } from "@/lib/semana";
@@ -288,7 +288,7 @@ export default function InformesPage() {
   const maxTareasDia = Math.max(1, ...serie.map((d) => d.tareas));
   const maxFocoDia = Math.max(1, ...serie.map((d) => d.foco_min));
 
-  // ── Metas completadas (issue #108).
+  // ── Metas cerradas y retiradas (issue #108).
   // Fuente de verdad: `metas.fecha_cierre` (migration 0028, fijada por el
   // trigger `trg_metas_fecha_cierre` cuando `estado` pasa a 'completada').
   // Fallback a `updated_at` para metas cerradas ANTES de la migration
@@ -305,12 +305,19 @@ export default function InformesPage() {
     () => contarMetasCerradas(metas, ventana.desde, ventana.hasta),
     [metas, ventana],
   );
+  // Las metas cerradas (logro) y las retiradas (archivadas) van en la misma
+  // lista pero se distinguen: una es "lo que conseguiste", la otra "lo que
+  // decidiste dejar".
   const metasCompletadas = cierreMetas.enVentana;
   const metasCerradasTotal = cierreMetas.total;
+  const metasCerradasEnVentana = metasCompletadas.filter(
+    (c) => c.motivo === "cerrada",
+  ).length;
+  const metasRetiradasEnVentana = metasCompletadas.length - metasCerradasEnVentana;
 
-  // ── KRs (resultados_periodo) completados: aplanamos todas las metas y
-  // nos quedamos con los que están en estado 'completado'. Los KRs de una
-  // meta archivada NO cuentan (esa meta no se va a hacer).
+  // ── KRs (resultados_periodo) cerrados: cuenta los que marcaste como
+  // 'completado', los que tienen TODAS sus tareas hechas y los que han
+  // alcanzado su objetivo. Cada uno con su motivo (ver cierres.ts).
   const cierreKrs = useMemo(
     () => contarKrsCerrados(metas, ventana.desde, ventana.hasta),
     [metas, ventana],
@@ -457,7 +464,7 @@ export default function InformesPage() {
         <Kpi
           label="Metas cerradas"
           value={loading ? "—" : metasCompletadas.length.toString()}
-          sub={`de ${metasCerradasTotal} totales · últimos ${dias} días`}
+          sub={`${metasCerradasEnVentana} cerradas · ${metasRetiradasEnVentana} retiradas`}
           accent="violet"
         />
         <Kpi
@@ -847,7 +854,7 @@ export default function InformesPage() {
         <header className="mb-3 flex items-end justify-between gap-2">
           <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-violet-700 dark:text-violet-300">
             <IconTarget className="h-4 w-4" />
-            Metas completadas
+            Metas cerradas y retiradas
           </h2>
           <span className="text-[11px] tabular-nums text-muted-foreground">
             {metasCompletadas.length} en ventana · {metasCerradasTotal} totales
@@ -855,7 +862,7 @@ export default function InformesPage() {
         </header>
         {metasCompletadas.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            Ninguna meta cerrada en este rango. Las metas pasan a{" "}
+            Ninguna meta cerrada ni retirada en este rango. Las metas pasan a{" "}
             <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
               estado = completada
             </code>{" "}
@@ -863,16 +870,20 @@ export default function InformesPage() {
             <Link href="/metas" className="underline underline-offset-4">
               /metas
             </Link>
-            ).
+            ) y a{" "}
+            <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+              estado = archivada
+            </code>{" "}
+            cuando las retiras.
           </p>
         ) : (
           <ul className="space-y-2">
-            {metasCompletadas.map((mp) => {
-              const m = mp.meta;
+            {metasCompletadas.map(({ plan, meta: m, motivo }) => {
               // Fecha REAL de cierre (`metas.fecha_cierre`), no la última
               // modificación: si reeditás una meta cerrada, la lista sigue
               // diciendo cuándo la cerraste.
               const fecha = fechaCierreMetaTexto(m);
+              const cerrada = motivo === "cerrada";
               const ambitoTxt =
                 m.ambito === "personal"
                   ? "👤"
@@ -884,7 +895,16 @@ export default function InformesPage() {
                   key={m.id}
                   className="flex items-center gap-3 rounded-lg border border-violet-500/20 bg-background/70 p-3 text-sm"
                 >
-                  <IconCheck className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  {cerrada ? (
+                    <IconCheck className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  ) : (
+                    <span
+                      className="shrink-0 text-xs"
+                      title="Retirada (archivada): no es un logro, pero se ve cuando la apartaste"
+                    >
+                      🗂︎
+                    </span>
+                  )}
                   <span className="font-mono text-xs text-muted-foreground">
                     {m.codigo ?? "—"}
                   </span>
@@ -895,11 +915,13 @@ export default function InformesPage() {
                     {m.titulo}
                   </Link>
                   <span className="hidden text-[11px] text-muted-foreground sm:inline">
+                    {cerrada ? "✓ cerrada" : "🗂︎ retirada"}
+                    {" · "}
                     {ambitoTxt} {m.plazo ? `· ${m.plazo}` : ""}
                   </span>
-                  {mp.total_tareas > 0 && (
+                  {plan.total_tareas !== undefined && plan.total_tareas > 0 && (
                     <span className="hidden tabular-nums text-[11px] text-muted-foreground sm:inline">
-                      · {mp.tareas_hechas}/{mp.total_tareas} tareas
+                      · {plan.tareas_hechas}/{plan.total_tareas} tareas
                     </span>
                   )}
                   <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
@@ -926,8 +948,16 @@ export default function InformesPage() {
         </header>
         {krsCompletados.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            Ningún resultado clave cerrado en este rango. Los KRs se
-            completan al editar el resultado desde{" "}
+            Ningún resultado clave cerrado en este rango. Un KR cuenta
+            como cerrado si lo marcas como{" "}
+            <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+              completado
+            </code>
+            , si tiene{" "}
+            <strong className="text-foreground">todas sus tareas hechas</strong>{" "}
+            o si ya ha{" "}
+            <strong className="text-foreground">alcanzado su objetivo</strong>
+            . Los KRs se completan al editar el resultado desde{" "}
             <Link href="/metas/plan" className="underline underline-offset-4">
               /metas/plan
             </Link>{" "}
@@ -939,7 +969,7 @@ export default function InformesPage() {
           </p>
         ) : (
           <ul className="space-y-2">
-            {krsCompletados.map(({ meta, kr }) => {
+            {krsCompletados.map(({ meta, kr, motivo, tareas }) => {
               const fecha = fechaCierreKrTexto(kr);
               const tieneMetrica =
                 kr.metrica && kr.valor_objetivo != null;
@@ -949,7 +979,6 @@ export default function InformesPage() {
                   : meta.ambito === "profesional"
                     ? "💼"
                     : "·";
-              const tareas = tareasDeKr(kr);
               return (
                 <li
                   key={kr.id}
@@ -967,6 +996,9 @@ export default function InformesPage() {
                         ` · objetivo ${kr.valor_objetivo} ${kr.metrica}`}
                       {tareas.total > 0 &&
                         ` · ${tareas.hechas}/${tareas.total} tareas hechas`}
+                    </p>
+                    <p className="truncate text-[11px] text-muted-foreground">
+                      {textoMotivoKr(motivo, tareas)}
                     </p>
                   </div>
                   <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
