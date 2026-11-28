@@ -2,13 +2,12 @@
 // Test del conteo de cierres de /informes (issue #108).
 //
 // QUÉ COMPRUEBA
-//   1. Las metas cerradas: cuáles entran en la ventana y cuántas hay en
-//      total (una meta con `fecha_cierre` y otra con `updated_at` de
-//      respaldo).
-//   2. Los KRs cerrados: cuentan, se ordenan por fecha y los de una meta
-//      archivada NO.
-//   3. Un KR reeditado después de cerrarse (updated_at de HOY, fecha_cierre
-//      de hace 3 meses) NO vuelve a la ventana.
+//   1. Las metas: `completada` = cerrada (logro), `archivada` = retirada
+//      (se cuenta y se etiqueta, pero no es un logro).
+//   2. La fecha de cierre es la REAL (`fecha_cierre`), no la última
+//      modificación: reeditar algo cerrado no lo devuelve a la ventana.
+//   3. Los KRs cerrados: marcados como `completado`, con todas las tareas
+//      hechas o con el objetivo alcanzado. Cada uno con su motivo.
 //   4. El reparto con plan / sin plan ignora las metas archivadas.
 //   5. El ratio de tareas de un KR.
 //
@@ -20,6 +19,7 @@ import {
   enVentana,
   fechaCierreKr,
   fechaCierreMeta,
+  motivoCierreKr,
   repartirPorPlan,
   tareasDeKr,
 } from "@/lib/informes/cierres";
@@ -83,6 +83,8 @@ test("una meta cerrada cuenta si su fecha de cierre cae en la ventana", () => {
   const r = contarMetasCerradas(metas, DESDE, HASTA);
   eq(r.enVentana.length, 2, "metas en ventana:");
   eq(r.total, 2, "metas cerradas totales:");
+  eq(r.cerradas, 2, "cerradas:");
+  eq(r.retiradas, 0, "retiradas:");
 });
 
 test("una meta cerrada fuera de la ventana no cuenta, pero sí suma al total", () => {
@@ -114,7 +116,7 @@ test("una meta sin fecha_cierre usa updated_at como respaldo", () => {
   eq(r.enVentana.length, 1, "en ventana con el respaldo:");
 });
 
-test("una meta que no está completada no cuenta como cerrada", () => {
+test("una meta que no está completada ni archivada no cuenta", () => {
   const metas = [
     {
       meta: {
@@ -128,6 +130,25 @@ test("una meta que no está completada no cuenta como cerrada", () => {
   const r = contarMetasCerradas(metas, DESDE, HASTA);
   eq(r.enVentana.length, 0);
   eq(r.total, 0);
+});
+
+test("una meta archivada se cuenta como RETIRADA (no como logro)", () => {
+  const metas = [
+    {
+      meta: {
+        id: "m1",
+        titulo: "Meta apartada",
+        estado: "archivada",
+        updated_at: "2026-11-20T10:00:00.000Z",
+      },
+      resultados: [],
+    },
+  ];
+  const r = contarMetasCerradas(metas, DESDE, HASTA);
+  eq(r.enVentana.length, 1, "aparece en la lista:");
+  eq(r.enVentana[0].motivo, "retirada", "pero como retirada:");
+  eq(r.cerradas, 0, "no cuenta como cerrada:");
+  eq(r.retiradas, 1, "cuenta como retirada:");
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -161,6 +182,86 @@ test("los KRs cerrados cuentan y se ordenan por fecha de cierre", () => {
   eq(r.enVentana.length, 2, "KRs cerrados en ventana:");
   eq(r.enVentana[0].kr.id, "k2", "el más reciente va primero:");
   eq(r.total, 2, "KRs cerrados totales:");
+});
+
+test("un KR con TODAS sus tareas hechas cuenta como cerrado", () => {
+  const metas = [
+    {
+      meta: { id: "m1", estado: "en_progreso" },
+      resultados: [
+        {
+          id: "k1",
+          titulo: "KR con el trabajo hecho",
+          estado: "pendiente",
+          updated_at: "2026-11-01T10:00:00.000Z",
+          tareas: [
+            { estado: "hecha", completada_at: "2026-11-10T09:00:00.000Z" },
+            { estado: "hecha", completada_at: "2026-11-12T09:00:00.000Z" },
+          ],
+        },
+      ],
+    },
+  ];
+  const r = contarKrsCerrados(metas, DESDE, HASTA);
+  eq(r.total, 1, "cuenta como cerrado:");
+  eq(r.enVentana[0].motivo, "tareas", "motivo: tareas completas:");
+  eq(
+    r.enVentana[0].fecha,
+    Date.parse("2026-11-12T09:00:00.000Z"),
+    "la fecha es la de la última tarea hecha:",
+  );
+});
+
+test("un KR con algunas tareas hechas NO cuenta como cerrado", () => {
+  const metas = [
+    {
+      meta: { id: "m1", estado: "en_progreso" },
+      resultados: [
+        {
+          id: "k1",
+          estado: "pendiente",
+          tareas: [
+            { estado: "hecha", completada_at: "2026-11-10T09:00:00.000Z" },
+            { estado: "pendiente" },
+          ],
+        },
+      ],
+    },
+  ];
+  const r = contarKrsCerrados(metas, DESDE, HASTA);
+  eq(r.total, 0, "no cuenta:");
+});
+
+test("un KR sin tareas no cuenta como cerrado por tareas", () => {
+  const kr = { id: "k1", estado: "pendiente", tareas: [] };
+  eq(motivoCierreKr(kr), null, "sin tareas no hay motivo de cierre:");
+  eq(tareasDeKr(kr).total, 0, "0 tareas:");
+});
+
+test("un KR que alcanzó su objetivo cuenta como cerrado", () => {
+  const kr = {
+    id: "k1",
+    estado: "pendiente",
+    valor_actual: 12,
+    valor_objetivo: 10,
+    updated_at: "2026-11-15T10:00:00.000Z",
+    tareas: [],
+  };
+  const r = motivoCierreKr(kr);
+  eq(r.motivo, "objetivo", "motivo: objetivo alcanzado:");
+  eq(r.fecha, Date.parse("2026-11-15T10:00:00.000Z"), "fecha: última actualización:");
+});
+
+test("un KR que NO alcanzó su objetivo no cuenta", () => {
+  const kr = {
+    id: "k1",
+    estado: "pendiente",
+    valor_actual: 4,
+    valor_objetivo: 10,
+    updated_at: "2026-11-15T10:00:00.000Z",
+    tareas: [],
+  };
+  eq(motivoCierreKr(kr), null, "no cuenta:");
 });
 
 test("un KR reeditado hoy NO vuelve a la ventana (usa fecha_cierre)", () => {
@@ -199,25 +300,6 @@ test("un KR cerrado sin fecha_cierre usa updated_at como respaldo", () => {
   ];
   const r = contarKrsCerrados(metas, DESDE, HASTA);
   eq(r.enVentana.length, 1, "con el respaldo entra:");
-});
-
-test("los KRs de una meta archivada NO cuentan", () => {
-  const metas = [
-    {
-      meta: { id: "m1", titulo: "Meta archivada", estado: "archivada" },
-      resultados: [
-        {
-          id: "k1",
-          titulo: "KR cerrado de una meta archivada",
-          estado: "completado",
-          fecha_cierre: "2026-11-10T10:00:00.000Z",
-        },
-      ],
-    },
-  ];
-  const r = contarKrsCerrados(metas, DESDE, HASTA);
-  eq(r.enVentana.length, 0, "no cuenta en la ventana:");
-  eq(r.total, 0, "no cuenta en el total:");
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
