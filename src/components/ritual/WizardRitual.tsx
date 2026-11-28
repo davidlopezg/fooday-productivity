@@ -469,13 +469,25 @@ export function WizardRitual({
     setGuardando(true);
     setError(null);
     try {
-      await guardarInformeSemanal(anio, semana_iso, informe);
+      // Si el informe no se puede guardar (migration 0049 sin aplicar), se
+      // avisa PERO se abre igualmente: la página del informe reconstruye
+      // la semana con lo que hay en la bitácora.
+      try {
+        await guardarInformeSemanal(anio, semana_iso, informe);
+        setAviso(null);
+      } catch (e) {
+        setAviso(
+          e instanceof Error
+            ? `No se ha podido guardar el informe: ${e.message}`
+            : "No se ha podido guardar el informe.",
+        );
+      }
       router.push(
         `/ritual-semanal/informe?anio=${anio}&semana=${semana_iso}`,
       );
     } catch (e) {
       setError(
-        e instanceof Error ? e.message : "No se pudo guardar el informe.",
+        e instanceof Error ? e.message : "No se pudo abrir el informe.",
       );
     } finally {
       setGuardando(false);
@@ -601,9 +613,11 @@ export function WizardRitual({
       try {
         await guardarInformeSemanal(anio, semana_iso, informe);
         setAviso(null);
-      } catch {
+      } catch (e) {
         setAviso(
-          "El paso está guardado, pero el informe de la semana no se ha podido guardar (¿aplicaste la migration 0049?).",
+          e instanceof Error
+            ? `El paso está guardado, pero el informe de la semana no: ${e.message}`
+            : "El paso está guardado, pero el informe de la semana no se ha podido guardar.",
         );
       }
 

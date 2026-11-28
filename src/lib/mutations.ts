@@ -2788,23 +2788,31 @@ export async function guardarRitualSemanal(
 ): Promise<void> {
   const b = normalizarBitacora(datos);
   const supabase = createClient();
-  const { error } = await supabase
+  const fila: Record<string, unknown> = {
+    anio: b.anio,
+    semana_iso: b.semana_iso,
+    metas_vivas: b.metas_vivas,
+    wigs_meta: b.wigs_meta,
+    krs_foco: b.krs_foco,
+    metas_pausadas: b.metas_pausadas,
+    tareas_activas: b.tareas_activas,
+    notas: b.notas ?? null,
+    informe: datos.informe ?? null,
+    cerrado_en: new Date().toISOString(),
+  };
+  let { error } = await supabase
     .from("ritual_semanales")
-    .upsert(
-      {
-        anio: b.anio,
-        semana_iso: b.semana_iso,
-        metas_vivas: b.metas_vivas,
-        wigs_meta: b.wigs_meta,
-        krs_foco: b.krs_foco,
-        metas_pausadas: b.metas_pausadas,
-        tareas_activas: b.tareas_activas,
-        notas: b.notas ?? null,
-        informe: datos.informe ?? null,
-        cerrado_en: new Date().toISOString(),
-      },
-      { onConflict: "owner_id,anio,semana_iso" },
-    );
+    .upsert(fila, { onConflict: "owner_id,anio,semana_iso" });
+
+  // La BD todavía no tiene la columna `informe` (migration 0049 sin
+  // aplicar): la bitácora se guarda igualmente, sin el documento. La
+  // semana NO se queda sin cerrar por culpa de una migración pendiente.
+  if (error && esEsquemaAusente(error)) {
+    delete fila.informe;
+    ({ error } = await supabase
+      .from("ritual_semanales")
+      .upsert(fila, { onConflict: "owner_id,anio,semana_iso" }));
+  }
   if (error)
     throw new Error(`No se pudo guardar la bitácora: ${error.message}`);
 }
@@ -2835,8 +2843,13 @@ export async function guardarInformeSemanal(
       .from("ritual_semanales")
       .update({ informe })
       .eq("id", (existente as { id: string }).id);
-    if (error)
+    if (error) {
+      if (esEsquemaAusente(error))
+        throw new Error(
+          "La base de datos todavía no tiene la columna `informe` (migration 0049): aplícala con `npm run db:push`.",
+        );
       throw new Error(`No se pudo guardar el informe: ${error.message}`);
+    }
     return;
   }
 
@@ -2845,8 +2858,13 @@ export async function guardarInformeSemanal(
     semana_iso,
     informe,
   });
-  if (error)
+  if (error) {
+    if (esEsquemaAusente(error))
+      throw new Error(
+        "La base de datos todavía no tiene la columna `informe` (migration 0049): aplícala con `npm run db:push`.",
+      );
     throw new Error(`No se pudo guardar el informe: ${error.message}`);
+  }
 }
 
 /**
