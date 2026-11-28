@@ -1,5 +1,7 @@
 // Tipos del dominio operativo (alineados con supabase/migrations/0001_init.sql)
 
+import type { InformeRitual } from "@/lib/ritual/informe";
+
 export type Semaforo = "verde" | "amarillo" | "rojo";
 
 export type EstadoMeta =
@@ -170,6 +172,9 @@ export interface RitualSemanal {
   notas: string | null;
   cerrado_en: string | null;
   created_at: string;
+  /** Migration 0049: el informe de la semana (JSON). Es lo que se consulta
+   *  en el historial y lo que se descarga en PDF. */
+  informe?: InformeRitual | null;
 }
 
 /** Lista configurable por el usuario (p.ej. el catálogo de fases de meta). */

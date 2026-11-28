@@ -125,7 +125,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           Sin el `flex-col` la barra superior se convertía en un item flex
           y empujaba todo el contenido a la derecha (bug real en móvil).
         */}
-        <div className="flex min-h-screen flex-col md:flex-row">
+        <div className="app-shell flex min-h-screen flex-col md:flex-row">
           {clockSkew && (
             <div className="sticky top-0 z-50 w-full border-b-2 border-amber-500/60 bg-amber-500/20 px-4 py-2.5 text-amber-900 backdrop-blur dark:text-amber-100">
               <div className="mx-auto flex max-w-6xl flex-wrap items-start gap-2 text-xs">
@@ -147,7 +147,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           )}
           <Sidebar />
-          <main className="safe-b min-w-0 flex-1">
+          <main className="app-main safe-b min-w-0 flex-1">
             <div className="mx-auto w-full max-w-6xl px-4 py-6 md:px-8 md:py-10">
               {children}
             </div>

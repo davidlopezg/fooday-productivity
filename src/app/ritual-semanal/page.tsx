@@ -14,6 +14,7 @@
 // ============================================================================
 
 import { useState } from "react";
+import Link from "next/link";
 import { WizardRitual } from "@/components/ritual/WizardRitual";
 import { getCurrentISOWeek, shiftISOWeek } from "@/lib/semana";
 
@@ -25,7 +26,13 @@ export default function RitualSemanalPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-end gap-1 rounded-lg border border-border bg-card p-1">
+      <div className="flex flex-wrap items-center justify-end gap-1 rounded-lg border border-border bg-card p-1">
+        <Link
+          href="/ritual-semanal/historial"
+          className="rounded-md px-2 py-1 text-sm hover:bg-accent"
+        >
+          Historial
+        </Link>
         <button
           type="button"
           onClick={() => setSemana((s) => shiftISOWeek(s.anio, s.semana_iso, -1))}
