@@ -563,7 +563,8 @@ export function WizardRitual({
       if (paso === "tareas") {
         // 5a) El inventario: completar / En espera / Cancelada.
         // El cupo de 10 es ORIENTATIVO (issue #96): avisa la pantalla, no la
-        // BD (la migration 0046 quitó el trigger global).
+        // BD (la migration 0050 quitó el trigger global; la 0046 solo lo
+        // decidió, pero nunca se aplicó a la BD).
         for (const [tareaId, decision] of Object.entries(draft.tareas)) {
           const estado = decision === "activa" ? "pendiente" : decision;
           await actualizarTarea({ id: tareaId, estado });

@@ -2690,8 +2690,8 @@ export async function asignarTareaResultado(
 // RITUAL SEMANAL (migration 0043)
 // ----------------------------------------------------------------------------
 // Escrituras de la capa de datos del ritual. Ninguna de ellas "decide" por
-// la persona: el cupo lo impone un trigger en la BD (0043) y aquí solo se
-// traduce el error a un mensaje legible.
+// la persona: la BD no impone topes (issue #114); los topes los muestra la
+// app.
 // ============================================================================
 
 /** Pausar / reanudar / archivar una meta. */
@@ -2759,8 +2759,10 @@ export async function actualizarEstadoProyecto(
 }
 
 /**
- * Cambia el estado de una tarea respetando el cupo de 10 activas.
- * El trigger de la BD (0043) es quien manda; aquí solo se traduce el error.
+ * Cambia el estado de una tarea.
+ * La BD no impone topes (issue #114): el cupo de ~10 activas es
+ * orientación y lo muestra la app, así que aquí no hay ningún error que
+ * traducir.
  */
 export async function setEstadoTarea(
   id: string,
@@ -2771,11 +2773,6 @@ export async function setEstadoTarea(
     .update({ estado })
     .eq("id", id);
   if (error) {
-    if (error.code === "23514" || /cupo/i.test(error.message)) {
-      throw new Error(
-        "Cupo de tareas activas alcanzado (máx 10). Baja alguna a “En espera” o “Cancelada” antes de activar esta.",
-      );
-    }
     throw new Error(`No se pudo actualizar la tarea: ${error.message}`);
   }
 }

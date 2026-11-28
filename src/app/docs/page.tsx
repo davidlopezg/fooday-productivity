@@ -2926,9 +2926,11 @@ export default function DocsPage() {
 
               <strong>la base de datos ya no lo impone</strong> (la migration
 
-              0046 quita el trigger global de la 0043, que además bloqueaba
+              0050 quita el trigger global de la 0043 y el tope de 3 por día
 
-              activar tareas con un inventario heredado grande).
+              de la 0045: ningún trigger bloquea ya activar tareas ni guardar
+
+              las 3 del día, ni con un inventario heredado grande).
 
             </span>
 
@@ -3100,7 +3102,9 @@ export default function DocsPage() {
 
               la harás). Las ~10 activas son un{" "}
 
-              <strong>objetivo, no un tope</strong>: la pantalla avisa y ya. (b)
+              <strong>objetivo, no un tope</strong>: la pantalla avisa y ya, y la
+
+              base de datos no bloquea (issue #114; migration 0050). (b)
 
               La{" "}
 
@@ -3116,7 +3120,9 @@ export default function DocsPage() {
 
               cuáles te comprometes cada día. Lo demás queda “de apoyo”. El
 
-              tope de 3 por día lo impone la base de datos.
+              tope de 3 por día lo eliges tú en la rejilla: la base de datos
+
+              no lo impone (issue #114; migration 0050).
 
             </span>
 
@@ -4211,6 +4217,46 @@ export default function DocsPage() {
 
 
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
+
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-11-28
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
+                La base de datos ya no bloquea tus tareas (issue #114).
+              </strong>{" "}
+              Al activar una tarea (o al guardar el paso 5 del ritual semanal)
+              salía el error «Cupo de tareas activas alcanzado (max 10s)» y
+              nada se guardaba. Ese muro lo ponía un{" "}
+              <strong>trigger de la base de datos</strong>, no la app:{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+
+                trg_tareas_cupo_activas
+              </code>{" "}
+              (de la migration 0043) y{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+
+                trg_ritual_tareas_dia_cap
+              </code>{" "}
+              (de la 0045, el de las 3 del día). Con el inventario acumulado
+              (253 tareas activas) cualquier activación fallaba, aunque la
+              tarea ya estuviera en tu lista. La migration 0046 ya había
+              decidido que el cupo de 10 es orientativo, pero{" "}
+              <strong>nunca se aplicó a la base de datos</strong>:{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+
+                0050_sin_muros_de_tareas.sql
+              </code>{" "}
+              lo aplica de verdad y quita los dos triggers. Ahora{" "}
+              <strong>la base de datos no decide ni avisa de nada</strong>{" "}
+              sobre cuántas tareas tienes: los topes son orientación y los
+              muestra la app (el contador X/10 del inventario y la rejilla de
+              3 huecos de las 3 del día). Actualizadas la sección 2.c, la
+              entrada del ritual semanal en el índice de features y la
+              explicación del inventario en la página del método.
+            </span>
+          </li>
 
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
