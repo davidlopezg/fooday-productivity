@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
   fetchDiasConPlan,
-  fetchMetasConProgreso,
+  fetchMetasConProgresoConAviso,
   fetchPomodoroSesiones,
   fetchProyectosConConteo,
   fetchSubtareasHechas,
@@ -18,15 +18,20 @@ import {
   resumenImproductividad,
   type DiaConPlan,
 } from "@/lib/informes/improductividad";
+import {
+  contarKrsCerrados,
+  contarMetasCerradas,
+  fechaCierreKrTexto,
+  fechaCierreMetaTexto,
+  repartirPorPlan,
+  tareasDeKr,
+} from "@/lib/informes/cierres";
 import { HelpDrawer, AYUDA_POR_RUTA } from "@/components/HelpDrawer";
 import { localYMD } from "@/lib/semana";
 import { IconCheck, IconTarget } from "@/components/icons";
 import type {
-  Meta,
-  MetaConPlan,
   PomodoroSesion,
   Proyecto,
-  ResultadoConTareas,
   Tarea,
 } from "@/lib/types";
 
@@ -72,10 +77,12 @@ export default function InformesPage() {
     fetchProyectosConConteo,
     [],
   );
-  const { data: metas, loading: l4 } = useData<MetaConPlan[]>(
-    fetchMetasConProgreso,
-    [],
+  const { data: metasCrudo, loading: l4 } = useData(
+    fetchMetasConProgresoConAviso,
+    { metas: [], aviso: null },
   );
+  const metas = useMemo(() => metasCrudo?.metas ?? [], [metasCrudo]);
+  const avisoMetas = metasCrudo?.aviso ?? null;
   const { data: subtareas, loading: l5 } = useData<SubtareaHecha[]>(
     () => fetchSubtareasHechas(dias),
     [],
@@ -101,6 +108,9 @@ export default function InformesPage() {
     d.setDate(d.getDate() - dias);
     return d.toISOString();
   }, [dias]);
+  // Fin de la ventana (ahora). Se calcula una vez por rango para que el
+  // conteo de cierres (metas y KRs) use la MISMA ventana que las tareas.
+  const hastaIso = useMemo(() => new Date().toISOString(), []);
   const hechasEnRango = useMemo(
     () => hechas.filter((t) => (t.completada_at ?? "") >= desde),
     [hechas, desde],
@@ -278,86 +288,43 @@ export default function InformesPage() {
   const maxTareasDia = Math.max(1, ...serie.map((d) => d.tareas));
   const maxFocoDia = Math.max(1, ...serie.map((d) => d.foco_min));
 
-  // ── Metas completadas.
+  // ── Metas completadas (issue #108).
   // Fuente de verdad: `metas.fecha_cierre` (migration 0028, fijada por el
   // trigger `trg_metas_fecha_cierre` cuando `estado` pasa a 'completada').
   // Fallback a `updated_at` para metas cerradas ANTES de la migration
   // (el backfill en BD ya intenta copiar updated_at → fecha_cierre, pero
   // por si acaso la app tolera la ausencia sin perderlas).
-  // `metasCerradasTotal` se usa en el KPI para mostrar "X ventana / Y total"
-  // y que un 0 en la ventana no se lea como "no he cerrado nada". ──
-  const metasCerradasTotal = useMemo(
-    () => metas.filter((m) => m.meta.estado === "completada").length,
-    [metas],
+  // El conteo vive en `src/lib/informes/cierres.ts` (lógica pura, testeada).
+  // `total` se usa en el KPI para mostrar "X ventana / Y total" y que un 0
+  // en la ventana no se lea como "no he cerrado nada".
+  const ventana = useMemo(
+    () => ({ desde: Date.parse(desde), hasta: Date.parse(hastaIso) }),
+    [desde, hastaIso],
   );
-  const metasCompletadas = useMemo<MetaConPlan[]>(() => {
-    return metas
-      .filter((m) => m.meta.estado === "completada")
-      .filter((m) => {
-        const f = m.meta.fecha_cierre ?? m.meta.updated_at ?? "";
-        return f >= desde;
-      })
-      .sort((a, b) => {
-        const fa = a.meta.fecha_cierre ?? a.meta.updated_at ?? "";
-        const fb = b.meta.fecha_cierre ?? b.meta.updated_at ?? "";
-        return fb.localeCompare(fa);
-      });
-  }, [metas, desde]);
+  const cierreMetas = useMemo(
+    () => contarMetasCerradas(metas, ventana.desde, ventana.hasta),
+    [metas, ventana],
+  );
+  const metasCompletadas = cierreMetas.enVentana;
+  const metasCerradasTotal = cierreMetas.total;
 
   // ── KRs (resultados_periodo) completados: aplanamos todas las metas y
-  // nos quedamos con los que están en estado 'completado'. ──
-  const krsCompletados = useMemo<
-    Array<{
-      meta: Meta;
-      kr: ResultadoConTareas;
-      metaCodigo: string | null;
-      metaTitulo: string;
-      updatedAt: string;
-    }>
-  >(() => {
-    const out: Array<{
-      meta: Meta;
-      kr: ResultadoConTareas;
-      metaCodigo: string | null;
-      metaTitulo: string;
-      updatedAt: string;
-    }> = [];
-    for (const mp of metas) {
-      for (const r of mp.resultados) {
-        if (r.estado !== "completado") continue;
-        out.push({
-          meta: mp.meta,
-          kr: r,
-          metaCodigo: mp.meta.codigo,
-          metaTitulo: mp.meta.titulo,
-          updatedAt: r.updated_at ?? "",
-        });
-      }
-    }
-    return out
-      .filter((k) => k.updatedAt >= desde)
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-  }, [metas, desde]);
+  // nos quedamos con los que están en estado 'completado'. Los KRs de una
+  // meta archivada NO cuentan (esa meta no se va a hacer).
+  const cierreKrs = useMemo(
+    () => contarKrsCerrados(metas, ventana.desde, ventana.hasta),
+    [metas, ventana],
+  );
+  const krsCompletados = cierreKrs.enVentana;
 
   // ── Metas con plan vs sin plan: una meta "forma parte de un OKR
   // completo" cuando tiene al menos un resultado_periodo (KR). Las que no
-  // tienen KRs son declaraciones aspiracionales sin estructura medible. ──
-  const metasConPlan = useMemo(
-    () => metas.filter((m) => m.resultados.length > 0),
-    [metas],
-  );
-  const metasSinPlan = useMemo(
-    () =>
-      metas
-        .filter((m) => m.resultados.length === 0)
-        .sort((a, b) =>
-          (a.meta.codigo ?? "zzz").localeCompare(b.meta.codigo ?? "zzz"),
-        ),
-    [metas],
-  );
-  const totalMetasNoArchivadas = metas.filter(
-    (m) => m.meta.estado !== "archivada",
-  ).length;
+  // tienen KRs son declaraciones aspiracionales sin estructura medible. Las
+  // metas ARCHIVADAS no cuentan: no se van a hacer. ──
+  const reparto = useMemo(() => repartirPorPlan(metas), [metas]);
+  const metasConPlan = reparto.conPlan;
+  const metasSinPlan = reparto.sinPlan;
+  const totalMetasNoArchivadas = reparto.conPlan.length + reparto.sinPlan.length;
 
   // ── Buckets para el chart "Tareas y subtareas por día/semana".
   // Para 7/30/90 días: granularidad diaria (1 columna por día).
@@ -496,10 +463,17 @@ export default function InformesPage() {
         <Kpi
           label="OKRs (KRs) cerrados"
           value={loading ? "—" : krsCompletados.length.toString()}
-          sub={`últimos ${dias} días`}
+          sub={`${krsCompletados.length} en ventana · ${cierreKrs.total} totales`}
           accent="violet"
         />
       </section>
+
+      {/* Aviso: la base de datos va por detrás del código (migration 0048). */}
+      {avisoMetas && (
+        <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+          {avisoMetas}
+        </p>
+      )}
 
       {/* Heatmap de tareas (incluye subtareas) */}
       <section className="rounded-xl border border-border bg-card p-5">
@@ -895,7 +869,10 @@ export default function InformesPage() {
           <ul className="space-y-2">
             {metasCompletadas.map((mp) => {
               const m = mp.meta;
-              const fecha = m.updated_at?.slice(0, 10) ?? "";
+              // Fecha REAL de cierre (`metas.fecha_cierre`), no la última
+              // modificación: si reeditás una meta cerrada, la lista sigue
+              // diciendo cuándo la cerraste.
+              const fecha = fechaCierreMetaTexto(m);
               const ambitoTxt =
                 m.ambito === "personal"
                   ? "👤"
@@ -943,7 +920,8 @@ export default function InformesPage() {
             OKRs (KRs) completados
           </h2>
           <span className="text-[11px] tabular-nums text-muted-foreground">
-            últimos {dias} días · {krsCompletados.length}
+            últimos {dias} días · {krsCompletados.length} en ventana ·{" "}
+            {cierreKrs.total} totales
           </span>
         </header>
         {krsCompletados.length === 0 ? (
@@ -961,8 +939,8 @@ export default function InformesPage() {
           </p>
         ) : (
           <ul className="space-y-2">
-            {krsCompletados.map(({ metaCodigo, metaTitulo, kr, updatedAt, meta }) => {
-              const fecha = updatedAt.slice(0, 10);
+            {krsCompletados.map(({ meta, kr }) => {
+              const fecha = fechaCierreKrTexto(kr);
               const tieneMetrica =
                 kr.metrica && kr.valor_objetivo != null;
               const ambitoTxt =
@@ -971,6 +949,7 @@ export default function InformesPage() {
                   : meta.ambito === "profesional"
                     ? "💼"
                     : "·";
+              const tareas = tareasDeKr(kr);
               return (
                 <li
                   key={kr.id}
@@ -978,14 +957,16 @@ export default function InformesPage() {
                 >
                   <IconCheck className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
                   <span className="font-mono text-xs text-muted-foreground">
-                    {metaCodigo ?? "—"}
+                    {meta.codigo ?? "—"}
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-medium">{kr.titulo}</p>
                     <p className="truncate text-[11px] text-muted-foreground">
-                      {ambitoTxt} meta: {metaTitulo}
+                      {ambitoTxt} meta: {meta.titulo}
                       {tieneMetrica &&
                         ` · objetivo ${kr.valor_objetivo} ${kr.metrica}`}
+                      {tareas.total > 0 &&
+                        ` · ${tareas.hechas}/${tareas.total} tareas hechas`}
                     </p>
                   </div>
                   <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
@@ -1017,7 +998,11 @@ export default function InformesPage() {
           <span className="text-[11px] tabular-nums text-muted-foreground">
             {totalMetasNoArchivadas === 0
               ? "0 metas activas"
-              : `${metasConPlan.length} con plan · ${metasSinPlan.length} sin plan (de ${totalMetasNoArchivadas} activas)`}
+              : `${metasConPlan.length} con plan · ${metasSinPlan.length} sin plan (de ${totalMetasNoArchivadas} activas${
+                  reparto.archivadas.length > 0
+                    ? ` · ${reparto.archivadas.length} archivadas no cuentan`
+                    : ""
+                })`}
           </span>
         </header>
 
@@ -1037,14 +1022,14 @@ export default function InformesPage() {
                 color="emerald"
                 etiqueta="Con plan (KRs definidos)"
                 n={metasConPlan.length}
-                total={metas.length}
+                total={totalMetasNoArchivadas}
                 ayuda="OKR completo: la meta tiene resultados_periodo asociados."
               />
               <ComparacionFila
                 color="amber"
                 etiqueta="Sin plan (aspiraciones)"
                 n={metasSinPlan.length}
-                total={metas.length}
+                total={totalMetasNoArchivadas}
                 ayuda="No tienen KRs. Siguiente paso: materializar el plan (botón ✨ Generar plan con IA en /metas o al crear la meta)."
               />
             </div>

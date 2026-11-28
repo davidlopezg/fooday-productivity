@@ -3314,7 +3314,104 @@ export default function DocsPage() {
 
 
 
-        {/* ── 3. Ritual mensual ── */}
+                {/* ── 2.d. Lo que has cerrado: metas y KRs (issue #108) ── */}
+
+        <h3 className="text-base font-semibold">
+
+          🏁 2.d. Lo que has cerrado: metas y KRs
+
+        </h3>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+
+          El informe no solo mira el trabajo del día: también cuenta{" "}
+          <strong className="text-foreground">lo que has cerrado</strong>. Y
+          para que ese recuento diga la verdad, la fecha que usa es{" "}
+          <strong className="text-foreground">la real de cierre</strong>, no
+          la última modificación: si reabres y reeditás una meta que
+          cerraste hace seis meses, el informe sigue diciendo que la
+          cerraste hace seis meses.
+
+        </p>
+        <ul className="mt-3 space-y-2 text-sm leading-relaxed text-muted-foreground">
+
+          <li className="flex gap-2">
+
+            <span className="text-rose-500">·</span>
+
+            <span>
+
+              <strong className="text-foreground">Una meta cuenta como
+              cerrada</strong> cuando su estado es{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-[11px]">
+                completada
+              </code>
+              . La fecha la sella el propio{" "}
+              <strong className="text-foreground">trigger</strong> de la base
+              de datos, no la app: es el dato que no se puede mover sin
+              abrir y volver a cerrar.
+
+            </span>
+          </li>
+
+          <li className="flex gap-2">
+
+            <span className="text-rose-500">·</span>
+
+            <span>
+
+              <strong className="text-foreground">Un KR cuenta como
+              cerrado</strong> cuando su estado es{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-[11px]">
+                completado
+              </code>
+              , con la misma regla de fecha. Cerrar el KR es decisión tuya
+              (el cierre lo marcas tú); el informe solo lo cuenta y te dice{" "}
+              <strong className="text-foreground">cuántas de sus tareas están
+              hechas</strong>, para que se vea si el cierre cuenta lo que
+              dice.
+
+            </span>
+          </li>
+
+          <li className="flex gap-2">
+
+            <span className="text-rose-500">·</span>
+
+            <span>
+
+              <strong className="text-foreground">Una meta archivada no
+              cuenta</strong> — ni ella ni sus KRs: archivar es decir «esto
+              no se va a hacer», así que no es un logro. Por eso el bloque
+              «con plan / sin plan» solo habla de las metas activas y su
+              total cuadra con la suma.
+
+            </span>
+          </li>
+
+        </ul>
+        <p className="mt-4 rounded-lg border border-border bg-muted/30 p-3 text-xs leading-relaxed text-muted-foreground">
+
+          Dónde se ve: en{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-[11px]">
+            /informes
+          </code>
+          , en los KPIs «Metas cerradas» y «OKRs (KRs) cerrados» y en las
+          dos listas de cierres (cada una con su total histórico, para que
+          un 0 en la ventana no se lea como «no has cerrado nada nunca»). Es
+          el resumen de la semana que se mira el{" "}
+          <strong className="text-foreground">viernes</strong>: no solo qué
+          hiciste cada día, sino qué cerraste.
+
+        </p>
+
+
+
+        <hr className="my-6 border-border" />
+
+
+
+
+{/* ── 3. Ritual mensual ── */}
 
         <h3 className="text-base font-semibold">
 
@@ -4041,6 +4138,53 @@ export default function DocsPage() {
 
 
         <ul className="mt-5 space-y-3 text-sm leading-relaxed">
+
+          <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
+            <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">
+              2026-11-28
+            </span>
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">
+                El informe cuenta de verdad las metas y los KRs cerrados
+                (issue #108).
+              </strong>{" "}
+              El informe <strong className="text-foreground">no contaba los
+              KRs cerrados</strong>: la lectura de KRs no traía{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">updated_at</code>{" "}
+              y el filtro por fecha no tenía con qué trabajar, así que el KPI
+              «OKRs (KRs) cerrados» y su lista salían siempre a 0. Además,
+              la fecha de cierre salía de{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">updated_at</code>{" "}
+              (un proxy que se movía con cualquier edición posterior), las
+              metas <strong className="text-foreground">archivadas</strong>{" "}
+              contaban como activas y la lista de metas completadas enseñaba
+              la última modificación en vez del cierre. Arreglo: (1) nueva
+              migration{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                0048_kr_fecha_cierre.sql
+              </code>{" "}
+              con{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                resultados_periodo.fecha_cierre
+              </code>{" "}
+              y su trigger (el equivalente de{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                metas.fecha_cierre
+              </code>
+              ), con degradación si la BD va por detrás (lee sin la columna y
+              avisa); (2) la lógica de conteo vive en{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                src/lib/informes/cierres.ts
+              </code>{" "}
+              (módulo puro, con su test): metas y KRs cerrados por su fecha
+              REAL de cierre, metas archivadas fuera de los recuentos y el
+              ratio de tareas hechas de cada KR en la lista; (3) nueva
+              sección 2.d de esta página («Lo que has cerrado: metas y KRs»)
+              y FEATURES (fila /informes) actualizados. No cambia la
+              metodología ni cómo se marca algo como cerrado: eso sigue
+              siendo decisión tuya.
+            </span>
+          </li>
 
           <li className="flex gap-3 rounded-lg border border-teal-500/20 bg-background/40 p-3">
             <span className="shrink-0 font-mono text-xs font-bold text-teal-700 dark:text-teal-300 sm:text-sm">

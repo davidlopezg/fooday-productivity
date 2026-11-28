@@ -734,6 +734,12 @@ export const AYUDA_POR_RUTA: Record<
         pilar: 2,
       },
       {
+        titulo: "Lo que has cerrado: metas y KRs",
+        cuerpo:
+          "Las metas y los KRs cerrados se cuentan con su fecha REAL de cierre, no con la última modificación: reeditar algo que ya cerraste no lo devuelve a la ventana de los últimos días. Y una meta archivada no cuenta (ni ella ni sus KRs): archivar es decir «esto no se va a hacer», no un logro. En la lista de KRs cerrados ves cuántas tareas están hechas de cada uno.",
+        pilar: 2,
+      },
+      {
         titulo: "Improductividad: ¿hiciste la principal?",
         cuerpo:
           "Cada día se mide contra tu plan: la primera tarea del plan es la PRINCIPAL y las demás son secundarias. La regla es hacer una principal todos los días, aunque solo sea una: un día en el que solo hiciste secundarias (o nada del plan) es un día improductivo, por mucho trabajo que se haya hecho. Los días sin plan no cuentan.",
